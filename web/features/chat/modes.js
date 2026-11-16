@@ -1,5 +1,40 @@
 'use strict';
 
+// 화면의 기본 동작만 상태에 따라 바꾸고, 서버에는 기존 전송 모드만 보낸다.
+function resolveComposerSendMode(selection,view,queueAllowed=true) {
+  if(selection!=='auto')return selection;
+  return view?.status==='active'?(queueAllowed?'queue':null):'send';
+}
+
+// 초안의 선택값은 숨긴 select에 보존하고 화면에는 전송 버튼과 보조 메뉴만 노출한다.
+class ComposerSendModes {
+  constructor({select,menu,send,onChange,isDisabled}) {
+    Object.assign(this,{select,menu,send,isDisabled});
+    for(const button of menu.querySelectorAll('[data-send-mode]'))button.onclick=()=>{
+      if(button.disabled)return;
+      select.value=button.dataset.sendMode;menu.open=false;onChange();
+    };
+    menu.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();menu.open=false;menu.querySelector('summary').focus();}
+    });
+    menu.ownerDocument.addEventListener('pointerdown',event=>{if(!menu.contains(event.target))menu.open=false;});
+    menu.ownerDocument.addEventListener('focusin',event=>{if(!menu.contains(event.target))menu.open=false;});
+  }
+  value(view){return resolveComposerSendMode(this.select.value,view,!this.select.querySelector('[value=queue]').disabled);}
+  render(view,busy=false) {
+    const t=BridgeI18n.t,mode=this.value(view);
+    const label=t(mode==='queue'?'완료 후 보내기':mode==='steer'?'현재 작업에 바로 보내기':mode===null?'이 연결은 대기열을 지원하지 않습니다.':'메시지 보내기');
+    this.send.title=label;this.send.setAttribute('aria-label',label);this.send.dataset.sendMode=mode||'unavailable';
+    this.send.disabled=this.isDisabled()||mode===null;
+    this.menu.hidden=view?.status!=='active'||this.select.disabled||busy;
+    if(this.menu.hidden)this.menu.open=false;
+    for(const button of this.menu.querySelectorAll('[data-send-mode]')){
+      button.disabled=this.select.disabled||busy||(button.dataset.sendMode==='steer'&&this.select.querySelector('[value=steer]').disabled);
+      button.setAttribute('aria-pressed',String(button.dataset.sendMode===(this.select.value==='steer'?'steer':'auto')));
+    }
+  }
+}
+
 class WorkModes {
   constructor({select,hint,goalRoot,goalToggle,storage=sessionStorage,onCancel,onStatus,onEdit,newId=()=>crypto.randomUUID()}) {
     this.select=select;this.hint=hint;this.goalRoot=goalRoot;this.goalToggle=goalToggle;this.storage=storage;this.onCancel=onCancel;this.onStatus=onStatus;this.onEdit=onEdit;this.newId=newId;this.sending=false;this.editing=false;this.editText="";
@@ -105,4 +140,4 @@ class WorkModes {
   }
 }
 
-if(typeof module!=='undefined')module.exports={WorkModes};
+if(typeof module!=='undefined')module.exports={WorkModes,ComposerSendModes,resolveComposerSendMode};

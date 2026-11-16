@@ -10,7 +10,7 @@ function fixture(){
  return{context,drafts,temporary,nodes,scope,old,current,view};
 }
 test('Codex WSL fresh detail continues the same original thread draft after another client switches accounts',()=>{
- const ui=fixture();ui.drafts.save(ui.scope(ui.old),{text:'phone unsent draft',selectionStart:2,selectionEnd:6,sendMode:'queue'});ui.context.bindCodexDraft(ui.view);assert.equal(ui.nodes.message.value,'phone unsent draft');assert.equal(ui.nodes.message.selectionStart,2);assert.equal(ui.context.codexDraftScope.account,ui.current);assert.equal(ui.nodes['send-mode'].value,'send');assert.equal(ui.drafts.pendingSend(ui.scope(ui.current)),null);
+ const ui=fixture();ui.drafts.save(ui.scope(ui.old),{text:'phone unsent draft',selectionStart:2,selectionEnd:6,sendMode:'queue'});ui.context.bindCodexDraft(ui.view);assert.equal(ui.nodes.message.value,'phone unsent draft');assert.equal(ui.nodes.message.selectionStart,2);assert.equal(ui.context.codexDraftScope.account,ui.current);assert.equal(ui.nodes['send-mode'].value,'auto');assert.equal(ui.drafts.pendingSend(ui.scope(ui.current)),null);
 });
 test('Codex continuation cannot cross Desktop SSH gateway host session or account scopes',()=>{
  for(const mutation of [{host:'local'},{host:'ssh:other'},{gateway:'another'},{view:{id:'other'}},{hint:{entry:'wsl:'+'b'.repeat(32)}},{hint:{accountIdentity:'3'.repeat(64)}},{hint:null}]){

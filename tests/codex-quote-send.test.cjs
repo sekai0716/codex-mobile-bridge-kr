@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {ComposerDrafts}=require('../web/features/chat/composer-drafts.js');
 const {ComposerQuotes}=require('../web/features/chat/composer-quotes.js');
+const {resolveComposerSendMode}=require('../web/features/chat/modes.js');
 
 for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preserves newer quote-only edits when durable storage fails`,async()=>{
  const nodes=new Map(['composer','message','send-mode','send-error','send'].map(id=>[id,{value:id==='send-mode'?'send':'',textContent:''}]));
@@ -13,6 +14,7 @@ for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preser
   $:id=>nodes.get(id),t:text=>text,sending:false,currentId:'chat',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
   codexQuotes:quotes,codexDraftScope:scope,composerDrafts:drafts,draftGateway:'gateway',codexProvisionalDrafts:provisionals,messageManagement:null,
   attachments:{ready:()=>true,ids:()=>[],references:()=>[],rows:[],setLocked(){},clear(){}},workModes:{value:()=> 'default',render(){},submitted(){}},
+  sendModes:{value:view=>resolveComposerSendMode(nodes.get('send-mode').value,view),render(){}},
   invalidSkills:new Set(),selectedSkills:new Set(),BridgeI18n:{locale:()=> 'ko'},chatKey:()=> 'local|chat',uuid:()=> 'send-id',
   saveDraft(){const fields={text:nodes.get('message').value,quotes:quotes.quotes};const saved=drafts.save(scope,fields);if(!saved)provisionals.set('local|chat',JSON.parse(JSON.stringify(fields)));return saved;},
   sessionStorage:{getItem:key=>temporary.get(key)||null,setItem:(key,value)=>temporary.set(key,value),removeItem:key=>temporary.delete(key)},

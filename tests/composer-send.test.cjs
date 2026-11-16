@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {ComposerDrafts}=require('../web/features/chat/composer-drafts.js');
+const {resolveComposerSendMode}=require('../web/features/chat/modes.js');
 
 function storage(){const values=new Map();return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};}
 // Model the serialization seam here; the browser fixture exercises real IDB.
@@ -16,6 +17,7 @@ function fixture({durable=true,request,local=storage(),temporary=storage(),coord
     codexQuotes:null,sending:false,currentId:'fixture',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
     attachments:{ready:()=>true,ids:()=>['attachment'],references:()=>[],rows:[{id:'attachment'}],setLocked(){},clear(){}},
     workModes:{value:()=> 'default',render(){},submitted(){}},invalidSkills:new Set(),selectedSkills:new Set(['skill']),
+    sendModes:{value:view=>resolveComposerSendMode(nodes['send-mode'].value,view),render(){}},
     codexProvisionalDrafts:new Map(),composerDrafts:drafts,codexDraftScope:durable?scope:null,messageManagement:null,renderQueue(){},
     sessionStorage:temporary,draftGateway:'gateway',chatKey:()=> 'local|fixture',uuid:()=> 'submission-'+tab+'-'+(++sequence),
     saveDraft:()=>drafts.save(scope,{text:nodes.message.value,sendMode:nodes['send-mode'].value,skills:['skill'],quotes:context.codexQuotes?.quotes||[]}),
@@ -31,6 +33,12 @@ function fixture({durable=true,request,local=storage(),temporary=storage(),coord
 }
 
 for(const durable of [true,false]){
+  for(const [status,mode] of [['idle','send'],['active','queue']])test(`default composer ${status} submits ${mode} with ${durable?'durable':'legacy'} tracking`,async()=>{
+    const ui=fixture({durable});ui.nodes['send-mode'].value='auto';ui.context.state.status=status;
+    await ui.submit();assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].mode,mode);
+    assert.equal(ui.pending().id,ui.calls[0].id);
+  });
+
   test(`explicit rejection releases ${durable?'durable':'legacy'} pending ID and allows queueing`,async()=>{
     let first=true;
     const ui=fixture({durable,request:()=>{if(first){first=false;throw Object.assign(Error('busy'),{status:400,code:'send_not_submitted'});}return {status:'unknown'};}});

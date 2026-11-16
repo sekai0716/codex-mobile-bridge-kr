@@ -38,15 +38,15 @@ async function runComposerReviewRegressionChecks({keepOpen=false,nativeDetails=n
   const original=document.getElementById('composer'),marker=document.createComment('Codex composer fixture');original.replaceWith(marker);
   const root=document.createElement('section');root.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;background:var(--page);z-index:100';
   const form=original.cloneNode(true);form.classList.remove('is-collapsed');form.querySelector('#composer-body').hidden=false;form.querySelectorAll('button,input,textarea,select').forEach(control=>control.disabled=true);root.append(form);document.body.append(root);
-  const mode=form.querySelector('#send-mode'),workMode=form.querySelector('#work-mode'),attachment=form.querySelector('#attach-button');mode.hidden=workMode.hidden=false;
+  const mode=form.querySelector('#send-mode'),workMode=form.querySelector('#work-mode'),attachment=form.querySelector('#attach-button');mode.hidden=true;workMode.hidden=false;
   let view,requests=0;
   try{
     for(const hidden of [false,true]){
       attachment.hidden=hidden;await frame();
-      const send=mode.getBoundingClientRect(),work=workMode.getBoundingClientRect(),bounds=form.getBoundingClientRect();
-      check(getComputedStyle(mode).gridColumnStart==='2'&&getComputedStyle(workMode).gridColumnStart==='3','Codex selects retain distinct grid columns with attachment hidden='+hidden);
-      check(Math.abs(send.top-work.top)<1&&send.right<=work.left+1,'Codex selects do not overlap or wrap with attachment hidden='+hidden);
-      check(send.width>=65&&work.width>=65,'Codex selects keep full column width with attachment hidden='+hidden);
+      const actions=form.querySelector('.compose-actions'),send=actions.getBoundingClientRect(),work=workMode.getBoundingClientRect(),bounds=form.getBoundingClientRect();
+      check(getComputedStyle(workMode).gridColumnStart==='2'&&getComputedStyle(actions).gridColumnStart==='3','Codex work mode and send actions retain distinct grid columns with attachment hidden='+hidden);
+      check(Math.abs(send.top-work.top)<3&&work.right<=send.left+1,'Codex controls do not overlap or wrap with attachment hidden='+hidden);
+      check(mode.getBoundingClientRect().width===0&&work.width>=65,'Codex send selector stays hidden and work mode keeps its width with attachment hidden='+hidden);
       check(bounds.left>=-1&&bounds.right<=innerWidth+1&&form.querySelector('#send').getBoundingClientRect().right<=bounds.right+1,'Codex send row fits viewport with attachment hidden='+hidden);
     }
     const shared=document.createElement('div');shared.className='app desktop-mode';shared.hidden=true;root.append(shared);

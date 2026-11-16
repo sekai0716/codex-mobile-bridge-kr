@@ -4040,7 +4040,22 @@ const en={
   "도움말 및 테스트": "Help & testing",
 "{count} 파일을 편집했습니다.":"Edited {count} files",
 "기록된 편집 내용":"Recorded edits",
-"컴퓨터에서 연결을 완료하세요.":"Complete the connection on your computer"
+"컴퓨터에서 연결을 완료하세요.":"Complete the connection on your computer",
+"완료 후 보내기":"Send when finished",
+"현재 작업에 바로 보내기":"Send to the current task",
+"기본 · 작업이 끝나면 전송":"Default · send after the current task",
+"진행 중인 작업에 지시 추가":"Add instructions to the running task",
+"전송 옵션":"Send options",
+"추론 요약 기본 펼침":"Expand reasoning summaries by default",
+"빠른 모드 켜짐":"Fast mode on",
+"빠른 모드 꺼짐":"Fast mode off",
+"빠른 모드 변경 중…":"Changing Fast mode…",
+"빠른 모드 확인 중…":"Checking Fast mode…",
+"빠른 모드 동기화 대기 중…":"Waiting for Fast mode to sync…",
+"빠른 모드 · 다른 속도 설정 사용 중":"Fast mode · another speed setting is active",
+"이 모델에서는 빠른 모드를 사용할 수 없습니다.":"Fast mode is unavailable for this model.",
+"응답 중지":"Stop response",
+"이 연결은 대기열을 지원하지 않습니다.":"This connection does not support queuing."
 };
 let lang='ko';
 try{lang=localStorage.getItem('bridge-language')==='en'?'en':'ko';}catch{}

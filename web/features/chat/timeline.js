@@ -38,6 +38,8 @@ class ChatTimeline {
     this.files=new Map();this.sequence=-1;this.epoch='';this.before=null;this.hasMore=false;
     this.busy=false;this.generation=0;this.windowRevision=0;this.following=true;this.lastTop=0;this.retryCount=0;
     this.showReasoning=document.documentElement.dataset.showReasoning!=='false';
+    this.expandReasoning=document.documentElement.dataset.expandReasoning!=='false';
+    this.reasoningExpanded=new Map();
     this.showProcess=document.documentElement.dataset.showProcess!=='false';
     this.showToolImages=document.documentElement.dataset.showToolImages!=='false';
     this.onScroll=()=>{
@@ -71,9 +73,11 @@ class ChatTimeline {
     if(row.role==='activity'||row.phase==='commentary')return this.showProcess;
     return true;
   }
-  setVisibility({showReasoning=this.showReasoning,showProcess=this.showProcess,showToolImages=this.showToolImages}){
-    if(this.showReasoning===showReasoning&&this.showProcess===showProcess&&this.showToolImages===showToolImages)return;
+  setVisibility({showReasoning=this.showReasoning,expandReasoning=this.expandReasoning,showProcess=this.showProcess,showToolImages=this.showToolImages}){
+    if(this.showReasoning===showReasoning&&this.expandReasoning===expandReasoning&&this.showProcess===showProcess&&this.showToolImages===showToolImages)return;
     const imagesChanged=this.showToolImages!==showToolImages;
+    const expansionChanged=this.expandReasoning!==expandReasoning;
+    this.expandReasoning=expandReasoning;
     this.showToolImages=showToolImages;
     this.showReasoning=showReasoning;this.showProcess=showProcess;
     const anchor=this.capture(node=>this.rowVisible(this.rows.get(node.dataset.key).row)),bottom=this.following;
@@ -83,6 +87,10 @@ class ChatTimeline {
         const reading=captureChatActivityState(entry.node);
         const node=this.renderRow(row,reading?.open);node.dataset.key=key;
         entry.node.replaceWith(node);entry.node=node;restoreChatActivityState(node,reading);
+      }
+      if(expansionChanged&&row.kind==='reasoning'&&!this.reasoningExpanded.has(key)){
+        const details=entry.node.tagName==='DETAILS'?entry.node:entry.node.querySelector('details.activity');
+        if(details)details.open=expandReasoning;
       }
       entry.node.hidden=!this.rowVisible(row);
     }
@@ -149,7 +157,7 @@ class ChatTimeline {
     }
     this.cached=cached;
     const anchor=this.capture(),bottom=this.following;
-    if(reset){this.generation++;window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
+    if(reset){this.generation++;window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.reasoningExpanded.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
     for(const file of page.files||[])this.files.set(file.id,file);
     if((!history&&page.sequence>=this.sequence)||reset){this.sequence=page.sequence;this.meta=page.meta;if(!cached)this.renderMeta({...page.meta,files:[...this.files.values()]});}
     if(!history)this.pendingRequests=!cached&&!!page.meta.requests?.length;
@@ -265,7 +273,14 @@ class ChatTimeline {
       const source=item.uploadId?this.url('uploads/'+encodeURIComponent(item.uploadId)+'/preview'):this.url('desktop-images/'+encodeURIComponent(item.desktopId));
       return {preview:source,original:item.uploadId?source+'&variant=original':source};
     }});
-    if(activity){content.open=!!open;content.ontoggle=()=>{if(content.open&&!this.details.has(row.key))load();};}
+    if(activity){
+      // 미지정 상태의 추론 요약만 처음에 펼친다. 갱신 시에는 기존 접힘 상태를 따른다.
+      content.open=open??(row.kind==='reasoning'?(this.reasoningExpanded.get(row.key)??this.expandReasoning):false);
+      // 기본값을 바꿔도 이 대화에서 직접 펼치거나 접은 선택은 유지한다.
+      if(row.kind==='reasoning')heading.addEventListener('click',()=>this.reasoningExpanded.set(row.key,!content.open));
+      // 숨겨진 항목과 이미 온전한 요약은 기본 펼침 때문에 다시 조회하지 않는다.
+      content.ontoggle=()=>{if(content.open&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();};
+    }
     return node;
   }
   fileUrl(file){
