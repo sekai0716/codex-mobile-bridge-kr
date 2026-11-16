@@ -5,7 +5,8 @@ const BridgePdfPreview = (() => {
   const MIN_ZOOM = .5, MAX_ZOOM = 2, GAP = 16, TOTAL_PIXELS = 12 * 1024 * 1024;
   const base = () => window.BridgeRelayBase || '';
   let libraryPromise;
-  const library = () => libraryPromise ||= import(base() + '/vendor/pdfjs/pdf.min.mjs?v=5.6.205');
+  // 서버가 내용 해시를 붙일 수 있도록 버전 태그까지 한 문자열로 유지한다.
+  const library = () => libraryPromise ||= import(base() + '/vendor/pdfjs/pdf.min.mjs?v=6.5.438');
   const allowed = info => Number.isSafeInteger(info?.size) && info.size >= 0
     && Number.isInteger(info?.clickDownloadMiB) && info.clickDownloadMiB > 0
     && info.size <= Math.min(MAX_BYTES, info.clickDownloadMiB * 1024 * 1024);
@@ -397,7 +398,7 @@ const BridgePdfPreview = (() => {
       status.textContent = BridgeI18n.t('PDF 여는 중…');
       try {
         const pdfjs = await loadLibrary(); if (disposed) return;
-        pdfjs.GlobalWorkerOptions.workerSrc = base() + '/vendor/pdfjs/pdf.worker.min.mjs?v=5.6.205';
+        pdfjs.GlobalWorkerOptions.workerSrc = base() + '/vendor/pdfjs/pdf.worker.min.mjs?v=6.5.438';
         loadingTask = pdfjs.getDocument({url:url + '&preview=1', rangeChunkSize:65536, disableStream:true, disableAutoFetch:true,
           cMapUrl:base() + '/vendor/pdfjs/cmaps/', cMapPacked:true,
           standardFontDataUrl:base() + '/vendor/pdfjs/standard_fonts/',
