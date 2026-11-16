@@ -1,2 +1,3 @@
 # Optional source dependency; bundled in desktop builds for shared relay access.
-aiohttp==3.13.3
+# Security-patched aiohttp requires Python 3.10 or newer.
+aiohttp==3.14.4

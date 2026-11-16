@@ -1,10 +1,11 @@
 # markdown-it
 
-- 固定版本：15.0.2（MIT，见 `markdown-it.LICENSE`）
+- 固定版本：15.0.3（MIT，见 `markdown-it.LICENSE`）
 - 上游：https://github.com/markdown-it/markdown-it
-- 分发包：https://registry.npmjs.org/markdown-it/-/markdown-it-15.0.2.tgz
+- 分发包：https://registry.npmjs.org/markdown-it/-/markdown-it-15.0.3.tgz
 - 文件：`dist/browser/markdown-it.umd.min.js`，原样保存为 `markdown-it.min.js`
-- SHA-256：`635972b985228e8af9f0143647c68616b7a3bb09f6946e7e4a52e43dcf5e7be5`
+- SHA-256：`758061fd114ea825a7864ad8a4aeffa4ab97233b1ff9924f51e9bb635c0776f2`
+- 원본 배포본 SHA-256: `391f2aa638e75e6c7859d0a5c5650ef0956722a45998f17e05b83bc655778e1e`. 파일 끝에 개행 1개를 추가했으며 나머지 바이트는 원본과 같습니다.
 
 浏览器从网关本机加载，无需 CDN 或前端构建步骤。升级时同时更新版本、许可证和校验值，并运行 `tests/browser/markdown.browser.js` 的浏览器检查。
 
