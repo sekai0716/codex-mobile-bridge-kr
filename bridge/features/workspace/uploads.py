@@ -1,16 +1,19 @@
 """Private, immutable uploads scoped to a host and an existing chat."""
 import hashlib
+import io
 import json
 import re
 import shutil
 import threading
+import tempfile
 import time
 import uuid
 from pathlib import Path
 
+# 기존 이미지 미리보기의 메모리 예산이며, 첨부 업로드 크기를 제한하지 않는다.
 MAX_FILE = 20 * 1024 * 1024
 MAX_FILES = 10
-MAX_TOTAL = 100 * 1024 * 1024
+UPLOAD_CHUNK = 1024 * 1024
 
 
 def file_name(value):
@@ -49,41 +52,66 @@ class Uploads:
         self.root = Path(directory)/'uploads'
         self.remote = remote
         self.lock = threading.RLock()
+        self._incoming = {}
 
     def put(self, thread, identifier, name, data):
+        """첨부를 작은 단위로 저장하고, 전체 해시를 확인한 뒤 원래 ID로 확정한다."""
         uuid.UUID(thread); uuid.UUID(identifier); file_name(name)
-        if not isinstance(data, bytes) or not 0 < len(data) <= MAX_FILE:
-            raise ValueError("각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.")
-        digest = hashlib.sha256(data).hexdigest()
+        source = io.BytesIO(data) if isinstance(data, bytes) else data
+        if not callable(getattr(source, 'read', None)):
+            raise ValueError('첨부파일은 1바이트 이상이어야 합니다.')
         with self.lock:
             folder = self.root/thread/identifier
             meta = folder.with_suffix('.json')
-            if meta.exists():
-                row = self.get(thread, identifier)
-                if row['sha256'] != digest or row['name'] != name:
-                    raise ValueError("첨부파일 ID는 다른 파일에 재사용할 수 없습니다.")
-                return self.public(row)
             folder.mkdir(parents=True, exist_ok=True, mode=0o700)
-            image = image_type(data)
             internal = _internal_dir(folder, self.root)
-            path = internal/('original' + _stored_suffix(name, image))
-            if folder.is_symlink() or internal.is_symlink():
+            if (self.root/thread).is_symlink() or folder.is_symlink() or internal.is_symlink() or meta.is_symlink():
                 raise ValueError("잘못된 첨부 파일 경로")
-            temporary = internal/'original.part'
-            # Uploaded names never become executable commands or overwrite project files.
-            with temporary.open('wb') as stream:
-                stream.write(data)
-            temporary.chmod(0o600)
-            temporary.replace(path)
-            target = str(path.resolve())
-            if self.remote:
-                target = self.remote(thread, identifier, name, data, digest)
-            row = {'id': identifier, 'name': name, 'size': len(data), 'sha256': digest, 'createdAt': time.time(),
-                   'image': image, 'path': target, 'localPath': str(path.resolve())}
-            tmp_meta = meta.with_suffix('.tmp')
-            tmp_meta.write_text(json.dumps(row, ensure_ascii=False), encoding='utf-8')
-            tmp_meta.chmod(0o600);tmp_meta.replace(meta)
-            return self.public(row)
+            stream = tempfile.NamedTemporaryFile(prefix='incoming-', suffix='.part', dir=internal, delete=False)
+            active = (thread, identifier)
+            self._incoming[active] = self._incoming.get(active, 0) + 1
+        temporary = Path(stream.name)
+        digest, size, header = hashlib.sha256(), 0, b''
+        try:
+            # 네트워크 읽기 중에는 대기열과 다른 첨부의 잠금을 점유하지 않는다.
+            with stream:
+                while True:
+                    chunk = source.read(UPLOAD_CHUNK)
+                    if not isinstance(chunk, bytes):
+                        raise ValueError('잘못된 첨부 파일 데이터')
+                    if not chunk:
+                        break
+                    if len(header) < 16:
+                        header = (header + chunk[:16])[:16]
+                    digest.update(chunk);size += len(chunk);stream.write(chunk)
+            if not size:
+                raise ValueError('첨부파일은 1바이트 이상이어야 합니다.')
+            digest = digest.hexdigest()
+            with self.lock:
+                if meta.exists():
+                    row = self.get(thread, identifier)
+                    if row['sha256'] != digest or row['name'] != name:
+                        raise ValueError("첨부파일 ID는 다른 파일에 재사용할 수 없습니다.")
+                    return self.public(row)
+                image = image_type(header)
+                path = internal/('original' + _stored_suffix(name, image))
+                temporary.replace(path)
+                target = str(path.resolve())
+                if self.remote:
+                    # SSH 어댑터의 기존 바이트 전송 계약은 유지한다.
+                    target = self.remote(thread, identifier, name, path.read_bytes(), digest)
+                row = {'id': identifier, 'name': name, 'size': size, 'sha256': digest, 'createdAt': time.time(),
+                       'image': image, 'path': target, 'localPath': str(path.resolve())}
+                tmp_meta = meta.with_suffix('.tmp')
+                tmp_meta.write_text(json.dumps(row, ensure_ascii=False), encoding='utf-8')
+                tmp_meta.chmod(0o600);tmp_meta.replace(meta)
+                return self.public(row)
+        finally:
+            temporary.unlink(missing_ok=True)
+            with self.lock:
+                self._incoming[active] -= 1
+                if not self._incoming[active]:
+                    del self._incoming[active]
 
     @staticmethod
     def public(row):
@@ -189,7 +217,7 @@ class Uploads:
         with self.lock:
             for meta in list(self.root.glob('*/*.json')):
                 thread, identifier = meta.parent.name, meta.stem
-                if identifier in protected:
+                if identifier in protected or (thread, identifier) in self._incoming:
                     continue
                 try:
                     row = json.loads(meta.read_text(encoding='utf-8'))
@@ -210,6 +238,4 @@ class Uploads:
         if not isinstance(identifiers, list) or len(identifiers) > MAX_FILES or any(not isinstance(v, str) for v in identifiers) or len(set(identifiers)) != len(identifiers):
             raise ValueError("메시지당 최대 10개의 파일 첨부")
         rows = [self.get(thread, value) for value in identifiers]
-        if sum(row['size'] for row in rows) > MAX_TOTAL:
-            raise ValueError("첨부 파일의 총 개수는 메시지당 MB 100개 이하여야 합니다.")
         return rows

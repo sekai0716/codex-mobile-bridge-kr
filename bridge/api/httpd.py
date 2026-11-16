@@ -18,7 +18,6 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from bridge.features.workspace.uploads import MAX_FILE
 from bridge.features.workspace.workspace import MAX_TRANSFER, Workspace
 from bridge.features.workspace.preferences import transfer_settings
 from bridge.features.workspace.files import workspace_relative_path, media_type
@@ -72,6 +71,26 @@ DESKTOP_IMAGE_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/desktop-images
 GOAL_CANCEL_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/goal/cancel$")
 GOAL_EDIT_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/goal/edit$")
 GOAL_STATUS_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/goal/status$")
+
+
+class UploadBody:
+    """인증된 첨부 요청을 정해진 길이만 읽고, 중간에 끊기면 확정하지 않는다."""
+    def __init__(self, handler, maximum=None):
+        sizes = handler.headers.get_all('Content-Length', [])
+        if (handler.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit()
+                or int(sizes[0]) <= 0 or (maximum is not None and int(sizes[0]) > maximum)):
+            raise ValueError('잘못된 첨부 파일 크기')
+        self.stream = handler.rfile
+        self.remaining = int(sizes[0])
+
+    def read(self, size):
+        if not self.remaining:
+            return b''
+        chunk = self.stream.read(min(size, self.remaining))
+        if not chunk:
+            raise ValueError('첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.')
+        self.remaining -= len(chunk)
+        return chunk
 
 
 class GatewayServer(ThreadingHTTPServer):
@@ -653,15 +672,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.attachment_preview(artifact, variant, download=download)
                 if not write or operation == 'preview':
                     return self.output(405, {'error': '잘못된 요청 방법'})
-                maximum = 1024 * 1024 if operation == 'thumb' else MAX_FILE
-                sizes = self.headers.get_all('Content-Length', [])
-                if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 < int(sizes[0]) <= maximum:
-                    raise ValueError("잘못된 첨부 파일 크기")
-                data = self.rfile.read(int(sizes[0]))
-                if len(data) != int(sizes[0]):
-                    raise ValueError("첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.")
+                data = UploadBody(self, 1024 * 1024 if operation == 'thumb' else None)
                 if operation == 'thumb':
-                    result = uploads.store.set_thumb(scope, identifier, data, int(query.get('width', ['0'])[0]), int(query.get('height', ['0'])[0]))
+                    chunks = []
+                    while chunk := data.read(1024 * 1024):
+                        chunks.append(chunk)
+                    result = uploads.store.set_thumb(scope, identifier, b''.join(chunks), int(query.get('width', ['0'])[0]), int(query.get('height', ['0'])[0]))
                 else:
                     result = uploads.store.put(scope, query.get('id', [''])[0], query.get('name', [''])[0], data)
                 return self.output(200, result)
@@ -1366,13 +1382,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("이 클라이언트에서는 네이티브 프로젝트 및 섹션을 사용할 수 없습니다.")
                 return self.output(200, bridge.organization(thread_id, self.read_json() if write else None))
             if write and action == 'uploads':
-                sizes = self.headers.get_all('Content-Length', [])
-                if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 < int(sizes[0]) <= MAX_FILE:
-                    raise ValueError("각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.")
-                size = int(sizes[0])
-                data = self.rfile.read(size)
-                if len(data) != size:
-                    raise ValueError("첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.")
+                data = UploadBody(self)
                 return self.output(200, bridge.side_attachment(thread_id, side, 'put', query.get('id', [''])[0], query.get('name', [''])[0], data) if side is not None else bridge.upload(thread_id, query.get('id', [''])[0], query.get('name', [''])[0], data))
             if action == 'notifications':
                 if getattr(bridge, 'capabilities', {}).get('notifications') is False:

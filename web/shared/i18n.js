@@ -4059,7 +4059,8 @@ const en={
 "빠른 모드 · 다른 속도 설정 사용 중":"Fast mode · another speed setting is active",
 "이 모델에서는 빠른 모드를 사용할 수 없습니다.":"Fast mode is unavailable for this model.",
 "응답 중지":"Stop response",
-"이 연결은 대기열을 지원하지 않습니다.":"This connection does not support queuing."
+"이 연결은 대기열을 지원하지 않습니다.":"This connection does not support queuing.",
+"첨부파일은 1바이트 이상이어야 합니다.":"Attachments must contain at least one byte."
 };
 let lang='ko';
 try{lang=localStorage.getItem('bridge-language')==='en'?'en':'ko';}catch{}

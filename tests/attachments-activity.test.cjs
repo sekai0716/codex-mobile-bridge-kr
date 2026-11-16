@@ -57,11 +57,19 @@ test('removing a pending upload or logging out prevents delayed results restorin
  ui.panel.add([file('b.txt')]);ui.panel.reset();finish({id:'2',name:'b.txt',size:12});await tick();assert.equal(ui.panel.rows.length,0);
  assert.equal(ui.saved.getItem('attachments:local|one'),'[]');
 });
-test('limits reject the selection before upload, and send lock prevents changing attachments',async()=>{
- const ui=fixture();ui.panel.add([file('large',21*1024*1024)]);assert.equal(ui.calls.length,0);
+test('invalid files and excess count reject the selection, and send lock prevents changes',async()=>{
+ const ui=fixture();ui.panel.add([file('empty',0)]);assert.equal(ui.calls.length,0);
  ui.panel.add(Array.from({length:11},(_,i)=>file(String(i))));assert.equal(ui.calls.length,0);
  ui.panel.add([file('ok')]);await tick();ui.panel.setLocked(true);ui.panel.add([file('other')]);assert.equal(ui.calls.length,1);assert.equal(ui.button.disabled,true);
  ui.panel.clear('local|one',ui.panel.ids());assert.equal(ui.panel.rows.length,0);
+});
+
+test('attachments over 20 MiB and total over 100 MiB retain their original files and IDs',async()=>{
+ const ui=fixture(),files=[file('large-a.bin',101*1024*1024),file('large-b.bin',102*1024*1024)];
+ ui.panel.add(files);await tick();
+ assert.equal(ui.calls.length,2);assert.equal(ui.panel.rows.length,2);assert.equal(ui.panel.ready(),true);
+ assert.deepEqual(Array.from(ui.panel.rows,row=>row.size),files.map(row=>row.size));
+ assert.equal(new Set(ui.panel.ids()).size,2);
 });
 
 test('pasted and dropped images upload, preview through authenticated endpoint, and are removable',async()=>{

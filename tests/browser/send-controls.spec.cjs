@@ -8,7 +8,7 @@ async function prepare(page){
   await page.evaluate(async()=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
-    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],details:[],reply:'accepted'};
+    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],uploadWrites:[],details:[],reply:'accepted'};
     fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',draftAccountIdentity:'c'.repeat(64),permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
     fixture.reason={key:'reason',order:1,role:'activity',kind:'reasoning',title:'추론 요약',text:'추론 요약의 앞부분',truncated:true,version:1};
     fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령 실행',text:'명령 출력',truncated:false,version:1}]});
@@ -19,6 +19,10 @@ async function prepare(page){
       if(path.pathname.endsWith('/changes'))return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true}));
       if(path.pathname.endsWith('/detail')){fixture.details.push(path.search);return response({version:Number(path.searchParams.get('version')),offset:0,text:'추론 요약 전체 내용',next:null,files:[]});}
       if(path.pathname.endsWith('/send')){const body=JSON.parse(options.body);fixture.writes.push(body);return response({status:fixture.reply});}
+      if(path.pathname.endsWith('/uploads')){
+        const file=options.body,row={id:path.searchParams.get('id'),name:path.searchParams.get('name'),size:file.size,image:null};
+        fixture.uploadWrites.push(row);return response(row);
+      }
       if(path.pathname.endsWith('/queue-send')){
         const body=JSON.parse(options.body);fixture.queueWrites.push(body);
         const finish=()=>response({status:'accepted',id:body.id});
@@ -100,6 +104,19 @@ test('queued message exposes Send now and repeated clicks keep its ID and the cu
   await page.evaluate(()=>sendControlsFixture.finishQueue());
   await expect(now).toHaveCount(0);await expect(page.locator('#message')).toHaveValue('보내지 않은 새 초안');
   expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
+});
+
+test('a real file over 20 MiB reaches upload and the original attachment ID reaches send',async({page})=>{
+  await prepare(page);
+  const size=21*1024*1024+3;
+  await page.locator('#attachment-input').setInputFiles({name:'large-fixture.bin',mimeType:'application/octet-stream',buffer:Buffer.alloc(size,120)});
+  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.uploadWrites.length)).toBe(1);
+  const uploaded=await page.evaluate(()=>sendControlsFixture.uploadWrites[0]);
+  expect(uploaded.size).toBe(size);expect(uploaded.name).toBe('large-fixture.bin');
+  await expect(page.locator('#attachment-list')).toContainText('large-fixture.bin');
+  await page.locator('#message').fill('첨부 확인');await expect(page.locator('#send')).toBeEnabled();await page.locator('#send').click();
+  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
+  expect(await page.evaluate(()=>sendControlsFixture.writes[0].attachments)).toEqual([uploaded.id]);
 });
 
 test('reasoning default expansion can be switched off, persisted and switched on',async({page})=>{

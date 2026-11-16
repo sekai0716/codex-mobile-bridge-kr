@@ -129,7 +129,7 @@ class UploadActivityTests(unittest.TestCase):
             with self.assertRaises(ValueError): store.resolve(thread, [identifier])
         for name in ('../private', 'x/y', 'x\\y', 'line\nbreak'):
             with self.assertRaises(ValueError): self.bridge.upload(THREAD, str(uuid.uuid4()), name, b'bad')
-        with self.assertRaises(ValueError): self.upload(data=b'x'*(MAX_FILE+1))
+        self.assertEqual(self.upload(data=b'x'*(MAX_FILE+1))['size'], MAX_FILE+1)
         with self.assertRaises(ValueError): self.bridge.uploads.resolve(THREAD, [identifier]*2)
 
     def test_unknown_delivery_retains_same_file_and_does_not_resubmit(self):
@@ -369,7 +369,11 @@ class UploadHttpTests(unittest.TestCase):
 
     def test_raw_binary_upload_requires_login_csrf_and_preserves_bytes(self):
         received=[]
-        self.server.bridge.upload=lambda *args: received.append(args) or {'id':args[1],'name':args[2],'size':len(args[3]),'image':'image/png'}
+        def upload(thread, identifier, name, stream):
+            data = b''.join(iter(lambda: stream.read(1024*1024), b''))
+            received.append((thread,identifier,name,data))
+            return {'id':identifier,'name':name,'size':len(data),'image':'image/png'}
+        self.server.bridge.upload=upload
         self.assertEqual(self.raw({})[0],401)
         credentials=self.login()
         self.assertEqual(self.raw({'Cookie':credentials['Cookie']})[0],403)

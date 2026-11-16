@@ -56,8 +56,7 @@ class ChatAttachments {
   add(files){
     if(!this.key||this.locked||!this.canUpload())return;
     if(this.rows.length+files.length>10){this.error='메시지당 최대 10개의 파일 첨부';this.render();return;}
-    if(files.some(f=>!f.size||f.size>20*1024*1024)){this.error='각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.';this.render();return;}
-    if([...this.rows.filter(row=>!row.reference),...files].reduce((n,f)=>n+f.size,0)>100*1024*1024){this.error='첨부 파일의 총 개수는 메시지당 MB 100개 이하여야 합니다.';this.render();return;}
+    if(files.some(f=>!Number.isSafeInteger(f.size)||f.size<=0)){this.error='첨부파일은 1바이트 이상이어야 합니다.';this.render();return;}
     this.error='';const key=this.key,rows=this.rows;
     for(const file of files){
       const row={id:uuid(),name:file.name,size:file.size,file,status:'pending'};
