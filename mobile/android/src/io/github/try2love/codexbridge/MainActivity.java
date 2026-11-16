@@ -1013,9 +1013,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
   if(data!=null){ClipData clips=data.getClipData();if(clips!=null)for(int i=0;i<clips.getItemCount();i++){Uri uri=clips.getItemAt(i).getUri();if(uri!=null)selected.add(uri);}if(data.getData()!=null)selected.add(data.getData());}
   if(selected.isEmpty()){callback.onReceiveValue(null);message(L("선택한 파일이 수신되지 않았습니다. 파일을 다시 선택하세요."));return;}
   worker.execute(()->{
-   boolean readable=true;
-   try{for(Uri uri:selected){if(!"content".equals(uri.getScheme()))throw new java.io.IOException();android.content.pm.ProviderInfo provider=getPackageManager().resolveContentProvider(uri.getAuthority(),0);if(provider==null||provider.applicationInfo.uid==android.os.Process.myUid())throw new java.io.IOException();try(android.content.res.AssetFileDescriptor descriptor=getContentResolver().openAssetFileDescriptor(uri,"r")){if(descriptor==null)throw new java.io.IOException();}}}catch(Exception e){readable=false;}
-   final boolean accepted=readable;
+   final boolean accepted=UploadFiles.readable(this,selected);
    runOnUiThread(()->{if(target!=web||ticket!=generation){callback.onReceiveValue(null);return;}callback.onReceiveValue(accepted?selected.toArray(new Uri[0]):null);if(!accepted)message(L("선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오."));});
   });
  }

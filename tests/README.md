@@ -31,6 +31,10 @@ HTTP、계전기、IPC、mailbox 테스트가 기본 격리 수신 및 합성 �
 
 Windows 포장 시 Microsoft가 검증 및 운반됩니다. ConPTY 일치하는 OpenConsole，지원하다 Windows 10 터미널 마우스/터치 이벤트; 시스템 구성 요소를 교체하지 않습니다. 소스 코드 승인이 먼저 실행될 수 있습니다. `python scripts/bundle-conpty.py`，다시 실행 `python -B -m unittest discover -s tests -p test_windows_terminal.py -v`。준비되지 않은 구성 요소의 소스 코드 환경은 시스템을 상속받습니다. ConPTY，마우스 관련 사용 사례는 명시적으로 건너뜁니다. 지정하다 `CMB_TEST_RUNTIME` 패키징 게이트웨이용 EXE 그 후에는 동일한 테스트 세트가 옆에 로드됩니다. `_internal/conpty` 구성 요소, 마우스 모드 확인, 좌표 클릭、VT 입력 및 중국어는 물론 원본 디렉토리와 크기까지、Ctrl+C、다시 연결 및 종료 동작。
 
+## Android 파일 선택
+
+Android 파일 선택 결과의 URI 검증과 콜백 수명 검사는 `python3 scripts/test-mobile-uploads.py`로 실행합니다. 실제 검증 코드와 Activity 메서드를 합성 provider·실행 큐에서 실행하며, 실기기 파일이나 사용자 데이터를 사용하지 않습니다. Android CI에서도 이 검사를 실행합니다.
+
 ## Node 브라우저로
 
 ```sh
