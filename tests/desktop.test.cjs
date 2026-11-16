@@ -997,7 +997,7 @@ test('entry notification preference, current-link test and update readiness stay
   const ui=await renderer();
   ui.value.preferences.tunnel=true;
   await ui.poll();
-  assert.match(ui.nodes.get('update-address-state').textContent,/(?:입장 알림이 꺼져 있습니다\. 게이트웨이 시작 및 주소 변경 사항은 귀하에게 전송되지 않습니다\.|끄다)/);
+  assert.match(ui.nodes.get('update-address-state').textContent,/(?:접속 주소 알림이 꺼져 있습니다\. 게이트웨이를 시작하거나 주소가 바뀌어도 알림을 보내지 않습니다\.|끄다)/);
   ui.value.notifications.addressEnabled=true;
   ui.value.notifications.addressName='Home computer';
   await ui.poll();
@@ -1006,7 +1006,7 @@ test('entry notification preference, current-link test and update readiness stay
   await ui.poll();
   assert.equal(ui.nodes.get('address-enabled').checked,true);
   assert.equal(ui.nodes.get('address-name').value,'Home computer');
-  assert.match(ui.nodes.get('update-address-state').textContent,/입장 알림이 켜져 있습니다/);
+  assert.match(ui.nodes.get('update-address-state').textContent,/접속 주소 알림이 켜져 있습니다/);
   const calls=[];ui.api.testNotification=async payload=>{calls.push(payload);return {message:'accepted'};};
   await ui.nodes.get('test-address').onclick();
   assert.equal(calls[0].channel,'address');
@@ -1180,7 +1180,7 @@ test('desktop WSL scope uses registered environment transport and restores nativ
 
 for(const platform of ['darwin','linux'])test(platform+' desktop does not initialize WSL account scopes',async()=>{
  const ui=await renderer('ko-KR',{platform});assert.equal(ui.run('wslAccountScopes.length'),0);assert.equal(ui.calls.some(call=>call.cliAccess?.action==='wslAccounts'),false);
- await assert.rejects(ui.context.window.loadWslAccounts(),/현재 컴퓨터는 지원하지 않습니다\. WSL 애플리케이션/);
+ await assert.rejects(ui.context.window.loadWslAccounts(),/이 컴퓨터에서는 WSL 앱을 사용할 수 없습니다\./);
 });
 
 

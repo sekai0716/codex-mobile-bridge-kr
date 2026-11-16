@@ -8,10 +8,10 @@ async function prepare(page){
   await page.evaluate(async()=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
-    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],uploadWrites:[],details:[],reply:'accepted'};
+    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],uploadWrites:[],edits:[],managedQueue:[],details:[],reply:'accepted'};
     fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',draftAccountIdentity:'c'.repeat(64),permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
     fixture.reason={key:'reason',order:1,role:'activity',kind:'reasoning',title:'추론 요약',text:'추론 요약의 앞부분',truncated:true,version:1};
-    fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령 실행',text:'명령 출력',truncated:false,version:1}]});
+    fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령을 실행하다',text:'명령 출력',truncated:false,version:1},...(fixture.extraRows||[])]});
     const response=data=>new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
     window.fetch=async(url,options={})=>{
       const path=new URL(url,location.origin);
@@ -22,6 +22,10 @@ async function prepare(page){
       if(path.pathname.endsWith('/uploads')){
         const file=options.body,row={id:path.searchParams.get('id'),name:path.searchParams.get('name'),size:file.size,image:null};
         fixture.uploadWrites.push(row);return response(row);
+      }
+      if(path.pathname.endsWith('/message-management')){
+        if(options.body){const body=JSON.parse(options.body);fixture.edits.push(body);if(body.action==='edit'){fixture.managedQueue=fixture.managedQueue.map(row=>row.id===body.id?{...row,text:body.text,editId:body.editId}:row);}}
+        return response({version:'queue-version',draftAccountIdentity:fixture.meta.draftAccountIdentity,queue:fixture.managedQueue,unknown:[],receipts:[],capabilities:{edit:true,withdraw:true,reorder:true}});
       }
       if(path.pathname.endsWith('/queue-send')){
         const body=JSON.parse(options.body);fixture.queueWrites.push(body);
@@ -117,6 +121,47 @@ test('a real file over 20 MiB reaches upload and the original attachment ID reac
   await page.locator('#message').fill('첨부 확인');await expect(page.locator('#send')).toBeEnabled();await page.locator('#send').click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
   expect(await page.evaluate(()=>sendControlsFixture.writes[0].attachments)).toEqual([uploaded.id]);
+});
+
+test('queue card opens its own editor and saving preserves order, attachment and composer draft',async({page})=>{
+  await prepare(page);const id='33333333-3333-4333-8333-333333333333';
+  await page.evaluate(id=>{
+    const f=sendControlsFixture;f.managedQueue=[{id,text:'수정 전 대기 메시지',status:'queued',attachments:['original.txt']},{id:'44444444-4444-4444-8444-444444444444',text:'다음 메시지',status:'queued'}];
+    f.update('active',{submissions:[{id,text:f.managedQueue[0].text,status:'queued',version:'a'.repeat(64),canSendNow:true}]});
+  },id);
+  await page.locator('#message').fill('지금 작성 중인 초안');
+  const card=page.locator('#queued');await expect(card.getByRole('button',{name:'지금 보내기',exact:true})).toBeVisible();
+  await expect(card.getByRole('button',{name:/철회/})).toHaveCount(0);await card.getByRole('button',{name:'다시 편집',exact:true}).click();
+  const dialog=page.locator('.message-management');const editor=dialog.getByRole('textbox',{name:'대기 중인 메시지 편집'});
+  await expect(editor).toHaveValue('수정 전 대기 메시지');await expect(page.locator('#message')).toHaveValue('지금 작성 중인 초안');
+  await editor.fill('수정한 대기 메시지');await dialog.getByRole('button',{name:'저장',exact:true}).click();
+  await expect(editor).toHaveCount(0);
+  expect(await page.evaluate(()=>sendControlsFixture.managedQueue.map(row=>({id:row.id,text:row.text,attachments:row.attachments})))).toEqual([{id,text:'수정한 대기 메시지',attachments:['original.txt']},{id:'44444444-4444-4444-8444-444444444444',text:'다음 메시지',attachments:undefined}]);
+  const writes=await page.evaluate(()=>sendControlsFixture.edits);expect(writes).toHaveLength(1);expect(writes[0].id).toBe(id);expect(writes[0].action).toBe('edit');
+  expect(await page.evaluate(()=>sendControlsFixture.writes.length+sendControlsFixture.queueWrites.length)).toBe(0);
+  await expect(page.locator('#message')).toHaveValue('지금 작성 중인 초안');
+});
+
+test('native activity headings and permissions use requested Korean and switch back to English',async({page})=>{
+  await prepare(page);await expect(page.locator('#permissions-button')).toHaveText('나 대신 승인');
+  await page.evaluate(()=>{
+    const label=workbench.node('span','','접는 사람');label.id='localized-folder-fixture';
+    const name=workbench.raw(workbench.node('span','','접는 사람'));name.id='raw-filename-fixture';workbench.panel.append(label,name);
+  });
+  await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('명령을 실행함');
+  await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'steer-event',order:3,role:'activity',kind:'steered',title:'steered',text:'unchanged tool output',version:1},{key:'approval-event',order:4,role:'activity',kind:'automaticApprovalReview',title:'automaticApprovalReview',text:'unchanged tool output',version:1}];chatTimeline.apply({...f.page(),sequence:2});f.update('active');});
+  await expect(page.locator('#working')).toHaveText('Codex 생각 중');
+  await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('스티어링함');
+  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동검토중');
+  await page.evaluate(()=>{BridgeI18n.setLanguage('en');BridgeI18n.apply();chatTimeline.relabel();});
+  await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('Ran a command');
+  await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('Steered');
+  await expect(page.locator('#localized-folder-fixture')).toHaveText('Folder');
+  await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
+  await page.evaluate(()=>{BridgeI18n.setLanguage('ko');BridgeI18n.apply();chatTimeline.relabel();});
+  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동검토중');
+  await expect(page.locator('#localized-folder-fixture')).toHaveText('폴더');
+  await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
 });
 
 test('reasoning default expansion can be switched off, persisted and switched on',async({page})=>{

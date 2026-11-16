@@ -19,11 +19,23 @@ class MessageManagement {
   node(tag,className=''){const node=this.doc.createElement(tag);node.className=className;return node;}
   button(label,action){const button=this.node('button');button.type='button';button.textContent=this.t(label);button.addEventListener('click',action);return button;}
   current(token){return this.dialog.open&&this.generation===token;}
-  async open(){
+  async open(editId=null){
     if(this.busy)return;this.target=structuredClone(typeof this.scope==='function'?this.scope():this.scope);if(!this.target)return;
     const token=++this.generation;
     this.opener=this.doc.activeElement;this.beforeOpen();await Promise.resolve(this.editorSave).catch(()=>{});this.editor=await this.loadEditor(this.target);this.persistedEditor=structuredClone(this.editor);if(token!==this.generation)return;
-    this.dialog.showModal();this.generation++;await this.refresh();
+    this.dialog.showModal();const visible=++this.generation;
+    const loaded=await this.refresh();
+    // 카드 바로가기도 최신 대기열과 계정을 확인한 뒤 기존 편집기를 사용한다.
+    // 저장해 둔 다른 편집 내용은 새 메시지로 덮어쓰지 않는다.
+    if(typeof editId!=='string'||!loaded||!this.current(visible))return;
+    if(this.editor){
+      if(this.editor.sourceId!==editId)this.status.textContent=this.t('현재 편집 내용을 먼저 완료하거나 삭제합니다.');
+      this.editInput?.focus({preventScroll:true});return;
+    }
+    const row=(this.data.queue||[]).find(item=>item.id===editId);
+    if(!row){this.status.textContent=this.t('이 메시지는 전송 중이거나 더 이상 대기 중이 아닙니다.');return;}
+    if(this.data.capabilities?.edit===false){this.status.textContent=this.t(this.data.reason||this.data.capabilities.reason||'이 대기 메시지를 편집할 수 없습니다.');return;}
+    await this.editRow(row);
   }
   locked(){return this.busy||!!this.drag||!!this.editor||Date.now()<(this.scrollingUntil||0);}
   async refresh(){
@@ -40,7 +52,7 @@ class MessageManagement {
         const baseVersion=blockedReason?this.editor.baseVersion:data.version;
         if(blockedReason!==this.editor.blockedReason||baseVersion!==this.editor.baseVersion){const updated={...this.editor,blockedReason,baseVersion};await this.persistEditor(updated);this.editor=updated;}
       }
-      this.render();
+      this.render();return true;
     }catch(error){if(valid())this.status.textContent=error.message||String(error);}
   }
   // Background state must not replace an actively edited list or its scroll position.

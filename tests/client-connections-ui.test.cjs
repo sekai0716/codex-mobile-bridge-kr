@@ -133,7 +133,7 @@ test('Claude known busy tasks never receive the unknown-state quit confirmation'
   await ui.all().find(n=>n.textContent==='Claude 종료…').onclick();assert.equal(ui.prompts.length,0);assert.equal(ui.calls.some(c=>c.action==='claude-quit-confirm'),false);assert.ok(ui.errors.some(x=>x.includes('작업이 실행 중')));
 });
 test('Claude desktop blockers retain their own labels and allow cancelling pending connection',async()=>{
-  for(const [setupStatus,label] of [['needs-screen-saver','화면 보호기가 끝날 때까지 기다리는 중'],['needs-unlock','잠금 해제를 기다리는 중'],['needs-desktop','데스크탑을 기다리고 있어요']])for(const running of [true,false]){
+  for(const [setupStatus,label] of [['needs-screen-saver','화면 보호기가 끝날 때까지 기다리는 중'],['needs-unlock','잠금 해제를 기다리는 중'],['needs-desktop','데스크톱을 기다리고 있어요']])for(const running of [true,false]){
     const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,enabled:true,running,setupStatus,reason:'waiting reason'};ui.panel.clients=[client];ui.panel.renderClients();
     assert.match(ui.text(),new RegExp(label));ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='연결 취소').onclick();assert.equal(ui.calls[0].action,'cancel-claude');
   }
@@ -295,7 +295,7 @@ test('process quit starts after a choice, excludes duplicates and rolls back a r
 test('desktop uncertain quit remains blocked after a failed read, then permits a confirmed retry',async()=>{
  const ui=fixture(),client={id:'claude',name:'Claude',enabled:true,configured:true,installed:true,connected:true,running:true};ui.panel.clients=[client];ui.panel.lifecycleTimeout=5;let finish,readable=false;
  ui.setHandler(body=>body.action==='toggle-client'?new Promise(resolve=>finish=resolve):readable?Promise.resolve({clients:[client]}):Promise.reject(Error('status offline')));
- await ui.panel.toggleClient('claude',false);assert.equal(ui.panel.busy,false);assert.equal(ui.panel.hasUncertain(),true);assert.equal(ui.panel.clients[0].connected,true);assert.match(ui.text(),/작업 결과가 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로고침하세요\./);assert.ok(ui.all().some(node=>node.textContent==='새로고침 상태'));const count=ui.calls.length;
+ await ui.panel.toggleClient('claude',false);assert.equal(ui.panel.busy,false);assert.equal(ui.panel.hasUncertain(),true);assert.equal(ui.panel.clients[0].connected,true);assert.match(ui.text(),/작업 결과가 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로고침하세요\./);assert.ok(ui.all().some(node=>node.textContent==='상태 새로고침'));const count=ui.calls.length;
  await ui.panel.retryOperation('claude');await ui.panel.pollClients();assert.equal(ui.calls.length,count);await ui.panel.refreshClients(true);assert.equal(ui.panel.hasUncertain(),true);
  readable=true;await ui.panel.refreshClients(true);assert.equal(ui.panel.hasUncertain(),false);finish({clients:[{...client,enabled:false,connected:false,running:false}]});await Promise.resolve();await Promise.resolve();assert.equal(ui.panel.clients[0].connected,true);
  ui.setChoice(null);await ui.all().find(node=>node.textContent==='종료 다시 시도').onclick();assert.equal(ui.choices.length,2);assert.equal(ui.calls.filter(call=>call.action==='toggle-client').length,1);
@@ -482,7 +482,7 @@ test('Codex overview shows unsaved native login quota and refreshes that exact l
  const login={id:'native-login',kind:'chatgpt',name:'fixture@example.invalid',details:{usage:{status:'ready',resetCredits:{availableCount:2},limits:[{name:'5h',windows:[{remainingPercent:75}]}]}}};
  const value={activeId:null,accounts:[],loginAccount:login,current:{name:login.name}};
  ui.panel.renderAccount(value);assert.match(ui.text(),/75%/);assert.match(ui.text(),/사용량 재설정 · 2/);assert.equal(ui.all().find(node=>node.tag==='progress').value,75);
- const calls=[];ui.panel.api.accounts=async request=>{calls.push(request);return value;};await ui.all().find(node=>node.textContent==='남은 할당량 보기').onclick();assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{action:'details',id:'native-login',section:'usage',refresh:true}]);
+ const calls=[];ui.panel.api.accounts=async request=>{calls.push(request);return value;};await ui.all().find(node=>node.textContent==='남은 사용 한도 보기').onclick();assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{action:'details',id:'native-login',section:'usage',refresh:true}]);
  ui.panel.renderAccount({accounts:[{...login,id:'another'}],activeId:null,current:{name:'Unknown'}});assert.doesNotMatch(ui.text(),/75%|사용량 재설정/);
 });
 
@@ -530,7 +530,7 @@ test('ZCode management shares its mode picker and refreshes official state only 
  await ui.panel.manageClient(client);assert.equal(ui.pages.size,1);assert.equal(ui.calls.filter(value=>value.action==='zcode-official-state').length,2);
  const input=section.querySelector('input');input.value='https://zcode.z.ai/pair?fixture=edited';input.oninput();
  client.connectionMode='official-remote';ui.panel.renderClients();assert.equal(modes.querySelector('[data-connection-mode="official-remote"]').attributes['aria-pressed'],'true');
- await section.querySelectorAll('button').find(button=>button.textContent==='새로고침 상태').onclick();
+ await section.querySelectorAll('button').find(button=>button.textContent==='상태 새로고침').onclick();
  assert.equal(guide.open,true,'A status refresh preserves the user-opened instructions');
  assert.equal(input.value,'https://zcode.z.ai/pair?fixture=edited');assert.match(text(),/연결 설정에 저장되지 않은 변경사항이 있습니다\./);assert.equal(section.querySelector('[data-official-action="connect"]').disabled,true);
 });
@@ -727,7 +727,7 @@ test('Antigravity management keeps exact manual model after catalog refresh fail
  const ui=fixture(),client={id:'antigravity',name:'Antigravity',enabled:true,capabilities:{management:true}};ui.panel.clients=[client];let fail=false;
  const state={enabled:true,surfaces:[{id:'app',name:'APP',connected:true,historyAvailable:true,sessions:[{id:'chat',model:'original'}]}],permissionOptions:[]};
  ui.setHandler(async body=>{if(body.operation==='settings')return {status:'accepted'};if(body.operation!=='catalog')return state;if(fail)throw Error('temporary directory failure');return {models:[{id:'original'}],cache:{identity:'verified-account',updatedAt:100},capabilities:{models:true,effort:false,manualModels:true}};});
- await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),model=root.querySelector('[aria-label="모델"]'),manual=root.querySelector('[aria-label="수동으로 모델 입력"]');
+ await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),model=root.querySelector('[aria-label="모델"]'),manual=root.querySelector('[aria-label="모델 직접 입력"]');
  model.value='__manual__';model.onchange();manual.value='MODEL_EXPLICIT_525';manual.oninput();fail=true;await root.querySelectorAll('button').find(b=>b.textContent==='모델 새로 고침').onclick();
  await root.querySelectorAll('button').find(b=>b.textContent==='다시 불러오기').onclick();assert.equal(manual.value,'MODEL_EXPLICIT_525');assert.equal(manual.disabled,false);assert.equal(root.querySelector('.project-picker-models').querySelector('.error').textContent,'');
  await root.querySelectorAll('button').find(b=>b.textContent==='애플리케이션 모델').onclick();const write=ui.calls.find(body=>body.operation==='settings');assert.equal(write.model,'MODEL_EXPLICIT_525');assert.equal(write.manualModel,true);assert.equal(write.modelCatalogIdentity,'verified-account');
@@ -738,5 +738,5 @@ test('Antigravity cached source keeps manual entry when its next directory read 
  const state={enabled:true,surfaces:['app','ide'].map(id=>({id,name:id,connected:true,historyAvailable:true,sessions:[{id:id+'-chat',model:'original'}]})),permissionOptions:[]};
  ui.setHandler(async body=>{if(body.operation!=='catalog')return state;if(fail)throw Error('offline');return {models:[{id:'original'}],cache:{identity:body.surface,updatedAt:100},capabilities:{models:true,manualModels:true,effort:false}};});
  await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),source=root.querySelector('[aria-label="세션 소스"]'),model=root.querySelector('[aria-label="모델"]');
- source.value='ide';await source.onchange();fail=true;source.value='app';await source.onchange();assert.ok(model.children.some(row=>row.value==='__manual__'));model.value='__manual__';model.onchange();const manual=root.querySelector('[aria-label="수동으로 모델 입력"]');assert.equal(manual.disabled,false);assert.equal(manual.hidden,false);assert.equal(root.querySelector('[aria-label="추론 강도"]').parent.hidden,true);
+ source.value='ide';await source.onchange();fail=true;source.value='app';await source.onchange();assert.ok(model.children.some(row=>row.value==='__manual__'));model.value='__manual__';model.onchange();const manual=root.querySelector('[aria-label="모델 직접 입력"]');assert.equal(manual.disabled,false);assert.equal(manual.hidden,false);assert.equal(root.querySelector('[aria-label="추론 강도"]').parent.hidden,true);
 });

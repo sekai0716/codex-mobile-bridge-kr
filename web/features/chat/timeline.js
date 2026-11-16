@@ -204,7 +204,7 @@ class ChatTimeline {
     const content=toolImages?document.createElement('details'):node;
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
-    heading.textContent=activity?(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
+    heading.textContent=activity?timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
       heading.replaceChildren();
@@ -322,7 +322,7 @@ class ChatTimeline {
       const row=this.rows.get(key)?.row;if(!row)continue;
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
       if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');}
-      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       const more=node.querySelector('.detail-more');
       if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'더 많은 텍스트 로드':'전체 콘텐츠 표시');
       const attachment=node.querySelector('.timeline-attachments small.muted');

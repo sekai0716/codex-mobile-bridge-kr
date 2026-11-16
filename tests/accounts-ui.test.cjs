@@ -218,7 +218,7 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} automatically
  assert.equal(ui.all(ui.panel.rows.children[0]).find(n=>n.tag==='h3').textContent,'Official');
  assert.equal(ui.all(ui.panel.rows.children[0]).find(n=>n.textContent==='현재 계정').disabled,true);
  ui.advance(120000);await ui.panel.refresh();assert.equal(ui.requests.length,1);
- await ui.all().find(n=>n.attributes['aria-label']==='남은 할당량 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
+ await ui.all().find(n=>n.attributes['aria-label']==='남은 사용 한도 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
  ui.advance(180000);await ui.panel.refresh();assert.equal(ui.requests.length,2,'old five-minute deadline is cancelled');
  ui.advance(119000);await ui.panel.refresh();assert.equal(ui.requests.length,2);
  ui.advance(2000);ui.hidden(true);await ui.panel.refresh();assert.equal(ui.requests.length,2);
@@ -229,7 +229,7 @@ test('quota and reset count precede account switching',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',checkedAt:Date.now()/1000,limits:[],resetCredits:{availableCount:2}}}}]});
  await ui.panel.refresh();const nodes=ui.all(ui.panel.rows.children[0]);
  assert.ok(nodes.findIndex(n=>n.textContent==='카드 재설정 · 2 장케커')<nodes.findIndex(n=>n.textContent==='이 계정으로 전환'));
- const refresh=nodes.find(n=>n.attributes['aria-label']==='남은 할당량 보기');assert.equal(refresh.textContent,'');assert.match(refresh.innerHTML,/<svg[^>]*viewBox="0 0 24 24"/);assert.equal(refresh.parent.className,'accounts-usage-controls');assert.equal(refresh.parent.parent,nodes.find(n=>n.className==='accounts-card-footer'));assert.ok(!nodes.some(n=>n.textContent==='새로고침 할당량'));
+ const refresh=nodes.find(n=>n.attributes['aria-label']==='남은 사용 한도 보기');assert.equal(refresh.textContent,'');assert.match(refresh.innerHTML,/<svg[^>]*viewBox="0 0 24 24"/);assert.equal(refresh.parent.className,'accounts-usage-controls');assert.equal(refresh.parent.parent,nodes.find(n=>n.className==='accounts-card-footer'));assert.ok(!nodes.some(n=>n.textContent==='새로고침 사용 한도'));
 });
 
 for(const desktop of [false,true])test(`${desktop?'desktop':'web'} groups reset count, next usable expiry and the selected account action`,()=>{
@@ -245,7 +245,7 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} groups reset 
  const note=nodes.find(n=>n.className==='account-muted account-subscription-note'),info=nodes.find(n=>n.attributes['aria-label']==='구독 날짜에 대해');assert.equal(note.hidden,true);info.onclick();assert.equal(note.hidden,false);assert.equal(info.attributes['aria-expanded'],'true');
  assert.equal(info.parent.parent.className,'accounts-name');assert.equal(info.textContent,'구독 기간 종료'+new Date(expiry*1000).toLocaleDateString('ko-KR',{month:'short',day:'numeric'}));assert.ok(info.title.includes(new Date(expiry*1000).toLocaleString('ko-KR')));assert.ok(!nodes.some(n=>n.textContent==='ⓘ'));
  ui.panel.render();assert.equal(ui.all().find(n=>n.className==='account-muted account-subscription-note').hidden,false);
- const updated=nodes.find(n=>n.className==='account-updated account-muted'),refresh=nodes.find(n=>n.attributes['aria-label']==='남은 할당량 보기');assert.equal(updated.textContent,'업데이트됨 '+new Date(now*1000).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit'}));assert.equal(updated.parent,refresh.parent);assert.equal(updated.parent.parent.className,'accounts-card-footer');assert.equal(updated.parent.children.at(-1),refresh);assert.equal(updated.title,new Date(now*1000).toLocaleString('ko-KR'));
+ const updated=nodes.find(n=>n.className==='account-updated account-muted'),refresh=nodes.find(n=>n.attributes['aria-label']==='남은 사용 한도 보기');assert.equal(updated.textContent,'업데이트됨 '+new Date(now*1000).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit'}));assert.equal(updated.parent,refresh.parent);assert.equal(updated.parent.parent.className,'accounts-card-footer');assert.equal(updated.parent.children.at(-1),refresh);assert.equal(updated.title,new Date(now*1000).toLocaleString('ko-KR'));
  ui.language();assert.match(ui.text(),/Usage resets · 2 available/);assert.match(ui.text(),/Subscription period ends:/);
 });
 
@@ -262,7 +262,7 @@ test('viewed quotas refresh at five minutes only while the account page is visib
  ui.root.closest=()=>null;
  ui.setRequest(async()=>{official.details.usage.checkedAt=Date.now()/1000;return structuredClone(ui.value());});
  await ui.panel.refresh();assert.equal(ui.requests.length,1);assert.equal(ui.requests[0].section,'usage');assert.equal(ui.requests[0].refresh,undefined);
- await ui.all().find(n=>n.attributes['aria-label']==='남은 할당량 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
+ await ui.all().find(n=>n.attributes['aria-label']==='남은 사용 한도 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
 });
 
 test('desktop Codex configuration stops polling while hidden and resumes on return',async()=>{
@@ -327,9 +327,9 @@ test('first account read failure stays visible and retries after ten seconds',as
 test('desktop and web can ignore only the selected unknown submission',async()=>{
  for(const desktop of [false,true]){
   const ui=fixture(desktop);ui.setValue({...ui.value(),blockers:[{reason:'unknown',title:'Chat',id:'thread',submissionId:'message',host:'local'},{reason:'running',title:'Busy',id:'busy'}]});
-  await ui.panel.refresh();assert.equal(ui.all().filter(n=>n.textContent==='무시하다').length,1);
-  ui.confirm(false);await ui.all().find(n=>n.textContent==='무시하다').onclick();assert.equal(ui.requests.length,0);
-  ui.confirm(true);await ui.all().find(n=>n.textContent==='무시하다').onclick();
+  await ui.panel.refresh();assert.equal(ui.all().filter(n=>n.textContent==='무시').length,1);
+  ui.confirm(false);await ui.all().find(n=>n.textContent==='무시').onclick();assert.equal(ui.requests.length,0);
+  ui.confirm(true);await ui.all().find(n=>n.textContent==='무시').onclick();
   assert.deepEqual(JSON.parse(JSON.stringify(ui.requests[0])),{action:'ignoreSubmission',threadId:'thread',submissionId:'message',host:'local'});
  }
 });
@@ -505,13 +505,13 @@ test('reset outlook switches at local midnight and prioritizes announcements',as
  const ui=fixture(),base=ui.value(),now=ui.now(),midnight=new Date(now);midnight.setHours(24,0,0,0);
  const forecast={state:'ready',source:'https://codex-reset.com/',lastResetAt:now/1000,updatedAt:now/1000,probabilities:{h24:49,h48:74}};
  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:forecast});
- assert.match(ui.text(),/오늘 글로벌 리셋/);assert.doesNotMatch(ui.text(),/24시간 이내|아직 공식적인 발표는 없습니다/);assert.match(ui.text(),/출처: codex-reset\.com ↗/);
+ assert.match(ui.text(),/오늘의 전체 한도 초기화/);assert.doesNotMatch(ui.text(),/24시간 이내|아직 공식적인 발표는 없습니다/);assert.match(ui.text(),/출처: codex-reset\.com ↗/);
  const delay=midnight.getTime()-now;ui.advance(delay);await ui.fireTimer(delay);
- assert.match(ui.text(),/마지막 전역 재설정 · 어제/);assert.match(ui.text(),/24시간 이내\n49%/);
+ assert.match(ui.text(),/최근 전체 한도 초기화 · 어제/);assert.match(ui.text(),/24시간 이내\n49%/);
  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:{...forecast,officialSignal:{summary:'공식 발표'}}});
- assert.match(ui.text(),/마지막 전역 재설정/);assert.match(ui.text(),/공식 발표/);assert.doesNotMatch(ui.text(),/24시간 이내/);
+ assert.match(ui.text(),/최근 전체 한도 초기화/);assert.match(ui.text(),/공식 발표/);assert.doesNotMatch(ui.text(),/24시간 이내/);
  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:{...forecast,state:'error',stale:true}});
- assert.match(ui.text(),/마지막 전역 재설정/);assert.match(ui.text(),/데이터 지연 · 업데이트 대기 중/);assert.doesNotMatch(ui.text(),/24시간 이내/);
+ assert.match(ui.text(),/최근 전체 한도 초기화/);assert.match(ui.text(),/데이터 지연 · 업데이트 대기 중/);assert.doesNotMatch(ui.text(),/24시간 이내/);
 });
 
 test('reset relative time omits duplicate date while account timestamps retain dates',()=>{

@@ -100,3 +100,29 @@ test('reopening after a failed editor save reloads current storage instead of re
  m.editorSave=Promise.reject(Error('previous save conflict'));m.scope=()=>m.target;m.doc={activeElement:null};m.beforeOpen=()=>{};m.loadEditor=async()=>structuredClone(stored);m.dialog.showModal=()=>shown++;
  await m.open();assert.equal(shown,1);assert.deepEqual(m.editor,stored);assert.deepEqual(m.persistedEditor,stored);assert.equal(m.refreshes,1);
 });
+
+function shortcutFixture(stored=null){
+ const result=fixture(),m=result.m;
+ m.scope=()=>m.target;m.doc={activeElement:null};m.beforeOpen=()=>{};m.loadEditor=async()=>structuredClone(stored);
+ m.dialog.showModal=()=>{m.dialog.open=true;};m.editInput={focus(){m.focused=true;}};
+ m.refresh=async()=>true;
+ return result;
+}
+test('queue card shortcut edits the latest row in place without withdrawing or sending',async()=>{
+ const {m,saved,sent}=shortcutFixture();m.data.queue=[{id:'queued',text:'latest server text',attachments:['original-file']}];
+ await m.open('queued');assert.equal(m.editor.sourceId,'queued');assert.equal(m.editor.body.text,'latest server text');
+ assert.deepEqual(m.editor.body.attachments,['original-file']);assert.equal(saved.length,1);assert.equal(sent.length,0);assert.equal(m.focused,true);
+});
+test('queue shortcut preserves an existing editor for another message',async()=>{
+ const stored={id:'other',sourceId:'other',status:'editing',body:{text:'unsaved edit'}};
+ const {m,saved}=shortcutFixture(stored);await m.open('queued');assert.deepEqual(m.editor,stored);assert.equal(saved.length,0);assert.match(m.status.textContent,/현재 편집/);
+});
+test('queue shortcut never edits a stale row, failed read or unsupported queue',async()=>{
+ for(const kind of ['missing','failed','unsupported']){
+  const {m,saved}=shortcutFixture();m.data.queue=[{id:'queued',text:'latest'}];
+  if(kind==='missing')m.data.queue=[];
+  if(kind==='failed')m.refresh=async()=>false;
+  if(kind==='unsupported')m.data.capabilities={edit:false};
+  await m.open('queued');assert.equal(m.editor,null);assert.equal(saved.length,0);
+ }
+});

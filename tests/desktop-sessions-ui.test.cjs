@@ -229,7 +229,7 @@ test('cached provider previews stay inert until client discovery confirms select
 
 test('search stays short in both languages while its accessible name stays specific',()=>{
  const ui=fixture();
- assert.equal(ui.view.search.placeholder,'찾다');
+ assert.equal(ui.view.search.placeholder,'검색');
  assert.equal(ui.view.search.getAttribute('aria-label'),'채팅 또는 프로젝트 검색');
  ui.run("BridgeI18n.setLanguage('en');BridgeI18n.apply()");
  assert.equal(ui.view.search.placeholder,'Search');
@@ -335,7 +335,7 @@ test('provisional desktop draft cannot cross a verified account or gateway chang
  assert.equal(ui.view.provisionalDrafts.size,0);assert.equal(ui.sessionStore.has('desktop-draft:claude:a'),false);
 });
 test('client shell and welcome appear before the first list response',async()=>{
- const ui=fixture();let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));const reading=ui.view.choose('claude');assert.equal(ui.view.container.hidden,false);assert.equal(ui.view.welcome.hidden,false);assert.match(ui.view.welcome.textContent,/채팅 계속하기/);assert.equal(ui.view.conversation.hidden,true);assert.match(ui.view.listStatus.textContent,/(?:로드 중|다른 게이트웨이에서 사용하는 연결|다른 게이트웨이는 Claude의 브리지를 사용하고 있습니다\. 이전 게이트웨이를 먼저 중지하십시오\. 레거시 연결에도 Claude를 다시 로드해야 합니다\.|새로고침|로드 중…|채팅 로드 중…|연결)/);finish({sessions:[]});await reading;
+ const ui=fixture();let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));const reading=ui.view.choose('claude');assert.equal(ui.view.container.hidden,false);assert.equal(ui.view.welcome.hidden,false);assert.match(ui.view.welcome.textContent,/채팅 계속하기/);assert.equal(ui.view.conversation.hidden,true);assert.match(ui.view.listStatus.textContent,/(?:불러오는 중|다른 게이트웨이에서 사용하는 연결|다른 게이트웨이는 Claude의 브리지를 사용하고 있습니다\. 이전 게이트웨이를 먼저 중지하십시오\. 레거시 연결에도 Claude를 다시 로드해야 합니다\.|새로고침|불러오는 중…|채팅 불러오는 중…|연결)/);finish({sessions:[]});await reading;
 });
 test('returning to list clears selection and prevents an old detail from reopening chat',async()=>{
  const ui=await opened();ui.view.input.value='draft';let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));const reading=ui.view.open('b');assert.equal(ui.view.isChatOpen,true);ui.view.backToList();assert.equal(ui.view.sid,null);assert.equal(ui.view.isChatOpen,false);assert.equal(ui.view.welcome.hidden,false);finish({session:{id:'b',title:'late',status:'idle'},messages:[]});await reading;assert.equal(ui.view.sid,null);assert.equal(ui.view.conversation.hidden,true);assert.equal(ui.view.drafts.get('claude:a'),'draft');
@@ -846,8 +846,8 @@ test('context monitor remains discoverable and distinguishes unsupported from mi
   assert.equal(ui.view.contextButton.textContent,'');assert.ok(ui.view.contextRing.classList.contains('unknown'));assert.doesNotMatch(ui.view.contextButton.title,/0%/);
   ui.view.contextDetails();dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,/600/);assert.match(dialog.textContent,/fixture-model/);assert.doesNotMatch(dialog.textContent,/3\.0%/);dialog.close();
   apply(null,'unsupported');assert.equal(ui.view.contextButton.textContent,'');assert.doesNotMatch(ui.view.contextButton.title,/0%|20%/);
-  ui.view.contextDetails();dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,language==='en'?/does not expose context usage/:/이 클라이언트 또는 세션 모드는 컨텍스트 사용법을 노출하지 않습니다\./);dialog.close();
-  apply(null,'unavailable');ui.view.contextDetails();dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,language==='en'?/update automatically when available/:/이 세션에서는 아직 컨텍스트 사용을 사용할 수 없습니다\. 사용 가능한 경우 자동으로 업데이트됩니다\./);assert.doesNotMatch(dialog.textContent,language==='en'?/does not expose/:/이 클라이언트 또는 세션 모드는 컨텍스트 사용법을 노출하지 않습니다\./);
+  ui.view.contextDetails();dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,language==='en'?/does not expose context usage/:/이 앱 또는 채팅 모드에서는 컨텍스트 사용량을 제공하지 않습니다\./);dialog.close();
+  apply(null,'unavailable');ui.view.contextDetails();dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,language==='en'?/update automatically when available/:/이 채팅의 컨텍스트 사용량은 아직 확인할 수 없습니다\. 확인되면 자동으로 갱신됩니다\./);assert.doesNotMatch(dialog.textContent,language==='en'?/does not expose/:/이 앱 또는 채팅 모드에서는 컨텍스트 사용량을 제공하지 않습니다\./);
  }
 });
 
@@ -1048,7 +1048,7 @@ test('last-prompt counters never become a current context percentage',async()=>{
  const ui=await opened();
  ui.view.applyDetail({session:{id:'a',title:'A',contextUsage:null,contextUsageStatus:'unavailable',lastPromptContextUsage:{usedTokens:112973,contextWindow:200000,measurement:'lastPrompt'}},messages:[]});
  assert.ok(ui.view.contextRing.classList.contains('unknown'));assert.doesNotMatch(ui.view.contextButton.title,/56%/);
- ui.view.contextDetails();const dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,/112,973/);assert.match(dialog.textContent,/최신 모델 입력/);assert.doesNotMatch(dialog.textContent,/56\.5%/);dialog.close();
+ ui.view.contextDetails();const dialog=ui.document.querySelector('dialog');assert.match(dialog.textContent,/112,973/);assert.match(dialog.textContent,/최근 모델 입력/);assert.doesNotMatch(dialog.textContent,/56\.5%/);dialog.close();
  ui.view.applyDetail({session:{id:'a',title:'A',contextUsage:{usedTokens:112973,contextWindow:200000,measurement:'lastPrompt'}},messages:[]});
  assert.ok(ui.view.contextRing.classList.contains('unknown'));
  ui.view.applyDetail({session:{id:'a',title:'A',contextUsage:{usedTokens:67500,contextWindow:200000}},messages:[]});assert.match(ui.view.contextButton.title,/34%/);
@@ -1169,7 +1169,7 @@ for(const [provider,backend,runtime] of [['claude','code','local'],['claude','co
  const ui=fixture(),view=ui.view;await view.choose(provider);await view.open('a');view.state={...view.state,backend,runtime,connectionState:'ready'};
  let finish;ui.setHandler((url,body)=>body?new Promise(resolve=>finish=resolve):Promise.resolve(url.includes('/detail')?{session:{id:'a',status:'idle',capabilities:{}},messages:[{id:'native',role:'user',text:'slow message'}]}:{sessions:[]}));
  view.input.value='slow message';const sending=view.submit();
- assert.equal(view.sendFeedback.hidden,false);assert.match(view.sendFeedback.textContent,/배상….*slow message/);assert.equal(view.send.textContent,'배상…');assert.equal(view.send.disabled,true);assert.equal(ui.notices.length,0);
+ assert.equal(view.sendFeedback.hidden,false);assert.match(view.sendFeedback.textContent,/전송 중….*slow message/);assert.equal(view.send.textContent,'전송 중…');assert.equal(view.send.disabled,true);assert.equal(ui.notices.length,0);
  await view.submit();assert.equal(ui.calls.filter(call=>call.body).length,1,'a second click does not submit twice');
  view.applyDetail({session:{id:'a',status:'idle',capabilities:{}},messages:[{id:'native',role:'user',text:'slow message'}]});assert.equal(view.messages.querySelectorAll('.message').length,1,'pending preview is not a second native-history bubble');assert.equal(view.sendFeedback.hidden,false);
  view.input.value='next draft';view.input.oninput();finish({status:'accepted'});await sending;
@@ -1278,7 +1278,7 @@ test('shared creation leaves title blank without weakening required first messag
   const requiresMessage=provider==='claude';
   ui.setHandler(async(url,body)=>url.endsWith('/projects')?{projects:[{key:'p',environment:'scope',cwd:'/p',name:'Project'}],environments:[{key:'scope',surface:requiresMessage?'code':'desktop',createRequiresMessage:requiresMessage}],browseDirectories:false}:url.endsWith('/create')?{status:'accepted',result:{id:'native'}}:url.includes('/detail')?{session:{id:'native',title:'Native',status:'idle'},messages:[]}:{sessions:[]});
   await ui.view.create();const dialog=ui.document.querySelector('dialog'),form=dialog.querySelector('form'),title=dialog.querySelector('input'),message=dialog.querySelector('textarea');
-  assert.equal(title.value,'');assert.ok(!title.required);assert.equal(title.placeholder,'상담원이 채팅 이름을 지정할 수 있도록 비워 두세요.');title.value=titleValue;
+  assert.equal(title.value,'');assert.ok(!title.required);assert.equal(title.placeholder,'비워 두면 에이전트가 채팅 이름을 자동으로 정합니다.');title.value=titleValue;
   if(requiresMessage){await form.onsubmit({preventDefault(){}});assert.equal(ui.calls.some(call=>call.url.endsWith('/create')),false);message.value='FIRST';}
   await form.onsubmit({preventDefault(){}});
   const sent=ui.calls.find(call=>call.url.endsWith('/create')).body;assert.equal(sent.title,titleValue.trim()||undefined);assert.equal(sent.firstMessage,requiresMessage?'FIRST':undefined);
@@ -1382,7 +1382,7 @@ test('shared context dialog shows native cache and threshold and blocks stale co
  view.applyDetail({session:{id:'a',status:'idle',contextUsage:{usedTokens:250,contextWindow:1000,autoCompactThresholdTokens:800,cache:{cacheReadTokens:100}},capabilities:{compact:true,tasks:true}},messages:[]});
  view.contextDetails();const dialog=view.contextUsage.dialog;
  assert.match(dialog.textContent,/자동 압축 임계값.*800/);assert.match(dialog.textContent,/캐시 읽기 토큰.*100/);
- const compact=dialog.querySelectorAll('button').find(n=>n.textContent==='컴팩트한 컨텍스트');assert.equal(compact.disabled,false);
+ const compact=dialog.querySelectorAll('button').find(n=>n.textContent==='컨텍스트 압축');assert.equal(compact.disabled,false);
  view.staleDetail();assert.equal(compact.disabled,true);assert.equal(view.workbench.current.capabilities.tasks,true);
 });
 

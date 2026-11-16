@@ -32,7 +32,7 @@ function fixture(resetOnly=false){
 test('official account shows limits, authoritative card count and refresh stays usable',async()=>{
   const ui=fixture();await ui.panel.refresh();
   assert.equal(ui.button.hidden,false);assert.match(ui.text(),/75%/);assert.match(ui.text(),/사용 가능:3/);
-  assert.equal(ui.all().find(n=>n.textContent==='남은 할당량 보기').disabled,false);
+  assert.equal(ui.all().find(n=>n.textContent==='남은 사용 한도 보기').disabled,false);
   assert.equal(ui.all().find(n=>n.tag==='progress').value,75);
   assert.equal(ui.panel.countdown(2523),'1일 18시간 3분');
   ui.language();assert.match(ui.text(),/Remaining 75%/);assert.match(ui.text(),/Shared account limits/);
@@ -40,7 +40,7 @@ test('official account shows limits, authoritative card count and refresh stays 
 
 test('reset-only view retains cards and confirmation while quota and subscription stay in the account card',async()=>{
  const ui=fixture(true);ui.setValue({...ui.value(),subscription:{source:'online',periodEndsAt:2000000000},limits:[{...ui.value().limits[0],credits:{balance:12}}]});await ui.panel.refresh();
- assert.match(ui.text(),/test@example.test/);assert.match(ui.text(),/사용 가능:3/);assert.match(ui.text(),/Test reset/);assert.match(ui.text(),/만료 기간이 제공되지 않음/);assert.equal(ui.all().find(n=>n.textContent==='새로고침 재설정').disabled,false);
+ assert.match(ui.text(),/test@example.test/);assert.match(ui.text(),/사용 가능:3/);assert.match(ui.text(),/Test reset/);assert.match(ui.text(),/만료 기간이 제공되지 않음/);assert.equal(ui.all().find(n=>n.textContent==='초기화 정보 새로고침').disabled,false);
  assert.doesNotMatch(ui.text(),/공유 할당량|남은75%|Credits:|신청|업데이트 날짜/);assert.equal(ui.all().some(n=>n.tag==='progress'),false);
  const pending=ui.panel.redeem('card-1');assert.equal(ui.confirmButton().disabled,true);assert.equal(ui.writes.length,0);ui.confirmDialog();await pending;
  assert.equal(ui.writes.length,1);assert.equal(ui.writes[0].confirmed,true);assert.match(ui.text(),/사용 가능:2/);

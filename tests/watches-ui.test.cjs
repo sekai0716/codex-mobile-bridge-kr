@@ -54,6 +54,6 @@ test('changing data directory ignores an old response; offline and disabled chan
   const pending=ui.all().find(n=>n.tag==='button').onclick();ui.panel.clear();
   ui.panel.render({...ui.value,runtime:{running:false},watches:[ui.value.watches[1]]});
   finish({watches:[]});await pending;assert.match(ui.text(),/Remote chat/);assert.match(ui.text(),/게이트웨이가 중지되었습니다\. 모니터링이 시작되면 재개됩니다\./);
-  ui.panel.render({...ui.value,notifications:{}});assert.match(ui.text(),/알림 채널이 비활성화되었습니다\. 저장된 시계에서는 알림이 전송되지 않습니다\./);
+  ui.panel.render({...ui.value,notifications:{}});assert.match(ui.text(),/알림 채널이 꺼져 있어 추적 중인 채팅의 알림을 보내지 않습니다\./);
   assert.ok(ui.all().filter(n=>['input','button'].includes(n.tag)).every(n=>!n.disabled));
 });

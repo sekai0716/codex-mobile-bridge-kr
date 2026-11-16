@@ -817,7 +817,7 @@ function messageManagementChanged(recovery){
 }
 const messageManagement=typeof MessageManagementBinding==='function'?new MessageManagementBinding({target:messageManagementTarget,request:api,notify:toast,translate:t,
   beforeOpen:()=>{document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());},onChanged:messageManagementChanged}):null;
-function openMessageManagement(){if(!messageManagementTarget()){toast('채팅을 열고 계정이 확인될 때까지 기다립니다.');return;}return messageManagement?.open();}
+function openMessageManagement(editId){if(!messageManagementTarget()){toast('채팅을 열고 계정이 확인될 때까지 기다립니다.');return;}return messageManagement?.open(typeof editId==='string'?editId:undefined);}
 $('open-message-management').onclick=openMessageManagement;
 desktopSessions.onManageMessages=openMessageManagement;
 
@@ -1252,8 +1252,9 @@ function renderQueue(rows){
         };
         card.append(now);
       }
-      const cancel=el('button','plain',t('대기 중인 메시지 철회'));
-      cancel.onclick=async()=>{try{await api(sessionUrl(target,'queue',host),{id:row.id});toast('대기 중인 메시지가 철회됨');}catch(e){toast(e.message);}};card.append(cancel);
+      const edit=el('button','plain',t('다시 편집'));edit.type='button';
+      edit.disabled=!account||!currentAccess().canSend||queuedSends.has(key);
+      edit.onclick=()=>{if(edit.disabled||currentId!==target||currentHost!==host||codexDraftScope?.account!==account)return;return openMessageManagement(row.id);};card.append(edit);
     }else{
       card.append(el('p','muted',t('채팅 기록을 확인하세요. 게이트웨이는 이 메시지를 자동으로 다시 보내지 않습니다.')));
       const ignore=el('button','plain',t('무시하다'));

@@ -28,3 +28,23 @@ test('phone help preserves long-term pairing separately from web sign-in expiry'
   assert.match(qr[0],/모바일 앱은 로그아웃.*인증을 철회.*로그인 상태를 유지/);
   assert.match(qr[1],/The mobile app stays signed in until you sign out or revoke it/);
 });
+
+test('requested Korean labels keep original keys and English meanings',()=>{
+ const ui=i18n(),labels={'명령을 실행하다':'명령을 실행함','승인해 주세요':'나 대신 승인','Codex 일하고 있는':'Codex 생각 중','Codex가 작동 중입니다…':'Codex 생각 중',steered:'스티어링함',automaticApprovalReview:'자동검토중','보조 채팅':'사이드 채팅','단말기':'터미널','상담원이 채팅 이름을 지정할 수 있도록 비워 두세요.':'비워 두면 에이전트가 채팅 이름을 자동으로 정합니다.'};
+ for(const [key,value] of Object.entries(labels)){assert.equal(ui.t(key),value,key);assert.ok(ui.source(value),value);ui.setLanguage('en');assert.equal(ui.t(key),ui.dictionary[key]);ui.setLanguage('ko');}
+ for(const value of ['echo "단말기"','user-supplied side chat text','file://project/보조 채팅.txt','constructor','__proto__'])assert.equal(ui.t(value),value);
+});
+test('every registered UI message uses consistent terms and preserves placeholders',()=>{
+ const ui=i18n(),placeholders=text=>[...text.matchAll(/\{[A-Za-z][A-Za-z0-9_]*\}/g)].map(m=>m[0]).sort();let changed=0;
+ for(const [key,english] of Object.entries(ui.dictionary)){
+  const korean=ui.t(key);assert.equal(typeof korean,'string',key);assert.doesNotMatch(korean,/보조 채팅|단말기|데스크탑|배송|MODEL_PLACEHOLDER/);
+  assert.deepEqual(placeholders(korean),placeholders(key),key);if(korean!==key)changed++;
+  ui.setLanguage('en');assert.equal(ui.t(key),english,key);ui.setLanguage('ko');
+ }
+ assert.ok(changed>200,'공통 화면의 용어와 직역 표현이 함께 교정되어야 합니다.');
+});
+test('desktop messages share Korean presentation and stable operation text',()=>{
+ const desktop=require('../desktop/shared/i18n.js');
+ for(const [source,expected] of [['작곡가 숨기기','입력창 접기'],['승인해 주세요','나 대신 승인'],['저지르다','커밋']])assert.equal(desktop.translate(source,'ko'),expected);
+ assert.equal(desktop.translate('승인해 주세요','en'),'Approve for me');
+});

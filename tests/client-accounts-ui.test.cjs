@@ -96,7 +96,7 @@ test('ZCode API editor reuses shared form and sends native protocol plus URL and
 test('ZCode API applied state is distinct from official login and selecting a model',async()=>{
   const ui=fixture({provider:'zcode',desktop:true});
   const value={...snapshot([{...row('official','official'),saved:true},{...row('draft','api'),saved:true},{...row('applied','api'),saved:true}],['official','applied']),capabilities:{apiFormats:[{value:'openai-responses',label:'OpenAI Responses'}],switchRequiresStopped:true,quota:false}};
-  ui.panel.accept(value);assert.match(ui.text(),/구성됨/);assert.match(ui.text(),/적용되지 않음/);assert.match(ui.text(),/구성 적용/);
+  ui.panel.accept(value);assert.match(ui.text(),/구성됨/);assert.match(ui.text(),/적용되지 않음/);assert.match(ui.text(),/설정 적용/);
   const applied=ui.panel.rows.children.find(card=>card.accountRowId==='applied');assert.equal(applied.children[0].children[0].children[0].children[1].textContent,'구성됨');
   ui.setHandler(async()=>value);await ui.panel.choose(row('draft','api'));
   assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].action,'switch');assert.match(ui.prompts[0],/이 저장된 구성을 적용하기 전에 전화 액세스를 비활성화하고 원래 앱을 정상적으로 종료하십시오\. API 구성은 공식 로그인을 유지합니다\. 다시 시작한 후 채팅에서 해당 모델을 선택하십시오\. 구성을 적용하시겠습니까\?/);assert.match(ui.prompts[0],/이 저장된 구성을 적용하기 전에 전화 액세스를 비활성화하고 원래 앱을 정상적으로 종료하십시오\. API 구성은 공식 로그인을 유지합니다\. 다시 시작한 후 채팅에서 해당 모델을 선택하십시오\. 구성을 적용하시겠습니까\?/);assert.doesNotMatch(ui.prompts[0],/스위치가 다시 시작됩니다/);
@@ -140,15 +140,15 @@ test('Claude explicit quota query is single-flight and failed refresh keeps the 
   const ui=fixture({provider:'claude'}),saved={status:'ready',checkedAt:1000,limits:[{name:'5h',windows:[{remainingPercent:70}]}]};
   ui.panel.accept(snapshot([row('current','account',saved)]));assert.match(ui.text(),/쿼리 위치:/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
   const card=ui.panel.rows.children[0],controls=card.children.find(n=>n.className==='accounts-card-footer').children.at(-1);
-  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'남은 할당량 보기');
+  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'남은 사용 한도 보기');
   assert.match(controls.children[0].textContent,/쿼리 위치:/);assert.equal(card.children[1].children[1].children.some(node=>node.className==='account-updated'),false);
   let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));
-  const button=ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 할당량 보기');const pending=button.onclick();
+  const button=ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 사용 한도 보기');const pending=button.onclick();
   assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].refresh,true);
   assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='확인 중…').disabled,true);
   await ui.panel.perform({action:'details',id:'current',refresh:true});assert.equal(ui.calls.length,1);
   finish(snapshot([row('current','account',{...saved,status:'error',error:'Claude 남은 사용량을 확인할 수 없습니다. 클라이언트가 로그인되어 있는지 확인하고 시스템 자격 증명 저장소를 잠금 해제한 후 다시 시도하십시오.'})]));await pending;
-  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 할당량 보기').disabled,false);
+  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 사용 한도 보기').disabled,false);
   assert.match(ui.text(),/70%/);assert.match(ui.text(),/Claude 남은 사용량을 확인할 수 없습니다\. 클라이언트가 로그인되어 있는지 확인하고 시스템 자격 증명 저장소를 잠금 해제한 후 다시 시도하십시오\./);assert.match(ui.text(),/마지막 결과를 표시합니다\. 데이터가 업데이트되지 않았습니다/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
   ui.english();assert.match(ui.text(),/Queried at: /);assert.match(ui.text(),/Showing the last result/);assert.match(ui.text(),/Cannot check Claude remaining usage/);
 });
@@ -167,7 +167,7 @@ test('DSH wallet amounts stay separate from percent quota and never invent missi
   const ui=fixture();ui.panel.accept(snapshot([row('current','account',{status:'ready',limits:[],balance:{wallets:[{currency:'CNY',remaining:'12.30',toppedUp:'10.00',granted:'2.30'},{currency:'USD',remaining:'4.00'}]}})]));
   assert.match(ui.text(),/CNY 12.30/);assert.match(ui.text(),/USD 4.00/);assert.match(ui.text(),/10.00/);assert.equal(ui.all().filter(node=>node.tag==='progress').length,0);
   const card=ui.panel.rows.children[0];assert.match(card.className,/accounts-client-card is-current/);assert.match(card.children[1].className,/accounts-client-usage/);
-  assert.equal(card.children[1].children[0].children[0].textContent,'계좌잔고');assert.equal(card.children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'잔액 새로고침');
+  assert.equal(card.children[1].children[0].children[0].textContent,'계정 잔액');assert.equal(card.children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'잔액 새로고침');
   ui.panel.accept(snapshot([row('current','account',{status:'unsupported',limits:[]})]));assert.match(ui.text(),/잔액 정보를 확인할 수 없습니다\./);assert.doesNotMatch(ui.text(),/0%|12.30|USD/);
 });
 test('DeepSeek balance time stays beside its refresh control',()=>{
@@ -180,7 +180,7 @@ test('DeepSeek balance time stays beside its refresh control',()=>{
 test('client cards keep provider usage and API actions distinct',async()=>{
   const claude=fixture({provider:'claude'});claude.panel.accept(snapshot([row('current'),row('api','api')]));
   assert.match(claude.panel.rows.children[0].children[1].className,/accounts-client-usage/);
-  assert.equal(claude.panel.rows.children[0].children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'남은 할당량 보기');
+  assert.equal(claude.panel.rows.children[0].children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'남은 사용 한도 보기');
   assert.equal(claude.panel.rows.children[1].children.length,2,'API card has identity and actions, no invented quota');
   const dsh=fixture();dsh.panel.accept(snapshot([row('current'),row('api','api')]));
   assert.equal(dsh.panel.rows.children[1].children.length,2);
@@ -310,6 +310,6 @@ test('current ZCode daily model quota shows exact native token quantities and ch
    {name:'GLM-5.3-Flash',windows:[{unit:'tokens',remaining:9,total:20,remainingPercent:45}]}]};
  ui.setValue(snapshot([{...row('current','official',usage),canReadQuota:true},{...row('other','official'),canReadQuota:false}]));
  await ui.panel.resume();assert.deepEqual(ui.calls.map(c=>c.action),['list','details']);assert.equal(ui.calls[1].id,'current');
- assert.match(ui.text(),/오늘 남은 할당량/);assert.match(ui.text(),/GLM-5.3/);assert.match(ui.text(),/GLM-5.3-Flash/);
+ assert.match(ui.text(),/오늘 남은 사용 한도/);assert.match(ui.text(),/GLM-5.3/);assert.match(ui.text(),/GLM-5.3-Flash/);
  assert.match(ui.text(),/0 \/ 10 tokens/);assert.match(ui.text(),/9 \/ 20 tokens/);assert.match(ui.text(),/앱에서 마지막으로 확인한 날짜:/);
 });

@@ -77,6 +77,6 @@ class MessageManagementBinding {
     if(!result?.ok)throw Error('수정사항을 저장할 수 없습니다. 기기 저장 공간을 확인하고 다시 시도하세요.');
     return true;
   }
-  async open(){try{return await this.panel.open();}catch(error){this.notify(this.translate(error.message));}}
+  async open(editId){try{return await this.panel.open(editId);}catch(error){this.notify(this.translate(error.message));}}
 }
 if(typeof module!=='undefined')module.exports={MessageManagementBinding};

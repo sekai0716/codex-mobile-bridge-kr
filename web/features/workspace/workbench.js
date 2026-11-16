@@ -89,7 +89,8 @@ class Workbench {
   button(text, action, title = text) { const b = this.node('button', '', text); b.type = 'button'; b._rawTitle=title;b.title = BridgeI18n.t(title); b.setAttribute('aria-label', BridgeI18n.t(title)); const source=BridgeI18n.source(title); if(source){b.dataset.i18nTitle=source;b.dataset.i18nAriaLabel=source;} b.onclick = action; return b; }
   raw(node) { if(node._rawText!==undefined)node.textContent=node._rawText;if(node._rawTitle!==undefined){node.title=node._rawTitle;node.setAttribute('aria-label',node._rawTitle);}delete node.dataset.i18n;delete node.dataset.i18nTitle;delete node.dataset.i18nAriaLabel;return node; }
   relabel() {
-    const refresh=root=>{for(const n of root.querySelectorAll('[data-i18n]'))if(![n.dataset.i18n,BridgeI18n.dictionary[n.dataset.i18n]].includes(n.children.length?[...n.childNodes].find(c=>c.nodeType===3)?.textContent:n.textContent))delete n.dataset.i18n;BridgeI18n.apply(root);for(const n of root.querySelectorAll('.wb-status,.wb-empty'))if(!n.children.length)n.textContent=BridgeI18n.t(n.textContent);};
+    // 교정된 한국어도 UI 문구로 인정한다. 파일명 등 직접 바뀐 원문은 계속 보존한다.
+    const refresh=root=>{for(const n of root.querySelectorAll('[data-i18n]'))if(![n.dataset.i18n,BridgeI18n.dictionary[n.dataset.i18n],BridgeI18n.translateKorean?.(n.dataset.i18n)].includes(n.children.length?[...n.childNodes].find(c=>c.nodeType===3)?.textContent:n.textContent))delete n.dataset.i18n;BridgeI18n.apply(root);for(const n of root.querySelectorAll('.wb-status,.wb-empty'))if(!n.children.length)n.textContent=BridgeI18n.t(n.textContent);};
     refresh(this.strip);refresh(this.panel);
     for(const session of this.sessions.values())for(const tab of session.files){refresh(tab.body);tab.sideChat?.relabel();}
     for(const dialog of document.querySelectorAll('.picker'))refresh(dialog);
