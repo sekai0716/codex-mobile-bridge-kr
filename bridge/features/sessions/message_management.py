@@ -5,6 +5,11 @@ import json
 import uuid
 
 
+def queue_version(identifier, entry):
+    """표시 후 수정된 대기 메시지를 이전 버튼으로 전송하지 않도록 내용을 묶는다."""
+    return hashlib.sha256(json.dumps([identifier, entry], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
 def snapshot(rows, receipt_ids=(), hidden=(), scope=None):
     if len(receipt_ids) > 16:
         raise ValueError("한 번에 최대 16개의 메시지를 확인할 수 있습니다.")

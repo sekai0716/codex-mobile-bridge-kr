@@ -8,7 +8,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from functools import wraps
-from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate
+from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate, queue_version
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1027,7 +1027,7 @@ class WslEntry(WslFeatures):
                                   attachments=attachments, ui_locale=options.get('ui_locale'))
         return self._send(identifier, text, submission_id, mode, skills, work_mode, attachments, references=options.get('references'))
 
-    def _send(self, identifier, text, submission_id, mode='send', skills=None, work_mode=None, attachments=None, *, references=None, queued=False, goal_activation=None):
+    def _send(self, identifier, text, submission_id, mode='send', skills=None, work_mode=None, attachments=None, *, references=None, queued=False, goal_activation=None, send_now=False):
         uuid.UUID(identifier); uuid.UUID(submission_id)
         skills = skills or []
         if not isinstance(skills, list) or len(skills) > 8 or any(not isinstance(s, str) for s in skills):
@@ -1059,9 +1059,15 @@ class WslEntry(WslFeatures):
                 return previous
             if not queued:
                 self._check_scope_new_work()
-            runtime, thread = self._target(identifier, activate=mode != 'queue', managed_control=True)
-            if (mode == 'send' or queued) and thread['status']['type'] == 'active':
+            runtime, thread = self._target(identifier, activate=mode != 'queue' or send_now, managed_control=True)
+            if send_now:
+                # 자동 대기열과 동일하게 원래 프로젝트·제공자 경계를 유지한다.
+                original_target = ((self.receipts.get(key) or {}).get('entry') or {}).get('target', {})
+                if any(thread.get(name) != value for name, value in original_target.items()):
+                    raise ValueError('대기 메시지의 원래 프로젝트 또는 제공자가 변경되었습니다. 대화를 확인하세요.')
+            if (mode == 'send' or queued) and thread['status']['type'] == 'active' and not send_now:
                 raise ValueError('작업이 실행 중입니다. 현재 작업을 보완하도록 선택하거나 완료될 때까지 기다리십시오.')
+            dispatch_mode = ('steer' if thread['status']['type'] == 'active' else 'send') if send_now else mode
             if goal_activation is not None:
                 from bridge.features.sessions.goal import goal_identity
                 current_goal = self._read_goal(identifier, runtime)
@@ -1086,7 +1092,7 @@ class WslEntry(WslFeatures):
                     items[0]['text'] += '\n\n사용자 제공 파일：' + file['path']
             items.extend({'type': 'skill', 'name': s['name'], 'path': s['path']} for s in selected)
             collaboration = None
-            if work_mode is not None:
+            if work_mode is not None and not (send_now and dispatch_mode == 'steer'):
                 state = self.session(identifier, attach=False).state
                 model = thread.get('model') or state.get('latestModel')
                 effort = thread.get('reasoningEffort') or state.get('latestReasoningEffort')
@@ -1095,11 +1101,12 @@ class WslEntry(WslFeatures):
                 collaboration = {'mode': work_mode, 'settings': {'model': model, 'reasoning_effort': effort, 'developer_instructions': None}}
             def dispatch():
                 params = {'threadId': identifier, 'input': items}
-                if mode == 'steer':
+                if dispatch_mode == 'steer':
                     turns = runtime.request('thread/turns/list', {'threadId': identifier, 'limit': 1, 'sortDirection': 'desc'}).get('data', [])
                     if not turns or turns[0].get('status') != 'inProgress':
                         raise ValueError('현재 작업이 종료되었습니다. 세션을 다시 확인하세요.')
                     params['expectedTurnId'] = turns[0]['id']
+                    params['clientUserMessageId'] = submission_id
                     result = runtime.request('turn/steer', params)
                 else:
                     params['clientUserMessageId'] = submission_id
@@ -1131,7 +1138,10 @@ class WslEntry(WslFeatures):
 
     def _submissions(self, identifier):
         with self.write_lock:
-            return [{**row['result'], 'text': (row.get('entry') or {}).get('text', '')} for key, row in self.receipts.items()
+            return [{**row['result'], 'text': (row.get('entry') or {}).get('text', ''),
+                     'version': queue_version(key.split(':send:', 1)[1], {**(row.get('entry') or {}), **row['result']}),
+                     'canSendNow': row['result'].get('status') == 'queued' and not (row.get('entry') or {}).get('goalActivation')}
+                    for key, row in self.receipts.items()
                     if key.startswith(identifier + ':send:') and row['result'].get('status') in ('queued', 'unknown')]
 
     def _queue(self, identifier):
@@ -1233,6 +1243,28 @@ class WslEntry(WslFeatures):
                 raise
             result.update(self.message_management(identifier))
             return result
+
+    @_entry_write
+    def send_queued_now(self, identifier, submission_id, version, expected_account):
+        """원래 대기 요청의 영수증을 재사용해 조종 또는 즉시 전송으로 한 번만 처리한다."""
+        uuid.UUID(identifier); uuid.UUID(submission_id)
+        with self.session(identifier, attach=False).action_lock:
+            if not expected_account or self._management_identity(identifier, refresh=True) != expected_account:
+                raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+            row = self.receipts.get(identifier + ':send:' + submission_id)
+            if row is None:
+                raise ValueError('이 메시지는 더 이상 대기열에 없습니다.')
+            if row['result'].get('status') != 'queued':
+                return {**row['result'], 'duplicate': True}
+            entry = row.get('entry') or {}
+            if entry.get('goalActivation'):
+                raise ValueError('목표 시작 메시지는 지금 보내기로 전환할 수 없습니다.')
+            if not isinstance(version, str) or queue_version(submission_id, {**entry, **row['result']}) != version:
+                raise ValueError('대기 메시지가 변경되었습니다. 새로고침하고 다시 시도하세요.')
+            self._check_scope_new_work()
+            return self._send(identifier, entry['text'], submission_id, entry.get('mode', 'queue'),
+                              entry.get('skills'), entry.get('workMode'), entry.get('attachments'),
+                              references=entry.get('references'), queued=True, send_now=True)
 
     @_entry_write
     def cancel_queued(self, identifier, submission_id):

@@ -77,10 +77,10 @@ async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=
     settings:()=>vm.runInContext('openChatNotifications()',context)};
 }
 
-test('homepage retains the v1.3 archive checkbox and complete mode labels',async()=>{
+test('homepage retains the archive checkbox and automatic/steer mode labels',async()=>{
   const ui=await fixture();
   assert.match(ui.html, /id="archived" type="checkbox"/);
-  for(const text of ['최근의','프로젝트','메시지 보내기','완료되면 보내기','현재 작업 조종','기본 모드','계획 모드','목표 모드'])assert.ok(ui.html.includes(text));
+  for(const text of ['최근의','프로젝트','기본 전송','현재 작업 조종','기본 모드','계획 모드','목표 모드'])assert.ok(ui.html.includes(text));
 });
 
 test('request and completion choices are independent and persist',async()=>{

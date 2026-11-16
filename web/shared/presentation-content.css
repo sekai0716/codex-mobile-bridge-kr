@@ -44,21 +44,9 @@
 @media(max-width:350px){.compose-bottom:has(.goal-toggle:not([hidden])){gap:6px}.compose-actions:has(.goal-toggle:not([hidden])) .primary,.compose-actions:has(.goal-toggle:not([hidden])) .stop{padding:8px 7px}.goal-toggle{width:32px}}
 .compose-actions .primary,.stop{min-height:36px;padding:8px 12px;font-size:12px;border-radius:10px}
 .stop{background:var(--surface);color:var(--text)}
-#composer .compose-bottom{grid-template-columns:30px minmax(0,1fr) auto}
-#composer .compose-bottom>#work-mode{grid-column:2;width:auto;justify-self:start;max-width:155px;padding-inline:12px 28px}
-#composer .compose-bottom>.compose-actions{grid-column:3;align-items:center}
+#composer .compose-bottom>.compose-actions{align-items:center}
 #composer #send,#composer #stop{display:grid;place-items:center;flex:none;width:40px;height:40px;min-height:40px;padding:8px;border-radius:50%}
 #composer #send svg,#composer #stop svg{width:22px;height:22px}
-.send-options{position:relative;flex:none;color:var(--text)}
-.send-options>summary{display:grid;place-items:center;width:36px;height:40px;border-radius:10px;list-style:none;cursor:pointer}
-.send-options>summary::-webkit-details-marker{display:none}
-.send-options>summary svg{width:20px;height:20px}
-.send-options>summary:hover,.send-options[open]>summary{background:var(--raised)}
-.send-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:20;width:245px;max-width:calc(100vw - 32px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 8px 28px #0002}
-.send-menu button{display:block;width:100%;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:var(--text);text-align:left;font-size:13px}
-.send-menu button[aria-pressed=true]{background:var(--soft)}
-.send-menu button:hover{background:var(--raised)}
-.send-menu small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
 .skill-pill{background:var(--soft);color:var(--green)}
 .newer{bottom:calc(var(--composer-height,190px) + 10px);background:var(--raised);color:var(--green);border-color:var(--line);font-size:12px;padding:9px 14px}
 .toast{background:var(--text);color:var(--page)}

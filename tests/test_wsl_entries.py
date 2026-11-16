@@ -284,6 +284,12 @@ class Runtime:
                 raise IPCError('Disconnected after bytes were sent')
             self.thread['status'] = {'type': 'active'}
             return {'turn': {'id': str(uuid.uuid4())}}
+        if method == 'turn/steer':
+            if not self.turns or self.turns[-1].get('status') != 'inProgress' or params.get('expectedTurnId') != self.turns[-1]['id']:
+                raise IPCError('Synthetic active turn changed')
+            if self.fail_send:
+                raise IPCError('Disconnected after bytes were sent')
+            return {'turnId': self.turns[-1]['id']}
         if method == 'turn/interrupt':
             return {}
         if method == 'config/read':

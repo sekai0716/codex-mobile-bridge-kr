@@ -65,7 +65,7 @@ def _prepared_static(data, content_type, use_gzip):
 from bridge.features.sessions.cli_release import CliConnections
 from bridge.app.lifecycle import private_json
 
-THREAD_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})(?:/(events|send|stop|history|respond|reconnect|cli-network|queue|catalog|settings|permissions|poll|timeline|changes|detail|notifications|uploads|message-action|message-management|rename|pin|archive|delete|organization|compact))?$")
+THREAD_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})(?:/(events|send|stop|history|respond|reconnect|cli-network|queue|queue-send|catalog|settings|permissions|poll|timeline|changes|detail|notifications|uploads|message-action|message-management|rename|pin|archive|delete|organization|compact))?$")
 UPLOAD_PREVIEW_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/uploads/([0-9a-f-]{36})/preview$")
 UPLOAD_THUMB_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/uploads/([0-9a-f-]{36})/thumb$")
 DESKTOP_IMAGE_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/desktop-images/([0-9a-f]{64})$")
@@ -1473,6 +1473,10 @@ class Handler(BaseHTTPRequestHandler):
                     result = {'ok': True}
                 else:
                     result = bridge.view(thread_id, background=True, force=True)
+            elif action == 'queue-send':
+                if set(body) != {'id', 'version', 'expectedAccount'} or not hasattr(bridge, 'send_queued_now'):
+                    raise ValueError('이 연결에서는 대기 메시지를 지금 보낼 수 없습니다.')
+                result = bridge.send_queued_now(thread_id, body['id'], body['version'], body['expectedAccount'])
             elif action == "queue":
                 result = bridge.cancel_queued(thread_id, body.get("id", ""))
             else:

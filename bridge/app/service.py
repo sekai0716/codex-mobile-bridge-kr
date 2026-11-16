@@ -19,7 +19,7 @@ from types import SimpleNamespace
 from bridge.features.endpoints.registry import codex_list_hosts
 from bridge.app.lifecycle import private_json
 from bridge.resources import source_text
-from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate
+from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate, queue_version
 
 from bridge.features.terminals.manager import TerminalManager
 from bridge.features.sessions.side_chat import SideChats
@@ -4418,7 +4418,9 @@ class Bridge:
                 if not old or command_entry['at'] >= old.get('at', 0):
                     merged[command_id] = command_entry
         activation_ids = self._goal_activation_ids(session.id)
-        view["submissions"] = [{"id": k, "text": v["text"], "status": v["status"], **({'attachments': v['attachmentNames']} if v.get('attachmentNames') else {})}
+        view["submissions"] = [{"id": k, "text": v["text"], "status": v["status"], 'version': queue_version(k, v),
+                                'canSendNow': v['status'] == 'queued' and not v.get('goalActivation') and not v.get('cliRelease'),
+                                **({'attachments': v['attachmentNames']} if v.get('attachmentNames') else {})}
                                for k, v in entries if v["status"] in ("queued", "unknown")
                                and k not in activation_ids]
         view["goalSubmission"] = None
@@ -5381,6 +5383,62 @@ class Bridge:
         with session.condition:
             session.changed()
         return result
+
+    @operation
+    def send_queued_now(self, thread_id, submission_id, version, expected_account):
+        """대기 항목의 ID를 유지해 현재 턴에 조종하거나 대기 중인 턴을 바로 시작한다."""
+        uuid.UUID(thread_id); uuid.UUID(submission_id)
+        self._management_identity(thread_id, refresh=True)
+        with self.lock:
+            current = self.live.get(thread_id)
+        target_options = {'defer_cli_account': True} if current and current.runtime == 'cli' and current.connected else {}
+        session = self._target(thread_id, **target_options)
+        key = thread_id + ':' + submission_id
+        with session.action_lock:
+            if not expected_account or self._management_identity(thread_id) != expected_account:
+                raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+            with self.goal_lock, self.submit_lock:
+                prior = self.submissions.get(key)
+                if prior is None:
+                    raise ValueError('이 메시지는 더 이상 대기열에 없습니다.')
+                if prior['status'] != 'queued':
+                    return {'id': submission_id, 'status': prior['status'], 'duplicate': True}
+                if prior.get('goalActivation') or submission_id in self._goal_activation_ids(thread_id):
+                    raise ValueError('목표 시작 메시지는 지금 보내기로 전환할 수 없습니다.')
+                if not isinstance(version, str) or queue_version(submission_id, prior) != version:
+                    raise ValueError('대기 메시지가 변경되었습니다. 새로고침하고 다시 시도하세요.')
+                entry = copy.deepcopy(prior)
+            if self._settle_scope_queued(session, key):
+                return {'id': submission_id, 'status': 'cancelled'}
+            if session.runtime == 'cli':
+                self._verify_cli_submission_account(session)
+            with session.condition:
+                active = (session.state or {}).get('threadRuntimeStatus', {}).get('type') == 'active'
+                if not active and entry.get('workMode') is not None and not (session.state.get('latestModel') or
+                        (session.state.get('latestCollaborationMode') or {}).get('settings', {}).get('model')):
+                    raise ValueError('모델 설정을 사용할 수 없습니다. 먼저 다시 연결하세요.')
+            if active and session.runtime == 'cli' and (entry.get('attachments') or entry.get('references')):
+                raise ValueError('이 CLI 연결에서는 첨부 메시지를 실행 중인 작업에 바로 추가할 수 없습니다.')
+            dispatch = {**entry, 'mode': 'steer' if active else 'send'}
+            if active:
+                dispatch['workMode'] = None
+            # 자동 대기열 처리와 같은 action_lock을 잡고, I/O 전에 불확정 상태를 영속화한다.
+            # 원래 전송 필드는 보존하므로 예전 요청의 재조회도 같은 ID로 수렴한다.
+            with self.submit_lock:
+                prior = self.submissions.get(key)
+                if prior is None or prior['status'] != 'queued' or queue_version(submission_id, prior) != version:
+                    raise ValueError('대기 메시지가 변경되었습니다. 새로고침하고 다시 시도하세요.')
+                self.submissions[key] = {**prior, 'status': 'unknown'}
+                try:
+                    self._save_ledger()
+                except Exception:
+                    self.submissions[key] = prior
+                    raise
+            try:
+                return self._dispatch(session, key, dispatch)
+            finally:
+                with session.condition:
+                    session.changed()
 
     def cancel_queued(self, thread_id, submission_id):
         uuid.UUID(submission_id)

@@ -59,6 +59,41 @@ class WslControlsTests(unittest.TestCase):
         self.assertFalse(self.entry._queue(self.identifier))
         self.assertEqual(self.entry.send(self.identifier, 'queued', submission, mode='queue')['status'], 'accepted')
 
+    def test_send_now_promotes_active_queue_once_without_changing_current_mode(self):
+        self.entry.server.thread['status'] = {'type': 'active'}
+        turn = str(uuid.uuid4())
+        self.entry.server.turns = [{'id': turn, 'status': 'inProgress'}]
+        submission = str(uuid.uuid4())
+        self.entry.send(self.identifier, 'queued', submission, mode='queue', work_mode='plan')
+        row = self.entry._submissions(self.identifier)[0]
+        with patch.object(self.entry, '_management_identity', return_value='account-a'):
+            result = self.entry.send_queued_now(self.identifier, submission, row['version'], 'account-a')
+            repeated = self.entry.send_queued_now(self.identifier, submission, row['version'], 'account-a')
+        self.assertEqual(result['status'], 'accepted')
+        self.assertEqual(repeated['status'], 'accepted')
+        calls = [params for method, params in self.entry.server.calls if method == 'turn/steer']
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]['clientUserMessageId'], submission)
+        self.assertEqual(calls[0]['expectedTurnId'], turn)
+        self.assertNotIn('collaborationMode', calls[0])
+        self.assertFalse(self.entry._queue(self.identifier))
+
+    def test_send_now_rejects_stale_message_and_changed_account_before_dispatch(self):
+        submission = str(uuid.uuid4())
+        self.entry.send(self.identifier, 'queued', submission, mode='queue')
+        row = self.entry._submissions(self.identifier)[0]
+        with patch.object(self.entry, '_management_identity', return_value='account-a'):
+            with self.assertRaises(ValueError):
+                self.entry.send_queued_now(self.identifier, submission, row['version'], 'other-account')
+            with self.assertRaises(ValueError):
+                self.entry.send_queued_now(self.identifier, submission, 'stale', 'account-a')
+            self.entry.server.thread['cwd'] = '/different'
+            self.entry.store.get = lambda identifier: {'id': identifier, 'cwd': '/different', 'model_provider': 'magpie'}
+            with self.assertRaises(ValueError):
+                self.entry.send_queued_now(self.identifier, submission, row['version'], 'account-a')
+        self.assertTrue(self.entry._queue(self.identifier))
+        self.assertFalse(any(method in ('turn/start', 'turn/steer') for method, _ in self.entry.server.calls))
+
     def test_queued_project_reference_keeps_identity_and_checks_target_at_dispatch(self):
         refs = [{'path': 'file.txt', 'absolutePath': '/home/fixture/project/file.txt'}]
         files = [{'path': refs[0]['absolutePath'], 'name': 'file.txt', 'image': None}]

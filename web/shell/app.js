@@ -40,7 +40,7 @@ async function goalAction(action,payload) {
 }
 const workModes=new WorkModes({select:$('work-mode'),hint:$('mode-hint'),goalRoot:$('goal-state'),goalToggle:$('goal-toggle'),newId:uuid,
   onCancel:payload=>goalAction('cancel',payload),onStatus:payload=>goalAction('status',payload),onEdit:payload=>goalAction('edit',payload)});
-const sendModes=new ComposerSendModes({select:$('send-mode'),menu:$('send-options'),send:$('send'),onChange:()=>$('send-mode').onchange(),
+const sendModes=new ComposerSendModes({select:$('send-mode'),send:$('send'),
   isDisabled:()=>sending||!state||state.loadingHistory||state.activating||!attachments.ready()||!currentAccess().canSend});
 document.addEventListener('bridge-language',()=>sendModes.render(state,sending));
 window.addEventListener('focus',()=>{if(!$('app').hidden)accountsPanel?.refresh();});
@@ -1220,16 +1220,38 @@ async function ignoreSubmission(value){
   if(currentId===value.threadId&&currentHost===value.host&&state){state.submissions=(state.submissions||[]).filter(row=>row.id!==value.submissionId);renderQueue(state.submissions);}
   return result;
 }
+const queuedSends=new Set();
 function renderQueue(rows){
   $('queued').replaceChildren();
   const pending=codexDraftScope&&composerDrafts?.pendingRecords(codexDraftScope,{temporary:sessionStorage,temporaryKey:'pending:'+chatKey()})||[];
   if(rows.length||pending.length){const manage=el('button','plain',t('메시지 관리'));manage.type='button';manage.onclick=openMessageManagement;$('queued').append(manage);}
-  const target=currentId,host=currentHost;
+  const target=currentId,host=currentHost,account=codexDraftScope?.account;
   for(const row of rows){
     const card=el('div','queue-card'),reply=row.text.startsWith('<send_user_message_question_reply>');
     card.append(el('strong','',row.status==='queued'?t('현재 작업을 기다리는 중'):t('배송이 확인되지 않았습니다.')),el('p','',reply?t('질문 답변'):row.text));
     if(row.attachments?.length)card.append(el('small','muted',t('부착:')+row.attachments.join('、')));
     if(row.status==='queued'){
+      const key=JSON.stringify([target,host,account,row.id]);
+      if(row.canSendNow&&row.version){
+        const now=el('button','plain',t('지금 보내기'));now.type='button';
+        now.disabled=queuedSends.has(key)||!account||!currentAccess().canSend;
+        now.onclick=async()=>{
+          if(now.disabled||!account||!currentAccess().canSend||queuedSends.has(key)||currentId!==target||currentHost!==host||codexDraftScope?.account!==account)return;
+          queuedSends.add(key);now.disabled=true;
+          try{
+            const result=await api(sessionUrl(target,'queue-send',host),{id:row.id,version:row.version,expectedAccount:account});
+            if(currentId===target&&currentHost===host&&codexDraftScope?.account===account){
+              if(result.status==='accepted'||result.status==='cancelled'){
+                state={...state,submissions:(state?.submissions||[]).filter(item=>item.id!==row.id)};
+                renderQueue(state.submissions);
+              }
+              toast(result.status==='accepted'?'대기 메시지를 보냈습니다.':result.status==='cancelled'?'대기 중인 메시지가 철회됨':'전송 결과가 확인되지 않았습니다. 대화 기록을 확인하세요.');
+            }
+          }catch(error){if(currentId===target&&currentHost===host)toast(error.message);}
+          finally{queuedSends.delete(key);if(now.isConnected)now.disabled=!currentAccess().canSend;}
+        };
+        card.append(now);
+      }
       const cancel=el('button','plain',t('대기 중인 메시지 철회'));
       cancel.onclick=async()=>{try{await api(sessionUrl(target,'queue',host),{id:row.id});toast('대기 중인 메시지가 철회됨');}catch(e){toast(e.message);}};card.append(cancel);
     }else{

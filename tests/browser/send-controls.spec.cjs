@@ -8,8 +8,8 @@ async function prepare(page){
   await page.evaluate(async()=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
-    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],details:[],reply:'accepted'};
-    fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
+    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],details:[],reply:'accepted'};
+    fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',draftAccountIdentity:'c'.repeat(64),permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
     fixture.reason={key:'reason',order:1,role:'activity',kind:'reasoning',title:'추론 요약',text:'추론 요약의 앞부분',truncated:true,version:1};
     fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령 실행',text:'명령 출력',truncated:false,version:1}]});
     const response=data=>new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
@@ -19,6 +19,11 @@ async function prepare(page){
       if(path.pathname.endsWith('/changes'))return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true}));
       if(path.pathname.endsWith('/detail')){fixture.details.push(path.search);return response({version:Number(path.searchParams.get('version')),offset:0,text:'추론 요약 전체 내용',next:null,files:[]});}
       if(path.pathname.endsWith('/send')){const body=JSON.parse(options.body);fixture.writes.push(body);return response({status:fixture.reply});}
+      if(path.pathname.endsWith('/queue-send')){
+        const body=JSON.parse(options.body);fixture.queueWrites.push(body);
+        const finish=()=>response({status:'accepted',id:body.id});
+        return fixture.holdQueue?new Promise(resolve=>fixture.finishQueue=()=>resolve(finish())):finish();
+      }
       if(path.pathname.endsWith('/catalog'))return response(path.searchParams.get('kind')==='models'?{models:[{id:'fixture',fastTier:'priority',efforts:['high']}],fastMode:{allowed:true,provider:'openai',defaultServiceTier:'default'}}:{skills:[],selectedSkills:[],total:0});
       if(path.pathname.endsWith('/settings')){
         const body=JSON.parse(options.body);fixture.settingsWrites.push(body);
@@ -39,10 +44,10 @@ test.beforeEach(async({context,request,baseURL})=>{
 });
 test.afterEach(async({page})=>{await page.evaluate(()=>chatTimeline?.dispose()).catch(()=>{});});
 
-test('Codex send button sends idle, queues busy, and keeps steering in its menu',async({page},testInfo)=>{
+test('Codex send mode stays in its original position and sends idle, queues busy or steers',async({page},testInfo)=>{
   await prepare(page);
-  const input=page.locator('#message'),send=page.locator('#send'),menu=page.locator('#send-options');
-  await expect(page.locator('#send-mode')).toBeHidden();await expect(menu).toBeHidden();
+  const input=page.locator('#message'),send=page.locator('#send'),mode=page.locator('#send-mode');
+  await expect(mode).toBeVisible();await expect(page.locator('#send-options')).toHaveCount(0);
   await expect(send).toHaveAttribute('aria-label','메시지 보내기');
   await input.fill('대기 중 일반 전송');await send.click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
@@ -54,23 +59,23 @@ test('Codex send button sends idle, queues busy, and keeps steering in its menu'
   expect(await page.evaluate(()=>sendControlsFixture.writes[1].mode)).toBe('queue');
   await expect(input).toHaveValue('');
   for(const width of [320,390,1280]){
-    await page.setViewportSize({width,height:844});await menu.locator('summary').click();
-    await expect(menu.locator('.send-menu')).toBeInViewport();
+    await page.setViewportSize({width,height:844});
+    const choice=await mode.boundingBox(),work=await page.locator('#work-mode').boundingBox();
+    expect(choice.x+choice.width).toBeLessThanOrEqual(work.x+1);expect(Math.abs(choice.y-work.y)).toBeLessThan(2);
     expect(await page.locator('#composer').evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`send-menu-${width}.png`)});
-    await page.keyboard.press('Escape');await expect(menu).not.toHaveAttribute('open','');
   }
-  await menu.locator('summary').click();await menu.locator('[data-send-mode=steer]').click();
+  await mode.selectOption('steer');
   await expect(send).toHaveAttribute('aria-label','현재 작업에 바로 보내기');
   await expect(page.locator('#work-mode')).toBeDisabled();
   await input.fill('현재 작업에 추가 지시');await send.click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(3);
   expect(await page.evaluate(()=>({mode:sendControlsFixture.writes[2].mode,workMode:sendControlsFixture.writes[2].workMode}))).toEqual({mode:'steer',workMode:null});
-  await page.evaluate(()=>sendControlsFixture.update('idle'));await expect(menu).toBeHidden();
+  await page.evaluate(()=>sendControlsFixture.update('idle'));await expect(mode).toBeVisible();await expect(mode).toHaveValue('auto');
   await expect(send).toHaveAttribute('aria-label','메시지 보내기');
   await page.evaluate(()=>sendControlsFixture.update('active',{endpointId:'wsl:fixture',access:{source:'cli',runtime:'wsl',canSend:true},capabilities:{queue:false}}));
   await expect(send).toBeDisabled();
-  await menu.locator('summary').click();await menu.locator('[data-send-mode=steer]').click();await expect(send).toBeEnabled();
+  await mode.selectOption('steer');await expect(send).toBeEnabled();
   await page.evaluate(()=>sendControlsFixture.update('idle',{endpointId:undefined,access:undefined,capabilities:undefined}));
   await page.evaluate(()=>{sendControlsFixture.update('active');sendControlsFixture.reply='unknown';});
   await input.fill('결과 미확인 전송');await send.click();
@@ -78,6 +83,23 @@ test('Codex send button sends idle, queues busy, and keeps steering in its menu'
   await page.evaluate(()=>sendControlsFixture.update('idle'));await send.click();
   expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(4);
   await expect(input).toHaveValue('결과 미확인 전송');
+});
+
+test('queued message exposes Send now and repeated clicks keep its ID and the current draft',async({page},testInfo)=>{
+  await prepare(page);
+  const id='22222222-2222-4222-8222-222222222222',version='a'.repeat(64);
+  await page.evaluate(({id,version})=>{
+    const f=sendControlsFixture;f.holdQueue=true;
+    f.update('active',{submissions:[{id,version,text:'대기열에 이미 넣은 지시',status:'queued',canSendNow:true}]});
+  },{id,version});
+  await page.locator('#message').fill('보내지 않은 새 초안');
+  const now=page.locator('#queued').getByRole('button',{name:'지금 보내기',exact:true});
+  await expect(now).toBeVisible();await page.screenshot({path:testInfo.outputPath('queued-send-now.png')});
+  await now.click();await expect(now).toBeDisabled();await now.dispatchEvent('click');
+  expect(await page.evaluate(()=>sendControlsFixture.queueWrites)).toEqual([{id,version,expectedAccount:'c'.repeat(64)}]);
+  await page.evaluate(()=>sendControlsFixture.finishQueue());
+  await expect(now).toHaveCount(0);await expect(page.locator('#message')).toHaveValue('보내지 않은 새 초안');
+  expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
 });
 
 test('reasoning default expansion can be switched off, persisted and switched on',async({page})=>{
