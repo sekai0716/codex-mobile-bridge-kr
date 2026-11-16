@@ -470,7 +470,7 @@ cd codex-mobile-bridge-kr
 python3 -B "$PWD/run.py" --lan
 ```
 
-Alternatively, double-click `게이트웨이 시작.command`. Stop with `Ctrl+C`, `python3 -B stop.py`, or `게이트웨이 중지.command`.
+Alternatively, double-click `start-gateway.command`. Stop with `Ctrl+C`, `python3 -B stop.py`, or `stop-gateway.command`.
 
 Open the printed LAN URL on a phone on the same network, for example `http://192.168.1.10:8787`. The initial username is `admin`; the generated password is in `.local/첫 로그인.txt`. Select a chat and wait for **Connected** before sending.
 
