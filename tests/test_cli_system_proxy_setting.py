@@ -73,7 +73,7 @@ class CliSystemProxySettingTests(unittest.TestCase):
 
     def test_changed_preview_version_refuses_before_write_even_if_enabled(self):
         probe = Mock(request=Mock(return_value=self.snapshot(True, True, version='new-version')))
-        with self.assertRaisesRegex(ValueError, '配置已变化'):
+        with self.assertRaisesRegex(ValueError, '구성이 변경되었습니다.'):
             enable_system_proxy_following(probe, self.home, expected_version='preview-version')
         self.assertEqual(probe.request.call_count, 1)
 
@@ -96,7 +96,7 @@ class CliSystemProxySettingTests(unittest.TestCase):
                        {**self.name, 'profile': 'work'}):
             with self.subTest(origin=origin):
                 probe = Mock(request=Mock(return_value=self.snapshot(False, False, origin)))
-                with self.assertRaisesRegex(ValueError, '策略限制'):
+                with self.assertRaisesRegex(ValueError, "기본\\ 시스템\\ 프록시\\ 설정은\\ 다른\\ 구성이나\\ 정책에\\ 의해\\ 제한됩니다\\.\\ 서비스가\\ 복원되지\\ 않았습니다。"):
                     enable_system_proxy_following(probe, self.home)
                 self.assertEqual(probe.request.call_count, 1)
 

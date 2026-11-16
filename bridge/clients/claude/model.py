@@ -21,13 +21,13 @@ def rows(value):
         for key in ('sessions', 'messages', 'transcript'):
             if isinstance(value.get(key), list):
                 return rows(value[key])
-    raise ValueError('Claude 返回了不支持的数据结构，需要更新适配器')
+    raise ValueError('Claude 지원되지 않는 데이터 구조가 반환되었으며 어댑터를 업데이트해야 합니다.')
 
 
 def session(surface, raw):
     native = raw.get('sessionId')
     if not isinstance(native, str) or not native:
-        raise ValueError('Claude 会话缺少 sessionId')
+        raise ValueError('Claude 세션 누락 sessionId')
     lifecycle = raw.get('lifecycleState', '')
     active = raw.get('turnRunning') is True or raw.get('isRunning') is True or lifecycle in ('running', 'initializing')
     runtime_known = (type(raw.get('turnRunning')) is bool or type(raw.get('isRunning')) is bool
@@ -38,12 +38,12 @@ def session(surface, raw):
             continue
         rid = item.get('requestId', item.get('id'))
         if isinstance(rid, str):
-            requests.append({'id': rid, 'tool': item.get('toolName', '工具'),
+            requests.append({'id': rid, 'tool': item.get('toolName', '도구'),
                              'input': item.get('input', {}),
                              'needsInput': item.get('toolName') == 'AskUserQuestion'})
     folders = [value for value in raw.get('userSelectedFolders') or [] if isinstance(value, str)]
     return {'id': gateway_id(surface, native), 'nativeId': native, 'backend': surface, 'mode': surface,
-            'host': 'local', 'title': raw.get('title') or '未命名 Claude 会话',
+            'host': 'local', 'title': raw.get('title') or '이름 없음 Claude 대화',
             'cwd': raw.get('originCwd') or raw.get('cwd') or '', 'model': raw.get('model'),
             'folders': folders,
             'effort': raw.get('effort', raw.get('effortLevel')),
@@ -118,7 +118,7 @@ def transcript(value):
             if block.get('type') in ('text', 'input_text', 'output_text'):
                 texts.append(str(block.get('text', '')))
             elif block.get('type') == 'tool_use':
-                flush();name=str(block.get('name','工具'));params=block.get('input',{})
+                flush();name=str(block.get('name','도구'));params=block.get('input',{})
                 title=name;body='';task_changed=False
                 if isinstance(params,dict):
                     title=params.get('description') or params.get('subject') or name
@@ -136,7 +136,7 @@ def transcript(value):
                         if key:
                             if params.get('status')=='deleted':tasks.pop(key,None)
                             else:
-                                task=tasks.setdefault(key,{'content':params.get('subject') or '任务 '+key,'status':'pending'})
+                                task=tasks.setdefault(key,{'content':params.get('subject') or '일 '+key,'status':'pending'})
                                 if params.get('subject'):task['content']=params['subject']
                                 if params.get('status'):task['status']=params['status']
                             task_changed=True
@@ -147,7 +147,7 @@ def transcript(value):
                         content='\n'.join('-'+s for s in str(params.get('old_string','')).splitlines())+'\n'+'\n'.join('+'+s for s in str(params['new_string']).splitlines())
                     if name == 'MultiEdit' and isinstance(params.get('edits'), list):
                         content='\n\n'.join('\n'.join('-'+s for s in str(e.get('old_string','')).splitlines())+'\n'+'\n'.join('+'+s for s in str(e.get('new_string','')).splitlines()) for e in params['edits'] if isinstance(e,dict))
-                    if content is not None:result.append({'id':str(event_id)+':code:'+str(part),'role':'activity','kind':'code','title':params.get('file_path','文件变更'),'language':'diff' if name!='Write' else '', 'changeType':'write' if name=='Write' else 'edit', 'text':str(content)})
+                    if content is not None:result.append({'id':str(event_id)+':code:'+str(part),'role':'activity','kind':'code','title':params.get('file_path','파일 변경'),'language':'diff' if name!='Write' else '', 'changeType':'write' if name=='Write' else 'edit', 'text':str(content)})
             elif block.get('type') == 'tool_result':
                 flush();content=block.get('content','')
                 if isinstance(content,list):content='\n'.join(str(b.get('text','')) for b in content if isinstance(b,dict))
@@ -160,17 +160,17 @@ def transcript(value):
                         except (ValueError,TypeError,AttributeError):native=None
                         key=str(native or (match.group(1) if match else ''))
                         if key:tasks[key]=tasks.pop(created)
-                if content:result.append({'id':str(event_id)+':result:'+str(part),'role':'activity','kind':'step','title':'执行结果','text':str(content)[:30000],**({'tasks':task_snapshot()} if created else {})})
+                if content:result.append({'id':str(event_id)+':result:'+str(part),'role':'activity','kind':'step','title':'실행 결과','text':str(content)[:30000],**({'tasks':task_snapshot()} if created else {})})
             elif block.get('type') in ('image', 'input_image'):
                 flush()
                 source = block.get('imageRef') or ({'event': event.get('uuid') or message.get('id'), 'part': part}
                     if event.get('uuid') or message.get('id') else None)
                 result.append({'id':str(event_id)+':image:'+str(part),'role':role,'text':'',
-                    'attachments':[{'type':'image','name':'图片', **({'_nativeImage':source} if source else {})}]})
+                    'attachments':[{'type':'image','name':'그림', **({'_nativeImage':source} if source else {})}]})
             elif block.get('type') == 'thinking_summary':
                 flush()
                 summary=block.get('text') or block.get('summary')
-                if summary:result.append({'id':str(event_id)+':thinking:'+str(part),'role':'reasoning','kind':'reasoning','title':'思考摘要','text':str(summary)})
+                if summary:result.append({'id':str(event_id)+':thinking:'+str(part),'role':'reasoning','kind':'reasoning','title':"추론 요약",'text':str(summary)})
         flush()
         # One native event can contain multiple text/image/tool blocks.
         for row in result[first_part:]:
@@ -186,7 +186,7 @@ def transcript(value):
 def history_image(value, source):
     if (not isinstance(source, dict) or not isinstance(source.get('event'), str)
             or type(source.get('part')) is not int or not 0 <= source['part'] < 4096):
-        raise ValueError('图片引用无效')
+        raise ValueError('잘못된 이미지 참조')
     for event in rows(value):
         message = event.get('message') if isinstance(event.get('message'), dict) else event
         if (event.get('uuid') or message.get('id')) != source['event']:
@@ -207,7 +207,7 @@ def history_image(value, source):
         if match:
             return {'mediaType': match[1], 'data': match[2]}
         break
-    raise ValueError('原生历史中未找到可预览图片')
+    raise ValueError('기본 역사에서 미리보기 이미지를 찾을 수 없습니다.')
 
 
 def transcript_notice(value):
@@ -222,4 +222,4 @@ def transcript_notice(value):
             waiting = True
         elif text.strip() and not event.get('isSynthetic') and not event.get('isMeta'):
             waiting = False
-    return 'Claude 暂未生成可见正文，正在由桌面端重试；无需重复发送。' if waiting else ''
+    return 'Claude 아직 표시되는 텍스트가 생성되지 않았으며 데스크톱에서 다시 시도 중입니다. 다시 보낼 필요 없어。' if waiting else ''

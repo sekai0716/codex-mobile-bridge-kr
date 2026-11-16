@@ -162,7 +162,7 @@ class FlybirdSourceFileTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.tmp')
         self.addCleanup(self.temp.cleanup)
-        root=Path(self.temp.name);self.home=root/'home';self.app=root/'飞鸟加速.app'
+        root=Path(self.temp.name);self.home=root/'home';self.app=root/'새의 속도가 빨라지다.app'
         self.config=self.home/'Library/Application Support/com.fnjs.clash/clash/config.yaml'
         self.config.parent.mkdir(parents=True)
         self.config.write_text('mixed-port: 4128\n# synthetic fixture only\n')

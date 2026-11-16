@@ -33,12 +33,12 @@ AUTH_ITEMS = ('Local State', 'Preferences', 'Cookies', 'Cookies-journal', 'Cooki
               'Local Storage', 'IndexedDB', 'Session Storage', 'Service Worker', 'ant-did')
 CONFIG = 'claude_desktop_config.json'
 TOKEN_KEY = 'oauth:tokenCache'
-AMBIGUOUS_PROFILE = '检测到多个 Claude 登录目录，无法安全切换账号；请在设置中指定客户端数据目录'
+AMBIGUOUS_PROFILE = '여러 개 감지됨 Claude 로그인 디렉터리, 계정을 안전하게 전환할 수 없습니다. 설정에서 클라이언트 데이터 디렉터리를 지정하세요.'
 
 
 def _safe(path):
     if any(parent.is_symlink() for parent in (path, *path.parents)):
-        raise ValueError('Claude 账号目录不能是符号链接')
+        raise ValueError('Claude 계정 디렉터리는 심볼릭 링크일 수 없습니다.')
 
 
 def _json(path, default=None):
@@ -46,10 +46,10 @@ def _json(path, default=None):
     if not path.exists():
         return {} if default is None else default
     if path.is_symlink():
-        raise ValueError('Claude 账号文件不能是符号链接')
+        raise ValueError('Claude 계정 파일은 심볼릭 링크일 수 없습니다.')
     value = json.loads(path.read_text(encoding='utf-8-sig'))
     if not isinstance(value, dict):
-        raise ValueError('Claude 账号配置格式不正确')
+        raise ValueError('Claude 계정 구성 형식이 잘못되었습니다.')
     return value
 
 
@@ -58,7 +58,7 @@ def _copy(source, target):
     _safe(source)
     _safe(target)
     if source.is_symlink():
-        raise ValueError('Claude 账号文件不能是符号链接')
+        raise ValueError('Claude 계정 파일은 심볼릭 링크일 수 없습니다.')
     if source.is_dir():
         target.mkdir(parents=True, exist_ok=True, mode=0o700)
         target.chmod(0o700)
@@ -67,13 +67,13 @@ def _copy(source, target):
     elif source.is_file():
         private_bytes(target, source.read_bytes())
     else:
-        raise ValueError('Claude 账号快照包含不支持的文件')
+        raise ValueError("Claude 계정 스냅샷에 지원되지 않는 파일이 포함되어 있습니다.")
 
 
 def _remove(path):
     _safe(path)
     if path.is_symlink():
-        raise ValueError('Claude 账号文件不能是符号链接')
+        raise ValueError('Claude 계정 파일은 심볼릭 링크일 수 없습니다.')
     if path.is_dir():
         shutil.rmtree(path)
     elif path.exists():
@@ -89,7 +89,7 @@ def _cookies(home):
         path = home/name
         if path.is_file():
             if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
-                raise ValueError('Claude 登录目录不能是符号链接')
+                raise ValueError("Claude 로그인 디렉터리는 심볼릭 링크일 수 없습니다.")
             try:
                 with closing(sqlite3.connect(path.as_uri()+'?mode=ro', uri=True, timeout=0)) as db:
                     rows = db.execute("SELECT host_key,name,value,encrypted_value,expires_utc FROM cookies WHERE name IN ('sessionKey','lastActiveOrg')").fetchall()
@@ -99,8 +99,8 @@ def _cookies(home):
                 if {row[1] for row in valid} >= {'sessionKey', 'lastActiveOrg'}:
                     return valid
             except sqlite3.Error:
-                raise ClaudeLoginDatabaseUnavailable('Claude 登录数据库暂不可读，账号操作暂不可用') from None
-    raise ValueError('没有找到已登录的 Claude Desktop 账号，请先在客户端登录')
+                raise ClaudeLoginDatabaseUnavailable("Claude의 로그인 데이터베이스를 일시적으로 읽을 수 없습니다. 계정 작업을 사용할 수 없습니다.") from None
+    raise ValueError("로그인한 Claude 데스크톱 계정을 찾을 수 없습니다. 먼저 클라이언트에 로그인하세요.")
 
 
 def _fingerprint(rows):
@@ -128,10 +128,10 @@ def _web_json(path, cookies, organization):
         return value
     except error.HTTPError as exc:
         if exc.code in (401, 403):
-            raise ValueError('Claude 登录已失效或需要在客户端完成验证') from None
-        raise ValueError('Claude 暂时无法查询剩余额度，请稍后重试') from None
+            raise ValueError("Claude 로그인이 만료되었거나 클라이언트에서 확인이 필요합니다.") from None
+        raise ValueError("Claude 남은 사용량을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.") from None
     except Exception:
-        raise ValueError('Claude 暂时无法查询剩余额度，请稍后重试') from None
+        raise ValueError("Claude 남은 사용량을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.") from None
 
 
 def _decrypt_cookie(host, encrypted, home, keys=None):
@@ -141,13 +141,13 @@ def _decrypt_cookie(host, encrypted, home, keys=None):
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     if sys.platform == 'darwin':
         if not encrypted.startswith(b'v10'):
-            raise ValueError('无法读取 Claude 登录凭据，请解锁系统钥匙串后重试')
+            raise ValueError("Claude 자격 증명을 읽을 수 없습니다. 시스템 키체인을 잠금 해제하고 다시 시도하세요.")
         if keys is None or 'claude' not in keys:
             from keyring.backends.macOS import Keyring
             vault = Keyring()
             password = vault.get_password('Claude Safe Storage', 'Claude') or vault.get_password('Claude Safe Storage', 'Claude Key')
             if not password:
-                raise ValueError('无法读取 Claude 登录凭据，请解锁系统钥匙串后重试')
+                raise ValueError("Claude 자격 증명을 읽을 수 없습니다. 시스템 키체인을 잠금 해제하고 다시 시도하세요.")
             key = hashlib.pbkdf2_hmac('sha1', password.encode(), b'saltysalt', 1003, dklen=16)
             if keys is not None:
                 keys['claude'] = key
@@ -162,14 +162,14 @@ def _decrypt_cookie(host, encrypted, home, keys=None):
         if encrypted.startswith(b'v10'):
             wrapped = base64.b64decode(_json(home/'Local State').get('os_crypt', {}).get('encrypted_key', ''), validate=True)
             if not wrapped.startswith(b'DPAPI'):
-                raise ValueError('当前 Claude 登录加密方式暂不支持额度查询')
+                raise ValueError("사용 확인은 아직 이 Claude 자격 증명 암호화 형식을 지원하지 않습니다.")
             plaintext = AESGCM(_unprotect(wrapped[5:])).decrypt(encrypted[3:15], encrypted[15:], None)
         elif encrypted.startswith((b'v11', b'v20')):
-            raise ValueError('当前 Claude 登录加密方式暂不支持额度查询')
+            raise ValueError("사용 확인은 아직 이 Claude 자격 증명 암호화 형식을 지원하지 않습니다.")
         else:
             plaintext = _unprotect(encrypted)
     else:
-        raise ValueError('当前系统暂不支持 Claude 加密登录的额度查询')
+        raise ValueError("이 시스템은 암호화된 Claude 자격 증명을 사용한 사용 확인을 아직 지원하지 않습니다.")
     digest = hashlib.sha256(host.encode()).digest()
     if plaintext.startswith(digest):
         plaintext = plaintext[32:]
@@ -190,7 +190,7 @@ def _unprotect(value):
     crypt32.CryptUnprotectData.restype = wintypes.BOOL
     kernel32.LocalFree.argtypes, kernel32.LocalFree.restype = [ctypes.c_void_p], ctypes.c_void_p
     if not crypt32.CryptUnprotectData(ctypes.byref(source), None, None, None, None, 1, ctypes.byref(target)):
-        raise ValueError('无法读取 Claude 登录凭据，请使用保存账号时的系统用户')
+        raise ValueError("Claude 자격 증명을 읽을 수 없습니다. 이 계정을 저장한 것과 동일한 운영 체제 사용자를 사용하십시오.")
     try:
         return ctypes.string_at(target.data, target.size)
     finally:
@@ -269,7 +269,7 @@ class ClaudeAccounts:
             from bridge.clients.profiles import launch_parameters
             launch_parameters(native_profile)  # Reject invented/mismatched root maps.
             if native_profile.family != 'claude':
-                raise ValueError('此独立配置不属于 Claude')
+                raise ValueError('이 독립형 구성은 다음의 일부가 아닙니다. Claude')
             self.mode_home = self.home = native_profile.roots['userData']
             self.threep = native_profile.roots['thirdParty']
         elif explicit_home:
@@ -311,7 +311,7 @@ class ClaudeAccounts:
         if sys.platform != 'win32':
             self.mode_home = self.home
         if any(path.is_symlink() for root in (self.directory, self.mode_home, self.home, self.threep) for path in (root, *root.parents)):
-            raise ValueError('Claude 账号目录不能是符号链接')
+            raise ValueError('Claude 계정 디렉터리는 심볼릭 링크일 수 없습니다.')
         self.lock = threading.RLock()
 
     def _index(self):
@@ -324,10 +324,10 @@ class ClaudeAccounts:
 
     def _account(self, identifier):
         if not isinstance(identifier, str) or len(identifier) != 32 or any(c not in '0123456789abcdef' for c in identifier):
-            raise ValueError('Claude 账号标识无效')
+            raise ValueError("Claude 계정 ID가 잘못되었습니다.")
         row = next((row for row in self._index()['accounts'] if row['id'] == identifier), None)
         if row is None:
-            raise ValueError('Claude 账号不存在，请刷新列表')
+            raise ValueError("Claude 계정은 더 이상 존재하지 않습니다. 목록을 새로 고칩니다.")
         return row, self.directory/'profiles'/identifier
 
     def _gateway(self):
@@ -342,10 +342,10 @@ class ClaudeAccounts:
         try:
             identifier = str(uuid.UUID(identifier))
         except (ValueError, TypeError, AttributeError):
-            raise ValueError('Claude Desktop 当前 API 配置不可读') from None
+            raise ValueError("현재 Claude 데스크톱 API 구성을 읽을 수 없습니다.") from None
         config = _json(library/(identifier+'.json'))
         if config.get('inferenceProvider') != 'gateway' or not config.get('inferenceGatewayBaseUrl'):
-            raise ValueError('当前 Claude 第三方接入暂不支持保存')
+            raise ValueError("이 Claude 타사 연결 저장은 아직 지원되지 않습니다.")
         name = next((entry.get('name') for entry in meta.get('entries', []) if entry.get('id') == identifier), None)
         return {'id': identifier, 'name': name or 'Claude API', 'config': config}
 
@@ -364,7 +364,7 @@ class ClaudeAccounts:
             kind, _, gateway = self._current()
             if kind == 'official':
                 return {'models': [], 'groups': [], 'notice':
-                    'Claude 官方账号未提供可离线读取的模型目录；连接 Desktop 后已有的缓存仍可查看'}
+                    "Claude의 공식 계정에는 로컬에서 읽을 수 있는 모델 카탈로그가 없습니다. 이전에 캐시된 모델은 Desktop이 연결된 후에도 계속 사용할 수 있습니다."}
             gateway = copy.deepcopy(gateway)
         config = gateway['config']
         base = config.get('inferenceGatewayBaseUrl')
@@ -396,11 +396,11 @@ class ClaudeAccounts:
                 if not configured:
                     raise
         if configured:
-            notice = '上游模型目录暂不可用；以下是 Claude Desktop 当前配置的模型' if static else '以下是 Claude Desktop 当前配置的模型；此接入不支持直接查询上游目录'
+            notice = "업스트림 카탈로그를 사용할 수 없습니다. 이러한 모델은 Claude Desktop에서 구성됩니다." if static else "이러한 모델은 Claude Desktop에서 구성됩니다. 이 연결은 직접 업스트림 카탈로그 쿼리를 지원하지 않습니다."
             return {'models': configured, 'groups': [{'surface': 'api', 'source': 'desktop-config',
                 'name': gateway.get('name') or 'Claude API', 'models': configured, 'notice': notice}],
-                **({'modelError': '上游模型目录刷新失败'} if static else {})}
-        return {'models': [], 'groups': [], 'notice': '当前 Claude Desktop API 接入未提供可读取的模型目录'}
+                **({'modelError': "업스트림 모델 카탈로그를 새로 고칠 수 없습니다."} if static else {})}
+        return {'models': [], 'groups': [], 'notice': "현재 Claude 데스크톱 API 연결에는 읽을 수 있는 모델 카탈로그가 없습니다."}
 
     def public(self):
         with self.lock:
@@ -440,14 +440,14 @@ class ClaudeAccounts:
             value = {'provider': 'claude', 'accounts': accounts, 'activeId': active, 'current': current,
                      'canManage': True, 'readOnly': False}
             if fingerprint is None:
-                value['notice'] = identity_error or '无法确认 Claude 当前登录，请在客户端登录后重试'
+                value['notice'] = identity_error or "현재 Claude 로그인을 확인할 수 없습니다. 클라이언트에 로그인하고 다시 시도하세요."
             return value
 
     def import_current(self, name=''):
         """Save the current desktop login after the manager verifies native exit."""
         with self.lock:
             if not isinstance(name, str) or len(name) > 120:
-                raise ValueError('账号名称不能超过 120 字')
+                raise ValueError("계정 이름은 120자를 초과할 수 없습니다.")
             kind, fingerprint, gateway = self._current()
             index = self._index()
             existing = next((row for row in index['accounts'] if row['kind'] == kind and row.get('fingerprint') == fingerprint), None)
@@ -465,7 +465,7 @@ class ClaudeAccounts:
                     config = _json(self.home/'config.json')
                     private_json(staged/'auth.json', {TOKEN_KEY: config[TOKEN_KEY]} if TOKEN_KEY in config else {})
                     if _fingerprint(_cookies(staged)) != fingerprint:
-                        raise ValueError('Claude 登录在保存时发生变化，请退出客户端后重试')
+                        raise ValueError("저장하는 동안 Claude 로그인이 변경되었습니다. 클라이언트를 종료하고 다시 시도하십시오.")
                 else:
                     private_json(staged/'gateway.json', gateway)
                 private_json(staged/'manifest.json', {'kind': kind, 'fingerprint': fingerprint})
@@ -476,7 +476,7 @@ class ClaudeAccounts:
                     target.rename(previous)
                 try:
                     staged.rename(target)
-                    row = dict(existing or {}, id=identifier, name=name.strip() or (existing or {}).get('name') or (gateway or {}).get('name') or 'Claude 账号', kind=kind, fingerprint=fingerprint)
+                    row = dict(existing or {}, id=identifier, name=name.strip() or (existing or {}).get('name') or (gateway or {}).get('name') or 'Claude 계정', kind=kind, fingerprint=fingerprint)
                     if gateway:
                         url = parse.urlsplit(gateway['config']['inferenceGatewayBaseUrl'])
                         row['baseUrl'] = url.scheme+'://'+(url.hostname or '')
@@ -516,7 +516,7 @@ class ClaudeAccounts:
         with self.lock:
             row, snapshot = self._account(identifier)
             if row['kind'] != 'api' or not self.edit(identifier).get('api'):
-                raise ValueError('请选择已保存的 API 接入')
+                raise ValueError('저장된 것을 선택해주세요 API 연결')
             config = _json(snapshot/'gateway.json')['config']
             return {'baseUrl': config['inferenceGatewayBaseUrl'], 'apiKey': config['inferenceGatewayApiKey'],
                     'apiFormat': 'anthropic-messages', 'authScheme': config.get('inferenceGatewayAuthScheme', 'bearer')}
@@ -533,7 +533,7 @@ class ClaudeAccounts:
     @staticmethod
     def _name(value):
         if not isinstance(value, str) or not value.strip() or len(value.strip()) > 120:
-            raise ValueError('接入名称不能为空且不能超过 120 字')
+            raise ValueError("연결 이름은 필수이며 120자를 초과할 수 없습니다.")
         return value.strip()
 
     def save_api(self, value):
@@ -544,12 +544,12 @@ class ClaudeAccounts:
             if value.get('id'):
                 existing, snapshot = self._account(value['id'])
                 if existing['kind'] != 'api' or not self.edit(existing['id']).get('api'):
-                    raise ValueError('此接入由客户端管理，仅支持修改名称')
+                    raise ValueError("이 연결은 데스크톱 클라이언트에 의해 관리됩니다. 여기서는 이름만 편집할 수 있습니다.")
                 old = _json(snapshot/'gateway.json')
             url = value.get('baseUrl')
             if (not isinstance(url, str) or len(url) > 2048
                     or any(c.isspace() or ord(c) < 32 or c in '\\\x7f' for c in url)):
-                raise ValueError('请输入有效的 API 地址')
+                raise ValueError("유효한 API URL를 입력하세요.")
             try:
                 parsed = parse.urlsplit(url)
                 valid = (parsed.scheme == 'https' or parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1', '::1'))
@@ -558,19 +558,19 @@ class ClaudeAccounts:
             except ValueError:
                 valid = False
             if not valid:
-                raise ValueError('API 地址须使用 HTTPS（本机可使用 HTTP），且不能包含凭据、查询参数或片段')
+                raise ValueError("API URL는 HTTPS(루프백에 HTTP가 허용됨)를 사용해야 하며 자격 증명, 쿼리 매개변수 또는 조각을 포함하지 않습니다.")
             key = value.get('apiKey', '')
             if key == '' and old:
                 key = old['config'].get('inferenceGatewayApiKey')
             if not isinstance(key, str) or not re.fullmatch(r'[\x21-\x7e]{1,8192}', key):
-                raise ValueError('请输入有效的 API Key')
+                raise ValueError("유효한 API 키를 입력하세요.")
             auth = value.get('authScheme', 'bearer')
             if auth not in ('bearer', 'x-api-key'):
-                raise ValueError('API 认证方式无效')
+                raise ValueError('API 인증 방법이 잘못되었습니다.')
             models = value.get('models')
             if (not isinstance(models, list) or not 1 <= len(models) <= 200
                     or any(not isinstance(model, str) or not re.fullmatch(r'[^\s\x00-\x1f\x7f]{1,200}', model) for model in models)):
-                raise ValueError('请填写上游支持的模型 ID，每行一个，最多 200 个')
+                raise ValueError("지원되는 모델 ID를 한 줄에 하나씩 최대 200개까지 입력하세요.")
             config = copy.deepcopy(old['config']) if old else {}
             old_models = config.get('inferenceModels', [])
             by_name = {model if isinstance(model, str) else model.get('name', ''): model for model in old_models}
@@ -657,10 +657,10 @@ class ClaudeAccounts:
 
     def _transaction(self, token):
         if not isinstance(token, str) or len(token) != 32 or any(c not in '0123456789abcdef' for c in token):
-            raise ValueError('Claude 恢复记录无效')
+            raise ValueError("Claude 복구 레코드가 잘못되었습니다.")
         root = self.directory/'transactions'/token
         if _json(root/'complete.json').get('complete') is not True:
-            raise ValueError('Claude 恢复记录不可用')
+            raise ValueError("Claude 복구 레코드를 사용할 수 없습니다.")
         return root
 
     def rollback(self, token):
@@ -684,7 +684,7 @@ class ClaudeAccounts:
             row, snapshot = self._account(identifier)
             manifest = _json(snapshot/'manifest.json')
             if manifest.get('fingerprint') != row.get('fingerprint') or manifest.get('kind') != row['kind']:
-                raise ValueError('Claude 账号快照不可用，请重新保存')
+                raise ValueError("저장된 Claude 계정 스냅샷을 사용할 수 없습니다. 계정을 다시 저장하세요.")
             token = self._backup()
             try:
                 if row['kind'] == 'official':
@@ -713,13 +713,13 @@ class ClaudeAccounts:
                     config['deploymentMode'] = '3p' if row['kind'] == 'api' else '1p'
                     private_json(home/CONFIG, config)
                 if self._current()[1] != row['fingerprint']:
-                    raise ValueError('Claude 账号写入后未通过核对')
+                    raise ValueError("저장된 Claude 계정 구성을 확인할 수 없습니다.")
             except Exception:
                 try:
                     self.rollback(token)
                 except Exception:
-                    raise ValueError('Claude 账号切换失败，原接入恢复未完成，请在桌面端恢复') from None
-                raise ValueError('Claude 账号切换失败，已恢复原接入') from None
+                    raise ValueError("Claude 계정 전환에 실패하여 이전 연결을 완전히 복원하지 못했습니다. 데스크탑 게이트웨이에서 복원하십시오.") from None
+                raise ValueError("Claude 계정 전환에 실패했습니다. 이전 연결이 복원되었습니다.") from None
             return token
 
     def details(self, identifier, refresh=False):
@@ -764,23 +764,23 @@ class ClaudeAccounts:
                             continue
                         value = value or _decrypt_cookie(host, encrypted, source, keys)
                         if not value or any(ord(c) < 33 or ord(c) > 126 or c in ';\r\n' for c in value):
-                            raise ValueError('Claude 登录凭据不可用，请在客户端重新登录后保存')
+                            raise ValueError("Claude 자격 증명을 사용할 수 없습니다. 클라이언트에 다시 로그인한 후 계정을 저장하세요.")
                         cookies[name] = value
                     if not all(cookies.get(name) for name in ('sessionKey', 'lastActiveOrg')):
-                        raise ValueError('Claude 登录已失效，请在客户端重新登录后保存')
+                        raise ValueError("Claude 로그인이 만료되었습니다. 클라이언트에 다시 로그인한 후 계정을 저장하세요.")
                     org = cookies['lastActiveOrg']
                     data = _web_json('/api/organizations/'+parse.quote(org, safe='')+'/usage', cookies, org)
                     if ephemeral and self._current()[:2] != (kind, fingerprint):
-                        raise ValueError('Claude 当前登录已发生变化，请重新查询')
+                        raise ValueError("현재 Claude 로그인이 변경되었습니다. 다시 확인하세요.")
                     limits = _usage_limits(data)
                     if not limits:
-                        raise ValueError('Claude 未返回可识别的剩余额度')
+                        raise ValueError("Claude가 인식할 수 없는 사용 형식을 반환했습니다.")
                     usage['limits'] = limits
                     usage['status'] = 'ready'
                     usage['checkedAt'] = time.time()
                 except Exception:
                     # Network/server bodies and OS errors may contain credentials.
-                    usage['error'] = '无法查询 Claude 剩余额度，请确认客户端登录有效并解锁系统凭据存储后重试'
+                    usage['error'] = "Claude 남은 사용량을 확인할 수 없습니다. 클라이언트가 로그인되어 있는지 확인하고 시스템 자격 증명 저장소를 잠금 해제한 후 다시 시도하십시오."
             if ephemeral:
                 self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
                 self.directory.chmod(0o700)

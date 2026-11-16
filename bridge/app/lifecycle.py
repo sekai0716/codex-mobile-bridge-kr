@@ -67,12 +67,12 @@ class GatewayControl:
                                 try:
                                     handler = {'accounts': accounts, 'account': account, 'harness': harness, 'desktop-sessions': desktop_sessions, 'cli-access': cli_access}[value['payload']['action']]
                                     if handler is None:
-                                        raise ValueError('请更新网关')
+                                        raise ValueError('게이트웨이를 업데이트하세요')
                                     result = {'ok': True, 'result': handler(value['payload'].get('value', {}))}
                                 except (AccountError, PermissionError, ValueError) as exc:
                                     result = {'ok': False, 'error': str(exc)}
                                 except Exception:
-                                    result = {'ok': False, 'error': '本地操作未完成，请检查运行状态后重试'}
+                                    result = {'ok': False, 'error': "로컬 작업이 실패했습니다. 런타임 상태를 확인하고 다시 시도하세요."}
                                 if not self.closed.is_set():
                                     try:
                                         private_json(request.with_suffix('.response'), result)
@@ -144,10 +144,10 @@ def request_pairing(data_dir, payload, timeout=5):
     record = read_record(path)
     name = record.get('pairingDir', '') if isinstance(record, dict) else ''
     if not re.fullmatch(r'\.pairing-[a-zA-Z0-9_-]+', name):
-        raise ValueError('请重新启动网关以启用扫码登录')
+        raise ValueError("QR 로그인을 활성화하려면 게이트웨이를 다시 시작하세요.")
     directory = path.parent / name
     if not directory.is_dir() or directory.is_symlink():
-        raise ValueError('网关已停止')
+        raise ValueError('게이트웨이가 중지되었습니다.')
     identifier = secrets.token_hex(16)
     request = directory / (identifier + '.request')
     response = request.with_suffix('.response')
@@ -156,14 +156,14 @@ def request_pairing(data_dir, payload, timeout=5):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if read_record(path) != record:
-                raise ValueError('网关已停止')
+                raise ValueError('게이트웨이가 중지되었습니다.')
             result = read_record(response)
             if isinstance(result, dict):
                 if not result.get('ok'):
-                    raise ValueError(result.get('error', '扫码登录操作失败'))
+                    raise ValueError(result.get('error', "QR 로그인 작업이 실패했습니다."))
                 return result['result']
             time.sleep(.05)
-        raise ValueError('扫码登录操作超时，请重试')
+        raise ValueError("QR 로그인 작업 시간이 초과되었습니다. 다시 시도해 주세요.")
     finally:
         request.unlink(missing_ok=True)
         response.unlink(missing_ok=True)

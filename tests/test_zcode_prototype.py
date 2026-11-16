@@ -51,7 +51,7 @@ class ZCodePrototypeTests(unittest.TestCase):
         self.assertEqual(recovered.call('zcode', 'send', 'sess_test', body), result)
         recovered_transport.assert_not_called()
         self.assertEqual(transport.call_count, 1)
-        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
+        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
             recovered.call('zcode', 'send', 'sess_test', {**body, 'text': 'different'})
 
     def test_project_reference_revalidates_shared_boundary(self):
@@ -70,7 +70,7 @@ class ZCodePrototypeTests(unittest.TestCase):
         adapter = ZCodePrototype(self.root, self.config, transport)
         with self.assertRaises(ValueError): adapter.call('stop', 'another-session', {'id': str(uuid.uuid4())})
         adapter.bindings.clear()
-        with self.assertRaisesRegex(Exception, '显式接入'): adapter.call('send', 'sess_test', {'id': str(uuid.uuid4()), 'text': 'hi'})
+        with self.assertRaisesRegex(Exception, "먼저\\ 기본\\ 테스트\\ 세션에\\ 명시적으로\\ 연결해야\\ 합니다\\."): adapter.call('send', 'sess_test', {'id': str(uuid.uuid4()), 'text': 'hi'})
         transport.assert_not_called()
 
     def test_explicit_attach_does_not_require_the_stale_binding(self):
@@ -89,23 +89,23 @@ class ZCodePrototypeTests(unittest.TestCase):
                 return {'workspace': str(self.project)}
             if req['action'] == 'attach':
                 return {'binding': binding, 'subscriptionId': 'lease'}
-            raise BridgeUnavailable('回执未知')
+            raise BridgeUnavailable('알 수 없는 영수증')
         transport = Mock(side_effect=native)
         adapter = ZCodePrototype(self.root, {**self.config, 'dataDirectory': self.root/'v2'}, transport)
         rid = str(uuid.uuid4())
         with patch.object(adapter, '_window_app', return_value='original'), \
                 patch.object(adapter, '_live_process', return_value={'pid': 70}), \
                 patch.object(adapter, '_resume_window', return_value={'id': rid, 'status': 'ready'}) as window, \
-                patch.object(adapter, '_send_window', side_effect=BridgeUnavailable('回执未知')) as send:
+                patch.object(adapter, '_send_window', side_effect=BridgeUnavailable('알 수 없는 영수증')) as send:
             adapter.call('resume', 'sess_test', {'id': rid})
-            with self.assertRaisesRegex(BridgeUnavailable, '回执未知'):
+            with self.assertRaisesRegex(BridgeUnavailable, '알 수 없는 영수증'):
                 adapter.call('send', 'sess_test', {'id': rid, 'text': 'only once'})
             transport.assert_not_called()
             # Lock only prevents the GUI's explicit resume. An authorized debugger
             # reconnects the same session without unlocking or retrying that input.
-            window.side_effect = ResumePreflightBlocked('屏幕已锁定')
+            window.side_effect = ResumePreflightBlocked('화면이 잠겨 있습니다.')
             self.assertEqual(adapter.call('resume', 'sess_test', {'id': rid})['status'], 'ready')
-            with self.assertRaisesRegex(BridgeUnavailable, '回执未知'):
+            with self.assertRaisesRegex(BridgeUnavailable, '알 수 없는 영수증'):
                 adapter.call('send', 'sess_test', {'id': rid, 'text': 'new input'})
             self.assertEqual([c.args[0]['action'] for c in transport.call_args_list], ['target','attach','send'])
             send.assert_called_once()
@@ -141,14 +141,14 @@ class ZCodePrototypeTests(unittest.TestCase):
         outside = self.root / 'replacement'; outside.mkdir()
         (outside / 'file.md').write_text('different project')
         self.project.symlink_to(outside, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, '项目目录已变化'):
+        with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 다시\\ 로그인하세요\\."):
             project_files(str(self.project), ['file.md'])
 
     @patch('bridge.clients.zcode.adapter.Workspace')
     def test_attachment_total_is_bounded_before_native_transfer(self, workspace):
         workspace.return_value.root = self.project
         workspace.return_value.read.return_value = {'name': 'file', 'size': 12 * 1024 * 1024, 'data': ''}
-        with self.assertRaisesRegex(ValueError, '总量'):
+        with self.assertRaisesRegex(ValueError, "프로토타입의\\ 총\\ 첨부\\ 파일\\ 수는\\ 다음을\\ 초과할\\ 수\\ 없습니다\\.\\ 20\\ MB"):
             project_files(self.project, ['one', 'two'])
 
     def test_projection_keeps_stable_ids_native_attachments_and_partial_history(self):
@@ -204,7 +204,7 @@ class ZCodePrototypeTests(unittest.TestCase):
         adapter = ZCodePrototype(self.root, self.config, transport)
         adapter.call('list')
         transport.reset_mock()
-        with self.assertRaisesRegex(Exception, '显式接入'):
+        with self.assertRaisesRegex(Exception, "먼저\\ 기본\\ 테스트\\ 세션에\\ 명시적으로\\ 연결해야\\ 합니다\\."):
             adapter.call('send', 'sess_new', {'id': str(uuid.uuid4()), 'text': 'test'})
         transport.assert_not_called()
 

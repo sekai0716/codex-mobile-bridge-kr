@@ -44,7 +44,7 @@ class ClientLifecycleTests(unittest.TestCase):
             self.manager.require_enabled(row['id'])
             with self.assertRaises(ValueError):
                 self.manager.require_enabled('codex')
-            with self.assertRaisesRegex(ValueError, '原 WSL 终端'):
+            with self.assertRaisesRegex(ValueError, '기존 WSL 단말기'):
                 self.manager.toggle_client({'provider': row['id'], 'enabled': False, 'quitDesktop': True})
             self.assertTrue(entries.enabled(row['id']))
             self.manager.toggle_client({'provider': row['id'], 'enabled': False, 'quitDesktop': False})
@@ -76,7 +76,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.manager.require_enabled(identifier)
         with self.assertRaises(ValueError):
             self.manager.require_enabled('codex')
-        with self.assertRaisesRegex(ValueError, '安装 Codex'):
+        with self.assertRaisesRegex(ValueError, "Codex를\\ 설치하고\\ 컴퓨터에\\ 계정\\ 또는\\ API를\\ 구성하세요\\."):
             self.manager.toggle_client({'provider': 'codex', 'enabled': True})
         self.launch.assert_not_called()
         self.assertTrue(entries.enabled(identifier))
@@ -294,7 +294,7 @@ class ClientLifecycleTests(unittest.TestCase):
             for provider in ('codex', 'claude', 'deepseek'):
                 self.manager.toggle_client({'provider': provider, 'enabled': False, 'quitDesktop': False})
                 self.assertFalse(self.manager.enabled(provider))
-                with self.assertRaisesRegex(ValueError, '应用已关闭'):
+                with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."):
                     self.manager.require_enabled(provider)
         idle.assert_not_called()
         self.accounts.assert_editable.assert_not_called()
@@ -348,7 +348,7 @@ class ClientLifecycleTests(unittest.TestCase):
     def test_explicit_quit_keeps_busy_guard_and_enabled_preference(self):
         self.claude.desktop_listing.return_value = {'complete': True, 'sessions': [
             {'id': 'one', 'status': 'running', 'runtimeKnown': True, 'requests': []}]}
-        with self.assertRaisesRegex(ValueError, '任务运行或等待'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.manager.toggle_client({'provider': 'claude', 'enabled': False, 'quitDesktop': True})
         self.assertTrue(self.manager.enabled('claude'))
         self.stop.assert_not_called()
@@ -361,10 +361,10 @@ class ClientLifecycleTests(unittest.TestCase):
                 self.manager.toggle_client({'provider': provider, 'enabled': False, 'quitDesktop': False})
                 with patch('bridge.features.workspace.workspace.operate') as operate, patch('bridge.app.service.Bridge.terminal') as terminal:
                     for action in ('upload', 'git-action'):
-                        with self.assertRaisesRegex(ValueError, '应用已关闭'):
+                        with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."):
                             workspace.workspace(workspace.identifier, action, {})
                     for action in ('start', 'open', 'input', 'resize', 'close', 'stop'):
-                        with self.assertRaisesRegex(ValueError, '应用已关闭'):
+                        with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."):
                             workspace.terminal(workspace.identifier, 'fixture', action, {})
                     operate.assert_not_called()
                     terminal.assert_not_called()
@@ -416,9 +416,9 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_invalid_quit_choice_never_changes_state(self):
         for value in (None, 'false', 0, 1, []):
-            with self.assertRaisesRegex(ValueError, '应用开关无效'):
+            with self.assertRaisesRegex(ValueError, "잘못된\\ 클라이언트\\ 액세스\\ 설정"):
                 self.manager.toggle_client({'provider': 'claude', 'enabled': False, 'quitDesktop': value})
-        with self.assertRaisesRegex(ValueError, '应用开关无效'):
+        with self.assertRaisesRegex(ValueError, "잘못된\\ 클라이언트\\ 액세스\\ 설정"):
             self.manager.toggle_client({'provider': 'claude', 'enabled': True, 'quitDesktop': False})
         self.assertTrue(self.manager.enabled('claude'))
         self.stop.assert_not_called()
@@ -465,10 +465,10 @@ class ClientLifecycleTests(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     self.manager.toggle_client(value)
             self.manager.gateway_running = False
-            with self.assertRaisesRegex(ValueError, '强制结束请求无效'):
+            with self.assertRaisesRegex(ValueError, "백그라운드\\ 강제\\ 종료\\ 요청이\\ 잘못되었습니다\\."):
                 self.manager.toggle_client(base)
             self.manager.gateway_running = True
-        with patch('bridge.clients.manager.sys.platform', 'unsupported'), self.assertRaisesRegex(ValueError, '强制结束请求无效'):
+        with patch('bridge.clients.manager.sys.platform', 'unsupported'), self.assertRaisesRegex(ValueError, "백그라운드\\ 강제\\ 종료\\ 요청이\\ 잘못되었습니다\\."):
             self.manager.toggle_client(base)
         self.assertTrue(self.manager.enabled('claude'))
         self.stop.assert_not_called()
@@ -507,9 +507,9 @@ class ClientLifecycleTests(unittest.TestCase):
     def test_windows_claude_implicit_quit_and_account_stop_still_need_idle_evidence(self):
         self.claude.status.return_value = {'connected': False}
         with patch('bridge.clients.manager.sys.platform', 'win32'):
-            with self.assertRaisesRegex(ValueError, '无法确认'):
+            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
                 self.toggle('claude', False)
-            with self.assertRaisesRegex(ValueError, '无法确认'):
+            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
                 self.manager._stop_client('claude', self.manager._descriptor('claude'), self.inspect(None))
         self.stop.assert_not_called()
         self.assertTrue(self.manager.enabled('claude'))
@@ -518,7 +518,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.claude.call.side_effect = lambda *args, **kwargs: {'complete': False, 'sessions': [
             {'id': 'one', 'status': 'running', 'runtimeKnown': True}]}
         with patch('bridge.clients.manager.sys.platform', 'win32'):
-            with self.assertRaisesRegex(ValueError, '任务运行或等待'):
+            with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
                 self.manager.toggle_client({'provider': 'claude', 'enabled': False, 'quitDesktop': True})
         self.stop.assert_not_called()
         self.assertTrue(self.manager.enabled('claude'))
@@ -541,15 +541,15 @@ class ClientLifecycleTests(unittest.TestCase):
         state = {**self.inspect(None), 'unknown': True}
         self.inspect.side_effect = lambda _: state
         with patch('bridge.clients.manager.sys.platform', 'win32'):
-            with self.assertRaisesRegex(ValueError, '无法确认'):
+            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
                 self.manager.toggle_client({'provider': 'claude', 'enabled': False, 'quitDesktop': True})
         self.stop.assert_not_called()
 
     def test_windows_claude_pending_native_confirmation_preserves_enabled(self):
         self.claude.status.return_value = {'connected': False}
-        self.stop.side_effect = ValueError('请在电脑端处理 Claude 的任务或保存提示后重试')
+        self.stop.side_effect = ValueError("Claude 작업을 처리하거나 컴퓨터에 프롬프트를 저장한 후 다시 시도하세요.")
         with patch('bridge.clients.manager.sys.platform', 'win32'):
-            with self.assertRaisesRegex(ValueError, '任务或保存提示'):
+            with self.assertRaisesRegex(ValueError, "Claude\\ 작업을\\ 처리하거나\\ 컴퓨터에\\ 프롬프트를\\ 저장한\\ 후\\ 다시\\ 시도하세요\\."):
                 self.manager.toggle_client({'provider': 'claude', 'enabled': False, 'quitDesktop': True})
         self.assertTrue(self.manager.enabled('claude'))
         self.claude.reconnect.assert_called_once_with()
@@ -701,7 +701,7 @@ class ClientLifecycleTests(unittest.TestCase):
             preview = self.manager.control({'action': 'deepseek-recovery-preview', 'restart': False})
             self.assertTrue(preview['unknown'])
             self.assertFalse(preview['canRecover'])
-            with self.assertRaisesRegex(ValueError, '尚未提交退出'):
+            with self.assertRaisesRegex(ValueError, "Harness\\ 액세스\\ 구성을\\ 확인할\\ 수\\ 없고\\ 작업\\ 상태를\\ 알\\ 수\\ 없으며\\ 종료가\\ 아직\\ 제출되지\\ 않았습니다\\.\\ 컴퓨터를\\ 정상적으로\\ 종료하거나\\ 강제\\ 종료를\\ 미리\\ 보고\\ 확인하세요\\."):
                 self.manager.control({'action': 'deepseek-recovery-confirm', 'token': preview['token'],
                                       'confirmed': True, 'acknowledgeUnknown': True})
         query.assert_not_called()
@@ -785,7 +785,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.manager._account_store = Mock(return_value=store)
         self.claude.desktop_listing.return_value = {'complete': True, 'sessions': [
             {'id': 'busy', 'status': 'active', 'runtimeKnown': True}]}
-        with self.assertRaisesRegex(ValueError, '运行或等待'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.manager.client_accounts('claude', {'operation': 'switch', 'id': 'other'})
         store.restore.assert_not_called()
         self.stop.assert_not_called()
@@ -860,7 +860,7 @@ class ClientLifecycleTests(unittest.TestCase):
             {'activeIds': ['previous'], 'accounts': []},
         ]
         self.manager._account_store = Mock(return_value=store)
-        with self.assertRaisesRegex(ValueError, '账号配置尚未生效'):
+        with self.assertRaisesRegex(ValueError, "계정\\ 구성이\\ 적용되지\\ 않았습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
             self.manager.client_accounts('claude', {'operation': 'switch', 'id': 'other'})
         store.rollback.assert_called_once_with('transaction')
         store.commit.assert_not_called()
@@ -910,7 +910,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.manager.gateway_running = False
         store = Mock()
         self.manager._account_store = Mock(return_value=store)
-        with self.assertRaisesRegex(ValueError, '先退出客户端'):
+        with self.assertRaisesRegex(ValueError, "계정을\\ 저장하거나\\ 전환하기\\ 전에\\ 클라이언트를\\ 종료하거나\\ 계속하려면\\ 게이트웨이를\\ 시작하세요\\."):
             self.manager.client_accounts('claude', {'operation': 'import-current'})
         store.import_current.assert_not_called()
         self.stop.assert_not_called()
@@ -944,7 +944,7 @@ class ClientLifecycleTests(unittest.TestCase):
             self.assertTrue(entered.wait(1))
             with patch('bridge.clients.manager.LIFECYCLE_GATE_WAIT', .05):
                 closer.start()
-                with self.assertRaisesRegex(ValueError, '操作正在进行'):
+                with self.assertRaisesRegex(ValueError, "가지다\\ Codex\\ 작업이\\ 진행\\ 중이며\\ 종료가\\ 수행되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\."):
                     result.result(timeout=.5)
             self.stop.assert_not_called()
             self.bridge.assert_desktop_idle.assert_not_called()
@@ -1096,7 +1096,7 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_linux_claude_enable_does_not_claim_supported_connection(self):
         with patch('bridge.clients.manager.sys.platform', 'linux'):
-            with self.assertRaisesRegex(ValueError, '不支持 Claude'):
+            with self.assertRaisesRegex(ValueError, "이\\ 시스템은\\ 지원하지\\ 않습니다\\ Claude\\ 데스크톱\\ 연결"):
                 self.manager.toggle_client({'provider': 'claude', 'enabled': True})
         self.launch.assert_not_called()
         self.claude.connect.assert_not_called()
@@ -1113,7 +1113,7 @@ class ClientLifecycleTests(unittest.TestCase):
         for provider, enabled, initialize in [('claude', True, 1), ('claude', True, 'true'),
                 ('claude', False, True), ('claude', False, False), ('deepseek', True, True), ('codex', True, False)]:
             with self.subTest(provider=provider, enabled=enabled, initialize=initialize):
-                with self.assertRaisesRegex(ValueError, '初始化请求'):
+                with self.assertRaisesRegex(ValueError, '초기화 요청'):
                     self.manager.toggle_client({'provider': provider, 'enabled': enabled, 'initializeDesktop': initialize})
         self.claude.connect.assert_not_called()
         self.claude.reconnect.assert_not_called()
@@ -1157,7 +1157,7 @@ class ClientLifecycleTests(unittest.TestCase):
             with self.subTest(platform=platform), patch('bridge.clients.manager.sys.platform', platform):
                 self.running = False
                 self.claude.status.return_value = {'connected': False, 'setupState': 'connecting',
-                                                   'reason': '正在连接 Claude'}
+                                                   'reason': "Claude에 연결 중"}
                 with patch('bridge.clients.manager.time.monotonic', return_value=10):
                     first = self.manager.clients(refresh=True)
                 row = next(r for r in first['clients'] if r['id'] == 'claude')
@@ -1193,7 +1193,7 @@ class ClientLifecycleTests(unittest.TestCase):
     def test_pending_interaction_blocks_stop_and_preserves_preference(self):
         self.claude.desktop_listing.return_value = {'complete': True,
             'sessions': [{'id': 'one', 'status': 'idle', 'runtimeKnown': True, 'requests': [{'id': 'question'}]}]}
-        with self.assertRaisesRegex(ValueError, '任务运行或等待'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.toggle('claude', False)
         self.stop.assert_not_called(); self.claude.cancel.assert_not_called()
         self.assertTrue(self.manager.enabled('claude'))
@@ -1202,7 +1202,7 @@ class ClientLifecycleTests(unittest.TestCase):
         for payload in ({'connected': True, 'complete': False, 'sessions': []},
                         {'connected': True, 'complete': True, 'sessions': [{'id': 'one', 'status': 'idle', 'runtimeKnown': False}]}):
             self.claude.desktop_listing.return_value = payload
-            with self.assertRaisesRegex(ValueError, '无法确认'):
+            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
                 self.toggle('claude', False)
         self.stop.assert_not_called()
 
@@ -1219,7 +1219,7 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_unavailable_adapter_never_means_idle(self):
         self.dsh.call.side_effect = BridgeUnavailable('disconnected')
-        with self.assertRaisesRegex(ValueError, '无法确认'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.toggle('deepseek', False)
         self.stop.assert_not_called(); self.assertTrue(self.manager.enabled('deepseek'))
 
@@ -1232,7 +1232,7 @@ class ClientLifecycleTests(unittest.TestCase):
     def test_restart_claude_uses_same_busy_guard(self):
         self.claude.desktop_listing.return_value = {'complete': True,
             'sessions': [{'id': 'one', 'status': 'active', 'runtimeKnown': True, 'requests': []}]}
-        with self.assertRaisesRegex(ValueError, '任务运行或等待'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.manager.control({'action': 'restart-claude'})
         self.stop.assert_not_called(); self.claude.connect.assert_not_called()
 
@@ -1261,14 +1261,14 @@ class ClientLifecycleTests(unittest.TestCase):
         self.inspect.return_value = None
         self.inspect.side_effect = lambda _: {'running': True, 'pids': [11, 12, 13], 'mainPids': [11],
             'runtimePids': [12, 13], 'unknown': False}
-        with self.assertRaisesRegex(ValueError, '无法确认'):
+        with self.assertRaisesRegex(ValueError, '모든 작업 상태를 확인할 수 있는 것은 아닙니다'):
             self.toggle('deepseek', False)
         self.stop.assert_not_called()
 
     def test_recovery_normal_exit_requires_server_rebuild_failure_and_explicit_ack(self):
         from bridge.clients.errors import TaskStateUnavailable
         self.bridge.desktop_restart_recommended = Mock(return_value=True)
-        self.bridge.assert_desktop_idle.side_effect = TaskStateUnavailable('无法确认')
+        self.bridge.assert_desktop_idle.side_effect = TaskStateUnavailable('확인할 수 없습니다')
         with patch('bridge.clients.manager.sys.platform', 'darwin'):
             with self.assertRaises(TaskStateUnavailable):
                 self.manager.toggle_client({'provider': 'codex', 'enabled': False, 'quitDesktop': True})
@@ -1279,19 +1279,19 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_recovery_confirmation_never_bypasses_known_busy_or_unrelated_exit(self):
         self.bridge.desktop_restart_recommended = Mock(return_value=True)
-        self.bridge.assert_desktop_idle.side_effect = ValueError('有任务运行')
+        self.bridge.assert_desktop_idle.side_effect = ValueError('실행 중인 작업이 있습니다.')
         with patch('bridge.clients.manager.sys.platform', 'darwin'):
-            with self.assertRaisesRegex(ValueError, '任务运行'):
+            with self.assertRaisesRegex(ValueError, '실행 중인 작업이 있습니다'):
                 self.manager.toggle_client({'provider': 'codex', 'enabled': False, 'quitDesktop': True,
                                             'acknowledgeUnavailable': True})
             self.bridge.desktop_restart_recommended.return_value = False
-            with self.assertRaisesRegex(ValueError, '退出确认无效'):
+            with self.assertRaisesRegex(ValueError, "데스크톱\\ 복구\\ 종료\\ 확인이\\ 잘못되었습니다\\.\\ 연결\\ 상태를\\ 다시\\ 확인하세요\\."):
                 self.manager.toggle_client({'provider': 'codex', 'enabled': False, 'quitDesktop': True,
                                             'acknowledgeUnavailable': True})
         self.stop.assert_not_called()
 
     def test_busy_codex_not_currently_followed_blocks_exit(self):
-        self.bridge.assert_desktop_idle.side_effect = ValueError('有任务运行或等待确认')
+        self.bridge.assert_desktop_idle.side_effect = ValueError('실행 중이거나 확인을 기다리는 작업이 있습니다.')
         with self.assertRaises(ValueError): self.toggle('codex', False)
         self.stop.assert_not_called(); self.assertTrue(self.manager.enabled('codex'))
 
@@ -1365,7 +1365,7 @@ class ClientLifecycleTests(unittest.TestCase):
         sending = threading.Thread(target=send); sending.start()
         self.assertTrue(sending.is_alive())
         finish.set(); closing.join(2); sending.join(2)
-        self.assertEqual(errors, ['此应用已关闭，请在应用管理中开启'])
+        self.assertEqual(errors, ["이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요."])
         self.assertFalse(any(call.args[0] == 'send' for call in self.dsh.call.call_args_list))
 
 
@@ -1376,7 +1376,7 @@ class ClientLifecycleTests(unittest.TestCase):
         @operation
         def mutate(bridge): submitted()
         self.manager.config['enabled']['codex'] = False
-        with self.assertRaisesRegex(ValueError, '应用已关闭'): mutate(self.bridge)
+        with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."): mutate(self.bridge)
         submitted.assert_not_called()
         self.manager.config['enabled']['codex'] = True
         mutate(self.bridge); submitted.assert_called_once()
@@ -1392,7 +1392,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.dsh.reused = True
         self.dsh.call.side_effect = lambda action, *args: ({'connected': True, 'configured': True,
             'bridgeRevision': 2, 'updateRequired': True} if action == 'status' else {'sessions': [{'id': 'old', 'status': 'idle'}]})
-        with self.assertRaisesRegex(ValueError, '退出 Harness'):
+        with self.assertRaisesRegex(ValueError, "이\\ Harness\\ 커넥터\\ 버전은\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터에서\\ Harness를\\ 종료한\\ 후\\ 다시\\ 연결하세요\\."):
             self.manager.connect_deepseek(restart=True)
         self.stop.assert_not_called(); self.dsh.update_existing.assert_not_called(); self.launch_dsh.assert_not_called()
 
@@ -1417,7 +1417,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.assertFalse(row['connected'])
         self.assertEqual(row['connectionState'], 'connecting')
         self.assertEqual(row['setupStatus'], 'connecting')
-        self.assertIn('等待', row['reason'])
+        self.assertIn("Harness가 시작되었습니다. 데스크톱 연결을 기다리는 중입니다.", row['reason'])
         self.assertFalse(row['retryable'])
 
     def test_dsh_slow_native_launch_remains_starting_until_process_is_observed(self):
@@ -1434,12 +1434,12 @@ class ClientLifecycleTests(unittest.TestCase):
         self.running = False
         self.dsh.call.side_effect = BridgeUnavailable('endpoint not ready')
         self.launch_dsh.side_effect = lambda *_: {'running': False, 'launched': False}
-        with self.assertRaisesRegex(ValueError, '尚未启动'):
+        with self.assertRaisesRegex(ValueError, "앱이\\ 시작되지\\ 않았습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
             self.manager._start_deepseek()
         row = self.dsh_row()
         self.assertEqual(row['connectionState'], 'error')
         self.assertTrue(row['retryable'])
-        self.assertIn('尚未启动', row['reason'])
+        self.assertIn("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.", row['reason'])
         self.assertEqual(json.loads(self.manager.config_path.read_text())['setup']['deepseek']['connectionState'], 'error')
 
     def test_dsh_connection_timeout_can_retry_and_late_connection_recovers(self):
@@ -1450,7 +1450,7 @@ class ClientLifecycleTests(unittest.TestCase):
             row = self.dsh_row()
             self.assertEqual(row['connectionState'], 'timeout')
             self.assertTrue(row['retryable'])
-            self.assertIn('重试', row['reason'])
+            self.assertIn("다시 시도", row['reason'])
             self.manager._start_deepseek()
             self.assertEqual(self.dsh_row()['connectionState'], 'connecting')
         self.dsh.call.side_effect = lambda *_: {'connected': True, 'configured': True, 'bridgeRevision': 3}
@@ -1468,7 +1468,7 @@ class ClientLifecycleTests(unittest.TestCase):
         self.assertEqual(row['connectionState'], 'error')
         self.assertFalse(row['connected'])
         self.assertTrue(row['retryable'])
-        self.assertIn('退出', row['reason'])
+        self.assertIn('종료', row['reason'])
 
     def test_windows_dsh_cold_start_allows_seventy_seconds_then_retry_and_late_connection(self):
         self.running = False

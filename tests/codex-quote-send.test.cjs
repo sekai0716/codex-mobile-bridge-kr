@@ -13,7 +13,7 @@ for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preser
   $:id=>nodes.get(id),t:text=>text,sending:false,currentId:'chat',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
   codexQuotes:quotes,codexDraftScope:scope,composerDrafts:drafts,draftGateway:'gateway',codexProvisionalDrafts:provisionals,messageManagement:null,
   attachments:{ready:()=>true,ids:()=>[],references:()=>[],rows:[],setLocked(){},clear(){}},workModes:{value:()=> 'default',render(){},submitted(){}},
-  invalidSkills:new Set(),selectedSkills:new Set(),BridgeI18n:{locale:()=> 'zh'},chatKey:()=> 'local|chat',uuid:()=> 'send-id',
+  invalidSkills:new Set(),selectedSkills:new Set(),BridgeI18n:{locale:()=> 'ko'},chatKey:()=> 'local|chat',uuid:()=> 'send-id',
   saveDraft(){const fields={text:nodes.get('message').value,quotes:quotes.quotes};const saved=drafts.save(scope,fields);if(!saved)provisionals.set('local|chat',JSON.parse(JSON.stringify(fields)));return saved;},
   sessionStorage:{getItem:key=>temporary.get(key)||null,setItem:(key,value)=>temporary.set(key,value),removeItem:key=>temporary.delete(key)},
   sessionUrl:()=>'/send',api:async(url,body)=>{submitted=body;entered();return new Promise(done=>resolve=done);},bumpRecency(){},toast(){},

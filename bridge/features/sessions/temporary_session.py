@@ -22,7 +22,7 @@ class TemporarySession:
 
     def session(self, identifier, **options):
         if self.chat.id != identifier:
-            raise ValueError('临时侧边聊天已结束，请返回主聊天')
+            raise ValueError('임시 사이드 채팅이 종료되었습니다. 메인 채팅으로 돌아가주세요.')
         return self.chat
 
     def view(self, identifier, **options):
@@ -31,10 +31,10 @@ class TemporarySession:
         value['submissions'] = [{**row, 'attachments': [item['name'] for item in row['attachments']]}
                                 for row in value['submissions'] if row['status'] in ('queued', 'unknown')]
         writable = value['connected']
-        return {**value, 'title': '临时侧边聊天', 'temporary': True, 'host': self.host,
+        return {**value, 'title': "임시 보조 채팅", 'temporary': True, 'host': self.host,
                 'draftAccountIdentity': 'temporary:' + identifier,
                 'hostLabel': self.host_label, 'connectionError': value.get('error'),
-                'attachedParent': {'id': chat.parent, 'host': self.host, 'title': '主聊天', 'available': True},
+                'attachedParent': {'id': chat.parent, 'host': self.host, 'title': '메인 채팅', 'available': True},
                 'access': {'source': 'temporary', 'runtime': 'temporary', 'readOnly': not writable,
                     'canSend': writable, 'canInterrupt': writable, 'canApprove': writable,
                     'canReconnect': False, 'canConfigure': False, 'canChangePermissions': writable,
@@ -81,7 +81,7 @@ class TemporarySession:
         if kind == 'skills':
             return self._operate(identifier, 'skills', query=query, offset=offset, refresh=refresh, selected=ids or [])
         if kind not in (None, 'models'):
-            raise ValueError('无效目录类型')
+            raise ValueError('잘못된 디렉터리 유형')
         return self._operate(identifier, 'catalog', refresh=refresh)
 
     def send(self, identifier, text, submission_id, mode='send', skills=None, *, work_mode=None,
@@ -92,7 +92,7 @@ class TemporarySession:
 
     def settings(self, identifier, model, effort, **options):
         if options:
-            raise ValueError('临时侧边聊天暂不支持此设置')
+            raise ValueError('임시 사이드 채팅은 아직 이 설정을 지원하지 않습니다.')
         return {**self._operate(identifier, 'settings', model=model, effort=effort), 'confirmed': True}
 
     def permissions(self, identifier, preset, confirmed=False, **options):
@@ -126,7 +126,7 @@ class TemporarySession:
         with chat.actions, chat.lock:
             body = dict(body)
             if body.pop('expectedAccount', None) != 'temporary:' + identifier:
-                raise ValueError('临时侧聊已变化，请重新打开消息管理')
+                raise ValueError('임시 사이드 채팅이 변경되었습니다. 메시지 관리를 다시 열어주세요.')
             rows, result = message_management.mutate(self._receipts(), body, scope=identifier)
             chat.submissions = {key: {**chat.submissions[key], **entry} for key, entry in rows}
             chat.changed()
@@ -150,5 +150,5 @@ class TemporarySession:
         with chat.lock:
             files = artifact_paths(chat.state, self.bridge.store.home)
             if artifact_id not in files:
-                raise KeyError('文件不属于此聊天的工作目录')
+                raise KeyError('파일이 이 채팅의 작업 디렉터리에 속하지 않습니다.')
             return files[artifact_id]

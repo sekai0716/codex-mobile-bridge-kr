@@ -8,11 +8,11 @@ import java.util.Locale;
 public final class DshMobileURL {
  public static String connection(String input)throws Exception {
   String value=input.trim();
-  if(value.length()>8192||value.matches("(?s).*[\\x00-\\x20\\x7f\\\\].*"))throw new Exception("DSH Mobile 地址无效");
+  if(value.length()>8192||value.matches("(?s).*[\\x00-\\x20\\x7f\\\\].*"))throw new Exception("잘못된 DSH Mobile 주소입니다.");
   URI u=new URI(value);String host=u.getHost(),scheme=u.getScheme();
-  if(host==null||u.getRawUserInfo()!=null||u.getPort()==0||u.getPort()>65535)throw new Exception("DSH Mobile 地址无效");
+  if(host==null||u.getRawUserInfo()!=null||u.getPort()==0||u.getPort()>65535)throw new Exception("잘못된 DSH Mobile 주소입니다.");
   scheme=scheme==null?"":scheme.toLowerCase(Locale.ROOT);
-  if(!scheme.equals("https")&&!(scheme.equals("http")&&local(host)))throw new Exception("公网地址必须使用 HTTPS；HTTP 仅限局域网");
+  if(!scheme.equals("https")&&!(scheme.equals("http")&&local(host)))throw new Exception("공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.");
   return scheme+"://"+u.getRawAuthority().toLowerCase(Locale.ROOT)+(u.getRawPath().isEmpty()?"/":u.getRawPath())+(u.getRawQuery()==null?"":"?"+u.getRawQuery())+(u.getRawFragment()==null?"":"#"+u.getRawFragment());
  }
  static boolean local(String host){

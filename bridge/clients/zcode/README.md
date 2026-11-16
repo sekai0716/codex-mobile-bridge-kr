@@ -1,25 +1,25 @@
-# ZCode 桌面接入
+# ZCode 데스크톱 액세스
 
-macOS、Windows 和 Linux 网关扫描已安装的 ZCode 桌面应用。Windows 和 Linux 默认通过网关启动原 App 并建立私有管道；Linux 需要已登录的图形桌面。普通启动时可在网关或手机管理应用、查看本机保存的聊天。停用手机访问后，电脑上的应用和任务继续运行。退出与强制退出是独立操作；Windows 正常退出使用 ZCode 自己的托盘菜单，请在可交互的桌面上使用。
+macOS、Windows 및 Linux 게이트웨이 스캔이 설치됨 ZCode 데스크탑 애플리케이션。Windows 및 Linux 기본적으로 원본은 App 그리고 개인 파이프를 생성합니다；Linux 로그인된 그래픽 데스크탑이 필요합니다. 정상적으로 시작하는 동안 게이트웨이나 휴대폰에서 애플리케이션을 관리하고 기기에 저장된 채팅을 볼 수 있습니다. 모바일 액세스를 비활성화한 후에도 PC의 앱과 작업은 계속 실행됩니다. 종료와 강제 종료는 독립적인 작업입니다.；Windows 정상적으로 종료 ZCode 나만의 트레이 메뉴를 대화형 데스크톱에서 사용해 보세요.。
 
-普通本机接入不会启动调试端口。保存的聊天标记为只读，不能通过这条通道发送消息或处理审批。连接后以原 App 的会话协议、项目目录和原生订阅核对控制权限。安装版本用于展示，模型选择、Skill 和附件依照原 App 当次提供的接口开放。切换已保存账号前，请先停用手机访问并退出 ZCode。
+일반 로컬 액세스에서는 디버깅 포트가 시작되지 않습니다. 저장된 채팅은 읽기 전용으로 표시되며 이 채널을 통해 메시지를 보내거나 승인을 처리할 수 없습니다. 연결 후 원본을 사용하세요. App 세션 프로토콜, 프로젝트 디렉터리 및 기본 구독에 대한 제어 권한을 확인하세요. 디스플레이용 설치 버전, 모델 선택、Skill 그리고 원본에 따른 첨부파일 App 이때 제공되는 인터페이스는 오픈되어 있습니다. 저장된 계정을 전환하기 전에 모바일 접속을 비활성화하고 로그아웃하세요. ZCode。
 
-## 旧版显式会话原型
+## 레거시 명시적 세션 프로토타입
 
-以下说明仅适用于单独配置的开发原型。原 App 负责执行、模型、账号和工作区。设计和证据见 [Agent Note](../../../.agents/notes/implemented/feature/2026-10-31-zcode-native-session-prototype.md)。
+다음 지침은 개별적으로 구성된 개발 프로토타입에만 적용됩니다. 원래의 App 실행, 모델, 계정 및 작업공간을 담당합니다. 디자인과 증거를 보려면 다음을 참조하세요. [Agent Note](../../../.agents/notes/implemented/feature/2026-10-31-zcode-native-session-prototype.md)。
 
-## 使用边界
+## 경계 사용
 
-- 仅使用专门的原生测试聊天，明确保存其 sessionId 和绝对 workspace 路径；本脚本不创建聊天。
-- 仅连接已由正常 Launch Services 启动、带 loopback 调试端口的原 App。禁止将调试端口开放到局域网或公网；它不是网关服务端口。
-- 通过原 App 的 SessionDataLayer 租约共享同一会话投影，可与桌面同时查看；不另行 subscribe 或抢回订阅。
-- 只读不自动启动或恢复冷会话。原 App/host 世代变化后，旧绑定停止写入。
-- 使用新请求 UUID 执行新操作。超时或结果未知时只查回执，不能改 UUID 重发同一操作。
-- 真实测试前必须核验原生会话执行器 `snapshot.config.model` 为 `GLM-5.3-Flash`、`snapshot.config.thought` 为 `low`。不能仅以原 App 下拉框或 Bridge 显示值为准；两者可能尚未同步。配置不符时停止发送，先同步并再次核验。已通过且源码未变的测试不重复消耗免费额度。
+- 전용 네이티브 테스트 채팅만 사용하고 명시적으로 저장하세요. sessionId 그리고 절대적으로 workspace 길; 이 스크립트는 채팅을 생성하지 않습니다。
+- 정상적으로 연결만 이루어졌습니다. Launch Services 시작하다, 가져오다 loopback 원래 디버그 포트 App。LAN 또는 공용 네트워크에 대한 디버그 포트를 여는 것은 금지되어 있습니다. 게이트웨이 서비스 포트가 아닙니다。
+- 원본으로 App 의 SessionDataLayer Lease는 동일한 세션 프로젝션을 공유하며 데스크탑과 동시에 볼 수 있습니다. 따로는 아니고 subscribe 아니면 구독권을 다시 빼앗아。
+- 읽기 전용은 콜드 세션을 자동으로 시작하거나 재개하지 않습니다. 원래의 App/host 이전 바인딩은 세대 변경 후 쓰기를 중지합니다.。
+- 새 요청 사용 UUID 새로운 작업을 수행합니다. 시간이 초과되거나 결과를 알 수 없는 경우 영수증만 확인되며 변경할 수 없습니다. UUID 동일한 작업을 다시 보냅니다.。
+- 실제 테스트 전에 기본 세션 실행자를 확인해야 합니다. `snapshot.config.model` ～을 위한 `GLM-5.3-Flash`、`snapshot.config.thought` ～을 위한 `low`。단순히 원작을 바탕으로 한 것이 아닌 App 드롭다운 상자 또는 Bridge 표시된 값이 적용됩니다. 둘은 아직 동기화되지 않았을 수 있습니다. 구성이 일치하지 않으면 전송을 중지하고 먼저 동기화한 후 다시 확인하세요. 테스트를 통과했고 소스 코드가 변경되지 않은 경우 무료 크레딧이 다시 소모되지 않습니다.。
 
-## 手动入口
+## 수동 입장
 
-在仓库 `.tmp/zcode-state/binding.json` 保存本机配置，不提交 Git：
+창고에 `.tmp/zcode-state/binding.json` 제출하지 않고 로컬 구성 저장 Git：
 
 ```json
 {
@@ -38,17 +38,17 @@ python3 -B scripts/zcode-prototype.py --state .tmp/zcode-state receipt < .tmp/re
 python3 -B scripts/zcode-prototype.py --state .tmp/zcode-state detach
 ```
 
-`send.json` 包含 UUID `id`、`text`，可选 `projectFiles` 为项目内相对文件路径列表。它复用现有文件访问边界，并通过原生附件上传协议提交，不生成文件提示词。最多 10 个文件、总计 20 MiB。
+`send.json` 포함하다 UUID `id`、`text`，선택 과목 `projectFiles` 프로젝트 내의 상대 파일 경로 목록입니다. 기존 파일 액세스 경계를 ​​재사용하고 파일 프롬프트를 생성하지 않고 기본 첨부 파일 업로드 프로토콜을 통해 제출합니다. 최대 10 파일, 전체 20 MiB。
 
-`stop` 的 JSON 为 `{ "id": "UUID", "executionId": "当前 control.activeWorks 中的标识" }`。
+`stop` 의 JSON ～을 위한 `{ "id": "UUID", "executionId": "현재 control.activeWorks 로고 입력" }`。
 
-`respond` 的 JSON 为 `{ "id": "UUID", "interactionId": "当前待决项标识", "answer": { "optionId": "原生选项" } }`。选择题可用原生 `action` / `content` 结构，权限项只能使用原生提供的选项。
+`respond` 의 JSON ～을 위한 `{ "id": "UUID", "interactionId": "현재 보류 중인 항목 ID", "answer": { "optionId": "기본 옵션" } }`。객관식 질문은 기본이 될 수 있습니다 `action` / `content` 구조, 권한 항목은 기본적으로 제공되는 옵션만 사용할 수 있습니다.。
 
-`receipt.json` 为 `{ "commandId": "原请求 UUID" }`。核对不会重放操作，也不会自动覆盖本地 unknown 记录。
+`receipt.json` ～을 위한 `{ "commandId": "원래 요청 UUID" }`。확인은 작업을 재생하지 않으며 로컬을 자동으로 덮어쓰지 않습니다. unknown 기록。
 
-`history` 只读原生已有运行时；`detail` 需先显式 attach，随后读取原 App 已同步的快照。适配器无自动轮询或重连计时器。结束原型实测时，先核验原 App 任务，再正常退出关闭临时调试端口；不要强杀。
+`history` 읽기 전용 네이티브에는 이미 런타임이 있습니다.；`detail` 먼저 명시적이어야 합니다. attach，그럼 원문을 읽어보세요 App 동기화된 스냅샷. 어댑터에는 자동 폴링 또는 재연결 타이머가 없습니다. 프로토타입 테스트를 완료하면 먼저 원본을 검증합니다. App 작업을 수행한 후 정상적으로 종료하여 임시 디버깅 포트를 닫습니다. 강제로 죽이지 마세요.。
 
-## 针对性检查
+## 표적 검사
 
 ```sh
 node --test tests/zcode-prototype.test.mjs
@@ -56,8 +56,8 @@ python3 -B -m unittest discover -s tests -p test_zcode_prototype.py -v
 python3 -B scripts/check-boundaries.py
 ```
 
-## Mac Test 手机入口
+## Mac Test 모바일 포털
 
-私有 `desktop-sessions/settings.json` 的 `zcodePrototype` 配置启用绑定的原生测试聊天，通过现有共享聊天页面和鉴权路由访问。模型、账号和新建聊天仍由原 App 管理。
+사적인 `desktop-sessions/settings.json` 의 `zcodePrototype` 기존 공유 채팅 페이지 및 인증된 경로를 통해 액세스되고 바인딩이 활성화된 기본 테스트 채팅을 구성합니다. 모델, 계정 및 새 채팅은 여전히 ​​원본에서 생성됩니다. App 관리하다。
 
-Mac Test 已验证 HTTPS 发送、原生附件和回复，以及局域网读取同一最新结果；窄屏布局使用浏览器模拟验证，不等于 iPhone 真机验收。Windows/Linux、SSH、任意冷会话和 App 更新迁移尚未验证，不能直接将临时调试入口作为正式接入发布。具体证据与限制见 [手机 Test 记录](../../../.agents/notes/implemented/feature/2026-10-31-zcode-mobile-test.md)。
+Mac Test 확인됨 HTTPS 보내기, 기본 첨부 파일 및 회신, LAN은 동일한 최신 결과를 읽습니다. 좁은 화면 레이아웃은 브라우저 시뮬레이션 검증을 사용합니다. iPhone 실제 기계 수용。Windows/Linux、SSH、모든 콜드 세션 및 App 업데이트 마이그레이션이 아직 검증되지 않았으며, 임시 디버깅 진입을 정식 접근으로 직접 해제할 수는 없습니다. 구체적인 증거와 제한 사항은 다음을 참조하세요. [휴대폰 Test 기록](../../../.agents/notes/implemented/feature/2026-10-31-zcode-mobile-test.md)。

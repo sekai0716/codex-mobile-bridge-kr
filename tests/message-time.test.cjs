@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-function fixture(locale='zh-CN'){
+function fixture(locale='ko-KR'){
  const context=vm.createContext({Date,Intl,BridgeI18n:{locale:()=>locale},document:{createElement:tag=>({tagName:tag,setAttribute(k,v){this[k]=v;}})}});
  vm.runInContext(fs.readFileSync('web/features/chat/activity.js','utf8'),context);
  return (value,now)=>{const rows=[];context.value=value;context.now=now;context.target={append:n=>rows.push(n)};vm.runInContext('renderChatMessageTime(target,value,now)',context);return rows;};
@@ -9,8 +9,8 @@ test('native milliseconds and ISO instants agree; local calendar dates include y
  const render=fixture(),now=new Date(2026,10,9,22),date=new Date(2026,10,9,8,7);
  const [time]=render(date.getTime(),now);assert.equal(time.textContent,'08:07');assert.equal(time.dateTime,date.toISOString());
  assert.equal(render(date.toISOString(),now)[0].textContent,time.textContent);
- assert.equal(render(new Date(2026,10,8,8,7).getTime(),now)[0].textContent,'11月8日 08:07');
- assert.equal(render(new Date(2025,10,8,8,7).getTime(),now)[0].textContent,'2025年11月8日 08:07');
+ assert.equal(render(new Date(2026,10,8,8,7).getTime(),now)[0].textContent,'11달8낮 08:07');
+ assert.equal(render(new Date(2025,10,8,8,7).getTime(),now)[0].textContent,'2025년도11달8낮 08:07');
  assert.ok(time.title.includes('2026'));assert.equal(time['aria-label'],time.title);
 });
 test('missing, invalid and ambiguous timestamps never become current time',()=>{

@@ -17,13 +17,13 @@
       const translate = text => typeof BridgeI18n === 'undefined' ? text : BridgeI18n.t(text);
       const label = button.textContent;
       button.disabled = true;
-      button.textContent = translate('正在读取…');
+      button.textContent = translate('독서…');
       try {
         const text = await getText();
-        if (typeof text !== 'string') throw new Error('无法读取复制内容');
-        if (text.length > 262144) throw new Error('内容过长，请分段复制');
-        if (nativePrompt(command, text) !== 'copied') throw new Error('复制失败，请重试');
-        button.textContent = translate('已复制');
+        if (typeof text !== 'string') throw new Error('복사된 콘텐츠를 읽을 수 없습니다.');
+        if (text.length > 262144) throw new Error('내용이 너무 길어요. 부분적으로 복사해주세요.');
+        if (nativePrompt(command, text) !== 'copied') throw new Error('복사하지 못했습니다. 다시 시도해 주세요.');
+        button.textContent = translate('복사됨');
         setTimeout(() => { button.textContent = label; }, 1500);
       } catch (error) {
         button.textContent = label;

@@ -252,12 +252,12 @@ class ClaudeCliContract(unittest.TestCase):
         first['message']['content'] = [{'type': 'tool_result', 'content': 'fixture'}]
         events[0] = json.dumps(first)
         self.path.write_text('\n'.join(events) + '\n')
-        self.assertEqual(self.cli.listing()['sessions'][0]['title'], 'Claude Code 会话')
+        self.assertEqual(self.cli.listing()['sessions'][0]['title'], "Claude Code 채팅")
 
     def test_utf8_history_keeps_chinese_filename_cwd_title_and_body(self):
-        path = self.root/'中文记录.jsonl'
-        event = {'type': 'user', 'cwd': '/项目/中文目录',
-                 'message': {'role': 'user', 'content': '中文标题\n正文内容'}}
+        path = self.root/'중국 기록.jsonl'
+        event = {'type': 'user', 'cwd': '/프로젝트/중국어 카탈로그',
+                 'message': {'role': 'user', 'content': '중국어 제목\n텍스트 내용'}}
         path.write_text(json.dumps(event, ensure_ascii=False)+'\n', encoding='utf-8')
         original = Path.open
         reads = []
@@ -270,11 +270,11 @@ class ClaudeCliContract(unittest.TestCase):
         with patch.object(Path, 'open', opening):
             self.assertEqual(_events(path), [event])
         self.assertEqual(reads, ['utf-8'])
-        saved_path = self.root/'中文项目'/(self.native + '.jsonl')
+        saved_path = self.root/'중국 프로젝트'/(self.native + '.jsonl')
         saved_path.parent.mkdir()
         saved_path.write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
         saved = _saved(saved_path, self.profile['origin'])
-        self.assertEqual((saved['title'], saved['cwd']), ('中文标题', '/项目/中文目录'))
+        self.assertEqual((saved['title'], saved['cwd']), ('중국어 제목', '/프로젝트/중국어 카탈로그'))
 
     def test_create_accepts_durably_saved_user_uuid_without_replay_event(self):
         process = Mock()
@@ -405,7 +405,7 @@ class ClaudeCliContract(unittest.TestCase):
         with patch('bridge.clients.claude.cli_session.subprocess.Popen') as popen:
             detail = self.cli.call('detail', self.sid, {})
             self.assertFalse(detail['capabilities']['resume'])
-            self.assertIn('权限模式', detail['notice'])
+            self.assertIn('권한 모드', detail['notice'])
             with self.assertRaises(BridgeUnavailable):
                 self.cli.call('resume', self.sid, {})
             popen.assert_not_called()
@@ -492,7 +492,7 @@ class ClaudeCliContract(unittest.TestCase):
         adapter.cli.busy.return_value = True
         manager.adapters['claude'] = adapter
         self.assertEqual(manager._claude_quit_evidence(), {'busy': True, 'unknown': False})
-        with self.assertRaisesRegex(ValueError, 'Claude Code 任务'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ Code\\ 작업이\\ 실행\\ 중이거나\\ 승인을\\ 기다리고\\ 있습니다\\.\\ 클라이언트를\\ 닫기\\ 전에\\ 완료하세요\\."):
             manager._assert_idle('claude', {'unknown': False, 'mainPids': []})
 
     def test_only_owned_process_receives_send_controls_and_approval(self):
@@ -525,7 +525,7 @@ class ClaudeCliContract(unittest.TestCase):
         self.assertNotIn('request-1', owner.pending)
         owner.write.assert_called_with({'type': 'control_response', 'response': {'subtype': 'success',
                                        'request_id': 'request-1', 'response': {'behavior': 'deny',
-                                                                             'message': '用户拒绝了本次操作'}}})
+                                                                             'message': '사용자가 이 작업을 거부했습니다.'}}})
         self.cli.call('stop', self.sid, {})
         owner.control.assert_called_with({'subtype': 'interrupt'})
 
@@ -546,7 +546,7 @@ class ClaudeCliContract(unittest.TestCase):
         self.cli.owned[self.native] = owner
         self.assertTrue(self.cli.call('detail', self.sid, {})['capabilities']['skills'])
         self.assertEqual({row['id'] for row in self.cli.call('catalog', self.sid, {})['skills']}, set(names))
-        with self.assertRaisesRegex(ValueError, '不可用'):
+        with self.assertRaisesRegex(ValueError, "해당\\ 스킬을\\ 더\\ 이상\\ 사용할\\ 수\\ 없습니다\\.\\ 새로고침하고\\ 다시\\ 선택하세요\\."):
             self.cli.call('send', self.sid, {'text': 'try', 'plugins': ['private']})
         self.cli.call('send', self.sid, {'text': 'review this', 'plugins': ['sample:check']})
         owner.write.assert_called_with({'type': 'user', 'message': {'role': 'user',
@@ -566,7 +566,7 @@ class ClaudeCliContract(unittest.TestCase):
         options = self.cli.call('access', self.sid, {})['options']
         self.assertEqual({option['value'] for option in options},
                          {'default', 'acceptEdits', 'plan', 'dontAsk', 'auto', 'bypassPermissions'})
-        with self.assertRaisesRegex(ValueError, '明确确认'):
+        with self.assertRaisesRegex(ValueError, "전체\\ 액세스에는\\ 명시적인\\ 확인이\\ 필요합니다\\."):
             self.cli.call('access', self.sid, {'mode': 'bypassPermissions'})
         owner.control.assert_not_called()
         self.cli.call('access', self.sid, {'mode': 'bypassPermissions', 'confirmed': True})
@@ -616,7 +616,7 @@ class ClaudeCliContract(unittest.TestCase):
         self.cli.owned[self.native] = owner
         with self.assertRaises(BridgeUnavailable):
             self.cli.call('respond', self.sid, {'requestId': 'request-1', 'decision': 'accept'})
-        with self.assertRaisesRegex(ValueError, '已处理或过期'):
+        with self.assertRaisesRegex(ValueError, '처리되었거나 만료되었습니다.'):
             self.cli.call('respond', self.sid, {'requestId': 'request-1', 'decision': 'accept'})
         owner.write.assert_called_once()
 
@@ -628,7 +628,7 @@ class ClaudeCliContract(unittest.TestCase):
         owned = _Owned(process, self.profile['origin'], self.native, str(self.cwd))
         with owned.condition:
             owned.condition.wait_for(lambda: owned.error is not None, timeout=1)
-        self.assertIn('身份', owned.error)
+        self.assertIn("Claude 채팅 ID 또는 작업 디렉터리가 일치하지 않습니다.", owned.error)
         if sys.platform == 'win32':
             # An unbound Windows child is not ours to terminate; the next test covers a bound child.
             process.terminate.assert_not_called()
@@ -849,7 +849,7 @@ class ClaudeCliModelContract(unittest.TestCase):
         self.assertIn({'subtype': 'apply_flag_settings', 'settings': {'effortLevel': None}}, self.calls)
 
     def test_rejected_effort_and_unconfirmed_model_do_not_claim_success(self):
-        with self.assertRaisesRegex(ValueError, '不支持'):
+        with self.assertRaisesRegex(ValueError, "이\\ 모델은\\ 추론\\ 강도를\\ 지원하지\\ 않습니다\\."):
             _set_cli_settings(self.owner, {'model': 'claude-haiku-4-5-20251001', 'effort': 'high'})
         self.assertEqual(self.calls, [])
         original = self.owner.control
@@ -859,7 +859,7 @@ class ClaudeCliModelContract(unittest.TestCase):
                 return {}
             return original(request)
         self.owner.control = ignored_switch
-        with self.assertRaisesRegex(BridgeUnavailable, '未确认'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Code\\ 모델\\ 또는\\ 반사\\ 강도\\ 설정이\\ 확인되지\\ 않았습니다\\.\\ 새로고침해\\ 주세요\\."):
             _set_cli_settings(self.owner, {'model': 'claude-sonnet-5-5'})
         self.assertIsNone(self.owner.model)
 
@@ -891,14 +891,14 @@ class ClaudeCliModelContract(unittest.TestCase):
         self.assertEqual(result['models'][0]['efforts'], ['auto', 'low', 'medium', 'high', 'max'])
         self.assertEqual(result['capabilities'], {'models': True, 'manualModels': True, 'manualEffort': True, 'effort': True, 'skills': True})
         self.assertEqual(calls, [{'subtype': 'get_settings'}])
-        with self.assertRaisesRegex(BridgeUnavailable, '不支持刷新模型目录'):
+        with self.assertRaisesRegex(BridgeUnavailable, "현재\\ Claude\\ Code\\ 이\\ 버전은\\ 모델\\ 디렉터리\\ 새로\\ 고침을\\ 지원하지\\ 않습니다\\."):
             _cli_catalog(owner, public, refresh=True)
         self.assertEqual(calls[-1], {'subtype': 'list_models'})
         count = len(calls)
-        with self.assertRaisesRegex(BridgeUnavailable, '不支持刷新模型目录'):
+        with self.assertRaisesRegex(BridgeUnavailable, "현재\\ Claude\\ Code\\ 이\\ 버전은\\ 모델\\ 디렉터리\\ 새로\\ 고침을\\ 지원하지\\ 않습니다\\."):
             _cli_catalog(owner, public, refresh=True)
         self.assertEqual(len(calls), count)
-        with self.assertRaisesRegex(ValueError, '不支持此思考强度'):
+        with self.assertRaisesRegex(ValueError, "이\\ 모델은\\ 추론\\ 강도를\\ 지원하지\\ 않습니다\\."):
             _set_cli_settings(owner, {'model': 'haiku', 'effort': 'high'})
         _set_cli_settings(owner, {'model': 'haiku'})
         self.assertIn({'subtype': 'set_model', 'model': 'haiku'}, calls)
@@ -908,11 +908,11 @@ class ClaudeCliModelContract(unittest.TestCase):
     def test_unconfirmed_model_refresh_does_not_mark_protocol_unsupported(self):
         def control(request):
             if request['subtype'] == 'list_models':
-                raise BridgeUnavailable('Claude Code 控制请求未确认')
+                raise BridgeUnavailable('Claude Code 제어 요청의 결과가 확인되지 않았습니다.')
             return {'applied': {'model': 'fixture-model'}}
         owner = SimpleNamespace(catalog={'models': [{'value': 'fixture-model'}]}, model=None,
                                 control=control)
-        with self.assertRaisesRegex(BridgeUnavailable, '未确认'):
+        with self.assertRaisesRegex(BridgeUnavailable, '결과가 확인되지 않았습니다'):
             _cli_catalog(owner, {'model': 'fixture-model'}, refresh=True)
         self.assertFalse(getattr(owner, 'model_list_unsupported', False))
 
@@ -920,10 +920,10 @@ class ClaudeCliModelContract(unittest.TestCase):
         def control(request):
             if request['subtype'] == 'get_settings':
                 return {'applied': {'model': 'claude-sonnet-4-6'}}
-            raise BridgeUnavailable('Claude Code 控制请求未确认')
+            raise BridgeUnavailable('Claude Code 제어 요청의 결과가 확인되지 않았습니다.')
         owner = SimpleNamespace(catalog={'models': [{'value': 'haiku'}]}, model=None,
                                 control=Mock(side_effect=control))
-        with self.assertRaisesRegex(BridgeUnavailable, '未确认'):
+        with self.assertRaisesRegex(BridgeUnavailable, '결과가 확인되지 않았습니다'):
             _set_cli_settings(owner, {'model': 'haiku'})
         self.assertIsNone(owner.model)
         self.assertEqual([call.args[0]['subtype'] for call in owner.control.call_args_list],
@@ -944,7 +944,7 @@ class ClaudeCliModelContract(unittest.TestCase):
             raise AssertionError(request)
         owner = SimpleNamespace(catalog={'models': [{'value': 'sonnet', 'supportsEffort': True,
                   'supportedEffortLevels': ['low', 'medium', 'high', 'max']}]}, model=None, control=control)
-        with self.assertRaisesRegex(BridgeUnavailable, '未确认'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Code\\ 모델\\ 또는\\ 반사\\ 강도\\ 설정이\\ 확인되지\\ 않았습니다\\.\\ 새로고침해\\ 주세요\\."):
             _set_cli_settings(owner, {'model': 'sonnet', 'effort': 'high'})
         self.assertEqual(state['flag'], 'high')
         self.assertEqual(state['effort'], 'max')

@@ -183,7 +183,7 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
             # Both target lookup and attach must verify the newly observed, exact PID.
             replacement = {**process, 'birth': [2, 0]}
             with patch.object(adapter, '_live_process', side_effect=[replacement, replacement, process]):
-                with self.assertRaisesRegex(BridgeUnavailable, '进程已变化'):
+                with self.assertRaisesRegex(BridgeUnavailable, '프로세스가 변경되었습니다.'):
                     adapter.call('resume', 'sess_ok', {'id': str(uuid.uuid4())})
             self.assertEqual(calls, ['target', 'attach', 'detail', 'target'])
 
@@ -192,9 +192,9 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
         adapter = ZCodePrototype(self.home.parent, {'dataDirectory': self.home, 'debugFallbackPort': 17742})
         with patch.object(adapter, '_live_process', return_value={'pid': 29}), \
                 patch.object(adapter, 'transport', return_value={'workspace': str(self.home.parent / 'unrelated')}) as native:
-            with self.assertRaisesRegex(BridgeUnavailable, '项目已变化'):
+            with self.assertRaisesRegex(BridgeUnavailable, '프로젝트가 변경되었습니다'):
                 adapter.call('resume', 'sess_ok', {'id': str(uuid.uuid4())})
-            with self.assertRaisesRegex(BridgeUnavailable, '归档'):
+            with self.assertRaisesRegex(BridgeUnavailable, "계속해서\\ 보관할\\ 수\\ 없습니다\\.\\ ZCode\\ 대화"):
                 adapter.call('resume', 'sess_archived', {'id': str(uuid.uuid4())})
             self.assertEqual([call.args[0]['action'] for call in native.call_args_list], ['target'])
             self.assertFalse(adapter.sid)

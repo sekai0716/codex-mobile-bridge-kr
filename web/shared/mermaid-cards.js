@@ -28,10 +28,10 @@
     let image=null, rendering=false, generation=0;
     const selected=scope?.views.get(viewKey)==='source'?'source':'diagram';
     let view=selected;
-    const diagramButton=make('图表',()=>show('diagram'));
-    const sourceButton=make('源码',()=>show('source'));
-    const copyButton=make('复制源码',()=>window.BridgeClipboard?.copy(getSource,copyButton));
-    const fullButton=make('全屏查看',()=>{
+    const diagramButton=make('도표',()=>show('diagram'));
+    const sourceButton=make('원천',()=>show('source'));
+    const copyButton=make('소스 복사',()=>window.BridgeClipboard?.copy(getSource,copyButton));
+    const fullButton=make('전체 화면',()=>{
       if(image) window.BridgeMermaidViewer?.open({image,source,getSource,scope,opener:fullButton});
     });
     toolbar.append(diagramButton,sourceButton,copyButton,fullButton);
@@ -50,11 +50,11 @@
     }
     function start() {
       if(rendering || image || !window.BridgeMermaidRenderer) return;
-      if(source.length > MAX_SOURCE) {status.textContent=t('图表过大，请查看源码');return;}
+      if(source.length > MAX_SOURCE) {status.textContent=t('다이어그램이 너무 큽니다. 소스를 확인하세요.');return;}
       const renderer=window.BridgeMermaidRenderer, key=JSON.stringify([renderer.version,theme(),source]);
       const cached=scope?.cache.get(key);
       if(cached){scope.cache.delete(key);scope.cache.set(key,cached);display(cached);return;}
-      rendering=true;status.textContent=t('正在生成图表…');
+      rendering=true;status.textContent=t('렌더링 다이어그램…');
       const ticket=++generation;
       const revision=scope?.revision;
       let task=scope?.pending.get(key);
@@ -70,14 +70,14 @@
         if(!result?.url || !Number.isFinite(result.width) || !Number.isFinite(result.height))throw Error('invalid diagram');
         display(result);
       }).catch(()=>{
-        if(ticket===generation && !scope?.disposed && (!scope || scope.revision===revision))status.textContent=t('图表无法显示，请查看源码');
+        if(ticket===generation && !scope?.disposed && (!scope || scope.revision===revision))status.textContent=t('다이어그램을 렌더링할 수 없습니다. 소스를 확인하세요.');
       }).finally(()=>{if(ticket===generation)rendering=false;});
     }
     function display(result) {
       image=result;
-      const img=document.createElement('img');img.alt=t('图表');img.src=result.url;img.width=result.width;img.height=result.height;
+      const img=document.createElement('img');img.alt=t('도표');img.src=result.url;img.width=result.width;img.height=result.height;
       img.loading='lazy';img.decoding='async';img.onclick=()=>window.BridgeMermaidViewer?.open({image,source,getSource,scope,opener:img});
-      img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',t('查看图表'));
+      img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',t('다이어그램 보기'));
       img.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();img.click();}};
       stage.replaceChildren(img);status.textContent='';fullButton.hidden=view!=='diagram';
     }
@@ -87,7 +87,7 @@
     };
     card.__relabelMermaid=()=>{
       for(const button of toolbar.querySelectorAll('[data-i18n]'))button.textContent=t(button.dataset.i18n);
-      const img=stage.querySelector('img');if(img){img.alt=t('图表');img.setAttribute('aria-label',t('查看图表'));}
+      const img=stage.querySelector('img');if(img){img.alt=t('도표');img.setAttribute('aria-label',t('다이어그램 보기'));}
     };
     show(view);
     return card;

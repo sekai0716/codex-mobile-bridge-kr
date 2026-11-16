@@ -15,18 +15,18 @@ from bridge.platforms.antigravity import endpoint, verify_endpoint
 from .model import SURFACE_LABELS, format_tool_call, _parse_iso_seconds
 
 _CONFIRM_INTERACTION_LABELS = {
-    'openBrowserUrl': '开启网页确认',
-    'readUrlContent': '读取网页确认',
-    'sendCommandInput': '发送终端输入确认',
-    'mcp': 'MCP 工具执行确认',
-    'approvalInteraction': '等待确认',
-    'runExtensionCode': '执行扩展代码确认',
-    'executeBrowserJavascript': '执行浏览器脚本确认',
-    'captureBrowserScreenshot': '截取浏览器画面确认',
-    'clickBrowserPixel': '浏览器点击确认',
-    'browserAction': '浏览器操作确认',
-    'openBrowserSetup': '开启浏览器设置确认',
-    'confirmBrowserSetup': '浏览器设置确认',
+    'openBrowserUrl': '웹페이지를 열어 확인하세요.',
+    'readUrlContent': '웹페이지 확인 읽기',
+    'sendCommandInput': '터미널 입력 확인 보내기',
+    'mcp': 'MCP 도구 실행 확인',
+    'approvalInteraction': "승인 대기 중",
+    'runExtensionCode': '확장 코드 확인 실행',
+    'executeBrowserJavascript': '브라우저 스크립트를 실행하여 확인',
+    'captureBrowserScreenshot': '확인을 위해 브라우저 화면의 스크린샷을 찍으세요.',
+    'clickBrowserPixel': '브라우저를 클릭하여 확인하세요.',
+    'browserAction': '브라우저 작동 확인',
+    'openBrowserSetup': '브라우저 설정 확인 활성화',
+    'confirmBrowserSetup': '브라우저 설정 확인',
 }
 
 _STEP_TYPE_TO_INTERACTION = {
@@ -147,7 +147,7 @@ def _schema_to_elicitation_questions(schema_raw):
             options = [{'id': str(v).lower() if isinstance(v, bool) else str(v),
                         'label': str(v).lower() if isinstance(v, bool) else str(v)} for v in enum_vals]
         elif prop_type == 'boolean':
-            options = [{'id': 'true', 'label': '是 (true)'}, {'id': 'false', 'label': '否 (false)'}]
+            options = [{'id': 'true', 'label': '예 (true)'}, {'id': 'false', 'label': '아니요 (false)'}]
         questions.append({
             'id': prop_name,
             'question': label,
@@ -203,7 +203,7 @@ def _normalize_ask_question(request_id, prefix, step, requested, meta):
             opts.append({'id': opt_id, 'label': opt_text})
         mapped.append({
             'id': str(idx),
-            'question': str(q.get('question') or f'问题 {idx + 1}'),
+            'question': str(q.get('question') or f'문제 {idx + 1}'),
             'multiSelect': bool(q.get('isMultiSelect')),
             'canSkip': True,
             'options': opts,
@@ -211,10 +211,10 @@ def _normalize_ask_question(request_id, prefix, step, requested, meta):
     meta['questions'] = [q for q in raw_questions if isinstance(q, dict)]
     public = {
         'id': request_id,
-        'tool': f'{prefix}提问',
+        'tool': f'{prefix}질문하기',
         'needsInput': True,
         'canCancel': True,
-        'cancelLabel': '取消',
+        'cancelLabel': '취소',
         'exclusiveWriteIn': True,
         'input': {'questions': mapped},
     }
@@ -233,10 +233,10 @@ def _normalize_elicitation(request_id, prefix, requested, meta):
         meta['elicitationRequired'] = [q['id'] for q in questions if not q['canSkip']]
         return {
             'id': request_id,
-            'tool': f'{prefix}MCP 信息补充 · {server_name}',
+            'tool': f'{prefix}MCP 정보 보충 · {server_name}',
             'needsInput': True,
             'canCancel': True,
-            'cancelLabel': '拒绝',
+            'cancelLabel': '거부',
             'exclusiveWriteIn': True,
             'input': {'questions': questions},
         }, meta
@@ -245,21 +245,21 @@ def _normalize_elicitation(request_id, prefix, requested, meta):
     meta['elicitationUnsupported'] = unsupported
     return {
         'id': request_id,
-        'tool': f'{prefix}MCP 授权确认 · {server_name}',
+        'tool': f'{prefix}MCP 승인 확인 · {server_name}',
         'needsInput': False,
         'input': _non_empty_dict(server=server_name, mode=spec.get('mode'), message=message, url=spec.get('url'),
-                                 notice='此表单请在原客户端完成' if unsupported else None),
-        'decisions': ([] if unsupported else [{'id': 'accept', 'label': '允许本次'}]) + [{'id': 'decline', 'label': '拒绝'}],
+                                 notice='원래 클라이언트에서 이 양식을 작성해 주세요.' if unsupported else None),
+        'decisions': ([] if unsupported else [{'id': 'accept', 'label': "한 번만 허용"}]) + [{'id': 'decline', 'label': '거부'}],
     }, meta
 
 
 def _permission_decisions(scope_filter):
-    decisions = [{'id': 'accept_once', 'label': '允许本次'}]
+    decisions = [{'id': 'accept_once', 'label': "한 번만 허용"}]
     if not scope_filter or 'PERMISSION_SCOPE_CONVERSATION' in scope_filter:
-        decisions.append({'id': 'accept_conversation', 'label': '本会话允许'})
+        decisions.append({'id': 'accept_conversation', 'label': '이 세션에서는'})
     if 'PERMISSION_SCOPE_WORKSPACE' in scope_filter:
-        decisions.append({'id': 'accept_workspace', 'label': '本工作区允许'})
-    decisions.append({'id': 'decline', 'label': '拒绝'})
+        decisions.append({'id': 'accept_workspace', 'label': '이 작업 공간에서는'})
+    decisions.append({'id': 'decline', 'label': '거부'})
     return decisions
 
 
@@ -269,7 +269,7 @@ def _normalize_waiting_step(request_id, surface, cascade_id, trajectory_id, step
     if not kind:
         return None, None
     requested = step.get('requestedInteraction') if isinstance(step.get('requestedInteraction'), dict) else {}
-    prefix = '子智能体 · ' if (root_cid and cascade_id != root_cid) else ''
+    prefix = '하위 에이전트 · ' if (root_cid and cascade_id != root_cid) else ''
     meta = {
         'requestId': request_id,
         'surface': surface,
@@ -292,10 +292,10 @@ def _normalize_waiting_step(request_id, surface, cascade_id, trajectory_id, step
         meta['proposedCommandLine'] = proposed
         return {
             'id': request_id,
-            'tool': f'{prefix}执行终端命令',
+            'tool': f'{prefix}터미널 명령 실행',
             'needsInput': False,
             'input': _non_empty_dict(command=proposed, cwd=str(rc.get('cwd') or '').strip()),
-            'decisions': [{'id': 'accept', 'label': '允许执行'}, {'id': 'decline', 'label': '拒绝'}],
+            'decisions': [{'id': 'accept', 'label': '실행을 허용하다'}, {'id': 'decline', 'label': '거부'}],
         }, meta
     if kind == 'filePermission':
         spec = requested.get('filePermission') or (step.get('codeAction') or {}).get('filePermissionRequest') or {}
@@ -303,17 +303,17 @@ def _normalize_waiting_step(request_id, surface, cascade_id, trajectory_id, step
         meta['absolutePathUri'] = uri
         return {
             'id': request_id,
-            'tool': f'{prefix}文件访问权限',
+            'tool': f'{prefix}파일 액세스 권한',
             'needsInput': False,
             'input': _non_empty_dict(path=uri, directory=True if spec.get('isDirectory') else None, reason=str(spec.get('blockReason') or '').strip()),
-            'decisions': [{'id': 'accept_once', 'label': '允许本次'}, {'id': 'accept_conversation', 'label': '本会话允许'}, {'id': 'decline', 'label': '拒绝'}],
+            'decisions': [{'id': 'accept_once', 'label': "한 번만 허용"}, {'id': 'accept_conversation', 'label': '이 세션에서는'}, {'id': 'decline', 'label': '거부'}],
         }, meta
     if kind == 'permission':
         spec = requested.get('permission') if isinstance(requested.get('permission'), dict) else {}
         res = spec.get('resource') if isinstance(spec.get('resource'), dict) else {}
         return {
             'id': request_id,
-            'tool': f'{prefix}操作权限确认',
+            'tool': f'{prefix}운영권한 확인',
             'needsInput': False,
             'input': _non_empty_dict(action=res.get('action'), target=res.get('target'), reason=spec.get('actionDescription') or spec.get('reason')),
             'decisions': _permission_decisions(list(spec.get('approvalScopeFilter') or [])),
@@ -322,12 +322,12 @@ def _normalize_waiting_step(request_id, surface, cascade_id, trajectory_id, step
         spec = requested.get('deploy') if isinstance(requested.get('deploy'), dict) else {}
         targets = [t for t in (spec.get('deployTargetOptions') or []) if isinstance(t, dict)]
         meta['deployTargets'] = targets
-        decisions = [{'id': f'deploy_{idx}', 'label': str(t.get('serviceName') or t.get('name') or t.get('platform') or f'部署目标 {idx + 1}')} for idx, t in enumerate(targets)]
-        decisions = decisions or [{'id': 'accept', 'label': '允许本次'}]
-        decisions.append({'id': 'decline', 'label': '拒绝'})
-        return {'id': request_id, 'tool': f'{prefix}部署确认', 'needsInput': False, 'input': _non_empty_dict(targets=targets), 'decisions': decisions}, meta
+        decisions = [{'id': f'deploy_{idx}', 'label': str(t.get('serviceName') or t.get('name') or t.get('platform') or f'배포 대상 {idx + 1}')} for idx, t in enumerate(targets)]
+        decisions = decisions or [{'id': 'accept', 'label': "한 번만 허용"}]
+        decisions.append({'id': 'decline', 'label': '거부'})
+        return {'id': request_id, 'tool': f'{prefix}배포 확인', 'needsInput': False, 'input': _non_empty_dict(targets=targets), 'decisions': decisions}, meta
 
-    label = _CONFIRM_INTERACTION_LABELS.get(kind, '等待确认')
+    label = _CONFIRM_INTERACTION_LABELS.get(kind, "승인 대기 중")
     tool_call = (step.get('metadata') or {}).get('toolCall')
     mcp_tool = step.get('mcpTool') if isinstance(step.get('mcpTool'), dict) else {}
     sci = step.get('sendCommandInput') if isinstance(step.get('sendCommandInput'), dict) else {}
@@ -351,38 +351,38 @@ def _normalize_waiting_step(request_id, surface, cascade_id, trajectory_id, step
         'tool': f'{prefix}{label}',
         'needsInput': False,
         'input': detail,
-        'decisions': [{'id': 'accept', 'label': '允许本次'}, {'id': 'decline', 'label': '拒绝'}],
+        'decisions': [{'id': 'accept', 'label': "한 번만 허용"}, {'id': 'decline', 'label': '거부'}],
     }, meta
 
 
 def _coerce_elicitation_value(raw_vals, prop_spec):
     if not isinstance(raw_vals, list) or not raw_vals or any(not isinstance(v, str) for v in raw_vals):
-        raise ValueError('回答格式无效')
+        raise ValueError('잘못된 답변 형식')
     prop_type = prop_spec['type']
     if prop_type == 'array':
         values = [_coerce_elicitation_value([v], prop_spec['items']) for v in raw_vals]
         if len(values) < prop_spec.get('minItems', 0) or len(values) > prop_spec.get('maxItems', len(values)):
-            raise ValueError('选择数量不符合要求')
+            raise ValueError('선택한 수량은 요구사항을 충족하지 않습니다.')
         return values
     if len(raw_vals) != 1:
-        raise ValueError('此项只能填写一个答案')
+        raise ValueError('이 항목에는 하나의 답변만 입력할 수 있습니다.')
     val = raw_vals[0] if prop_type == 'string' else raw_vals[0].strip()
     if prop_type == 'boolean':
-        if val.lower() not in ('true', 'false', '是 (true)', '否 (false)'):
-            raise ValueError('请选择是或否')
-        val = val.lower() in ('true', '是 (true)')
+        if val.lower() not in ('true', 'false', '예 (true)', '아니요 (false)'):
+            raise ValueError('예 또는 아니요를 선택하세요.')
+        val = val.lower() in ('true', '예 (true)')
     elif prop_type in ('integer', 'number'):
         val = int(val) if prop_type == 'integer' else float(val)
         if not math.isfinite(val) or val < prop_spec.get('minimum', val) or val > prop_spec.get('maximum', val):
-            raise ValueError('数字不符合要求')
+            raise ValueError('숫자가 요구사항을 충족하지 않습니다.')
     elif prop_type == 'string':
         if len(val) < prop_spec.get('minLength', 0) or len(val) > prop_spec.get('maxLength', len(val)):
-            raise ValueError('文本长度不符合要求')
+            raise ValueError('텍스트 길이가 요구사항을 충족하지 않습니다.')
     else:
-        raise ValueError('此回答类型请在原客户端处理')
+        raise ValueError('원래 클라이언트에서 이 답변 유형을 처리하세요.')
     if 'enum' in prop_spec and not any(val == v and (type(val) is type(v)
             or (type(val) in (int, float) and type(v) in (int, float))) for v in prop_spec['enum']):
-        raise ValueError('请选择问题中提供的选项')
+        raise ValueError('질문에 제공된 옵션을 선택하세요.')
     return val
 
 
@@ -390,7 +390,7 @@ def _build_ask_question_response(meta, is_decline, answers):
     if is_decline:
         return {'askQuestion': {'cancelled': True}}
     if not isinstance(answers, dict):
-        raise ValueError('请回答每一项问题')
+        raise ValueError("모든 질문에 답변하세요")
     responses = []
     for idx, orig_q in enumerate(meta.get('questions') or []):
         q_text = str(orig_q.get('question') or '')
@@ -407,7 +407,7 @@ def _build_ask_question_response(meta, is_decline, answers):
         raw_vals = ans_entry.get('answers') if isinstance(ans_entry, dict) else None
         cleaned_vals = [str(v).strip() for v in (raw_vals if isinstance(raw_vals, list) else []) if isinstance(v, str) and str(v).strip()]
         if not cleaned_vals:
-            raise ValueError('请回答每一项问题')
+            raise ValueError("모든 질문에 답변하세요")
         text_to_id = {}
         valid_ids = set()
         for opt_idx, opt in enumerate(opts):
@@ -449,7 +449,7 @@ def _build_interaction_response(meta, decision, answers=None):
         return _build_ask_question_response(meta, is_decline, answers)
     if kind == 'runCommand':
         if decision_norm not in _ACCEPT_DECISIONS and not is_decline:
-            raise ValueError('请选择允许执行或拒绝')
+            raise ValueError('실행 허용 또는 거부를 선택하세요.')
         proposed = meta.get('proposedCommandLine') or ''
         return {'runCommand': {'confirm': not is_decline, 'proposedCommandLine': proposed, 'submittedCommandLine': proposed}}
     if kind == 'filePermission':
@@ -458,26 +458,26 @@ def _build_interaction_response(meta, decision, answers=None):
             return {'filePermission': {'allow': False, 'scope': 'PERMISSION_SCOPE_ONCE', 'absolutePathUri': uri}}
         scope = _SCOPE_BY_DECISION.get(decision_norm)
         if not scope:
-            raise ValueError('无效的权限选择')
+            raise ValueError('잘못된 권한 선택')
         return {'filePermission': {'allow': True, 'scope': scope, 'absolutePathUri': uri}}
     if kind == 'permission':
         if is_decline:
             return {'permission': {'allow': False, 'scope': 'PERMISSION_SCOPE_ONCE'}}
         scope = _SCOPE_BY_DECISION.get(decision_norm)
         if not scope:
-            raise ValueError('无效的权限选择')
+            raise ValueError('잘못된 권한 선택')
         return {'permission': {'allow': True, 'scope': scope}}
     if kind == 'elicitation':
         if is_decline:
             return {'elicitation': {'action': 'decline'}}
         if meta.get('elicitationUnsupported'):
-            raise ValueError('此表单请在原客户端完成')
+            raise ValueError('원래 클라이언트에서 이 양식을 작성해 주세요.')
         if decision_norm not in _ACCEPT_DECISIONS:
-            raise ValueError('请选择允许或拒绝')
+            raise ValueError('허용 또는 거부를 선택하세요.')
         prop_specs = meta.get('elicitationProps')
         if prop_specs:
             if not isinstance(answers, dict):
-                raise ValueError('请回答每一项问题')
+                raise ValueError("모든 질문에 답변하세요")
             payload = {}
             for prop_name, prop_spec in prop_specs.items():
                 ans_entry = answers.get(prop_name)
@@ -485,12 +485,12 @@ def _build_interaction_response(meta, decision, answers=None):
                 raw_vals = ans_entry.get('answers') if isinstance(ans_entry, dict) else None
                 if skipped or not raw_vals:
                     if prop_name in meta.get('elicitationRequired', []):
-                        raise ValueError('请回答每一项必填问题')
+                        raise ValueError('각 필수 질문에 답해 주세요.')
                     continue
                 payload[prop_name] = _coerce_elicitation_value(raw_vals, prop_spec)
             return {'elicitation': {'action': 'accept', 'contentJson': json.dumps(payload, ensure_ascii=False, allow_nan=False)}}
         if decision_norm not in _ACCEPT_DECISIONS:
-            raise ValueError('请选择允许或拒绝')
+            raise ValueError('허용 또는 거부를 선택하세요.')
         return {'elicitation': {'action': 'accept'}}
     if kind == 'deploy':
         if is_decline:
@@ -509,14 +509,14 @@ def _build_interaction_response(meta, decision, answers=None):
         return {'deploy': body}
     if kind in _CONFIRM_INTERACTION_LABELS:
         if decision_norm not in _ACCEPT_DECISIONS and not is_decline:
-            raise ValueError('请选择允许或拒绝')
+            raise ValueError('허용 또는 거부를 선택하세요.')
         return {kind: {'confirm': not is_decline}}
-    raise ValueError(f'暂不支持的互动请求类型: {kind}')
+    raise ValueError(f'아직 지원되지 않는 상호작용 요청 유형: {kind}')
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise BridgeUnavailable('Antigravity 本机服务不允许重定向')
+        raise BridgeUnavailable('Antigravity 기본 서비스는 리디렉션을 허용하지 않습니다.')
 
 
 class AntigravityCli:
@@ -547,13 +547,13 @@ class AntigravityCli:
 
     def call_ls_rpc(self, method, payload=None, *, surface='app', expected_identity=None):
         if method not in self._ALLOWED_METHODS:
-            raise ValueError('不支持的 Antigravity 原生操作')
+            raise ValueError('지원되지 않음 Antigravity 기본 작동')
         # This serializes bridge writes; ownership remains with the native LS.
         with self._lock:
             try:
                 target = endpoint(surface, self.home)
                 if expected_identity is not None and target['identity'] != expected_identity:
-                    raise ValueError('原生服务进程已变化')
+                    raise ValueError('기본 서비스 프로세스가 변경되었습니다.')
                 verify_endpoint(target)
                 request = urllib.request.Request(
                     target['address'] + '/exa.language_server_pb.LanguageServerService/' + method,
@@ -562,17 +562,17 @@ class AntigravityCli:
                 with self._opener.open(request, timeout=8) as response:
                     raw = response.read(8 * 1024 * 1024 + 1)
                 if len(raw) > 8 * 1024 * 1024:
-                    raise ValueError('Antigravity 原生回复过大')
+                    raise ValueError('Antigravity 원래 답글이 너무 깁니다.')
                 if method == 'GetAllCascadeTrajectories' and not raw:
-                    raise ValueError('Antigravity 任务状态回复为空')
+                    raise ValueError('Antigravity 작업 상태 응답이 비어 있습니다.')
                 result = json.loads(raw) if raw else {}
                 if not isinstance(result, dict):
-                    raise ValueError('Antigravity 原生回复无效')
+                    raise ValueError('Antigravity 잘못된 기본 응답')
                 verify_endpoint(target)
                 return result
             except (OSError, ValueError, urllib.error.URLError):
                 # Do not expose native error bodies, tokens or retry a write.
-                raise BridgeUnavailable('Antigravity 原生操作未确认，请检查电脑原会话后再操作') from None
+                raise BridgeUnavailable('Antigravity 기본 작업이 확인되지 않았습니다. 작동하기 전에 컴퓨터의 원래 세션을 확인하십시오.') from None
 
     def _invalidate_trajectories_cache(self, surface=None):
         with self._lock:
@@ -603,7 +603,7 @@ class AntigravityCli:
             res = self.call_ls_rpc('GetAllCascadeTrajectories', {}, surface=surface)
             summaries = res.get('trajectorySummaries', {})
             if not isinstance(summaries, dict):
-                raise BridgeUnavailable('原会话等待状态未确认，请稍后重试')
+                raise BridgeUnavailable('원래 세션 대기 상태가 확인되지 않았습니다. 나중에 다시 시도해 주세요.')
 
             waiting_by_cid = {}
             active_cids = set()
@@ -681,19 +681,19 @@ class AntigravityCli:
     def _resolve_waiting_meta(self, expected_cid, request_id, *, surface='app'):
         parsed = parse_waiting_request_id(request_id)
         if not parsed or (parsed[0] and parsed[0] != surface):
-            raise ValueError('该互动请求来源不匹配')
+            raise ValueError('상호작용 요청 소스가 일치하지 않습니다.')
         # Display caches cannot authorize a response: a question may have been
         # answered, or moved to another parent, since it was shown.
         self.waiting_state_by_cid(surface=surface, max_age=0.0)
         with self._lock:
             meta = self._waiting_cache.get(request_id)
         if meta is None:
-            raise ValueError('该互动请求已过期或已在桌面端处理')
+            raise ValueError('상호 작용 요청이 만료되었거나 데스크톱에서 처리되었습니다.')
         if meta.get('surface') != surface:
-            raise ValueError('该互动请求来源不匹配')
+            raise ValueError('상호작용 요청 소스가 일치하지 않습니다.')
         owners = set(meta.get('ownerCids', []))
         if expected_cid and expected_cid not in owners:
-            raise ValueError('该请求不属于当前会话')
+            raise ValueError('요청이 현재 세션에 속하지 않습니다.')
         return meta
 
     def respond_interaction(self, conversation_id, request_id, decision, answers=None, *, surface='app'):
@@ -728,15 +728,15 @@ class AntigravityCli:
         # Do not extend this to malformed fields, error objects or DB fallbacks.
         rows = {} if result == {} else result.get('trajectorySummaries')
         if set(result) - {'trajectorySummaries'}:
-            raise ValueError('无法完整核验 Antigravity 任务，请在原客户端正常退出后切换账号')
+            raise ValueError('완전히 확인할 수 없습니다. Antigravity 작업을 진행하려면 원래 클라이언트가 정상적으로 종료된 후 계정을 전환하세요.')
         if not isinstance(rows, dict):
-            raise ValueError('无法完整核验 Antigravity 任务，请在原客户端正常退出后切换账号')
+            raise ValueError('완전히 확인할 수 없습니다. Antigravity 작업을 진행하려면 원래 클라이언트가 정상적으로 종료된 후 계정을 전환하세요.')
         for row in rows.values():
             if not isinstance(row, dict) or row.get('status') != 'CASCADE_RUN_STATUS_IDLE':
-                raise ValueError('Antigravity 有未结束或状态未知的任务，请处理后重试')
+                raise ValueError('Antigravity 완료되지 않았거나 알 수 없는 작업이 있습니다. 처리한 후 다시 시도하세요.')
             if any(row.get(key) for key in ('waitingSteps', 'notFullyIdle', 'hasActiveChildren',
                                            'hasRunningSubagents', 'backgroundTaskCount')):
-                raise ValueError('Antigravity 有运行任务、后台任务或待确认操作，请处理后重试')
+                raise ValueError('Antigravity 실행 중인 작업, 백그라운드 작업 또는 보류 중인 작업이 있습니다. 이를 처리한 후 다시 시도하세요.')
 
     @staticmethod
     def _format_reset_note(reset_time):
@@ -745,8 +745,8 @@ class AntigravityCli:
             return ''
         stamp = _parse_iso_seconds(text)
         if stamp is not None:
-            return f'将于 {datetime.fromtimestamp(stamp).astimezone():%m/%d %H:%M %Z} 重置'
-        return f'重置时间 {text}'
+            return f'될 것이다 {datetime.fromtimestamp(stamp).astimezone():%m/%d %H:%M %Z} 다시 놓기'
+        return f'재설정 시간 {text}'
 
     @staticmethod
     def _quota_info(row):
@@ -758,13 +758,13 @@ class AntigravityCli:
         if not isinstance(frac, (int, float)):
             return ({'quotaTag': '', 'quotaStatus': '', 'resetNote': reset_note} if reset_note else None)
         if frac <= 0.0:
-            return {'quotaTag': '已用尽', 'quotaStatus': 'exhausted', 'resetNote': reset_note}
+            return {'quotaTag': '탈진한', 'quotaStatus': 'exhausted', 'resetNote': reset_note}
         if frac <= 0.005:
-            return {'quotaTag': f'剩余 {frac * 100.0:.1f}%', 'quotaStatus': 'exhausted', 'resetNote': reset_note}
+            return {'quotaTag': f'남은 {frac * 100.0:.1f}%', 'quotaStatus': 'exhausted', 'resetNote': reset_note}
         if frac >= 0.999:
-            return {'quotaTag': '剩余 100%', 'quotaStatus': 'good', 'resetNote': ''}
+            return {'quotaTag': '남은 100%', 'quotaStatus': 'good', 'resetNote': ''}
         return {
-            'quotaTag': f'剩余 {frac * 100.0:.1f}%',
+            'quotaTag': f'남은 {frac * 100.0:.1f}%',
             'quotaStatus': 'warning' if frac < 0.2 else 'good',
             'resetNote': reset_note,
         }
@@ -809,12 +809,12 @@ class AntigravityCli:
         f_credits = plan_status.get('availableFlowCredits', 0)
         credits_line = ''
         if isinstance(status.get('planStatus'), dict):
-            credits_line = f'可用 Prompt 点数: {p_credits or 0} · Flow 点数: {f_credits or 0}'
+            credits_line = f'사용 가능 Prompt 전철기: {p_credits or 0} · Flow 전철기: {f_credits or 0}'
             notice_lines.append(credits_line)
 
         if notice_lines and tier_name:
-            notice_lines.insert(0, f'账号等级 · {tier_name}')
-        notice = '\n'.join(notice_lines) if notice_lines else ('' if models else '原客户端暂未提供可用模型列表')
+            notice_lines.insert(0, f'계정 수준 · {tier_name}')
+        notice = '\n'.join(notice_lines) if notice_lines else ('' if models else '원래 클라이언트는 아직 사용 가능한 모델 목록을 제공하지 않습니다.')
         result = {'models': models, 'userStatus': status, 'notice': notice}
         if usage_items or credits_line:
             result['usageSummary'] = {'tier': tier_name, 'items': usage_items, 'credits': credits_line}
@@ -829,7 +829,7 @@ class AntigravityCli:
         found = [row.get('nativeModel') for row in catalog.get('models', [])
                  if isinstance(row, dict) and row.get('id') == model]
         if len(found) != 1 or not found[0]:
-            raise ValueError('未找到此模型的原生标识，请刷新目录或手动填写完整 MODEL_ 标识')
+            raise ValueError('이 모델의 기본 ID를 찾을 수 없습니다. 디렉터리를 새로 고치거나 수동으로 입력하세요. MODEL_ 심벌 마크')
         return found[0]
 
     def send_user_message(self, conversation_id, prompt, model=None, effort=None, *, surface='app'):
@@ -844,7 +844,7 @@ class AntigravityCli:
     def start_cascade(self, *, surface='app', model=None, effort=None, cwd=None):
         path = Path(cwd or '').resolve()
         if not cwd or not path.is_dir():
-            raise ValueError('请选择有效的本机项目目录')
+            raise ValueError('유효한 기본 프로젝트 디렉터리를 선택하세요.')
         uri = path.as_uri()
         body = {'source': 'CORTEX_TRAJECTORY_SOURCE_CASCADE_CLIENT', 'workspace_uris': [uri]}
         selected = self._model(model, surface)
@@ -853,10 +853,10 @@ class AntigravityCli:
         result = self.call_ls_rpc('StartCascade', body, surface=surface)
         cid = result.get('cascadeId') or result.get('cascade_id')
         if not isinstance(cid, str) or not cid:
-            raise BridgeUnavailable('Antigravity 原客户端未确认新会话标识')
+            raise BridgeUnavailable('Antigravity 원래 클라이언트가 새 세션 ID를 확인하지 않았습니다.')
         environment = result.get('projectEnvInfo') or result.get('project_env_info') or {}
         if environment.get('workspaceUris', environment.get('workspace_uris')) != [uri]:
-            raise BridgeUnavailable('原客户端尚未确认新会话项目绑定，首条消息未发送；请在电脑检查已创建的会话')
+            raise BridgeUnavailable('원래 클라이언트는 새 세션 항목의 바인딩을 확인하지 않았으며 첫 번째 메시지가 전송되지 않았습니다. 컴퓨터에서 생성된 세션을 확인하세요.')
         self._invalidate_trajectories_cache(surface)
         return cid
 

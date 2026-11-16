@@ -30,13 +30,13 @@ class ClaudeSessionTests(unittest.TestCase):
             patcher.start(); self.addCleanup(patcher.stop)
 
     def locked(self):
-        self.snapshot.return_value = {'state': 'locked', 'interactive': False, 'reason': 'Windows 已锁定'}
+        self.snapshot.return_value = {'state': 'locked', 'interactive': False, 'reason': 'Windows 잠긴'}
 
     def test_windows_owner_conflict_receipt_has_actionable_state(self):
-        for code, expected in (('OWNER_BUSY', '请求进行中'),
-                               ('OWNER_UNCONFIRMED', '未确认请求'),
-                               ('OWNER_LEGACY', '重新加载或退出重开 Claude Desktop'),
-                               ('OWNER_CONFLICT', '重新加载或退出重开 Claude Desktop')):
+        for code, expected in (('OWNER_BUSY', "Claude 아직 브릿지 요청이 진행 중입니다. 나중에 다시 연결해 보세요."),
+                               ('OWNER_UNCONFIRMED', '확인되지 않은 요청'),
+                               ('OWNER_LEGACY', "이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）"),
+                               ('OWNER_CONFLICT', "이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）")):
             with self.subTest(code=code):
                 process = Mock(returncode=0)
                 process.communicate.return_value = (code, '')
@@ -127,8 +127,8 @@ class ClaudeSessionTests(unittest.TestCase):
         with patch.object(claude_setup, 'helper_path', return_value=Path(__file__)), \
              patch.object(claude_setup.subprocess, 'Popen', return_value=process):
             for action in ('connect', 'inspect-error'):
-                for reason, state in [('Windows 已锁定', 'needs-unlock'), ('Windows 桌面不可用', 'needs-desktop'),
-                                      ('焦点已离开 Claude', 'needs-retry'), ('已取消 Claude 连接', 'cancelled')]:
+                for reason, state in [('Windows 잠금 상태입니다', 'needs-unlock'), ('Windows 데스크톱을 사용할 수 없습니다.', 'needs-desktop'),
+                                      ('초점이 나갔어 Claude', 'needs-retry'), ("Claude 연결이 취소되었습니다.", 'cancelled')]:
                     process.communicate.return_value = (reason, '')
                     self.assertEqual(claude_setup.native_action(action, pid=42), {'setupState': state, 'reason': reason})
             process.returncode = 0; process.communicate.return_value = ('NEEDS_TRUST', '')
@@ -213,8 +213,8 @@ class ClaudeSessionTests(unittest.TestCase):
             manager._stop_client.assert_called_once_with('claude', manager._descriptor.return_value, inspect.return_value)
             launch.assert_not_called(); inspect.assert_called_once()
             self.assertEqual(manager.adapters['claude'].connect.call_count, 2)
-            manager._stop_client.side_effect = ValueError('任务仍在运行')
-            with self.assertRaisesRegex(ValueError, '任务仍在运行'):
+            manager._stop_client.side_effect = ValueError('작업이 아직 실행 중입니다.')
+            with self.assertRaisesRegex(ValueError, '작업이 아직 실행 중입니다.'):
                 manager.connect_claude(restart=True)
             self.assertEqual(manager.adapters['claude'].connect.call_count, 2)
             manager.adapters['claude'].connect.reset_mock()

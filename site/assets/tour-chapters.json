@@ -1,42 +1,42 @@
 [
   {
     "start": 0,
-    "zh": "启动网关，继续原来的工作",
+    "ko": "게이트웨이를 시작하고 작업을 유지하세요.",
     "en": "Start the gateway, keep your work"
   },
   {
     "start": 6.309,
-    "zh": "账号、额度，放在一起",
+    "ko": "계정과 할당량을 한 곳에서 확인하세요",
     "en": "Accounts and quota in one place"
   },
   {
     "start": 14.347,
-    "zh": "填入 API，读取上游模型",
+    "ko": "API를 연결하고 모델을 검색하세요",
     "en": "Connect an API and discover models"
   },
   {
     "start": 20.234,
-    "zh": "手机接着聊，不用重开",
+    "ko": "휴대폰에서 동일한 채팅을 계속하세요",
     "en": "Continue the same chat on your phone"
   },
   {
     "start": 26.823,
-    "zh": "当前接入与额度，一眼看清",
+    "ko": "활성 계정과 할당량을 한 눈에 살펴보세요",
     "en": "Your active account and quota at a glance"
   },
   {
     "start": 34.152,
-    "zh": "模型列表，来自当前上游",
+    "ko": "현재 업스트림의 모델",
     "en": "Models from your current upstream"
   },
   {
     "start": 40.318,
-    "zh": "授权范围，说清再继续",
+    "ko": "올바른 승인 범위 선택",
     "en": "Choose the right approval scope"
   },
   {
     "start": 46.453,
-    "zh": "计划先确认，再继续执行",
+    "ko": "계속하기 전에 계획을 검토하세요.",
     "en": "Review the plan before continuing"
   }
 ]

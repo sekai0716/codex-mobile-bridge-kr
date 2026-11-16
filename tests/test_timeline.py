@@ -292,7 +292,7 @@ class TimelineTests(unittest.TestCase):
     def test_activity_is_bounded_and_detail_chunks_are_lossless(self):
         timeline = Timeline()
         state = view(20)
-        text = ('长日志 🚀 \n' * 10000)
+        text = ('긴 로그 🚀 \n' * 10000)
         for item in state['turns'][0]['messages']:
             item.update(role='activity', text=text)
         timeline.update(state)
@@ -316,7 +316,7 @@ class TimelineTests(unittest.TestCase):
         timeline = Timeline()
         state = view(100)
         for item in state['turns'][0]['messages']:
-            item['text'] = '内容' * 10000
+            item['text'] = '콘텐츠' * 10000
         timeline.update(state)
         count, cursor = 0, None
         while True:

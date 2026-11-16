@@ -53,7 +53,7 @@ test('checksum failures, missing coverage and duplicate entries are rejected',t=
 });
 test('recomputed checksums cannot conceal a changed desktop ZIP or wrong signing identity',t=>{
   const {directory,key}=fixture(t);
-  assert.throws(()=>verifyRelease(directory,{key:generateKeyPairSync('ed25519').publicKey,write:true}),/签名/);
+  assert.throws(()=>verifyRelease(directory,{key:generateKeyPairSync('ed25519').publicKey,write:true}),/업데이트 매니페스트 서명이 잘못되었습니다\./);
   fs.appendFileSync(path.join(directory,assetName(version,'darwin','arm64')),'modified');
   writeChecksums(directory);
   assert.throws(()=>verifyRelease(directory,{key,write:true}),/Signed update asset mismatch/);

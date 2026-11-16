@@ -23,11 +23,11 @@ window.runHostFileNavigationChecks=async({project,outside})=>{
   let address=tab.body.querySelector('.wb-address input');address.value=outside;address.form.requestSubmit();
   await wait(()=>session.directory===outside&&tab.loaded&&!tab.loading);
   check(tab.upload.disabled&&!tab.up.disabled,'outside navigation permits parent but blocks upload');
-  const target=outside+'/报告.txt',row=[...tab.list.children].find(n=>n.dataset.path===target);
+  const target=outside+'/보고서.txt',row=[...tab.list.children].find(n=>n.dataset.path===target);
   check(!!row,'host list keeps absolute file identity');
   row.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
   let dialog=document.querySelector('dialog[open]');
-  check(!!dialog.querySelector('a[download]')&&![...dialog.querySelectorAll('button')].some(n=>n.textContent==='引用到消息'),'outside menu preserves download and excludes project reference');
+  check(!!dialog.querySelector('a[download]')&&![...dialog.querySelectorAll('button')].some(n=>n.textContent==='메시지 인용'),'outside menu preserves download and excludes project reference');
   const download=new URL(dialog.querySelector('a').href);check(download.searchParams.get('scope')==='host','download keeps explicit host scope');dialog.close();
   row.click();await wait(()=>session.files.some(t=>t.id==='file:'+target&&t.body.textContent.includes('outside preview')));
   check(true,'actual production HTTP preview reads the sibling file');

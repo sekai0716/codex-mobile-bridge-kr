@@ -35,11 +35,11 @@ class DeleteRejected(CreationError):
 def native_delete_error(error, thread_id):
     """Only known pre-mutation rejections are safe to submit again explicitly."""
     if error.get('code') == -32601:
-        return DeleteRejected('当前原生运行时不支持永久删除，请在原客户端操作')
+        return DeleteRejected('현재 네이티브 런타임은 영구 삭제를 지원하지 않습니다. 원래 클라이언트에서 작업하세요.')
     if (error.get('code') == -32600 and
             error.get('message') == f'thread {thread_id} already has an active writer'):
-        return DeleteRejected('原客户端仍持有此聊天，尚未删除；请在原客户端删除，或释放该聊天后重新确认')
-    return CreationError(error.get('message', '原生删除结果待核对'))
+        return DeleteRejected("원래 클라이언트는 여전히 이 채팅을 보유하고 있습니다. 아무것도 삭제되지 않았습니다. 거기에서 삭제하시거나, 채팅을 해제하고 다시 확인해 주세요.")
+    return CreationError(error.get('message', '기본 삭제 결과를 확인해야 합니다.'))
 
 
 def runtime_environment(codex_home, *, isolated_home=False):
@@ -52,9 +52,9 @@ def runtime_environment(codex_home, *, isolated_home=False):
 
 def _runtime_operation(executable, codex_home, cwd, operation, *, failure_message=None, isolated_home=False):
     if not executable:
-        raise CreationUnavailable('找不到 Codex 运行时，请在电脑启动器的运行配置中指定路径')
+        raise CreationUnavailable('찾을 수 없음 Codex 실행 시 컴퓨터 런처의 실행 구성에서 경로를 지정해 주세요.')
     if not Path(cwd).is_dir():
-        raise CreationUnavailable('项目目录不存在，请先在电脑 App 中检查项目')
+        raise CreationUnavailable('프로젝트 디렉터리가 존재하지 않습니다. 먼저 확인하세요. App 검사항목')
     env = runtime_environment(codex_home, isolated_home=isolated_home)
     kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
     try:
@@ -62,7 +62,7 @@ def _runtime_operation(executable, codex_home, cwd, operation, *, failure_messag
                                    cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.DEVNULL, text=True, encoding='utf-8', **kwargs)
     except OSError as exc:
-        raise CreationUnavailable('无法启动 Codex 运行时，请检查运行配置中的程序路径、项目目录和访问权限后重试') from exc
+        raise CreationUnavailable('시작할 수 없습니다 Codex 실행시 실행중인 구성에서 프로그램 경로, 프로젝트 디렉터리, 접근권한을 확인하신 후 다시 시도해주세요.') from exc
     messages = queue.Queue()
 
     def read():
@@ -89,19 +89,19 @@ def _runtime_operation(executable, codex_home, cwd, operation, *, failure_messag
             try:
                 result = messages.get(timeout=max(.01, deadline - time.monotonic()))
             except queue.Empty as exc:
-                raise CreationError(failure_message or '创建聊天超时，请先检查桌面聊天列表，不要重复创建') from exc
+                raise CreationError(failure_message or '채팅 생성 시간이 초과되었습니다. 먼저 데스크톱 채팅 목록을 확인하신 후 다시 생성하지 마세요.') from exc
             if result is None:
-                raise CreationError(failure_message or '创建聊天的运行时已断开，请先检查桌面聊天列表')
+                raise CreationError(failure_message or '채팅 생성 런타임이 중단되었습니다. 먼저 데스크톱 채팅 목록을 확인하세요.')
             if result.get('id') != counter:
                 if time.monotonic() >= deadline:
-                    raise CreationError(failure_message or '创建聊天超时，请先检查桌面聊天列表')
+                    raise CreationError(failure_message or '채팅 생성 시간이 초과되었습니다. 먼저 데스크톱 채팅 목록을 확인하세요.')
                 continue
             if 'error' in result:
                 if method in ('thread/archive', 'thread/unarchive'):
                     raise ArchiveRejected(result['error'])
                 if method == 'thread/delete':
                     raise native_delete_error(result['error'], params['threadId'])
-                raise CreationError(result['error'].get('message', failure_message or '创建聊天失败'))
+                raise CreationError(result['error'].get('message', failure_message or '채팅을 생성하지 못했습니다.'))
             return result['result']
 
     try:
@@ -122,12 +122,12 @@ def _runtime_operation(executable, codex_home, cwd, operation, *, failure_messag
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
-            raise CreationError(failure_message or '创建运行时未正常退出，请先检查桌面聊天列表')
+            raise CreationError(failure_message or '생성 런타임이 정상적으로 종료되지 않았습니다. 먼저 데스크톱 채팅 목록을 확인해주세요.')
         finally:
             reader.join(timeout=1)
             process.stdout.close()
     if process.returncode:
-        raise CreationError(failure_message or '创建运行时退出异常，请先检查桌面聊天列表')
+        raise CreationError(failure_message or '런타임 종료 예외를 생성하십시오. 먼저 데스크톱 채팅 목록을 확인하십시오.')
     return result
 
 
@@ -138,53 +138,53 @@ def independent_directory(data_dir, request_id):
     target = root / request_id
     try:
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if root.is_symlink(): raise CreationUnavailable('独立聊天目录不可用')
+        if root.is_symlink(): raise CreationUnavailable('독립형 채팅 디렉터리를 사용할 수 없습니다.')
         target.mkdir(mode=0o700, exist_ok=True)
-        if target.is_symlink() or not target.is_dir(): raise CreationUnavailable('独立聊天目录不可用')
+        if target.is_symlink() or not target.is_dir(): raise CreationUnavailable('독립형 채팅 디렉터리를 사용할 수 없습니다.')
         return str(target.resolve())
     except OSError as exc:
-        raise CreationUnavailable('独立聊天目录不可用') from exc
+        raise CreationUnavailable('독립형 채팅 디렉터리를 사용할 수 없습니다.') from exc
 
 
 def project_directory(value, create=False, expected=None):
     """Explicit project selection only; return the canonical directory identity."""
     if not isinstance(value, str) or not value.strip() or len(value) > 4096 or any(ord(c) < 32 for c in value):
-        raise ValueError('请输入完整的项目目录')
+        raise ValueError('전체 프로젝트 디렉터리를 입력하세요.')
     if type(create) is not bool:
-        raise ValueError('创建目录选项无效')
+        raise ValueError('디렉터리 생성 옵션이 잘못되었습니다.')
     value = value.strip()
     # UNC/device paths can initiate remote authentication on Windows. Projects
     # on SSH/WSL must be resolved on that registered host instead.
     if os.name == 'nt' and (value.startswith(('\\\\', '//')) or ':' in value[2:]):
-        raise ValueError('请使用此电脑的本地绝对路径')
+        raise ValueError('이 컴퓨터의 로컬 절대 경로를 사용하십시오.')
     path = Path(value).expanduser()
     if not path.is_absolute() or '..' in path.parts:
-        raise ValueError('请使用绝对路径或 ~/ 开头的目录，不含 ..')
+        raise ValueError('절대 경로를 사용하거나 ~/ 제외하고 처음에 디렉토리 ..')
     try:
         if create and not path.exists():
             parent = path.parent.resolve(strict=True)
-            if not parent.is_dir(): raise ValueError('父目录不存在')
+            if not parent.is_dir(): raise ValueError('상위 디렉터리가 존재하지 않습니다.')
             # Deliberately create only the requested final directory, never a
             # guessed hierarchy, and never overwrite existing contents.
             try: (parent/path.name).mkdir(mode=0o700)
             except FileExistsError: pass
         canonical = path.resolve(strict=True)
-        if not canonical.is_dir(): raise ValueError('所选路径不是目录')
+        if not canonical.is_dir(): raise ValueError('선택한 경로는 디렉터리가 아닙니다.')
         if not os.access(canonical, os.R_OK | os.W_OK | os.X_OK):
-            raise ValueError('项目目录不可读写')
+            raise ValueError('프로젝트 디렉터리를 읽거나 쓸 수 없습니다.')
         st = canonical.stat()
         identity = {'cwd': str(canonical), 'device': st.st_dev, 'inode': st.st_ino}
         if expected is not None and identity != expected:
-            raise ValueError('项目目录已变化，请重新选择目录')
+            raise ValueError('프로젝트 디렉터리가 변경되었습니다. 디렉터리를 다시 선택하세요.')
         return identity
     except OSError as exc:
-        raise ValueError('项目目录不存在或不可访问；新目录请勾选创建，并确保父目录存在') from exc
+        raise ValueError('프로젝트 디렉터리가 존재하지 않거나 액세스할 수 없습니다. 새 디렉토리를 생성하고 상위 디렉토리가 존재하는지 확인하십시오.') from exc
 
 
 def project_trust(executable, codex_home, identity, confirmed=False):
     """Trust only an explicitly selected, unchanged directory via native config RPC."""
     if type(confirmed) is not bool:
-        raise ValueError('目录信任确认无效')
+        raise ValueError('디렉터리 신뢰 확인이 잘못되었습니다.')
     cwd = project_directory(identity['cwd'], expected=identity)['cwd']
     def run(request):
         def read():
@@ -197,19 +197,19 @@ def project_trust(executable, codex_home, identity, confirmed=False):
                       if layer.get('name', {}).get('type') == 'user'
                       and not layer['name'].get('profile') and not layer.get('disabledReason')]
             if len(layers) != 1 or not layers[0].get('version'):
-                raise CreationUnavailable('无法确认 Codex 用户配置版本，请在电脑 App 中信任此项目')
+                raise CreationUnavailable('확인할 수 없습니다 Codex 사용자 구성 버전입니다. 컴퓨터에서 구성하세요. App 이 프로젝트를 믿으세요')
             project_directory(cwd, expected=identity)
             result = request('config/batchWrite', {'edits': [{
                 'keyPath': 'projects.' + json.dumps(cwd, ensure_ascii=False) + '.trust_level',
                 'value': 'trusted', 'mergeStrategy': 'replace'}],
                 'filePath': None, 'expectedVersion': layers[0]['version'], 'reloadUserConfig': True})
             if result.get('status') != 'ok' or not trusted(read()):
-                raise CreationError('目录信任结果尚未确认，请检查 Codex App 配置；不会自动重复提交')
+                raise CreationError('디렉터리 신뢰 결과가 아직 확인되지 않았습니다. 확인하세요. Codex App 구성; 자동으로 다시 제출되지 않습니다.')
             value = {'config': {'projects': {cwd: {'trust_level': 'trusted'}}}}
         return {'trusted': trusted(value), 'path': cwd}
     # Do not launch the temporary reader in an as-yet untrusted project.
     return _runtime_operation(executable, codex_home, str(codex_home), run,
-                              failure_message='目录信任结果尚未确认，请检查 Codex App 配置；不会自动重复提交')
+                              failure_message='디렉터리 신뢰 결과가 아직 확인되지 않았습니다. 확인하세요. Codex App 구성; 자동으로 다시 제출되지 않습니다.')
 
 
 def apply_desktop_config():
@@ -218,31 +218,31 @@ def apply_desktop_config():
 
 def project_directory_listing(value=None, hidden=False, name=None, identity=None):
     """Explicit filesystem picker; only directories, never file contents."""
-    if type(hidden) is not bool: raise ValueError('目录显示选项无效')
+    if type(hidden) is not bool: raise ValueError('디렉터리 표시 옵션이 잘못되었습니다.')
     if value is None: value = str(Path.home())
     if not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value):
-        raise ValueError('目录路径无效')
+        raise ValueError('잘못된 디렉터리 경로')
     if os.name == 'nt' and (value.startswith(('\\\\', '//')) or ':' in value[2:]):
-        raise ValueError('请使用此电脑的本地目录')
+        raise ValueError('이 컴퓨터의 로컬 디렉토리를 사용하십시오')
     try:
         path = Path(value).expanduser()
-        if not path.is_absolute() or '..' in path.parts: raise ValueError('目录路径无效')
+        if not path.is_absolute() or '..' in path.parts: raise ValueError('잘못된 디렉터리 경로')
         path = path.resolve(strict=True)
-        if not path.is_dir() or not os.access(path, os.R_OK | os.X_OK): raise ValueError('目录不可浏览')
+        if not path.is_dir() or not os.access(path, os.R_OK | os.X_OK): raise ValueError('디렉터리를 탐색할 수 없습니다.')
         st = path.stat()
         current = {'cwd': str(path), 'device': st.st_dev, 'inode': st.st_ino}
         if name is not None:
             if (not isinstance(name, str) or not name.strip() or len(name) > 200 or name in ('.', '..')
                     or any(c in name for c in '/\\:') or any(ord(c) < 32 for c in name)):
-                raise ValueError('请输入有效的文件夹名称，不含路径分隔符')
-            if identity != current: raise ValueError('当前目录已变化，请刷新后新建')
+                raise ValueError('경로 구분 기호 없이 유효한 폴더 이름을 입력하세요.')
+            if identity != current: raise ValueError('현재 디렉터리가 변경되었습니다. 새로고침하여 새 디렉터리를 만드세요.')
             child = path/name.strip()
             # A lost mkdir response must never silently select an existing
             # folder or follow a replacement symlink on a later request.
             try:
                 child.mkdir(mode=0o700)
             except FileExistsError as exc:
-                raise ValueError('文件夹已存在，请刷新后选择') from exc
+                raise ValueError('폴더가 이미 존재합니다. 새로고침한 후 선택하세요.') from exc
             path = Path(project_directory(str(child))['cwd'])
             st = path.stat(); current = {'cwd': str(path), 'device': st.st_dev, 'inode': st.st_ino}
         directories = []
@@ -261,7 +261,7 @@ def project_directory_listing(value=None, hidden=False, name=None, identity=None
         return {'path': str(path), 'parent': str(path.parent) if path.parent != path else None,
                 'home': str(Path.home()), 'roots': roots, 'identity': current, 'directories': directories}
     except (OSError, RuntimeError) as exc:
-        raise ValueError('无法浏览此目录，请检查访问权限') from exc
+        raise ValueError('이 디렉터리를 탐색할 수 없습니다. 액세스 권한을 확인하세요.') from exc
 
 
 def _native_project_support(executable, required):
@@ -280,7 +280,7 @@ def _native_project_support(executable, required):
     except (OSError, ValueError, subprocess.TimeoutExpired):
         supported = False
     if required and not supported:
-        raise CreationUnavailable('此 Codex 版本不支持原生项目关联，请更新电脑 Codex App 后重试，或在 App 中添加项目后重新选择')
+        raise CreationUnavailable("이 Codex 런타임은 네이티브 프로젝트 할당을 지원하지 않습니다. Codex 데스크톱을 업데이트하거나 앱에 프로젝트를 추가하고 다시 선택하세요.")
     return supported
 
 
@@ -297,24 +297,24 @@ def _native_project(request, cwd, project):
         if cursor is None:
             break
         if cursor in seen:
-            raise CreationError('原生项目列表游标无效，请在电脑 App 检查项目')
+            raise CreationError('기본 항목 목록 커서가 잘못되었습니다. 컴퓨터에서 사용해 보세요. App 확인항목')
         seen.add(cursor)
     named = [row for row in matches if row.get('name') == project.get('name')]
     selected = named if named else matches
     if len(selected) > 1:
-        raise CreationError('此目录对应多个原生项目，请在电脑 App 确认项目归属后重试')
+        raise CreationError("이 폴더는 여러 네이티브 프로젝트와 일치합니다. 다시 시도하기 전에 데스크톱 앱에서 프로젝트를 확인하세요.")
     if selected:
         return selected[0]['id']
-    raise CreationUnavailable('电脑 App 项目与运行时尚未对应，请检查所用 Codex App 和运行时配置后重试')
+    raise CreationUnavailable("데스크톱 프로젝트와 런타임이 아직 일치하지 않습니다. Codex 앱과 런타임 구성을 확인한 후 다시 시도하세요.")
 
 
 def model_overrides(model=None, effort=None):
     if model is None and effort is None:
         return {}
     if not isinstance(model, str) or not model or len(model) > 300 or any(c.isspace() or ord(c) < 32 for c in model):
-        raise CreationUnavailable('新会话模型无效')
+        raise CreationUnavailable('새 세션 모델이 유효하지 않습니다.')
     if effort is not None and effort not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
-        raise CreationUnavailable('新会话思考强度无效')
+        raise CreationUnavailable('새 세션의 생각 강도가 잘못되었습니다.')
     return {'model': model, **({'config': {'model_reasoning_effort': effort}} if effort is not None else {})}
 
 
@@ -340,20 +340,20 @@ def create_empty(executable, codex_home, cwd, title, project=None, model=None, e
         thread_id = result['thread']['id']
         uuid.UUID(thread_id)
         if model is not None and (result.get('model') != model or effort is not None and result.get('reasoningEffort') != effort):
-            raise CreationError('聊天已创建，但模型或思考强度尚未确认，请检查原会话；不会重复创建')
+            raise CreationError('채팅이 생성되었으나 모델이나 사고 강도가 확인되지 않았습니다. 원본 대화를 확인하세요. 다시 생성되지 않습니다.')
         if project_id is not None and result['thread'].get('projectId') != project_id:
-            raise CreationError('聊天已创建但原生项目归属未确认，请检查电脑 App，不要重复创建')
+            raise CreationError("채팅이 생성되었지만 해당 프로젝트가 확인되지 않았습니다. 데스크톱 앱을 확인하세요. 다시 생성하지 마십시오.")
         save_new_thread(request, result['thread'], title)
         saved = request('thread/read', {'threadId': thread_id, 'includeTurns': True})
         if project_id is not None and saved['thread'].get('projectId') != project_id:
-            raise CreationError('聊天已创建但项目归属未持久化确认，请检查电脑 App，不要重复创建')
+            raise CreationError("채팅이 생성되었지만 저장된 프로젝트 할당이 확인되지 않았습니다. 데스크톱 앱을 확인하세요. 다시 생성하지 마십시오.")
         return thread_id
     return _runtime_operation(executable, codex_home, cwd, create)
 
 
 def fork_copy(executable, codex_home, cwd, source_id, turn_id, title, settings, *, thread_source=None, isolated_home=False):
     if not executable:
-        raise ForkUnavailable('找不到 Codex 运行时，请在电脑启动器的运行配置中指定路径')
+        raise ForkUnavailable('찾을 수 없음 Codex 실행 시 컴퓨터 런처의 실행 구성에서 경로를 지정해 주세요.')
     # Check the bundled runtime, not a guessed version. Older servers can silently
     # ignore unknown fields; that must never copy later turns or start a goal.
     kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
@@ -362,16 +362,16 @@ def fork_copy(executable, codex_home, cwd, source_id, turn_id, title, settings, 
             result = subprocess.run([str(executable), 'app-server', 'generate-json-schema', '--experimental', '--out', folder],
                                     capture_output=True, timeout=30, **kwargs)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            raise ForkUnavailable('无法检查 Codex 运行时，请检查运行配置中的程序路径后重试') from exc
+            raise ForkUnavailable('확인할 수 없음 Codex 실행시 실행중인 구성에서 프로그램 경로를 확인하신 후 다시 시도해주세요.') from exc
         paths = list(Path(folder).rglob('ThreadForkParams.json'))
         if result.returncode or not paths:
-            raise ForkUnavailable('此 Codex 版本暂不支持安全分支，请更新电脑 Codex App')
+            raise ForkUnavailable("안전한 대화 분기를 사용하려면 데스크톱 Codex 앱을 업데이트하세요.")
         properties = json.loads(paths[0].read_text(encoding='utf-8')).get('properties', {})
         required = {'lastTurnId', 'deferGoalContinuation'}
         if thread_source is not None:
             required.add('threadSource')
         if not required <= properties.keys():
-            raise ForkUnavailable('此 Codex 版本暂不支持安全分支，请更新电脑 Codex App')
+            raise ForkUnavailable("안전한 대화 분기를 사용하려면 데스크톱 Codex 앱을 업데이트하세요.")
     def fork(request):
         result = request('thread/fork', {'threadId': source_id, 'lastTurnId': turn_id,
                                         'deferGoalContinuation': True, 'ephemeral': False,
@@ -379,12 +379,12 @@ def fork_copy(executable, codex_home, cwd, source_id, turn_id, title, settings, 
         thread = result['thread']
         uuid.UUID(thread['id'])
         if thread['id'] == source_id:
-            raise CreationError('分支结果无效，请检查桌面聊天列表')
+            raise CreationError('잘못된 분기 결과입니다. 데스크톱 채팅 목록을 확인하세요.')
         turns = thread.get('turns', [])
         if not turns or turns[-1].get('id') != turn_id:
-            raise CreationError('分支位置未确认，请检查桌面聊天列表，不要重复创建')
+            raise CreationError("지점 위치는 확인되지 않았습니다. 다시 시도하기 전에 데스크톱 채팅 목록을 확인하세요.")
         if result.get('modelProvider') != settings['modelProvider']:
-            raise CreationError('分支模型提供商不一致，请检查桌面聊天列表')
+            raise CreationError("지점 공급자가 일치하지 않습니다. 데스크톱 채팅 목록을 확인하세요.")
         request('thread/name/set', {'threadId': thread['id'], 'name': title})
         return thread['id']
     return _runtime_operation(executable, codex_home, cwd, fork, isolated_home=isolated_home)
@@ -409,7 +409,7 @@ def fork_attached(executable, codex_home, cwd, source_id, title, settings, creat
     safe substitute. `created` records the child before subsequent writes.
     """
     if not executable:
-        raise ForkUnavailable('找不到 Codex 运行时，请检查电脑客户端配置')
+        raise ForkUnavailable('찾을 수 없음 Codex 실행 시 컴퓨터 클라이언트 구성을 확인하세요.')
     kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
     with tempfile.TemporaryDirectory(prefix='attached-schema-') as folder:
         try:
@@ -422,9 +422,9 @@ def fork_attached(executable, codex_home, cwd, source_id, title, settings, creat
                          {'attachToSource', 'excludeTurns'} <= properties('ThreadForkParams').keys() and
                          {'attachedToThreadId', 'useStateDbOnly'} <= properties('ThreadListParams').keys())
         except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
-            raise ForkUnavailable('无法检查 Codex 原生侧边聊天支持，请检查运行时后重试') from exc
+            raise ForkUnavailable("네이티브 보조 채팅 지원을 확인할 수 없습니다. Codex 런타임을 확인하고 다시 시도하십시오.") from exc
     if not supported:
-        raise ForkUnavailable('此 Codex 版本不支持原生侧边聊天，请更新 Codex App 后重试')
+        raise ForkUnavailable("이 Codex 버전은 네이티브 보조 채팅을 지원하지 않습니다. Codex 앱을 업데이트하고 다시 시도해 보세요.")
 
     def fork(request):
         result = request('thread/fork', {**settings, 'threadId': source_id, 'cwd': cwd,
@@ -433,10 +433,10 @@ def fork_attached(executable, codex_home, cwd, source_id, title, settings, creat
         child = result['thread']['id']
         uuid.UUID(child)
         if child == source_id or result['thread'].get('ephemeral') is True:
-            raise CreationError('原生侧边聊天身份未确认，请检查父聊天，不会重复创建')
+            raise CreationError("네이티브 보조 채팅 신원이 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.")
         created(child)
         if result.get('modelProvider') != settings['modelProvider'] or result.get('model') != settings['model'] or result.get('cwd') != cwd:
-            raise CreationError('侧边聊天的运行配置未确认，请检查父聊天，不会重复创建')
+            raise CreationError("보조 채팅 런타임 구성이 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.")
         cursor, seen = None, set()
         while True:
             page = request('thread/list', {'attachedToThreadId': source_id, 'archived': False,
@@ -445,7 +445,7 @@ def fork_attached(executable, codex_home, cwd, source_id, title, settings, creat
                 break
             cursor = page.get('nextCursor')
             if not cursor or cursor in seen:
-                raise CreationError('原生侧边聊天归属未确认，请检查父聊天，不会重复创建')
+                raise CreationError("네이티브 보조 채팅 관계가 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.")
             seen.add(cursor)
         request('thread/inject_items', {'threadId': child, 'items': [{'type': 'message', 'role': 'user',
                 'content': [{'type': 'input_text', 'text': SIDE_CHAT_BOUNDARY}]}]})
@@ -454,7 +454,7 @@ def fork_attached(executable, codex_home, cwd, source_id, title, settings, creat
     if runtime_operation is not None:
         return runtime_operation(fork)
     return _runtime_operation(executable, codex_home, cwd, fork, isolated_home=isolated_home,
-                              failure_message='侧边聊天创建结果尚未确认，请查看父聊天；不会重复创建')
+                              failure_message="보조 채팅 생성이 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.")
 
 
 def open_project_in_desktop(cwd):
@@ -480,11 +480,11 @@ def _open_desktop_url(url):
             subprocess.run(['xdg-open', url], check=True, timeout=10,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError) as exc:
-            raise CreationError('无法打开桌面聊天，请在桌面登录会话中运行网关，并检查 xdg-open 和 codex:// 协议关联') from exc
+            raise CreationError("데스크톱 채팅을 열 수 없습니다. 데스크탑 로그인 세션에서 게이트웨이를 실행하고 xdg-open 및 codex:// 프로토콜 핸들러를 확인하십시오.") from exc
     elif os.name == 'nt':
         os.startfile(url)
     else:
-        raise CreationError('请在支持 Codex App 的 Mac 或 Windows 电脑运行网关')
+        raise CreationError('지원해주세요 Codex App 의 Mac 또는 Windows 게이트웨이를 실행하는 컴퓨터')
 
 
 def rename_thread(executable, codex_home, thread_id, title, *, isolated_home=False):
@@ -501,10 +501,10 @@ class ArchiveRejected(CreationError):
         message = str(self.rpc_error.get('message', ''))
         self.reason = ('active_writer' if 'already has an active writer' in message else
                        'unsupported' if self.rpc_error.get('code') == -32601 else 'native_rejected')
-        public = ('聊天仍由原 Codex 客户端持有；当前原生连接无法归档，请在持有该聊天的原客户端操作'
+        public = ("원래 Codex 클라이언트는 여전히 이 채팅을 소유하고 있습니다. 거기에 보관하세요. 이 연결은 보관할 수 없습니다."
                   if self.reason == 'active_writer' else
-                  '原 Codex 运行时不支持此归档操作，请在原客户端操作' if self.reason == 'unsupported' else
-                  '原生客户端已拒绝此次归档操作，请检查原客户端后重试')
+                  "원래 Codex 런타임은 이 아카이브 작업을 지원하지 않습니다. 원래 클라이언트를 사용하십시오." if self.reason == 'unsupported' else
+                  "네이티브 클라이언트가 이 아카이브 작업을 거부했습니다. 다시 시도하기 전에 원래 클라이언트를 확인하세요.")
         super().__init__(public)
 
 
@@ -520,7 +520,7 @@ def check_archive_runtime(request, identifiers, *, allow_terminal_error=False):
         terminal_error = allow_terminal_error and status == 'systemError'
         if (thread.get('id') != identifier or (status not in ('idle', 'notLoaded') and not terminal_error) or
                 thread.get('requests') or any(turn.get('status') == 'inProgress' for turn in thread.get('turns', []))):
-            raise ValueError('聊天或子智能体正在运行、等待确认或状态未知，请先在原客户端处理')
+            raise ValueError("이 채팅 또는 하위 에이전트가 실행 중이거나 승인 대기 중이거나 상태를 알 수 없습니다. 원래 클라이언트를 먼저 확인하세요.")
         if terminal_error:
             from bridge.clients.codex.release import check_terminal_system_error
             check_terminal_system_error(request, thread)
@@ -532,12 +532,12 @@ def stop_archive_runtime(request, identifiers, timeout=20):
     def background(identifier):
         thread = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
         if thread.get('id') != identifier:
-            raise ValueError('原会话身份已变化，尚未发送归档请求')
+            raise ValueError("원래 세션 ID가 변경되었습니다. 보관 요청이 전송되지 않았습니다.")
         if (thread.get('status') or {}).get('type') == 'notLoaded':
             return False
         result = request('thread/backgroundTerminals/list', {'threadId': identifier, 'limit': 1})
         if not isinstance(result.get('data'), list):
-            raise ValueError('无法确认原生后台任务状态')
+            raise ValueError("네이티브 백그라운드 작업 상태를 확인할 수 없습니다.")
         return bool(result['data'] or result.get('nextCursor'))
     # Complete preflight before the first stop; never resume to discover activity.
     try:
@@ -545,14 +545,14 @@ def stop_archive_runtime(request, identifiers, timeout=20):
             thread = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
             status = (thread.get('status') or {}).get('type')
             if thread.get('id') != identifier or status not in ('idle', 'notLoaded', 'active'):
-                raise ValueError('无法确认原会话状态，未停止或归档')
+                raise ValueError("원래 세션 상태를 확인할 수 없습니다. 아무것도 중지되거나 보관되지 않았습니다.")
             if status == 'active':
                 rows = request('thread/turns/list', {'threadId': identifier, 'limit': 1, 'sortDirection': 'desc'})['data']
                 if len(rows) != 1 or rows[0].get('status') != 'inProgress' or not isinstance(rows[0].get('id'), str):
-                    raise ValueError('无法确认可停止的原生任务，未停止或归档')
+                    raise ValueError("중지할 네이티브 작업을 확인할 수 없습니다. 아무것도 중지되거나 보관되지 않았습니다.")
                 turns.append((identifier, rows[0]['id']))
             elif thread.get('requests'):
-                raise ValueError('聊天有等待确认的请求，未停止或归档')
+                raise ValueError("채팅에 대기 중인 요청이 있습니다. 아무것도 중지되거나 보관되지 않았습니다.")
             background(identifier)
     except Exception as exc:
         raise ArchiveNotSent(str(exc)) from exc
@@ -560,7 +560,7 @@ def stop_archive_runtime(request, identifiers, timeout=20):
         # Stopping a parent can already settle its descendants.
         thread = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
         if thread.get('id') != identifier:
-            raise CreationError('原会话身份已变化，尚未发送归档请求')
+            raise CreationError("원래 세션 ID가 변경되었습니다. 보관 요청이 전송되지 않았습니다.")
         if (thread.get('status') or {}).get('type') == 'active':
             request('turn/interrupt', {'threadId': identifier, 'turnId': turn_id})
     for identifier in identifiers:
@@ -571,11 +571,11 @@ def stop_archive_runtime(request, identifiers, timeout=20):
         try:
             check_archive_runtime(request, identifiers)
             if any(background(identifier) for identifier in identifiers):
-                raise ValueError('后台任务尚未停止')
+                raise ValueError('백그라운드 작업이 아직 중지되지 않았습니다.')
             return
         except ValueError:
             if time.monotonic() >= deadline:
-                raise CreationError('停止结果待核对，尚未发送归档请求') from None
+                raise CreationError("정지 결과는 확인되지 않았습니다. 보관 요청이 전송되지 않았습니다.") from None
             time.sleep(.1)
 
 

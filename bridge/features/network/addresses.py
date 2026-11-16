@@ -8,7 +8,7 @@ def selected_addresses(value):
     if value is None:
         return None
     if not isinstance(value, list) or len(value) > 256:
-        raise ValueError('请选择有效的局域网 IPv4 地址')
+        raise ValueError("유효한 LAN IPv4 주소를 선택하세요.")
     result = []
     for item in value:
         try:
@@ -16,7 +16,7 @@ def selected_addresses(value):
         except ipaddress.AddressValueError:
             address = None
         if address is None or address.is_loopback or address.is_unspecified or address.is_multicast or str(address) == '255.255.255.255':
-            raise ValueError('请选择有效的局域网 IPv4 地址')
+            raise ValueError("유효한 LAN IPv4 주소를 선택하세요.")
         if str(address) not in result:
             result.append(str(address))
     return result

@@ -24,13 +24,13 @@ test('native organization preserves host and expected assignment and rejects sta
  assert.equal(ui.requests.at(-1).url,'/remote/native/organization');
  assert.equal(ui.requests.at(-1).body.expectedId,'project-a');
  ui.context.csrf='replacement';
- await assert.rejects(()=>context.organization(),/连接或账号/);
+ await assert.rejects(()=>context.organization(),/연결 또는 계정이 변경되었습니다\. 채팅 메뉴를 다시 엽니다\./);
  assert.equal(ui.requests.length,1);
 });
 test('recent sections sort pinned and unpinned independently; project grouping ignores pins',()=>{
  const ui=fixture();ui.context.listRows=[ui.row('recent',30),ui.row('old-pin',1,true),ui.row('new-pin',20,true),ui.row('older',2)];
  ui.context.renderList();const rows=ui.$('sessions').children;
- assert.deepEqual(rows.map(n=>n.dataset.id||n.textContent),['置顶聊天','new-pin','old-pin','最近聊天','recent','older']);
+ assert.deepEqual(rows.map(n=>n.dataset.id||n.textContent),['고정된 채팅','new-pin','old-pin','최근 채팅','recent','older']);
  ui.$('list-mode').value='project';ui.context.renderList();
  assert.deepEqual(ui.$('sessions').children[0].children.slice(1).map(n=>n.dataset.id),['recent','new-pin','older','old-pin']);
 });
@@ -46,18 +46,18 @@ test('shared context preserves original host for pin, rename and archive',async(
 test('project groups put unassigned hosts last and preserve activity order within each group',()=>{
  const ui=fixture();ui.$('list-mode').value='project';
  ui.context.listRows=[
-  {...ui.row('unassigned-new',100),projectKey:'local|unassigned',projectName:'未归类'},
+  {...ui.row('unassigned-new',100),projectKey:'local|unassigned',projectName:'분류되지 않음'},
   {...ui.row('assigned-old',5),projectKey:'local|project-a'},
-  {...ui.row('remote-unassigned',90),host:'remote',projectKey:'remote|unassigned',projectName:'未归类'},
+  {...ui.row('remote-unassigned',90),host:'remote',projectKey:'remote|unassigned',projectName:'분류되지 않음'},
   {...ui.row('assigned-new',20),projectKey:'local|project-a'},
-  {...ui.row('named-unassigned',30),projectKey:'local|named-project',projectName:'未归类'},
-  {...ui.row('unassigned-old',1),projectKey:'local|unassigned',projectName:'未归类'}];
+  {...ui.row('named-unassigned',30),projectKey:'local|named-project',projectName:'분류되지 않음'},
+  {...ui.row('unassigned-old',1),projectKey:'local|unassigned',projectName:'분류되지 않음'}];
  ui.context.renderList();
  assert.deepEqual(ui.$('sessions').children.map(group=>group.children.slice(1).map(row=>row.dataset.id)),
   [['named-unassigned'],['assigned-new','assigned-old'],['unassigned-new','unassigned-old'],['remote-unassigned']]);
 });
 test('recent chat order continues to use activity when a chat is unassigned',()=>{
- const ui=fixture();ui.context.listRows=[ui.row('assigned',10),{...ui.row('unassigned',20),projectKey:'local|unassigned',projectName:'未归类'}];
+ const ui=fixture();ui.context.listRows=[ui.row('assigned',10),{...ui.row('unassigned',20),projectKey:'local|unassigned',projectName:'분류되지 않음'}];
  ui.context.renderList();
  assert.deepEqual(ui.$('sessions').children.map(row=>row.dataset.id),['unassigned','assigned']);
 });
@@ -94,7 +94,7 @@ test('CLI network handler rejects changed authentication or navigation before an
  for(const change of [c=>c.csrf='other',c=>c.listIdentity='other',c=>c.currentId='other',c=>c.currentHost='other',c=>c.clientNavigation.provider='claude']){
   const ui=fixture(),chat={...ui.row('cli-native',1),access:{source:'cli'}},menu=ui.context.sessionMenuContext(chat);let finish;
   ui.context.api=async(url,body,_signal,current)=>{ui.requests.push({url,body});assert.equal(current(),true);return new Promise(resolve=>finish=resolve);};
-  const pending=menu.cliNetwork();change(ui.context);finish({canRecover:true,generation:'old'});await assert.rejects(pending,/连接或聊天已变化/);await assert.rejects(()=>menu.cliNetwork({confirmed:true,generation:'old'}),/连接或聊天已变化/);assert.equal(ui.requests.length,1);
+  const pending=menu.cliNetwork();change(ui.context);finish({canRecover:true,generation:'old'});await assert.rejects(pending,/연결 또는 채팅이 변경되었습니다\. 세션 메뉴를 다시 엽니다\./);await assert.rejects(()=>menu.cliNetwork({confirmed:true,generation:'old'}),/연결 또는 채팅이 변경되었습니다\. 세션 메뉴를 다시 엽니다\./);assert.equal(ui.requests.length,1);
  }
 });
 test('rename response for another active chat never replaces the current header',async()=>{

@@ -47,10 +47,10 @@ test('application handshake reads the original project service without activatin
   assert.deepEqual(await f.request('application'),{ready:true});
   assert.deepEqual(f.calls,[]);
   f.agent.helloConversationV4=async()=>({protocolVersion:3,clientMode:'web-remote-replayable',connectionId:'foreign'});
-  await assert.rejects(f.request('application'),/会话服务/);
+  await assert.rejects(f.request('application'),/세션 서비스/);
   f.agent.helloConversationV4=async()=>({protocolVersion:3,clientMode:'desktop-continuous',connectionId:'native'});
   f.services.projectService.readTree=async()=>({});
-  await assert.rejects(f.request('application'),/会话服务/);
+  await assert.rejects(f.request('application'),/세션 서비스/);
 });
 
 test('quota reads the exact original Start account without a conversation or model request', async()=>{
@@ -77,10 +77,10 @@ test('quota rejects a changed account and never guesses access from a provider n
   const row={providerId:'account:zai-start-plan',effectiveConfig:{access:{type:'zhipu-account',accountType:'zai',mode:'start-plan',entitled:true}}};
   f.services.providerSettingsService={getView:async()=>({providers:[row]})};
   f.services.usageStatsService={getEntitlementSnapshot:async()=>{reads++;profile='after';return {};}};
-  await assert.rejects(f.request('quota'),/登录正在变化/);assert.equal(reads,1);
+  await assert.rejects(f.request('quota'),/로그인이 변경됩니다/);assert.equal(reads,1);
   row.effectiveConfig.access.accountType='bigmodel';
-  await assert.rejects(f.request('quota'),/尚未确认/);assert.equal(reads,1);
-  await assert.rejects(f.request('quota',{preferredProviderId:'untrusted'}),/参数无效/);assert.equal(reads,1);
+  await assert.rejects(f.request('quota'),/기존 App 현재 계좌가 아직 확인되지 않았습니다\. Start Plan 연결/);assert.equal(reads,1);
+  await assert.rejects(f.request('quota',{preferredProviderId:'untrusted'}),/ZCode 할당량 쿼리 매개변수가 잘못되었습니다\./);assert.equal(reads,1);
   assert.deepEqual(f.calls,[]);
 });
 
@@ -108,10 +108,10 @@ test('official services reuse native operations without reading the desktop rend
 test('transport mode is selected only by the trusted environment, never by request fields', async () => {
   const f = fixture();
   f.agent.helloConversationV4 = async () => ({protocolVersion:3,clientMode:'web-remote-replayable',connectionId:f.binding.connectionId});
-  await assert.rejects(f.request('application',{}, {clientMode:'web-remote-replayable',officialRemote:true}),/会话服务/);
+  await assert.rejects(f.request('application',{}, {clientMode:'web-remote-replayable',officialRemote:true}),/세션 서비스/);
   const environment = {clientMode:'web-remote-replayable',services:f.services,state:{},storage:localStorage};
   f.agent.helloConversationV4 = async () => ({protocolVersion:3,clientMode:'desktop-continuous',connectionId:f.binding.connectionId});
-  await assert.rejects(nativeRequest({action:'application',expiresAt:Date.now()+1000},environment),/会话服务/);
+  await assert.rejects(nativeRequest({action:'application',expiresAt:Date.now()+1000},environment),/세션 서비스/);
   await assert.rejects(nativeRequest({action:'application',expiresAt:Date.now()+1000},{...environment,clientMode:'desktop-continuous'}),/environment/);
   assert.deepEqual(f.calls,[]);
 });
@@ -152,11 +152,11 @@ test('startup observers join one slow original hello and tree read without enter
 test('runtime handshake requires owner, command and receipt primitives independently of release version',async()=>{
   for(const missing of ['helloConversationV4','getWorkspaceRuntimeIdentity','queryConversationCommandsV4','sendConversationCommandV4']){
     const f=fixture();delete f.agent[missing];
-    await assert.rejects(f.request('application'),/会话服务/);
+    await assert.rejects(f.request('application'),/세션 서비스/);
     assert.deepEqual(f.calls,[]);
   }
   const f=fixture();f.agent.helloConversationV4=async()=>({protocolVersion:4,clientMode:'desktop-continuous',connectionId:'other'});
-  await assert.rejects(f.request('application'),/会话服务/);assert.deepEqual(f.calls,[]);
+  await assert.rejects(f.request('application'),/세션 서비스/);assert.deepEqual(f.calls,[]);
 });
 
 test('partial optional services keep text working and never begin an unsupported attachment transfer',async()=>{
@@ -165,7 +165,7 @@ test('partial optional services keep text working and never begin an unsupported
   const detail=await f.request('detail');
   assert.deepEqual(detail.capabilities,{rename:false,models:true,effort:true,manualModels:true,manualEffort:true,create:false,skills:false,attachments:false,uploadFiles:false,projectReferences:false});
   assert.equal(detail.account,undefined);
-  await assert.rejects(f.request('send',{id:'file',text:'one',files:[{name:'a.txt',data:'MQ==',mime:'text/plain'}]}),/附件/);
+  await assert.rejects(f.request('send',{id:'file',text:'one',files:[{name:'a.txt',data:'MQ==',mime:'text/plain'}]}),/ZCode 기존 App 완전한 첨부 파일 업로드 인터페이스가 제공되지 않습니다\./);
   assert.deepEqual(f.calls,['acquire']);
   assert.equal((await f.request('send',{id:'text',text:'one'})).status,'accepted');
 });
@@ -198,7 +198,7 @@ test('cold reconnect uses V4 history without a legacy session runtime and keeps 
   f.agent.readSession=async()=>{throw Error('legacy session runtime is not ready');};
   await assert.rejects(f.request('history'),/runtime not running/);
   assert.equal(warm,false);
-  await assert.rejects(f.request('attach',{}, {workspace:'/wrong'}),/项目已变化/);
+  await assert.rejects(f.request('attach',{}, {workspace:'/wrong'}),/프로젝트가 변경되었습니다/);
   assert.equal(warm,false);
   await f.request('attach');
   assert.equal(warm,true);assert.equal(removed,true);assert.deepEqual(f.calls,['acquire']);
@@ -209,7 +209,7 @@ test('cold restore timeout releases the new Bridge lease and listener without se
   f.storeState.status='connecting';
   f.services.layer.acquire=()=>({store:{getState:()=>f.storeState,subscribe:()=>()=>{removed=true;}},release:()=>f.calls.push('release')});
   window.__codexMobileZCodeAcquireWorkspace=()=>({layer:f.services.layer,release:()=>f.calls.push('workspace-release')});
-  await assert.rejects(f.request('attach',{}, {expiresAt:Date.now()+260}),/恢复超时/);
+  await assert.rejects(f.request('attach',{}, {expiresAt:Date.now()+260}),/ZCode 기본 채팅 복구 시간이 초과되었습니다\. 다시 연결하세요\./);
   assert.equal(removed,true);assert.deepEqual(f.calls,['release','workspace-release']);
   assert.equal(window.__codexMobileZCodePrototypeV1,undefined);
 });
@@ -236,8 +236,8 @@ test('a slow observed restore releases the transport between checks and preserve
   assert.equal(initial.status,'pending');
   assert.equal((await f.request('detail')).detached,true);
   assert.deepEqual(f.calls,['acquire']);
-  await assert.rejects(f.step('b'),/另一次接续/);
-  await assert.rejects(f.step('b',true),/另一次接续/);
+  await assert.rejects(f.step('b'),/이 채팅에는 다른 연결이 있습니다\. 완료될 때까지 기다려 주세요\./);
+  await assert.rejects(f.step('b',true),/이 채팅에는 다른 연결이 있습니다\. 완료될 때까지 기다려 주세요\./);
   for(let i=0;i<3;i++){
     t.mock.timers.tick(105000);
     f.storeState.status = i%2 ? 'connecting' : 'restoring'; f.emit();
@@ -263,13 +263,13 @@ test('abandoned or stalled restores release only their temporary lease; stale po
   }
   assert.deepEqual(f.calls,['acquire']);
   t.mock.timers.tick(16000);
-  await assert.rejects(f.step('old',true),/失效/);
+  await assert.rejects(f.step('old',true),/(?:연결이 만료되었습니다\. 다시 연결해 주세요\.|기존 App 연결 또는 연결에 실패했습니다\. 다시 연결해 주세요\.)/);
   assert.deepEqual(f.calls,['acquire','release','workspace-release']);
   await f.step('fresh');
-  await assert.rejects(f.step('old',true),/另一次接续/);
+  await assert.rejects(f.step('old',true),/이 채팅에는 다른 연결이 있습니다\. 완료될 때까지 기다려 주세요\./);
   t.mock.timers.tick(65000); await f.step('fresh',true);
   t.mock.timers.tick(65000); await f.step('fresh',true);
-  t.mock.timers.tick(51000); await assert.rejects(f.step('fresh',true),/失效/);
+  t.mock.timers.tick(51000); await assert.rejects(f.step('fresh',true),/연결이 만료되었습니다\. 다시 연결해 주세요\./);
   assert.deepEqual(f.calls,['acquire','release','workspace-release','acquire','release','workspace-release']);
 });
 
@@ -278,7 +278,7 @@ test('unobserved cold restores use a bounded number of native leases per window'
   const f = pendingFixture(), ids=Array.from({length:17},(_,i)=>'sess_'+i);
   f.services.projectService.readTree=async()=>({tasks:ids.map(taskId=>({taskId,workspacePath:'/project',hostId:'local'}))});
   for(const sessionId of ids.slice(0,16)) await f.step(sessionId,false,{sessionId});
-  await assert.rejects(f.step(ids[16],false,{sessionId:ids[16]}),/较多/);
+  await assert.rejects(f.step(ids[16],false,{sessionId:ids[16]}),/진행 중인 채팅이 많습니다\. 나중에 다시 시도해 주세요\./);
   assert.equal(f.calls.filter(x=>x==='acquire').length,16);
   t.mock.timers.tick(301000);
   assert.equal(f.calls.filter(x=>x==='release').length,16);
@@ -290,11 +290,11 @@ test('a changed original connection or project cannot promote a held restore to 
   const f = pendingFixture();
   await f.step('generation');
   f.binding.connectionId='replacement';
-  await assert.rejects(f.step('generation',true),/失效/);
+  await assert.rejects(f.step('generation',true),/(?:연결이 만료되었습니다\. 다시 연결해 주세요\.|기존 App 연결 또는 연결에 실패했습니다\. 다시 연결해 주세요\.)/);
   await f.step('project');
   f.services.projectService.readTree = async()=>({tasks:[{taskId:'sess-test',hostId:'local',workspacePath:'/other'}]});
   f.storeState.status='live'; f.emit();
-  await assert.rejects(f.step('project',true),/项目已变化/);
+  await assert.rejects(f.step('project',true),/프로젝트가 변경되었습니다/);
   assert.deepEqual(f.calls,['acquire','release','workspace-release','acquire','release','workspace-release']);
   assert.equal(window.__codexMobileZCodePrototypeV1,undefined);
 });
@@ -327,7 +327,7 @@ test('owner change and expired requests fail before mutation', async () => {
 test('unavailable native projection fails immediately without resync or replacing the desktop subscription', async () => {
   const f = fixture(); await f.request('attach');
   f.storeState.status = 'error';
-  await assert.rejects(f.request('detail'), /尚未就绪/);
+  await assert.rejects(f.request('detail'), /(?:ZCode 기본 세션 연결이 아직 준비되지 않았습니다\.|ZCode 기본 세션 연결이 아직 준비되지 않았습니다\. App 확인하고 다시 연결하세요)/);
   assert.equal(f.listeners.size, 0);
   assert.deepEqual(f.calls, ['acquire']);
 });
@@ -391,13 +391,13 @@ test('a failed turn follows native input routing; only a new explicit send may c
 test('model selection uses native catalog, idle guard and revision CAS without starting a turn',async()=>{
  const f=fixture();await f.request('attach');const catalog=await f.request('catalog',{section:'models'});
  assert.equal(catalog.currentModel,'account:test/Flash');assert.deepEqual(catalog.models[0].efforts,['low','high']);
- await assert.rejects(f.request('settings',{id:'bad',model:'unknown',effort:'low'}),/原 App/);
- await assert.rejects(f.request('settings',{id:'bad',model:'account:test/Flash',effort:'max'}),/原 App/);
+ await assert.rejects(f.request('settings',{id:'bad',model:'unknown',effort:'low'}),/(?:기존 App 고유한 로컬 세션을 찾을 수 없습니다\. 목록을 새로 고치십시오\.|기존 App 현재 계좌가 아직 확인되지 않았습니다\. Start Plan 연결|기존 App 연결 또는 연결에 실패했습니다\. 다시 연결해 주세요\.|원본을 선택해주세요 App 완전한 provider\/model 심벌 마크|ZCode 기본 세션 연결이 아직 준비되지 않았습니다\. App 확인하고 다시 연결하세요|ZCode 기존 App 완전한 첨부 파일 업로드 인터페이스가 제공되지 않습니다\.)/);
+ await assert.rejects(f.request('settings',{id:'bad',model:'account:test/Flash',effort:'max'}),/원본을 선택해주세요 App 현재 제공되는 사고의 깊이/);
  await f.request('settings',{id:'switch',model:'account:test/Flash',effort:'low'});
  assert.deepEqual(f.calls.at(-1).envelope.payload,{provider:'account:test',model:'Flash',thought:'low'});
  assert.equal(f.calls.at(-1).envelope.baseRevision,7);assert.equal(f.calls.at(-1).envelope.baseLogEpoch,'epoch');
  f.snapshot.queue.items.push({id:'queued'});const n=f.calls.length;
- await assert.rejects(f.request('settings',{model:'account:test/Flash',effort:'low'}),/任务结束/);assert.equal(f.calls.length,n);
+ await assert.rejects(f.request('settings',{model:'account:test/Flash',effort:'low'}),/모델을 전환하기 전에 현재 작업이 끝날 때까지 기다리십시오\./);assert.equal(f.calls.length,n);
 });
 
 test('Skill selection revalidates session authority and sends native mentions, not copied instructions',async()=>{
@@ -406,8 +406,8 @@ test('Skill selection revalidates session authority and sends native mentions, n
  await f.request('send',{id:'skill-send',text:'review this',plugins:['skill']});
  assert.equal(f.calls.at(-1).envelope.payload.text,'[$my skill](/project/.agents/skills/check/SKILL.md)\n\nreview this');
  const n=f.calls.length;catalog.skills=[];
- await assert.rejects(f.request('send',{id:'removed',text:'review',plugins:['skill']}),/已变化/);
- catalog.authority='workspace';await assert.rejects(f.request('catalog',{section:'skills'}),/尚未就绪/);assert.equal(f.calls.length,n);
+ await assert.rejects(f.request('send',{id:'removed',text:'review',plugins:['skill']}),/(?:원래 프로젝트 디렉터리가 변경되었습니다\. 다시 선택하세요\.|선택된 Skill 변경되었습니다\. 다시 선택해 주세요\.|메시지가 변경되었거나 이 작업이 지원되지 않습니다\. 새로고침한 후 다시 선택하세요\.)/);
+ catalog.authority='workspace';await assert.rejects(f.request('catalog',{section:'skills'}),/ZCode 대화 Skill 디렉터리가 아직 준비되지 않았습니다\./);assert.equal(f.calls.length,n);
 });
 
 test('account restart preflight blocks queued native work and refuses incomplete inventory',async()=>{
@@ -429,11 +429,11 @@ test('native plan and goal commands keep original owner, CAS and stale-goal guar
  const f=fixture();await f.request('attach');f.snapshot.config.mode='build';f.snapshot.goal=null;
  await f.request('work-mode',{id:'plan',mode:'plan'});
  assert.equal(f.calls.at(-1).envelope.type,'switchCollaborationMode');assert.equal(f.calls.at(-1).envelope.baseRevision,7);
- f.snapshot.config.planEnabled=true;await assert.rejects(f.request('goal',{id:'goal',operation:'set',objective:'one'}),/退出计划/);
+ f.snapshot.config.planEnabled=true;await assert.rejects(f.request('goal',{id:'goal',operation:'set',objective:'one'}),/(?:현재 작업을 종료하고 먼저 계획 모드를 종료하십시오\.|대상을 열기 전에 현재 작업을 종료하고 계획 모드를 종료하십시오\.)/);
  f.snapshot.config.planEnabled=false;await f.request('goal',{id:'goal',operation:'set',objective:'one'});
  assert.equal(f.calls.at(-1).envelope.type,'sendGoalCommand');assert.deepEqual(f.calls.at(-1).envelope.payload,{text:'one'});
  f.snapshot.goal={targetId:'target',objective:'one',status:'active'};
- await assert.rejects(f.request('goal',{id:'old',operation:'pause',expected:{goalId:'old',objective:'one'}}),/目标已变化/);
+ await assert.rejects(f.request('goal',{id:'old',operation:'pause',expected:{goalId:'old',objective:'one'}}),/대상이 변경되었습니다\. 새로고침 후 진행해주세요\./);
  await f.request('goal',{id:'pause',operation:'pause',expected:{goalId:'target',objective:'one'}});
  assert.equal(f.calls.at(-1).envelope.type,'pauseGoal');assert.equal(f.calls.at(-1).envelope.baseLogEpoch,'epoch');
  const nodes=document.querySelectorAll();document.querySelectorAll=()=>nodes;
@@ -453,7 +453,7 @@ test('new native chat uses atomic firstInput and independent shared lease withou
  assert.equal(create.envelope.clientId,'original-client');assert.equal(create.envelope.sessionId,null);
  assert.equal(create.envelope.payload.firstInput.text,'first message');assert.equal(create.envelope.payload.config.model,'Flash');assert.equal(create.envelope.payload.config.thought,'low');
  assert.equal(window.__codexMobileZCodePrototypeV1.sessions.size,2);
- const before=f.calls.length;await assert.rejects(f.request('create',{id:'empty',firstMessage:''}),/首条消息/);assert.equal(f.calls.length,before);
+ const before=f.calls.length;await assert.rejects(f.request('create',{id:'empty',firstMessage:''}),/첫 번째 메시지/);assert.equal(f.calls.length,before);
 });
 
 test('explicit new-chat model and effort override the anchor before firstInput admission',async()=>{
@@ -467,7 +467,7 @@ test('explicit new-chat model and effort override the anchor before firstInput a
  assert.deepEqual(command.envelope.payload.firstInput.modelSelection,{providerId:'account:test',modelId:'Selected',options:{reasoningLevel:'low'}});
  assert.equal(command.envelope.payload.config.model,'Selected');assert.equal(command.envelope.payload.firstInput.text,'FIRST');
  const before=f.calls.filter(value=>value.envelope?.type==='createSession').length;
- await assert.rejects(f.request('create',{id:'bad-new',firstMessage:'FIRST',model:'account:test/Selected',effort:'high'}),/有效的模型和思考/);
+ await assert.rejects(f.request('create',{id:'bad-new',firstMessage:'FIRST',model:'account:test/Selected',effort:'high'}),/먼저 부탁드립니다 ZCode 효과적인 모델을 선택하고 깊이 생각해 보세요\./);
  assert.equal(f.calls.filter(value=>value.envelope?.type==='createSession').length,before);
 });
 
@@ -510,14 +510,14 @@ test('cold app creates its first chat in the selected project without opening an
  assert.deepEqual(f.calls[0].envelope.payload.firstInput.modelSelection,settings);
  assert.equal(window.__codexMobileZCodePrototypeV1.sessionId,'sess_new');
  p.prepareSession=async()=>({projectId:'different-project',workspacePath:'/new'});
- await assert.rejects(f.request('create',{id:'wrong',projectKey:project.id,firstMessage:'x'},cold),/目录已变化/);
+ await assert.rejects(f.request('create',{id:'wrong',projectKey:project.id,firstMessage:'x'},cold),/원래 프로젝트 디렉터리가 변경되었습니다\. 다시 선택하세요\./);
  assert.equal(f.calls.length,1);
 });
 
 test('native project cwd mismatch rejects first input instead of sending it to the anchor',async()=>{
   const f=fixture();await f.request('attach');window.__codexMobileZCodeAcquireWorkspace=()=>{throw Error('must not acquire')};
   f.services.projectService={saveProject:async()=>({id:'project',hostId:'local'}),prepareSession:async()=>({projectId:'project',workspacePath:'/changed'})};
-  await assert.rejects(f.request('create',{id:'new',firstMessage:'hello',projectKey:'registered',directoryProject:{cwd:'/requested'}}),/目录已变化/);
+  await assert.rejects(f.request('create',{id:'new',firstMessage:'hello',projectKey:'registered',directoryProject:{cwd:'/requested'}}),/원래 프로젝트 디렉터리가 변경되었습니다\. 다시 선택하세요\./);
   assert.equal(f.calls.filter(p=>p.envelope).length,0);
 });
 
@@ -525,7 +525,7 @@ test('project inventory and cold session target are passive and use native host 
   const f=fixture();f.services.projectService={readTree:async()=>({projects:[{id:'p',name:'Native',hostId:'local',roots:[{rootPath:'/new',isPrimary:true}]},{id:'remote',hostId:'ssh',roots:[{rootPath:'/remote',isPrimary:true}]}],tasks:[{taskId:'sess-new',workspacePath:'/new',hostId:'local'}]})};
   assert.equal((await f.request('projects')).projects.length,1);
   assert.deepEqual(await f.request('target',{}, {sessionId:'sess-new'}),{workspace:'/new'});
-  await assert.rejects(f.request('target',{}, {sessionId:'sess-unknown'}),/找不到/);assert.deepEqual(f.calls,[]);
+  await assert.rejects(f.request('target',{}, {sessionId:'sess-unknown'}),/기존 App 고유한 로컬 세션을 찾을 수 없습니다\. 목록을 새로 고치십시오\./);assert.deepEqual(f.calls,[]);
 });
 
 
@@ -547,10 +547,10 @@ test('maintenance and individual task stop are native commands and reject stale 
   assert.equal(f.calls.at(-1).envelope.type,'cancelBackgroundWork');
   assert.deepEqual(f.calls.at(-1).envelope.payload,{workId:'own-task'});
   f.snapshot.backgroundWorks[0].status='resultPending';
-  await assert.rejects(f.request('stop-task',{id:'late',taskId:'own-task'}),/已结束/);
+  await assert.rejects(f.request('stop-task',{id:'late',taskId:'own-task'}),/백그라운드 작업이 종료되었거나 독립적인 중지가 지원되지 않습니다\./);
   await f.request('compact',{id:'compact-once'});assert.equal(f.calls.at(-1).envelope.type,'compact');
   f.snapshot.queue.items=[{itemId:'held'}];
-  await assert.rejects(f.request('compact',{id:'held'}),/队列结束/);
+  await assert.rejects(f.request('compact',{id:'held'}),/컨텍스트를 압축하기 전에 현재 작업과 대기열이 끝날 때까지 기다리십시오\./);
 });
 
 test('native message actions bind the row entity and epoch and preserve files and attachments',async()=>{
@@ -562,8 +562,8 @@ test('native message actions bind the row entity and epoch and preserve files an
   await f.request('edit-message',{id:'edit',target,text:'new text'});
   const edit=f.calls.at(-1).envelope;assert.equal(edit.type,'editUserQuery');assert.equal(edit.baseLogEpoch,'epoch');assert.equal(edit.baseRevision,7);
   assert.equal(edit.payload.workspaceMode,'preserve');assert.deepEqual(edit.payload.attachments,[attachment]);
-  await assert.rejects(f.request('edit-message',{id:'stale',target:{...target,logEpoch:'old'},text:'bad'}),/消息已变化/);
-  await assert.rejects(f.request('fork',{id:'wrong',target}),/消息已变化/);
+  await assert.rejects(f.request('edit-message',{id:'stale',target:{...target,logEpoch:'old'},text:'bad'}),/메시지가 변경되었거나 이 작업이 지원되지 않습니다\. 새로고침한 후 다시 선택하세요\./);
+  await assert.rejects(f.request('fork',{id:'wrong',target}),/메시지가 변경되었거나 이 작업이 지원되지 않습니다\. 새로고침한 후 다시 선택하세요\./);
   await f.request('fork',{id:'fork',target:{rowId:4,entityId:'assistant-message',logEpoch:'epoch'}});
   assert.equal(f.calls.at(-1).envelope.type,'forkAssistant');
 });
@@ -572,15 +572,15 @@ test('native rename uses the original task service and durable list title withou
  const f=fixture(),task={taskId:'sess-test',workspacePath:'/project',hostId:'local',title:'Original'};let writes=0;
  f.services.projectService.readTree=async()=>({tasks:[{...task}]});
  f.services.zcodeTaskService={renameTask:async request=>{
-  assert.deepEqual(request,{taskId:'sess-test',workspacePath:'/project',title:'原生标题'});
+  assert.deepEqual(request,{taskId:'sess-test',workspacePath:'/project',title:'네이티브 타이틀'});
   writes++;task.title=request.title;return {...task};
  }};
  const listing=await f.request('list',{}, {sessionId:null});assert.equal(listing.sessions[0].nativeRename,true);
- const result=await f.request('rename',{title:' 原生标题 '},{binding:null});
- assert.deepEqual(result,{status:'confirmed',scope:'native',result:{id:'sess-test',title:'原生标题'}});
- assert.equal((await f.request('list',{}, {sessionId:null})).sessions[0].title,'原生标题');
+ const result=await f.request('rename',{title:' 네이티브 타이틀 '},{binding:null});
+ assert.deepEqual(result,{status:'confirmed',scope:'native',result:{id:'sess-test',title:'네이티브 타이틀'}});
+ assert.equal((await f.request('list',{}, {sessionId:null})).sessions[0].title,'네이티브 타이틀');
  assert.equal(writes,1);assert.deepEqual(f.calls,[]);
- for(const title of ['', 'bad\nname', 'x'.repeat(121)])await assert.rejects(f.request('rename',{title}),/标题/);
+ for(const title of ['', 'bad\nname', 'x'.repeat(121)])await assert.rejects(f.request('rename',{title}),/제목/);
  const changed=await f.request('rename',{title:'Other'},{workspace:'/other'});
  assert.equal(changed.notSent,true);assert.equal(writes,1);
 });
@@ -590,16 +590,16 @@ test('native rename never retries an unconfirmed write or uses a missing task se
  f.services.projectService.readTree=async()=>({tasks:[{...task}]});
  assert.equal((await f.request('rename',{title:'New'})).notSent,true);
  f.services.zcodeTaskService={renameTask:async()=>{writes++;return {...task};}};
- await assert.rejects(f.request('rename',{title:'New'}),/待核对/);
+ await assert.rejects(f.request('rename',{title:'New'}),/이름 변경 결과를 확인해야 합니다\. 원래 클라이언트를 확인하세요\. 중복 제출은 되지 않습니다/);
  assert.equal(writes,1);assert.deepEqual(f.calls,[]);
 });
 
 test('native access switch requires confirmation for full access and preserves revision and original owner',async()=>{
  const f=fixture(); await f.request('attach'); f.snapshot.config.mode='build';
- await assert.rejects(f.request('access',{id:'unsafe',mode:'yolo'}),/确认/);
+ await assert.rejects(f.request('access',{id:'unsafe',mode:'yolo'}),/확인/);
  assert.equal(f.calls.filter(x=>x?.envelope?.type==='switchCollaborationMode').length,0);
  f.snapshot.pendingInteractions=[{}];
- await assert.rejects(f.request('access',{id:'busy',mode:'yolo',confirmed:true}),/结束/);
+ await assert.rejects(f.request('access',{id:'busy',mode:'yolo',confirmed:true}),/(?:백그라운드 작업이 종료되었거나 독립적인 중지가 지원되지 않습니다\.|현재 작업을 종료하고 먼저 계획 모드를 종료하십시오\.|대상을 열기 전에 현재 작업을 종료하고 계획 모드를 종료하십시오\.)/);
  f.snapshot.pendingInteractions=[];
  await f.request('access',{id:'checked',mode:'yolo',confirmed:true});
  const cmd=f.calls.at(-1).envelope;

@@ -183,7 +183,7 @@ async function runScenario(gatewayRunning){
       const value=await rendererManagementState(cdp);
       if(value?.choosingClient==='claude'){
         // Hosts with Claude installed offer its setup guide after discovery; defer it like a user.
-        await cdp.call('Runtime.evaluate',{expression:`document.querySelector('dialog[open][aria-labelledby="claude-setup-title"] button[data-i18n="稍后设置"]')?.click()`});
+        await cdp.call('Runtime.evaluate',{expression:`document.querySelector('dialog[open][aria-labelledby="claude-setup-title"] button[data-i18n="나중에 설정하세요"]')?.click()`});
       }
       const discoveryIdle=value&&(value.scanning===null&&!value.statusLoaded||value.scanning===false&&value.statusLoaded);
       return discoveryIdle&&!value.busy&&!value.clientsLoading&&!value.choosingClient?value:null;

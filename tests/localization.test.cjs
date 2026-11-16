@@ -13,11 +13,11 @@ test('workbench literal translation keys are covered',()=>{
 });
 test('client readiness errors and live notices translate in both desktop and web',()=>{
  const desktop=require('../desktop/shared/i18n.js');
- for(const source of ['启动网关后检查连接状态','请在电脑端安装 Codex 并配置账号或 API','请在桌面配置账号或 API；旧版插件请重新安装','客户端连接不可用，请在电脑端检查']){
+ for(const source of ['게이트웨이를 시작하여 연결을 확인하세요.','Codex를 설치하고 컴퓨터에 계정 또는 API를 구성하세요.','데스크톱 클라이언트에서 계정 또는 API를 구성합니다. 이전 플러그인을 다시 설치하세요','클라이언트를 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.']){
    i18n.setLanguage('en');assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);
    assert.equal(desktop.translate("Error invoking remote method 'bridge:desktop-sessions': Error: "+source,'en'),i18n.t(source));
  }
- i18n.setLanguage('zh');
+ i18n.setLanguage('ko');
 });
 test('desktop module markup has translations, including dynamically inserted controls',()=>{
  for(const file of ['desktop/index.html','desktop/shell/layout.js'])

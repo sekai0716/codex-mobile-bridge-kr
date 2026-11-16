@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   deploy:
+    # 한국어 포크는 About·README만 갱신하며 사이트 공개는 수동 실행으로 선택한다.
+    if: github.repository == 'try2love/codex-mobile-bridge' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

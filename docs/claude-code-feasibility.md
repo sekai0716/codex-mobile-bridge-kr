@@ -1,46 +1,46 @@
-# Claude Code CLI 接入可行性核查（2026-10-14）
+# Claude Code CLI 접근 타당성 확인（2026-10-14）
 
-## v2.1.0 后续实施状态
+## v2.1.0 후속 시행 현황
 
-本页下方保留初始探针的条件和结论，不作为当前功能清单。初始 `--bare` 探针之后，macOS 已另行验证所选认证与项目 `CLAUDE.md` 的隔离继承；这些合成/回环请求不代表真实付费或 OAuth 验收。后续候选已实现本机及 SSH Claude Code 的已关闭会话恢复、新建、发送、模型/权限、Skill、文件上传、审批和中断；账号管理可独立配置 CLI 接入。仍不接管其他终端中的活跃写入者。
+초기 조사의 조건과 결론은 이 페이지 하단에 유지되며 현재 기능 목록으로 사용되지 않습니다. 초기의 `--bare` 프로브 후，macOS 선정된 자격증 및 프로그램은 별도로 검증되었습니다. `CLAUDE.md` 고립된 상속; 이들 작곡/루프백 요청은 실제 지불을 나타내지 않거나 OAuth 수락. 후속 후보자는 기본 및 SSH Claude Code 닫힌 세션 복구, 신규, 전송, 모델/권한、Skill、파일 업로드, 승인 및 중단 계정 관리를 독립적으로 구성할 수 있습니다. CLI 입장. 아직 다른 터미널의 활성 작성자를 인수하지 않음。
 
-Windows 10 x64 / Claude Code 2.1.168 与 Ubuntu 22.04.5 x64 / 2.1.287 已通过独立 Test 包安装、GUI 和已安装网关的 CLI HTTP 验收，包含完整回复、审批允许/拒绝及重启后历史；Linux SSH 控制另有真实服务器验收。以上跨平台运行使用隔离配置和模拟 API，不代表真实付费认证、所有项目配置或手机真机已验收。当前能力与限制以 [CLI 接入说明](codex-cli.md) 和 [验收总览](../VERIFICATION.md#v210-platform-status) 为准。
+Windows 10 x64 / Claude Code 2.1.168 및 Ubuntu 22.04.5 x64 / 2.1.287 독립을 통과하다 Test 패키지 설치、GUI 그리고 설치된 게이트웨이 CLI HTTP 완전한 답변 및 승인을 포함한 수락/거부 및 재시작 후 기록；Linux SSH 제어에는 실제 서버 승인도 포함됩니다. 위의 크로스 플랫폼 작업은 격리된 구성 및 시뮬레이션을 사용합니다. API，실제 유료 인증, 모든 프로젝트 구성 또는 실제 휴대폰이 승인되었음을 의미하지는 않습니다. 현재 기능과 제한 사항은 다음을 기반으로 합니다. [CLI 액세스 지침](codex-cli.md) 및 [수락 개요](../VERIFICATION.md#v210-platform-status) 대상。
 
-## 初始探针结论
+## 초기 조사 결론
 
-**可验证的范围是由网关自己启动并持有的 CLI 进程，以及已退出会话的显式恢复。** 本机 Claude Code `2.1.287` 在隔离环境中通过了两轮 `--resume <session-id>` 续接和同一进程内两条 `stream-json` 输入。手机端若要提供实时消息与控制，需要持有该进程的输入/输出通道，或采用官方 Agent SDK 的流式会话接口。现有证据不足以支持“无侵入接管用户正在另一终端运行的任意 Claude Code 进程”。
+**검증 가능한 범위는 게이트웨이 자체에서 시작되고 보유됩니다. CLI 프로세스 및 종료된 세션의 명시적 복구。** 로컬 머신 Claude Code `2.1.287` 격리 환경에서 2차 통과 `--resume <session-id>` 동일한 프로세스 내에서 계속 및 두 개 `stream-json` 입력하다. 휴대폰에서 실시간 정보 제공 및 제어를 위해서는 프로세스의 입력을 잡아야 합니다./출력 채널을 사용하거나 공식 Agent SDK 스트리밍 세션 인터페이스. 기존 증거는 뒷받침하기에 불충분합니다.“사용자가 다른 터미널에서 실행 중인 모든 애플리케이션을 방해하지 않고 인계 Claude Code 프로세스”。
 
-这个结论只涉及接入机制。未使用用户的 Claude 登录、订阅额度、真实 API Key、真实会话或远程主机。Claude Desktop Code/Cowork 的现有连接器属于另一条执行通路，不能据此推断 CLI 进程可接管。
+이 결론은 액세스 메커니즘에만 관련됩니다. 미사용 사용자 Claude 로그인, 구독 할당량, 정품 여부 API Key、실제 세션 또는 원격 호스트。Claude Desktop Code/Cowork 의 기존 커넥터는 다른 실행 경로에 속하며 이 경로에서 추론할 수 없습니다. CLI 프로세스가 인계될 수 있음。
 
-## 初始本机实测
+## 초기 로컬 측정
 
-安装的 `/opt/homebrew/bin/claude --version` 返回 `2.1.287 (Claude Code)`。探针位于项目的 `.tmp/cli-expansion-20261014/claude-probe-artifacts/`（`probe.py`、`control_probe.py`、`approval_probe.py`），其结果保留在同目录的独立运行文件夹中，不纳入提交。探针使用临时 `HOME` 与 `CLAUDE_CONFIG_DIR`、`--bare`、假 API Key、仅指向 `127.0.0.1` 的 `ANTHROPIC_BASE_URL`，并禁用非必要流量；本地 HTTP 服务只返回预设文本/工具调用，没有外部模型请求。
+설치됨 `/opt/homebrew/bin/claude --version` 뒤로 `2.1.287 (Claude Code)`。프로브는 프로젝트의 `.tmp/cli-expansion-20261014/claude-probe-artifacts/`（`probe.py`、`control_probe.py`、`approval_probe.py`），결과는 동일한 디렉터리의 별도 실행 폴더에 보관되며 제출에는 포함되지 않습니다. 프로브 사용 임시 `HOME` 및 `CLAUDE_CONFIG_DIR`、`--bare`、가짜 API Key、만을 가리킨다 `127.0.0.1` 의 `ANTHROPIC_BASE_URL`，필수적이지 않은 트래픽을 비활성화합니다. 현지의 HTTP 서비스는 기본 텍스트만 반환합니다./도구 호출, 외부 모델 요청 없음。
 
-| 检查 | 观察 | 证据界限 |
+| 조사하다 | 관찰하다 | 증거 경계 |
 | --- | --- | --- |
-| 保存并冷恢复 | 第一进程输出 `LOCAL_MOCK_REPLY_1` 后退出；第二进程用同一 UUID `--resume` 输出 `LOCAL_MOCK_REPLY_2`，退出码均为 0。隔离目录仅有一份该 UUID 的 `.jsonl` 会话文件；第二次请求包含更多历史消息（2 → 4）。 | 证明这台机器的 2.1.287 能在假接口下按 ID 续接；不证明真实订阅/模型可用。 |
-| 双向流输入 | `--input-format stream-json --output-format stream-json` 接受同一进程的两条用户消息，产生两次用户确认、两条成功结果及同一会话 ID。 | 证明消息与结果通路。 |
-| 动态模型 | 同一进程的 `set_model: haiku` 控制请求返回 `success`；随后 `system/init.model` 和发往本地假接口的请求均为 `claude-haiku-4-5-20251001`。 | 证明下一轮生效；没有真实模型调用或订阅认证。 |
-| 动态权限 | `set_permission_mode: plan` 和 `dontAsk` 均返回 `success` 和 `response.mode`；随后两条 `system/status.permissionMode` 依次报告 `plan`、`dontAsk`。 | 证明状态切换；真实用户策略、项目配置与工具集组合未验证。 |
-| 运行中打断 | 假接口延迟响应时，`interrupt` 收到 `success` 回执；该轮随后出现 `[Request interrupted by user]` 和 `terminal_reason: aborted_streaming`，进程退出码为 1。 | 中断已发生；中断结果是错误终态，接入层不可将控制回执当作正常回答。 |
-| 工具审批 | 假模型请求在隔离工作目录执行 `Bash: touch approval-marker`；CLI 发出 `can_use_tool`，包含输入、`tool_use_id`、`blocked_path` 和建议规则。宿主返回 `behavior: deny` 后工具结果为 `Synthetic host denial`，标记文件不存在。 | 验证拒绝回路；尚未验证允许后的执行、`AskUserQuestion` 或真实配置。简单 `printf` 被 CLI 自行放行，说明不是每个工具调用都会生成审批卡。 |
-| 保存历史 | 隔离的 `.jsonl` 包含 user/assistant 等事件。 | 这些文件可供只读研究；未找到可承诺稳定格式的公开历史读取协议，不能直接把文件布局当成长期 API。 |
+| 저장 및 콜드 복원 | 첫 번째 프로세스 출력 `LOCAL_MOCK_REPLY_1` 그런 다음 종료하십시오. 두 번째 프로세스는 동일한 것을 사용합니다 UUID `--resume` 산출 `LOCAL_MOCK_REPLY_2`，종료 코드는 모두 0。격리 디렉터리 사본은 하나만 있습니다. UUID 의 `.jsonl` 세션 파일; 두 번째 요청에 더 많은 기록 메시지가 포함되어 있습니다.（2 → 4）。 | 이 기계의 증거 2.1.287 가짜 인터페이스에서 누를 수 있음 ID 계속; 실제 가입을 증명하지 않습니다/사용 가능한 모델。 |
+| 양방향 스트림 입력 | `--input-format stream-json --output-format stream-json` 동일한 프로세스에서 두 개의 사용자 메시지를 수락하면 두 개의 사용자 확인, 두 개의 성공적인 결과 및 동일한 세션이 발생합니다. ID。 | 메시지 및 결과 경로 증명。 |
+| 동적 모델 | 같은 과정의 `set_model: haiku` 제어 요청 반환 `success`；그후 `system/init.model` 로컬 가짜 인터페이스로 전송된 요청은 둘 다입니다. `claude-haiku-4-5-20251001`。 | 다음 라운드가 적용될 것임을 증명하십시오. 실제 모델콜이나 구독 인증이 없습니다.。 |
+| 동적 권한 | `set_permission_mode: plan` 및 `dontAsk` 모두 반환됨 `success` 및 `response.mode`；다음 두 `system/status.permissionMode` 차례로 보고하다 `plan`、`dontAsk`。 | 증명 상태 스위치; 실제 사용자 정책, 프로젝트 구성 및 도구 세트 조합이 확인되지 않았습니다.。 |
+| 작동 중 중단 | 가짜 인터페이스로 인해 응답이 지연되는 경우，`interrupt` 받다 `success` 승인; 라운드는 나중에 온다 `[Request interrupted by user]` 및 `terminal_reason: aborted_streaming`，프로세스 종료 코드는 다음과 같습니다. 1。 | 인터럽트가 발생했습니다. 인터럽트 결과는 오류 최종 상태이고 액세스 계층은 제어 수신을 정상적인 응답으로 처리해서는 안 됩니다.。 |
+| 도구 승인 | 가짜 모델 요청은 격리된 작업 디렉터리에서 실행됩니다. `Bash: touch approval-marker`；CLI 문제 `can_use_tool`，입력을 포함합니다、`tool_use_id`、`blocked_path` 그리고 제안된 규칙. 호스트 반환 `behavior: deny` 최종 도구 결과는 다음과 같습니다. `Synthetic host denial`，태그 파일이 존재하지 않습니다.。 | 거부 루프를 확인합니다. 허용 후 실행이 확인되지 않았습니다.、`AskUserQuestion` 또는 실제 구성. 단순한 `printf` 이불 CLI 모든 도구 호출이 승인 카드를 생성하지는 않음을 나타내는 자체 릴리스。 |
+| 기록 저장 | 외딴 `.jsonl` 포함하다 user/assistant 등 이벤트。 | 이 파일은 읽기 전용 조사에만 사용할 수 있습니다. 안정적인 형식을 약속하는 공개 기록 읽기 프로토콜은 발견되지 않았으며 파일 레이아웃은 장기적인 것으로 직접 간주될 수 없습니다. API。 |
 
-首次探针因假服务没有解析 `/v1/messages?beta=true` 的查询串而返回模拟模型错误；修正假服务路由后上述检查通过。该失败只属于探针，不是 Claude Code 的接入失败。
+허위 서비스로 인해 1차 조사가 해결되지 않았습니다. `/v1/messages?beta=true` 쿼리 문자열은 시뮬레이션 모델 오류를 반환합니다. 가짜 서비스 경로를 수정한 후 위의 확인이 통과됩니다. 이 실패는 프로브에만 속하며, Claude Code 액세스 실패。
 
-## 文档与控制协议
+## 문서화 및 제어 프로토콜
 
-- [Claude Code 无头模式](https://code.claude.com/docs/en/headless) 规定 `-p`、`--output-format stream-json`、`--continue` 和 `--resume` 的行为；运行中停止可用 SIGINT 或 SDK 的 `interrupt()`。单次 `-p` 调用适合续接后的一轮任务；[SDK 流式输入](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode) 面向持久、多轮、排队和打断。
-- [SDK 审批与用户输入](https://code.claude.com/docs/en/agent-sdk/user-input) 使用 `canUseTool` 回调交回批准/拒绝及 `AskUserQuestion`。[官方 Python SDK 源码](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py)给出 `control_request` / `control_response` 封装、`set_model`、`set_permission_mode`、`interrupt`、`can_use_tool` 的具体字段与回执；本次按该结构对本机 CLI 做了隔离实测。没有可答复的宿主通道或配置为 `dontAsk` 时，不能把手机端显示审批卡等同于真实挂起请求。
-- [SDK 权限文档](https://code.claude.com/docs/en/agent-sdk/permissions)支持会话启动时指定模式及运行中 `setPermissionMode()`；本机 CLI 帮助也列出 `--permission-mode` 和 `--model`。本次动态模型、权限、打断及拒绝审批只证明本机假接口条件下的协议行为。
-- [会话文档](https://code.claude.com/docs/en/agent-sdk/sessions) 将恢复定位为按 ID 从持久会话重新运行。安装的 CLI 帮助将 `claude attach <id>` 描述为附着由 `--bg` 管理的后台任务；没有发现可让第三方程序无侵入共享任意现有交互终端标准输入/输出和审批回调的公开接口。因此，任意活跃终端的实时接管保持**未证实**，设计不能以它为前提。
+- [Claude Code 헤드리스 모드](https://code.claude.com/docs/en/headless) 규제 `-p`、`--output-format stream-json`、`--continue` 및 `--resume` 행동; 운전 중 정지 가능 SIGINT 또는 SDK 의 `interrupt()`。하나의 `-p` 계속하기에 적합한 다음 작업 라운드 호출；[SDK 스트리밍 입력](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode) 지속성을 위해 여러 라운드, 대기열 및 인터럽트。
+- [SDK 승인 및 사용자 입력](https://code.claude.com/docs/en/agent-sdk/user-input) 사용 `canUseTool` 승인을 위한 콜백/거절하고 `AskUserQuestion`。[공식적인 Python SDK 소스 코드](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py)주어진 `control_request` / `control_response` 캡슐화、`set_model`、`set_permission_mode`、`interrupt`、`can_use_tool` 특정 필드 및 영수증 이번에는 이 구조에 따라 로컬 머신이 CLI 격리 테스트를 실시했습니다. 응답할 호스트 채널이 없거나 다음과 같이 구성되었습니다. `dontAsk` 이때, 휴대폰에 표시되는 승인 카드는 실제 대기 중인 요청과 일치할 수 없습니다.。
+- [SDK 허가 문서](https://code.claude.com/docs/en/agent-sdk/permissions)세션 시작 및 실행 시 모드 지정 지원 `setPermissionMode()`；로컬 머신 CLI 도움말도 나열되어 있습니다. `--permission-mode` 및 `--model`。이 동적 모델, 허가, 중단 및 승인 거부는 로컬 가짜 인터페이스 조건 하의 프로토콜 동작만을 증명합니다.。
+- [세션 문서](https://code.claude.com/docs/en/agent-sdk/sessions) 목표 회복 ID 영구 세션에서 다시 실행합니다. 설치됨 CLI 도움이 될 것입니다 `claude attach <id>` 첨부된 대로 설명됨 `--bg` 관리되는 백그라운드 작업 타사 프로그램이 기존 대화형 터미널의 표준 입력을 방해하지 않고 공유하도록 허용하는 방법을 찾을 수 없습니다./출력 및 승인 콜백을 위한 공개 인터페이스입니다. 따라서 활성 터미널의 실시간 인수가 유지됩니다.**확인되지 않음**，디자인은 그것을 기반으로 할 수 없습니다。
 
-## 身份、配置与产品边界
+## 아이덴티티, 구성 및 제품 경계
 
-探针的 `--bare` 有意绕开真实配置和登录。正式候选方案若要保留原用户的项目指令、Skills、hooks、MCP、供应商与权限规则，必须先审计正常 `-p` 的设置来源及当前工作目录，再验证原会话的配置继承。官方[无头模式文档](https://code.claude.com/docs/en/headless)指出：正常 `-p` 会加载用户/项目上下文，且对未信任目录也不会弹工作区信任框；`--bare` 则跳过许多上下文和 OAuth/钥匙串登录，要求 API Key 或指定密钥助手。不能用本次 `--bare` 成功声称已保留用户的日常 Claude Code 环境。
+조사 `--bare` 의도적으로 실제 구성 및 로그인을 우회합니다. 공식 후보 기획이 원래 사용자의 프로젝트 지침을 유지하려는 경우、Skills、hooks、MCP、공급업체 및 권한 규칙을 먼저 적절하게 감사해야 합니다. `-p` 설정 소스 및 현재 작업 디렉터리를 확인한 다음 원래 세션의 구성 상속을 확인합니다. 공식적인[헤드리스 모드 문서](https://code.claude.com/docs/en/headless)지적: 정상 `-p` 사용자가 로드됩니다./프로젝트 컨텍스트 및 작업공간 신뢰 상자는 신뢰할 수 없는 디렉터리에 대해 팝업되지 않습니다.；`--bare` 그런 다음 많은 컨텍스트를 건너뛰고 OAuth/키체인 로그인, 요구 사항 API Key 또는 주요 도우미를 지정하세요. 이번에는 사용할 수 없습니다 `--bare` 사용자의 일일 정보를 유지했다고 주장하는 데 성공했습니다. Claude Code 환경。
 
-[Agent SDK 官方说明](https://code.claude.com/docs/en/agent-sdk/overview)明确表示，未经事先批准，第三方开发者不得在自己的产品中提供 claude.ai 登录或订阅限额，应使用 API Key 认证方式。SDK 能启动同类代理循环，并不意味着可将用户的 Claude 订阅登录移植到本产品。[Remote Control](https://code.claude.com/docs/en/remote-control) 面向 claude.ai/code 与官方 Claude 手机端；它要求合规订阅，API Key、自定义 `ANTHROPIC_BASE_URL` 和第三方上游均不支持该通路。它可作为用户已有的官方远控方案参考，不是本项目可复用的公开接入协议。
+[Agent SDK 공식 설명](https://code.claude.com/docs/en/agent-sdk/overview)제3자 개발자가 제공할 수 없음을 분명히 하세요. claude.ai 로그인 또는 구독 한도를 사용해야 합니다. API Key 인증방법。SDK 유사한 프록시 루프를 시작할 수 있다고 해서 사용자의 Claude 이 제품으로 이전된 구독 로그인。[Remote Control](https://code.claude.com/docs/en/remote-control) 을 위한 claude.ai/code 공식적으로 Claude 모바일 버전; 규정 준수 구독이 필요합니다，API Key、사용자 정의 `ANTHROPIC_BASE_URL` 타사 업스트림이나 타사 업스트림 모두 이 경로를 지원하지 않습니다. 이는 사용자의 기존 공식 원격 제어 솔루션에 대한 참조로 사용될 수 있으며 이 프로젝트에서 재사용 가능한 공개 액세스 프로토콜이 아닙니다.。
 
-## 初始探针提出的后续验证要求（历史记录）
+## 초기 프로브의 후속 검증 요구 사항（이력）
 
-先以**网关持有的专用 CLI 进程**为候选形态，在明确可用的认证方式下，补验正常配置下的流式多轮、允许/拒绝审批及问题卡、打断后的续用、断线不重发。每项都需保持原 cwd、用户配置和供应商身份，且不能因只读打开聊天而启动进程。接入 SSH 时重新验证选中主机的二进制、配置路径、会话文件与进程归属。未取得合适认证授权和完整控制面证据前，不启用 Claude Code CLI 生产接入。
+먼저**게이트웨이는 전용 보유 CLI 프로세스**후보 형태로 명확하게 사용 가능한 인증 방식으로 일반 구성에서 스트리밍 다중 라운드를 다시 확인하고 허용합니다./승인거부 및 문제카드, 중단 후 갱신, 연결해제 후 재전송 불가. 각 항목은 원본을 유지해야 합니다. cwd、사용자 구성 및 공급업체 ID, 읽기 전용 오픈 채팅으로는 프로세스를 시작할 수 없습니다. 입장 SSH 선택한 호스트의 바이너리, 구성 경로, 세션 파일 및 프로세스 소유권을 다시 확인하세요. 적절한 인증 권한을 얻고 완전한 제어 평면 증거를 얻기 전에는 활성화하지 마십시오. Claude Code CLI 프로덕션 액세스。

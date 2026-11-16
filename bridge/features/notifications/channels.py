@@ -48,7 +48,7 @@ class WebhookDeliveryError(RuntimeError):
     """A fixed, safe message that can be shown by a notification test endpoint."""
 
 
-WEBHOOK_PROVIDER_NAMES = {'feishu': '飞书', 'dingtalk': '钉钉', 'discord': 'Discord', 'telegram': 'Telegram'}
+WEBHOOK_PROVIDER_NAMES = {'feishu': 'Feishu', 'dingtalk': 'DingTalk', 'discord': 'Discord', 'telegram': 'Telegram'}
 
 
 def resolved_webhook_provider(config):
@@ -75,63 +75,63 @@ def effective_webhook_template(config):
 
 def webhook_url(value):
     if not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 33 or ord(c) == 127 for c in value):
-        raise FieldError('Webhook 地址格式不正确', 'webhook-url')
+        raise FieldError("잘못된 웹훅 엔드포인트 URL.", 'webhook-url')
     try:
         parsed = urlsplit(value)
     except ValueError:
-        raise FieldError('Webhook 地址格式不正确', 'webhook-url') from None
+        raise FieldError("잘못된 웹훅 엔드포인트 URL.", 'webhook-url') from None
     try:
         port = parsed.port
     except ValueError:
-        raise FieldError('Webhook 地址格式不正确', 'webhook-url') from None
+        raise FieldError("잘못된 웹훅 엔드포인트 URL.", 'webhook-url') from None
     if (parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username is not None
             or parsed.password is not None or parsed.fragment or not parsed.netloc or port == 0):
-        raise FieldError('Webhook 地址格式不正确', 'webhook-url')
+        raise FieldError("잘못된 웹훅 엔드포인트 URL.", 'webhook-url')
     if parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
-        raise FieldError('Webhook 请使用 HTTPS；HTTP 仅用于本机测试', 'webhook-url')
+        raise FieldError("웹훅에는 HTTPS를 사용하세요. HTTP는 로컬 테스트에만 허용됩니다.", 'webhook-url')
     return value
 
 
 def webhook_headers(value):
     if not isinstance(value, dict) or len(value) > 32:
-        raise FieldError('Webhook 请求头格式不正确', 'webhook-headers')
+        raise FieldError("웹훅 요청 헤더가 잘못되었습니다.", 'webhook-headers')
     result = {}
     for name, content in value.items():
         if (not isinstance(name, str) or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]{1,80}", name)
                 or name.lower() in UNSAFE_WEBHOOK_HEADERS or name.lower().startswith(('proxy-', 'sec-'))
                 or not isinstance(content, str) or len(content) > 2000
                 or any(ord(c) < 32 or ord(c) == 127 for c in content)):
-            raise FieldError('Webhook 请求头格式不正确', 'webhook-headers')
+            raise FieldError("웹훅 요청 헤더가 잘못되었습니다.", 'webhook-headers')
         result[name] = content
     return result
 
 
 def webhook_template(value):
     if not isinstance(value, str):
-        raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template')
+        raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template')
     try:
         size = len(value.encode('utf-8'))
     except UnicodeEncodeError:
-        raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template') from None
+        raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template') from None
     if size > 16384:
-        raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template')
+        raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template')
     def reject_constant(_):
         raise ValueError('Non-finite JSON number')
     try:
         document = json.loads(value, parse_constant=reject_constant)
     except (ValueError, TypeError, RecursionError):
-        raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template') from None
+        raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template') from None
     def check(item, depth=0):
         if depth > 32:
-            raise FieldError('Webhook JSON 模板层级过深', 'webhook-body-template')
+            raise FieldError('Webhook JSON 템플릿 수준이 너무 깊습니다.', 'webhook-body-template')
         if isinstance(item, dict):
             for key, child in item.items():
                 try:
                     key.encode('utf-8')
                 except UnicodeEncodeError:
-                    raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template') from None
+                    raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template') from None
                 if '{{' in key or '}}' in key:
-                    raise FieldError('Webhook 占位符只能用于字符串值', 'webhook-body-template')
+                    raise FieldError("웹후크 자리 표시자는 JSON 문자열 값에만 허용됩니다.", 'webhook-body-template')
                 check(child, depth + 1)
         elif isinstance(item, list):
             for child in item:
@@ -140,12 +140,12 @@ def webhook_template(value):
             try:
                 item.encode('utf-8')
             except UnicodeEncodeError:
-                raise FieldError('Webhook JSON 模板格式不正确', 'webhook-body-template') from None
+                raise FieldError("웹훅 JSON 본문 템플릿이 잘못되었습니다.", 'webhook-body-template') from None
             for match in WEBHOOK_PLACEHOLDER.finditer(item):
                 if match.group(1) not in WEBHOOK_FIELDS:
-                    raise FieldError('Webhook 模板包含未知占位符', 'webhook-body-template')
+                    raise FieldError("웹훅 템플릿에 알 수 없는 자리 표시자가 포함되어 있습니다.", 'webhook-body-template')
             if '{{' in WEBHOOK_PLACEHOLDER.sub('', item) or '}}' in WEBHOOK_PLACEHOLDER.sub('', item):
-                raise FieldError('Webhook 模板占位符格式不正确', 'webhook-body-template')
+                raise FieldError("웹후크 자리 표시자 구문이 잘못되었습니다.", 'webhook-body-template')
     check(document)
     return value
 
@@ -165,7 +165,7 @@ def visible_webhook(config):
     if 'webhookEndpoints' in config:
         rows = []
         if config.get('webhookUrl') or config.get('webhookEnabled'):
-            rows.append({'webhookId': 'legacy', 'webhookName': config.get('webhookName', '默认 Webhook'), **visible})
+            rows.append({'webhookId': 'legacy', 'webhookName': config.get('webhookName', "기본 웹훅"), **visible})
         rows.extend({'webhookId': row['webhookId'], 'webhookName': row['webhookName'], **visible_webhook(row)}
                     for row in config['webhookEndpoints'])
         visible['webhookEndpoints'] = rows
@@ -192,31 +192,31 @@ def valid_url(value, allow_path=False):
     parsed = urlsplit(value)
     if (parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password
             or parsed.query or parsed.fragment or (not allow_path and parsed.path not in ('', '/'))):
-        raise ValueError('请输入完整的 HTTP/HTTPS 地址，不含账号、查询参数或片段')
+        raise ValueError("자격 증명, 쿼리 매개변수 또는 조각 없이 완전한 HTTP/HTTPS URL를 입력하세요.")
     if parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
-        raise ValueError('推送服务请使用 HTTPS；HTTP 仅用于本机测试')
+        raise ValueError("알림 서버에는 HTTPS를 사용합니다. HTTP는 로컬 테스트에만 지원됩니다.")
     return value.rstrip('/')
 
 
 def settings(data_dir):
-    return {'webhookEndpoints': [], 'webhookName': '默认 Webhook', **DEFAULTS,
+    return {'webhookEndpoints': [], 'webhookName': "기본 웹훅", **DEFAULTS,
             **read_json(Path(data_dir)/'notifications.json', {})}
 
 
 def merge_webhook_config(prior, value):
     result = {key: value.get(key, prior.get(key, DEFAULTS[key])) for key in WEBHOOK_CONFIG_FIELDS}
     if any(not isinstance(result[key], bool) for key in ('webhookEnabled', 'webhookSignEnabled')):
-        raise ValueError('通知开关格式不正确')
+        raise ValueError("잘못된 알림 스위치")
     if (prior['webhookBodyTemplate'] == DEFAULTS['webhookBodyTemplate']
             and value.get('webhookBodyTemplate') == effective_webhook_template(prior)):
         result['webhookBodyTemplate'] = DEFAULTS['webhookBodyTemplate']
     for flag in ('clearWebhookUrl', 'clearWebhookHeaders', 'clearWebhookSignSecret'):
         if flag in value and not isinstance(value[flag], bool):
-            raise ValueError('Webhook 配置格式不正确')
+            raise ValueError("웹훅 설정이 잘못되었습니다.")
     if 'webhookUrl' in value and not isinstance(value['webhookUrl'], str):
-        raise FieldError('Webhook 地址格式不正确', 'webhook-url')
+        raise FieldError("잘못된 웹훅 엔드포인트 URL.", 'webhook-url')
     if 'webhookHeaders' in value and not isinstance(value['webhookHeaders'], dict):
-        raise FieldError('Webhook 请求头格式不正确', 'webhook-headers')
+        raise FieldError("웹훅 요청 헤더가 잘못되었습니다.", 'webhook-headers')
     if value.get('clearWebhookUrl'):
         result['webhookUrl'] = ''
     elif value.get('webhookUrl'):
@@ -225,18 +225,18 @@ def merge_webhook_config(prior, value):
         result['webhookUrl'] = prior['webhookUrl']
     url_changed = result['webhookUrl'] != prior['webhookUrl']
     if result['webhookProvider'] not in ('auto', *WEBHOOK_TEMPLATES):
-        raise FieldError('Webhook 类型格式不正确', 'webhook-provider')
+        raise FieldError("웹훅 서비스 유형이 잘못되었습니다.", 'webhook-provider')
     provider_changed = result['webhookProvider'] != prior['webhookProvider']
     secret = result['webhookSignSecret']
     if not isinstance(secret, str) or len(secret) > 2000 or any(ord(c) < 33 or ord(c) == 127 for c in secret):
-        raise FieldError('Webhook 签名密钥格式不正确', 'webhook-sign-secret')
+        raise FieldError("웹훅 서명 비밀번호가 잘못되었습니다.", 'webhook-sign-secret')
     if not value.get('webhookSignSecret'):
         result['webhookSignSecret'] = '' if value.get('clearWebhookSignSecret') or url_changed or provider_changed else prior['webhookSignSecret']
     if result['webhookSignEnabled']:
         if resolved_webhook_provider(result) not in ('feishu', 'dingtalk'):
-            raise FieldError('签名仅支持飞书和钉钉 Webhook', 'webhook-sign-enabled')
+            raise FieldError("서명은 Feishu 및 DingTalk 웹후크에만 사용할 수 있습니다.", 'webhook-sign-enabled')
         if not result['webhookSignSecret']:
-            raise FieldError('开启签名前请填写密钥；更换地址或类型后需重新填写', 'webhook-sign-secret')
+            raise FieldError("서명을 활성화하기 전에 서명 비밀을 입력하세요. 엔드포인트나 서비스 유형을 변경한 후 다시 입력하세요.", 'webhook-sign-secret')
     if value.get('clearWebhookHeaders'):
         result['webhookHeaders'] = {}
     elif value.get('webhookHeaders'):
@@ -248,9 +248,9 @@ def merge_webhook_config(prior, value):
     if result['webhookSignEnabled'] and resolved_webhook_provider(result) == 'feishu':
         signed_template = json.loads(effective_webhook_template(result))
         if not isinstance(signed_template, dict) or any(key in signed_template for key in ('timestamp', 'sign')):
-            raise FieldError('签名消息不能自行设置 timestamp 或 sign', 'webhook-body-template')
+            raise FieldError("서명된 메시지는 타임스탬프를 설정하거나 본문 템플릿에 로그인할 수 없습니다.", 'webhook-body-template')
     if result['webhookEnabled'] and not result['webhookUrl']:
-        raise FieldError('开启 Webhook 前请填写地址', 'webhook-url')
+        raise FieldError("Webhook을 활성화하기 전에 엔드포인트 URL를 입력하세요.", 'webhook-url')
     return result
 
 
@@ -269,39 +269,39 @@ def _save_settings_unlocked(data_dir, value):
     result['barkServer'] = at_field('bark-server', valid_url, str(result['barkServer']), allow_path=True)
     for key in ('enabled', 'barkEnabled', 'pushplusEnabled', 'webhookEnabled', 'webhookSignEnabled', 'includeTitle', 'addressEnabled', 'securityEnabled', 'mobileEnabled', 'mobileAppLinks'):
         if not isinstance(result[key], bool):
-            raise ValueError('通知开关格式不正确')
+            raise ValueError("잘못된 알림 스위치")
     if not isinstance(result['addressName'], str) or len(result['addressName']) > 80 or any(not c.isprintable() for c in result['addressName']):
-        raise FieldError('网关名称应为不超过 80 字的单行文本', 'address-name')
+        raise FieldError("게이트웨이 이름에는 최대 80자의 한 줄을 사용하십시오.", 'address-name')
     if not isinstance(result['topic'], str) or (result['topic'] and not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', result['topic'])):
-        raise FieldError('ntfy 主题只允许 1–64 位字母、数字、下划线和短横线', 'ntfy-topic')
+        raise FieldError("ntfy 주제에는 1~64자의 문자, 숫자, 밑줄 또는 하이픈이 포함되어야 합니다.", 'ntfy-topic')
     if result['enabled'] and not result['topic']:
-        raise FieldError('开启通知前请填写 ntfy 主题', 'ntfy-topic')
+        raise FieldError("알림을 활성화하기 전에 ntfy 주제를 입력하세요.", 'ntfy-topic')
     if result['clickBase']:
-        # A link back to the existing LAN gateway may intentionally use HTTP.
+        # 기존 LAN 게이트웨이로 연결하는 링크는 의도적으로 HTTP를 사용할 수 있다.
         parsed = urlsplit(result['clickBase'])
         if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
-            raise FieldError('通知跳转地址格式不正确', 'click-base')
+            raise FieldError("잘못된 알림 클릭 URL", 'click-base')
         result['clickBase'] = result['clickBase'].rstrip('/')
     if not isinstance(result['token'], str) or len(result['token']) > 2000 or '\n' in result['token'] or '\r' in result['token']:
-        raise FieldError('ntfy Token 格式不正确', 'ntfy-token')
+        raise FieldError("잘못된 ntfy 토큰", 'ntfy-token')
     # Blank fields from the UI preserve a token only for the same server.
     if not value.get('token'):
         result['token'] = '' if value.get('clearToken') or result['server'] != prior['server'] else prior['token']
     if not isinstance(result['barkKey'], str) or len(result['barkKey']) > 2000 or any(not c.isprintable() or c.isspace() or c in '/?#' for c in result['barkKey']):
-        raise FieldError('Bark Device Key 格式不正确，请仅填写密钥，不要粘贴完整推送地址', 'bark-key')
+        raise FieldError("Bark 장치 키가 잘못되었습니다. URL를 완전히 누르지 않고 키만 입력하십시오.", 'bark-key')
     if not value.get('barkKey'):
         result['barkKey'] = '' if value.get('clearBarkKey') or result['barkServer'] != prior['barkServer'] else prior['barkKey']
     if result['barkEnabled'] and not result['barkKey']:
-        raise FieldError('开启 Bark 前请填写 Device Key；更换服务地址后需重新填写', 'bark-key')
+        raise FieldError("Bark를 활성화하기 전에 장치 키를 입력하세요. 서버를 변경한 후 다시 입력해 주세요.", 'bark-key')
     if 'clearPushplusToken' in value and not isinstance(value['clearPushplusToken'], bool):
-        raise ValueError('PushPlus 配置格式不正确')
+        raise ValueError("잘못된 PushPlus 설정")
     token = result['pushplusToken']
     if not isinstance(token, str) or len(token) > 2000 or any(not c.isprintable() or c.isspace() for c in token):
-        raise FieldError('PushPlus Token 格式不正确', 'pushplus-token')
+        raise FieldError("잘못된 PushPlus 토큰", 'pushplus-token')
     if not value.get('pushplusToken'):
         result['pushplusToken'] = '' if value.get('clearPushplusToken') else prior['pushplusToken']
     if result['pushplusEnabled'] and not result['pushplusToken']:
-        raise FieldError('开启 PushPlus 前请填写 Token', 'pushplus-token')
+        raise FieldError("PushPlus를 활성화하기 전에 토큰을 입력하세요.", 'pushplus-token')
     result.update(merge_webhook_config(prior, value))
     write_json(Path(data_dir)/'notifications.json', result)
     return result
@@ -311,11 +311,11 @@ def webhook_config(config, webhook_id='legacy'):
     if webhook_id == 'legacy':
         return config
     if not isinstance(webhook_id, str):
-        raise FieldError('Webhook 标识无效', 'webhook-id')
+        raise FieldError("잘못된 웹훅 ID", 'webhook-id')
     for row in config.get('webhookEndpoints', []):
         if row.get('webhookId') == webhook_id:
             return row
-    raise FieldError('Webhook 不存在，请刷新列表', 'webhook-id')
+    raise FieldError("웹훅을 찾을 수 없습니다. 목록을 새로 고칩니다.", 'webhook-id')
 
 
 def webhook_channel_config(config, channel):
@@ -324,10 +324,10 @@ def webhook_channel_config(config, channel):
 
 def save_webhook_endpoint(data_dir, value):
     if not isinstance(value, dict) or value.get('action') not in ('upsert', 'delete'):
-        raise ValueError('Webhook 配置格式不正确')
+        raise ValueError("웹훅 설정이 잘못되었습니다.")
     allowed = {'action', 'webhookId', 'webhookName', *WEBHOOK_CONFIG_FIELDS, *WEBHOOK_CLEAR_FIELDS}
     if set(value) - allowed:
-        raise ValueError('Webhook 配置格式不正确')
+        raise ValueError("웹훅 설정이 잘못되었습니다.")
     with SETTINGS_LOCK:
         path = Path(data_dir)/'notifications.json'
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -341,25 +341,25 @@ def _save_webhook_endpoint_unlocked(data_dir, value):
     webhook_id = value.get('webhookId')
     if value['action'] == 'delete':
         if set(value) != {'action', 'webhookId'}:
-            raise ValueError('Webhook 删除请求格式不正确')
+            raise ValueError("잘못된 웹훅 삭제 요청")
         webhook_config(config, webhook_id)
         if webhook_id == 'legacy':
             config.update({key: DEFAULTS[key] for key in WEBHOOK_CONFIG_FIELDS})
-            config['webhookName'] = '默认 Webhook'
+            config['webhookName'] = "기본 웹훅"
         else:
             config['webhookEndpoints'] = [row for row in rows if row['webhookId'] != webhook_id]
     else:
         creating = webhook_id is None
         if creating:
             if len(rows) >= 20:
-                raise ValueError('最多配置 20 个额外 Webhook')
+                raise ValueError("최대 20개의 추가 웹훅을 구성할 수 있습니다.")
             webhook_id = uuid.uuid4().hex
             prior = {key: DEFAULTS[key] for key in WEBHOOK_CONFIG_FIELDS}
         else:
             prior = webhook_config(config, webhook_id)
-        name = value.get('webhookName', prior.get('webhookName', '默认 Webhook' if webhook_id == 'legacy' else ''))
+        name = value.get('webhookName', prior.get('webhookName', "기본 웹훅" if webhook_id == 'legacy' else ''))
         if not isinstance(name, str) or not name.strip() or len(name) > 80 or any(not c.isprintable() for c in name):
-            raise FieldError('Webhook 名称应为不超过 80 字的单行文本', 'webhook-name')
+            raise FieldError("웹훅 이름은 80자 이하의 한 줄이어야 합니다.", 'webhook-name')
         updated = {**merge_webhook_config(prior, value), 'webhookId': webhook_id, 'webhookName': name.strip()}
         if webhook_id == 'legacy':
             config.update({key: updated[key] for key in WEBHOOK_CONFIG_FIELDS})
@@ -382,7 +382,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 def publish(config, title, body, click=''):
     if not config.get('topic'):
-        raise ValueError('请先配置 ntfy 服务和主题')
+        raise ValueError("ntfy 서버 및 주제를 먼저 구성하십시오.")
     server = valid_url(config['server'], allow_path=True)
     payload = {'topic': config['topic'], 'title': title, 'message': body, 'tags': ['bell'], 'priority': 3}
     if click:
@@ -393,13 +393,13 @@ def publish(config, title, body, click=''):
     request = Request(server + '/', data=json.dumps(payload, ensure_ascii=False).encode(), headers=headers)
     with build_opener(NoRedirect(), HTTPSHandler(context=client_context())).open(request, timeout=8) as response:
         if not 200 <= response.status < 300:
-            raise RuntimeError('ntfy 未接受通知')
+            raise RuntimeError("ntfy가 알림을 수락하지 않았습니다.")
         response.read(65536)
 
 
 def publish_bark(config, title, body, click=''):
     if not config.get('barkKey'):
-        raise ValueError('请先配置 Bark 服务和 Device Key')
+        raise ValueError("Bark 서버와 장치 키를 먼저 구성하세요.")
     server = valid_url(config['barkServer'], allow_path=True)
     payload = {'device_key': config['barkKey'], 'title': title, 'body': body, 'group': 'Codex Mobile Bridge'}
     if click:
@@ -419,12 +419,12 @@ def publish_bark(config, title, body, click=''):
         # The server may echo the device key in its error response. Do not expose it.
         if isinstance(error, HTTPError):
             error.close()
-        raise RuntimeError('Bark 未接受通知，请检查服务地址、Device Key 和网络') from None
+        raise RuntimeError("Bark가 알림을 수락하지 않았습니다. 서버, 장치 키, 네트워크를 확인하세요.") from None
 
 
 def publish_pushplus(config, title, body, click=''):
     if not config.get('pushplusToken'):
-        raise ValueError('请先配置 PushPlus Token')
+        raise ValueError("먼저 PushPlus 토큰을 구성하세요.")
     payload = {'token': config['pushplusToken'], 'title': title,
                'content': body + ('\n\n' + click if click else ''), 'template': 'txt'}
     request = Request('https://www.pushplus.plus/send',
@@ -438,7 +438,7 @@ def publish_pushplus(config, title, body, click=''):
     except Exception as error:
         if isinstance(error, HTTPError):
             error.close()
-        raise RuntimeError('PushPlus 未接受通知，请检查 Token 和网络') from None
+        raise RuntimeError("PushPlus가 알림을 거부했습니다. 토큰과 네트워크를 확인하세요.") from None
 
 
 def publish_webhook(config, title, body, click='', *, event='test', event_id='', session_name='', client='', host='', count=1):
@@ -459,20 +459,20 @@ def publish_webhook(config, title, body, click='', *, event='test', event_id='',
     if provider == 'telegram':
         if (not isinstance(document, dict) or type(document.get('chat_id')) not in (str, int)
                 or not str(document['chat_id']).strip() or not isinstance(document.get('text'), str)):
-            raise WebhookDeliveryError('Telegram 请在 JSON 模板中填写 chat_id 和 text')
+            raise WebhookDeliveryError("Telegram JSON 템플릿에 chat_id와 텍스트를 입력하세요.")
         if len(document['text']) > 4096:
-            raise WebhookDeliveryError('Telegram 消息超过 4096 字')
+            raise WebhookDeliveryError("Telegram 메시지가 4,096자를 초과합니다.")
     if provider == 'discord':
         if not isinstance(document, dict) or ('content' in document and not isinstance(document['content'], str)):
-            raise WebhookDeliveryError('Discord JSON 模板格式不正确')
+            raise WebhookDeliveryError("Discord JSON 템플릿이 잘못되었습니다.")
         if len(document.get('content', '')) > 2000:
-            raise WebhookDeliveryError('Discord 消息超过 2000 字')
+            raise WebhookDeliveryError("Discord 메시지가 2,000자를 초과합니다.")
     if config.get('webhookSignEnabled'):
         if provider not in ('feishu', 'dingtalk') or not config.get('webhookSignSecret'):
-            raise WebhookDeliveryError('Webhook 签名配置不完整，请检查类型和密钥')
+            raise WebhookDeliveryError("웹훅 서명이 불완전합니다. 서비스 유형과 비밀번호를 확인하세요.")
         if provider == 'feishu':
             if not isinstance(document, dict) or any(key in document for key in ('timestamp', 'sign')):
-                raise WebhookDeliveryError('签名消息不能自行设置 timestamp 或 sign')
+                raise WebhookDeliveryError("서명된 메시지는 타임스탬프를 설정하거나 본문 템플릿에 로그인할 수 없습니다.")
             timestamp = str(int(time.time()))
             key = (timestamp + '\n' + config['webhookSignSecret']).encode('utf-8')
             document['timestamp'] = timestamp
@@ -490,7 +490,7 @@ def publish_webhook(config, title, body, click='', *, event='test', event_id='',
         url = urlunsplit(parsed._replace(query=urlencode(query + [('wait', 'true')])))
     payload = json.dumps(document, ensure_ascii=False).encode('utf-8')
     if len(payload) > (20 * 1024 if provider == 'feishu' else 65536):
-        raise WebhookDeliveryError('飞书消息过长' if provider == 'feishu' else 'Webhook 消息过长')
+        raise WebhookDeliveryError('Feishu 메시지가 너무 깁니다.' if provider == 'feishu' else "웹훅 메시지가 너무 깁니다.")
     headers = {'Content-Type': 'application/json', **webhook_headers(config.get('webhookHeaders', {}))}
     request = Request(url, data=payload, headers=headers, method='POST')
     handlers = [NoRedirect(), HTTPSHandler(context=client_context())]
@@ -500,39 +500,39 @@ def publish_webhook(config, title, body, click='', *, event='test', event_id='',
         with build_opener(*handlers).open(request, timeout=8) as response:
             if provider != 'generic':
                 if (response.status != 200 if provider in ('feishu', 'dingtalk', 'telegram') else not 200 <= response.status < 300):
-                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}未接受通知（HTTP {response.status}）')
+                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}알림이 수락되지 않음（HTTP {response.status}）')
                 try:
                     raw = response.read(65537)
                     if len(raw) > 65536:
-                        raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}响应格式不正确')
+                        raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}응답 형식이 잘못되었습니다.')
                     result = json.loads(raw)
                 except (ValueError, UnicodeDecodeError, RecursionError):
-                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}响应格式不正确') from None
+                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}응답 형식이 잘못되었습니다.') from None
                 if not isinstance(result, dict):
-                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}响应格式不正确')
+                    raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}응답 형식이 잘못되었습니다.')
                 if provider == 'feishu':
                     code = result.get('code', result.get('StatusCode'))
                     if type(code) is not int:
-                        raise WebhookDeliveryError('飞书响应格式不正确')
+                        raise WebhookDeliveryError("Feishu의 응답이 잘못되었습니다.")
                     if code:
-                        reasons = {9499: '消息格式错误', 19002: '消息格式错误', 19021: '签名或时间无效', 19022: 'IP 不在允许范围',
-                                   19024: '未满足关键词要求', 11232: '发送过于频繁'}
-                        raise WebhookDeliveryError(f'飞书未接受通知（{code}：{reasons.get(code, "请检查机器人配置")}）')
+                        reasons = {9499: "잘못된 메시지 형식", 19002: "잘못된 메시지 형식", 19021: "잘못된 서명 또는 타임스탬프", 19022: "IP 주소는 허용되지 않습니다.",
+                                   19024: "키워드 요구 사항이 충족되지 않았습니다.", 11232: "너무 자주 보내는 경우"}
+                        raise WebhookDeliveryError(f'Feishu는 알림을 수락하지 않았습니다.（{code}：{reasons.get(code, "봇 구성 확인")}）')
                 elif provider == 'dingtalk':
                     code = result.get('errcode')
                     if type(code) is not int:
-                        raise WebhookDeliveryError('钉钉响应格式不正确')
+                        raise WebhookDeliveryError("DingTalk의 응답이 잘못되었습니다.")
                     if code:
-                        reasons = {310000: '请检查关键词、签名、时间或 IP 限制', 40035: '消息格式错误',
-                                   400101: '访问令牌无效', 400102: '机器人已停用', 400105: '消息类型不支持',
-                                   400106: '机器人不存在', 410100: '发送过于频繁', -1: '服务暂时不可用'}
-                        raise WebhookDeliveryError(f'钉钉未接受通知（{code}：{reasons.get(code, "请检查机器人配置")}）')
+                        reasons = {310000: "키워드, 서명, 시간 또는 IP 제한 사항을 확인하세요.", 40035: "잘못된 메시지 형식",
+                                   400101: "잘못된 액세스 토큰", 400102: '봇이 비활성화되었습니다.', 400105: "메시지 유형이 지원되지 않습니다.",
+                                   400106: "봇이 존재하지 않습니다", 410100: "너무 자주 보내는 경우", -1: '일시적으로 서비스를 이용할 수 없습니다'}
+                        raise WebhookDeliveryError(f'DingTalk가 알림을 수락하지 않았습니다.（{code}：{reasons.get(code, "봇 구성 확인")}）')
                 elif provider == 'telegram':
                     if result.get('ok') is not True:
-                        raise WebhookDeliveryError('Telegram 未接受通知，请检查 chat_id 和机器人权限')
+                        raise WebhookDeliveryError("Telegram가 알림을 수락하지 않았습니다. chat_id와 봇 권한을 확인하세요.")
                 elif provider == 'discord':
                     if not isinstance(result.get('id'), str) or not result['id']:
-                        raise WebhookDeliveryError('Discord 响应缺少消息 ID')
+                        raise WebhookDeliveryError("Discord 응답에는 ID 메시지가 없습니다.")
             else:
                 if not 200 <= response.status < 300:
                     raise ValueError('Rejected')
@@ -543,9 +543,9 @@ def publish_webhook(config, title, body, click='', *, event='test', event_id='',
         if isinstance(error, HTTPError):
             error.close()
             if provider != 'generic':
-                raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}未接受通知（HTTP {error.code}）') from None
-        raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}未接受通知，请检查地址和网络' if provider != 'generic'
-                                   else 'Webhook 未接受通知，请检查地址、认证和网络') from None
+                raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}알림이 수락되지 않음（HTTP {error.code}）') from None
+        raise WebhookDeliveryError(f'{WEBHOOK_PROVIDER_NAMES[provider]}알림이 수락되지 않았습니다. 주소와 네트워크를 확인하세요.' if provider != 'generic'
+                                   else "웹훅이 알림을 수락하지 않았습니다. 엔드포인트, 인증, 네트워크를 확인하세요.") from None
 
 
 def destination(config, channel):
@@ -564,7 +564,7 @@ def destination(config, channel):
                   config.get('webhookProvider', 'auto'), resolved_webhook_provider(config),
                   config.get('webhookSignEnabled', False), config.get('webhookSignSecret', '')]
     else:
-        raise ValueError('未知通知通道')
+        raise ValueError('알 수 없는 알림 채널')
     return channel + ':' + hashlib.sha256(json.dumps(values).encode()).hexdigest()
 
 
@@ -709,7 +709,7 @@ class Notifications:
             policies = self.policies()
             if value is not None:
                 if not isinstance(value, dict) or set(value) != {'requests', 'completion'} or any(type(v) is not bool for v in value.values()):
-                    raise ValueError('通知开关格式不正确')
+                    raise ValueError("잘못된 알림 스위치")
                 self.candidates.update({key: {'host': key[0], 'id': key[1]} for key in self.dormant})
                 self.dormant.clear()
                 self.wakeup.set()
@@ -742,17 +742,17 @@ class Notifications:
         provider = self.desktop_provider(host)
         if provider:
             if not isinstance(thread_id, str) or not 1 <= len(thread_id) <= 512 or any(ord(c) < 32 or ord(c) == 127 for c in thread_id):
-                raise ValueError('会话标识无效')
+                raise ValueError("잘못된 세션 식별자")
         else:
             uuid.UUID(thread_id)
         with self.lock:
             policies = self.policies()
             if value is not None:
                 if not isinstance(value, dict) or set(value) != {'requests', 'completion'} or any(v not in ('inherit', 'on', 'off') for v in value.values()):
-                    raise ValueError('聊天通知设置格式不正确')
+                    raise ValueError("잘못된 채팅 알림 설정")
                 if provider:
                     if self.desktop_sessions is None:
-                        raise ValueError('桌面会话接入不可用')
+                        raise ValueError('데스크톱 세션에 액세스할 수 없습니다.')
                     manager = self.desktop_sessions.resolve_instance(provider, desktop_client(host)) if ':' in desktop_client(host) else self.desktop_sessions
                     manager.require_enabled(provider)
                     manager.call(provider, 'detail', thread_id)
@@ -789,14 +789,14 @@ class Notifications:
         uuid.UUID(thread_id)
         for value in (enabled, notify_on_completion):
             if value is not None and not isinstance(value, bool):
-                raise ValueError('提醒开关格式不正确')
+                raise ValueError("잘못된 알림 스위치")
         with self.lock:
             config = settings(self.data_dir)
             targets = self._targets(config)
             rows = self.watches()
             prior = next((r for r in rows if r['id'] == thread_id and r['host'] == host), None)
             if existing_only and prior is None:
-                raise ValueError('该会话的通知监控已移除，请刷新列表')
+                raise ValueError("이 채팅은 더 이상 시청되지 않습니다. 목록을 새로 고칩니다.")
             selected = prior is not None if enabled is None else enabled
             completion = bool(prior and prior.get('notifyOnCompletion')) if notify_on_completion is None else notify_on_completion
             if enabled is False:
@@ -805,13 +805,13 @@ class Notifications:
                 self.dormant.discard((host, thread_id))
                 self.wakeup.set()
                 if selected and not targets and not existing_only:
-                    raise ValueError('请先配置并开启 PushPlus、Bark 或 ntfy 通知')
+                    raise ValueError("먼저 PushPlus, Bark 또는 ntfy를 구성하고 활성화합니다.")
                 if not selected and completion:
-                    raise ValueError('请先开启此聊天提醒')
+                    raise ValueError("먼저 이 채팅에 대한 알림을 활성화하세요")
                 rows = [r for r in rows if not (r['id'] == thread_id and r['host'] == host)]
                 if selected:
                     if len(rows) >= 100:
-                        raise ValueError('最多关注 100 个聊天')
+                        raise ValueError("최대 100개의 채팅을 시청할 수 있습니다.")
                     session = self.attached.get((host, thread_id)) if existing_only else None
                     if not existing_only and self.bridge is not None:
                         session = self.bridge.for_host(host).session(thread_id, background=True)
@@ -847,14 +847,14 @@ class Notifications:
 
     def control(self, value):
         if not isinstance(value, dict) or not isinstance(value.get('id'), str) or not isinstance(value.get('host'), str):
-            raise ValueError('通知监控操作格式不正确')
+            raise ValueError("잘못된 알림 감시 작업")
         action = value.get('action')
         if action == 'remove' and set(value) == {'action', 'id', 'host'}:
             # Removal is also available for a host/chat that is no longer reachable.
             return self.watch(value['id'], value['host'], False, existing_only=True)
         if action == 'update' and set(value) == {'action', 'id', 'host', 'notifyOnCompletion'} and isinstance(value['notifyOnCompletion'], bool):
             return self.watch(value['id'], value['host'], notify_on_completion=value['notifyOnCompletion'], existing_only=True)
-        raise ValueError('通知监控操作格式不正确')
+        raise ValueError("잘못된 알림 감시 작업")
 
     def _clear_completion(self, host, thread_id):
         self.completions = {k: v for k, v in self.completions.items() if json.loads(k)[:2] != [host, thread_id]}
@@ -883,7 +883,7 @@ class Notifications:
             ordered = self.desktop_provider(row['host']) and all(type(t.get('sequence')) is int for t in turns)
             if ordered:
                 current['sequence'] = max([t['sequence'] for t in turns] + [(previous or {}).get('sequence', -1)])
-            current['title'] = row.get('title') or (previous or {}).get('title') or '聊天'
+            current['title'] = row.get('title') or (previous or {}).get('title') or '채팅'
             if previous is not None:
                 # Only turns after the last live boundary (or observed running) are new.
                 # Older pages loaded into a snapshot must never become completion alerts.
@@ -959,7 +959,7 @@ class Notifications:
                 if turn is turns[-1] and failed and episode:
                     pending = json.dumps([identifier, episode])
             current = {'anchor': turns[-1]['turnId'], 'turns': dict(list(observed.items())[-128:]),
-                       'pending': pending, 'title': row.get('title') or '聊天'}
+                       'pending': pending, 'title': row.get('title') or '채팅'}
             if ordered:
                 current['sequence'] = max([t['sequence'] for t in turns] + [(previous or {}).get('sequence', -1)])
             if current != previous:
@@ -1048,9 +1048,9 @@ class Notifications:
                     return False
             client = {'claude': 'Claude', 'deepseek': 'DSH', 'zcode': 'ZCode', 'antigravity': 'Antigravity'}.get(provider, 'Codex')
             kind = 'attention' if completed == 'attention' else 'completion' if completed else 'request'
-            heading = client + (' 需要你处理' if kind == 'attention' else ' 运行已完成' if completed else ' 需要你的确认')
-            body = ('本轮运行遇到问题，请打开聊天查看并手动继续或调整模型。' if kind == 'attention' else
-                    f'有 {len(pending)} 次运行已完成，请打开聊天查看。' if completed else f'有 {len(pending)} 项请求等待处理，请打开聊天查看。')
+            heading = client + (' 당신이 처리해야' if kind == 'attention' else ' 실행 완료' if completed else ' 당신의 확인이 필요합니다')
+            body = ('실행 중에 문제가 발생하면 채팅을 열어 수동으로 보고 계속하거나 모델을 조정하세요.。' if kind == 'attention' else
+                    f'완료된 실행이 {len(pending)}건 있습니다. 채팅에서 확인하세요.' if completed else f'처리를 기다리는 요청이 {len(pending)}개 있습니다. 채팅에서 확인하세요.')
             if config['includeTitle']:
                 body = title[:120] if channel == 'mobile' else title[:120] + '\n' + body
         success = False
@@ -1088,7 +1088,7 @@ class Notifications:
             if success:
                 self._status(channel, lastSent=now, error='')
             else:
-                self._status(channel, error='发送失败，将在提醒仍开启时重试完成通知；待确认通知仅在请求仍待处理时重试。请检查服务地址、认证和网络。')
+                self._status(channel, error="배송에 실패했습니다. 활성화된 동안 완료 알림이 다시 시도됩니다. 확인 알림은 보류 중에만 재시도됩니다. 서버, 인증, 네트워크를 확인하세요.")
             if len(self.ledger) > 5000:
                 self.ledger = dict(sorted(self.ledger.items(), key=lambda p: p[1].get('time', 0))[-4000:])
             write_json(self.data_dir/'notification-delivery.json', self.ledger)
@@ -1141,7 +1141,7 @@ class Notifications:
                     # Unlike completion, do not replay mobile events before the latest
                     # native state has had a chance to cancel a recovered episode.
                     if channel != 'mobile':
-                        changed = self._dispatch(config, row, record.get('title') or '聊天', channel, target, keys, 'attention') or changed
+                        changed = self._dispatch(config, row, record.get('title') or '채팅', channel, target, keys, 'attention') or changed
             for key, record in list(self.completions.items()):
                 host, identifier, target = json.loads(key)
                 row = {'host': host, 'id': identifier}
@@ -1154,7 +1154,7 @@ class Notifications:
                     continue
                 channel = next(c for c, t in targets.items() if t == target)
                 keys = [self._delivery_key(row, turn, completion=True, target=target) for turn in record['pending']]
-                changed = self._dispatch(config, row, record.get('title') or '聊天', channel, target, keys, True) or changed
+                changed = self._dispatch(config, row, record.get('title') or '채팅', channel, target, keys, True) or changed
         selected = {(r['host'], r['id']) for r in watches}
         for key in set(self.attached) - selected:
             session = self.attached[key]
@@ -1197,7 +1197,7 @@ class Notifications:
                         requests = session.pending_requests()
                         live_running = session.state.get('threadRuntimeStatus', {}).get('type') == 'active' or any(t.get('status') == 'inProgress' for t in ordered_turns(session.state))
                         self.mobile_push.update_activity(row, 'waiting' if requests else 'running' if live_running else 'ready')
-                        title = session.state.get('title') or '聊天'
+                        title = session.state.get('title') or '채팅'
                         turns = [{k: t[k] for k in ('turnId', 'status', 'willRetry') if k in t} for t in ordered_turns(session.state)]
                     completed_keys = {channel: self._completion_pending({**current, 'title': title}, turns, target) if current.get('notifyOnCompletion') else [] for channel, target in targets.items()}
                     attention_keys = {channel: self._attention_pending({**current, 'title': title}, turns, target) for channel, target in targets.items()}
@@ -1218,7 +1218,7 @@ class Notifications:
                             self.candidates.pop(key, None)
                             self.attached.pop(key, None)
             except Exception:
-                self._status(error='部分关注聊天暂时无法连接，请检查电脑 App 或 SSH 连接。')
+                self._status(error='일부 팔로우 채팅을 일시적으로 사용할 수 없습니다. 컴퓨터를 확인하세요. App 또는 SSH 연결。')
         changed = self._scan_desktops(config, targets) or changed
         # Retry failed durable inbox writes after fresh native snapshots have
         # cancelled recovered episodes, including now-dormant subscriptions.
@@ -1229,7 +1229,7 @@ class Notifications:
                     if target == targets['mobile'] and record.get('pending'):
                         row = {'host': host, 'id': identifier}
                         keys = [self._delivery_key(row, record['pending'], completion='attention', target=target)]
-                        changed = self._dispatch(config, row, record.get('title') or '聊天', 'mobile', target, keys, 'attention') or changed
+                        changed = self._dispatch(config, row, record.get('title') or '채팅', 'mobile', target, keys, 'attention') or changed
         elapsed = (time.monotonic() - started) * 1000
         if elapsed >= 2000:
             logging.warning('notification stage=scan work_ms=%.1f', elapsed)
@@ -1268,7 +1268,7 @@ class Notifications:
             current = self._effective(row)
             if not (current['notifyOnRequest'] or current['notifyOnCompletion']):
                 continue
-            title = row.get('title') or '聊天'
+            title = row.get('title') or '채팅'
             requests = [r for r in row.get('requests', []) if isinstance(r, dict) and r.get('id')]
             if requests or row.get('runtimeKnown') is True:
                 self.mobile_push.update_activity(row, 'waiting' if requests else 'running' if row.get('status') == 'active' else 'ready')
@@ -1322,7 +1322,7 @@ class Notifications:
             try:
                 self.scan(deliver=False)
             except Exception:
-                self._status(error='通知配置读取失败，请在电脑启动器重新保存配置。')
+                self._status(error='알림 구성을 읽지 못했습니다. 컴퓨터 실행 프로그램에서 구성을 다시 저장하세요.。')
             self.wakeup.wait(3)
             self.wakeup.clear()
             # Coalesce a burst of stream patches rather than scan per token.
@@ -1336,7 +1336,7 @@ class Notifications:
                 if not self.closed.is_set():
                     self.security.scan()
             except Exception:
-                self._status(error='通知配置读取失败，请在电脑启动器重新保存配置。')
+                self._status(error='알림 구성을 읽지 못했습니다. 컴퓨터 실행 프로그램에서 구성을 다시 저장하세요.。')
             self.delivery_wakeup.wait(3)
 
     def _push_allowed(self, event):
@@ -1353,5 +1353,5 @@ class Notifications:
             try:
                 self.mobile_push.drain(settings(self.data_dir).get('mobileEnabled', False), self._push_allowed)
             except Exception:
-                self._status('nativePush', error='系统推送暂不可用，请检查平台配置')
+                self._status('nativePush', error='시스템 푸시를 일시적으로 사용할 수 없습니다. 플랫폼 구성을 확인하세요.')
             self.closed.wait(3)

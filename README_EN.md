@@ -21,13 +21,17 @@
 
 # Codex Mobile Bridge · A remote workbench for desktop agents
 
+> This is a **Korean-language fork** of [Codex Mobile Bridge](https://github.com/try2love/codex-mobile-bridge). It retains the upstream documentation structure, features, contributor credits and license while translating UI text, documentation and comments and updating security-sensitive dependencies. **This fork has no published installation packages yet.** The upstream downloads below do not include its translations or changes.
+>
+> Update checks target `sekai0716/codex-mobile-bridge-kr`; the desktop in-app updater is disabled until separately signed releases are ready. Original screenshots and videos retain their embedded Chinese text. Upstream device-validation records do not mean this fork has been installed or tested on those devices.
+
 > **v2.2.1:** [Stable release](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.1) · [Release notes](RELEASE_NOTES.md). Updating is recommended for native connections to the latest Codex App. Adds Antigravity and interactive charts, with improvements to long chats and model caching.
 
 **Android installation:** The new **Bridge** app installs alongside the old v2.2.0 app and cannot replace it in place. Install Bridge, add your computers and verify the connections first. Preserve any drafts you need from the old app before uninstalling it; old bindings and drafts do not migrate automatically. Users of the separate v2.2.1-preview.1 **Bridge Preview** app can upgrade in place and retain that preview app’s connections and drafts.
 
 > **v2.2.0 (stable):** [Release page](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.0) · [Full release notes](RELEASE_NOTES.md) · [Mobile installation](mobile/README.md). ZCode, multiple routes per computer, native side chats and lower idle resource usage.
 
-[简体中文](README.md) · [English](README_EN.md)
+[한국어](README.md) · [English](README_EN.md)
 
 **[Product guide and interactive demos ↗](https://try2love.github.io/codex-mobile-bridge/?lang=en)** · **[Download desktop and mobile apps](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.0)**
 
@@ -278,7 +282,7 @@ Use a Release package above for everyday use. The desktop app manages the gatewa
 
 Download links are in the quick start above. Development artifacts are available from successful **GitHub Actions → Desktop builds** runs, or you can build locally as described below.
 
-On Windows, closing the window hides it to the tray; launching again restores it. The tray offers separate actions to stop the gateway and quit, or quit only the controller. Stop the gateway and exit before manually upgrading or moving the app. Select Chinese or English at the top right; existing Windows language preferences are retained, and tray labels follow the selection. Phone language is independent. Uninstalling does not automatically remove gateway settings or credentials.
+On Windows, closing the window hides it to the tray; launching again restores it. The tray offers separate actions to stop the gateway and quit, or quit only the controller. Stop the gateway and exit before manually upgrading or moving the app. Select Korean or English at the top right. This fork defaults to Korean when no choice is saved; an explicit English choice and existing Windows language preferences are retained, and tray labels follow the selection. Phone language is independent. Uninstalling does not automatically remove gateway settings or credentials.
 
 The App provides:
 
@@ -326,7 +330,7 @@ Cloudflare and Tailscale public relay paths may cross overseas nodes and be slow
 
 All entries reach the same gateway and share the same gateway login. Saved single-entry settings from earlier versions are converted when read; existing files are not rewritten until you save.
 
-Server profiles offer **Export manual setup reference**, **Copy manual setup instructions**, and **Check fixed entry**. NAS profiles retain their deployment ZIP and Agent instructions. The ZIP contains concrete configuration and Chinese/English deployment instructions, without passwords, notification tokens, Codex data or SSH private keys. Clipboard instructions use the current UI language.
+Server profiles offer **Export manual setup reference**, **Copy manual setup instructions**, and **Check fixed entry**. NAS profiles retain their deployment ZIP and Agent instructions. The ZIP contains concrete configuration and Korean/English deployment instructions, without passwords, notification tokens, Codex data or SSH private keys. Clipboard instructions use the current UI language.
 
 The username `try2love` and URL `https://codex.try2love.com` are configuration examples, not a live demo site. Replace them with your own settings.
 
@@ -334,7 +338,7 @@ The username `try2love` and URL `https://codex.try2love.com` are configuration e
 
 Choose **Fixed domain · Cloudflare Tunnel**. Use Cloudflare DNS for the domain (keep your registrar), create a tunnel, and publish a hostname such as `codex.try2love.com` pointing to `http://localhost:8787`. Save the hostname and tunnel token in the App, start the gateway, then check the fixed entry. The token runs the existing tunnel; it does not create DNS records. No public server or inbound computer port is needed. Use a dedicated hostname, not a `/codex/` path. Keep the computer, Codex App and gateway online.
 
-See the [complete fixed-domain walkthrough (Chinese)](docs/fixed-domain.md), or expand the first-time setup guide in the Cloudflare connection card. The guide covers nameservers, the tunnel token, the hostname route and verification over phone mobile data.
+See the [complete fixed-domain walkthrough (Korean)](docs/fixed-domain.md), or expand the first-time setup guide in the Cloudflare connection card. The guide covers nameservers, the tunnel token, the hostname route and verification over phone mobile data.
 
 #### Own server
 
@@ -346,7 +350,7 @@ The computer initiates SSH, so the server does not need direct access to the com
 
 The server must allow remote forwarding and keep the listening socket on loopback (`GatewayPorts no` or `clientspecified`, not `yes`). For the generated Caddy configuration, DNS must point to the server and public TCP 80/443 must be reachable and free. Caddy obtains and renews certificates. Its generated Docker service uses host networking on Linux Docker Engine, on the same host as SSH; it is not a Mac/Windows Docker Desktop deployment.
 
-Everyday SSH forwarding can use a regular user such as `try2love`, without root or sudo. Follow the [server SSH walkthrough (Chinese)](docs/server-ssh.md): manually prepare DNS, HTTPS and forwarding permissions; save the app settings and check SSH sign-in; start the connection and check the fixed entry, then verify over phone mobile data.
+Everyday SSH forwarding can use a regular user such as `try2love`, without root or sudo. Follow the [server SSH walkthrough (Korean)](docs/server-ssh.md): manually prepare DNS, HTTPS and forwarding permissions; save the app settings and check SSH sign-in; start the connection and check the fixed entry, then verify over phone mobile data.
 
 Server software installation, firewall rules and SSH permissions must be configured manually by you or your administrator. The app does not accept sudo passwords or run remote installation commands. Preserve existing sites and use their reverse proxy. SSH sign-in success does not verify forwarding or public HTTPS access. Export or copy setup references for manual use; any administrative commands must be run by the user.
 
@@ -370,9 +374,9 @@ This is the gateway's **address allowlist**. Add a URL only when its HTTPS rever
 
 Adding a URL does **not** create a tunnel, configure DNS or obtain a certificate. The proxy must reach the gateway and preserve the public Host header. Fixed URLs in connection profiles are added automatically. Leave this field empty when using only LAN or temporary Cloudflare.
 
-### Chinese and English UI
+### Korean and English UI
 
-The desktop App and phone website each have a **Language / 语言** selector and remember their own choice. Switching language does not restart the gateway or translate chat content, commands, model/Skill descriptions, user input or raw logs. Unsaved settings, message drafts and pending-confirmation form input are preserved. Language switching is disabled while a confirmation is being submitted.
+The desktop App and phone website each have a **한국어 / English** selector and remember their own choice. Korean is the default when no choice is saved; explicit English choices are retained. Switching language does not restart the gateway or translate chat content, commands, model/Skill descriptions, user input or raw logs. Unsaved settings, message drafts and pending-confirmation form input are preserved. Language switching is disabled while a confirmation is being submitted.
 
 ### Third-party notifications: Bark, ntfy and PushPlus
 
@@ -420,7 +424,7 @@ This switch is independent of chat notifications, defaults to on for new configu
 | Independent authentication | Username/password or explicit passwordless mode |
 | Parallel access | LAN, temporary HTTPS and multiple fixed entries |
 | Files and images | Project previews, folder location, zoom and resumable downloads; live configurable ordinary-download threshold |
-| Bilingual UI | Chinese / English on the desktop and phone |
+| Bilingual UI | Korean / English on the desktop and phone |
 
 Large history pages also have a byte budget, so a large reply may require multiple pages. Incremental long polling updates changed records without retransmitting the entire chat. Stale cursors after a gateway restart or replaced desktop snapshot trigger a fresh synchronization. Full model context stays on the computer.
 
@@ -428,7 +432,7 @@ Large history pages also have a byte budget, so a large reply may require multip
 
 - macOS, Windows 10/11 or experimental Ubuntu, with the desktop clients you need installed and configured. Claude automatic connection supports macOS/Windows only.
 - Release packages include the gateway runtime; no Python or Node.js installation is needed.
-- For command-line deployment: native Python 3.9+. The gateway uses only the Python standard library; no WSL or pip dependencies are needed.
+- For source or command-line deployment: native Python 3.10+. The basic gateway uses only the Python standard library; no WSL or pip dependencies are needed.
 - Desktop App development and packaging additionally require Node.js and the build dependencies below.
 - Keep the computer awake, network reachable and gateway running.
 - For SSH chats: the host is configured in the App, the SSH alias works non-interactively, and remote Python 3 is available. Model/Skill discovery also needs the remote Codex runtime. On Windows, OpenSSH `ssh.exe` must be on PATH.
@@ -441,8 +445,8 @@ Skip this section if you downloaded the desktop App. These commands are for runn
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/try2love/codex-mobile-bridge.git
-cd codex-mobile-bridge
+git clone https://github.com/sekai0716/codex-mobile-bridge-kr.git
+cd codex-mobile-bridge-kr
 py -3 -B .\run.py --lan
 ```
 
@@ -461,14 +465,14 @@ If Windows Firewall prompts, allow only the network scope you need. Files use UT
 ### macOS
 
 ```sh
-git clone https://github.com/try2love/codex-mobile-bridge.git
-cd codex-mobile-bridge
+git clone https://github.com/sekai0716/codex-mobile-bridge-kr.git
+cd codex-mobile-bridge-kr
 python3 -B "$PWD/run.py" --lan
 ```
 
-Alternatively, double-click `启动手机网关.command`. Stop with `Ctrl+C`, `python3 -B stop.py`, or `停止手机网关.command`.
+Alternatively, double-click `게이트웨이 시작.command`. Stop with `Ctrl+C`, `python3 -B stop.py`, or `게이트웨이 중지.command`.
 
-Open the printed LAN URL on a phone on the same network, for example `http://192.168.1.10:8787`. The initial username is `admin`; the generated password is in `.local/首次登录.txt`. Select a chat and wait for **Connected** before sending.
+Open the printed LAN URL on a phone on the same network, for example `http://192.168.1.10:8787`. The initial username is `admin`; the generated password is in `.local/첫 로그인.txt`. Select a chat and wait for **Connected** before sending.
 
 Without `--lan`, the gateway listens only on `127.0.0.1`. It does not install a system login service. Restarting with the same data directory preserves valid sign-ins and trusted phone bindings. If a Desktop chat shows saved history only, open it in the desktop App and reconnect on the phone; the gateway does not replace its original execution owner. Use **Continue chat** to explicitly connect or resume a CLI chat after its terminal closes. Reading history does not start a runtime.
 
@@ -607,7 +611,7 @@ Do not include actual passwords, tokens or API keys in public issues, commits, s
 
 The product icon source is `assets/icon.png`. Run `npm run icons:desktop` to refresh the desktop PNG/ICO, phone and product-site icons. macOS packaging converts the desktop PNG into its system icon.
 
-The product website lives in `site/` and is hosted on GitHub Pages. Pushing changes under `site/` to `main` automatically publishes them through the **Product website** workflow; no separate build step is required.
+The upstream product website lives in `site/` and is hosted on GitHub Pages. Upstream publishes changes under `site/` on `main` through the **Product website** workflow, with no separate build step. Automatic Pages publication is disabled in this fork; repository updates do not publish a separate website.
 
 This section requires Node.js and Python on the target OS, matching the package's CPU architecture. Release users do not need these tools.
 

@@ -96,7 +96,7 @@
       if(!value||!canReuse(value,scope))return;
       reuse.disabled=true;
       try{if(await composer.add(value,scope)!==false&&dialog.open&&reuseValue===value&&canReuse(value,scope))dialog.close();}
-      catch(error){if(dialog.open&&reuseValue===value)status.textContent=error.message||t('附件上传失败，请重试');}
+      catch(error){if(dialog.open&&reuseValue===value)status.textContent=error.message||t('첨부파일 업로드에 실패했습니다. 다시 시도해 보세요.');}
       finally{if(dialog.open&&reuseValue===value)reuse.disabled=false;}
     });
     save=document.createElement('a');save.id='image-preview-save';save.onclick=()=>dialog.close();
@@ -147,19 +147,19 @@
     const value = source(target); if (!value) return;
     event.preventDefault(); if (!dialog) create(); cleanup(); opener = target;
     reuseScope=composer?.scope();reuseValue=canReuse(value,reuseScope)?value:null;
-    reuse.textContent=t('引用');reuse.hidden=!reuseValue;reuse.disabled=false;
+    reuse.textContent=t('인용');reuse.hidden=!reuseValue;reuse.disabled=false;
     const download=new URL(value.downloadUrl||value.url,location.href);
     if(!value.downloadUrl){download.searchParams.set('download','1');download.searchParams.set('variant','original');}
-    save.setAttribute('aria-label',t('保存到本地'));save.title=t('保存到本地');save.hidden=!BridgeDownload.eligible(download.href,location.href);
-    if(!save.hidden){save.href=download.href;save.download=value.name||t('图片附件');}else save.removeAttribute('href');
-    close.textContent = '× ' + t('关闭'); close.setAttribute('aria-label', t('关闭图片预览'));
-    zoomIn.setAttribute('aria-label', t('放大图片')); zoomOut.setAttribute('aria-label', t('缩小图片')); fit.textContent = t('适应屏幕');
-    percentage.setAttribute('aria-label', t('图片缩放比例')); percentage.textContent = '100%'; zoomIn.disabled = zoomOut.disabled = fit.disabled = true;
-    title.textContent = value.name || target.querySelector('img')?.alt || target.alt || t('图片附件');
-    status.textContent = t('正在加载图片…'); content.classList.remove('is-zoomed');
+    save.setAttribute('aria-label',t('로컬에 저장'));save.title=t('로컬에 저장');save.hidden=!BridgeDownload.eligible(download.href,location.href);
+    if(!save.hidden){save.href=download.href;save.download=value.name||t('이미지 첨부');}else save.removeAttribute('href');
+    close.textContent = '× ' + t('닫기'); close.setAttribute('aria-label', t('이미지 미리보기 닫기'));
+    zoomIn.setAttribute('aria-label', t('확대')); zoomOut.setAttribute('aria-label', t('축소')); fit.textContent = t('화면에 맞추기');
+    percentage.setAttribute('aria-label', t('이미지 확대/축소 수준')); percentage.textContent = '100%'; zoomIn.disabled = zoomOut.disabled = fit.disabled = true;
+    title.textContent = value.name || target.querySelector('img')?.alt || target.alt || t('이미지 첨부');
+    status.textContent = t('이미지 로드 중…'); content.classList.remove('is-zoomed');
     const current = image = document.createElement('img'); current.alt = title.textContent; current.draggable = false;
     current.onload = () => { if (image === current && current.isConnected && dialog.open) { status.textContent = ''; measure(); } };
-    current.onerror = () => { if (image === current && current.isConnected) { current.hidden = true; status.textContent = t('图片加载失败，请关闭后重试。'); } };
+    current.onerror = () => { if (image === current && current.isConnected) { current.hidden = true; status.textContent = t('이미지를 로드할 수 없습니다. 닫고 다시 시도하세요.'); } };
     content.replaceChildren(current); if (!dialog.open) dialog.showModal(); observer.observe(content); current.src = value.url;
   }
   window.BridgeImageViewer = {
@@ -173,7 +173,7 @@
       // cannot opt arbitrary data/blob/remote URLs into the delegated viewer.
       const value={url,name:result.name,context,composerScope,mime:result.mime,size:result.size,downloadUrl};registeredSources.add(value);
       registered.set(target, value); target.classList.add('image-preview-source'); target.tabIndex = 0; target.setAttribute('role', 'button');
-      target.setAttribute('aria-label', t('查看图片') + ' ' + (result.name || target.alt)); return true;
+      target.setAttribute('aria-label', t('이미지 보기') + ' ' + (result.name || target.alt)); return true;
     }
   };
   document.addEventListener('click', event => {

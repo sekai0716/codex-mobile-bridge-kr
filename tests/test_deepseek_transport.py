@@ -21,14 +21,14 @@ class DeepSeekProfileErrorTests(unittest.TestCase):
             profile.parent.mkdir(parents=True)
             profile.write_text('[]')
             adapter = DeepSeek(root/'gateway', root/'home')
-            with self.assertRaisesRegex(BridgeUnavailable, 'Web.*扫描并绑定'):
+            with self.assertRaisesRegex(BridgeUnavailable, "찾을\\ 수\\ 없음\\ Harness\\ 데스크탑\\ 파일\\.\\ 사용\\ Web\\ 또는\\ 제3자\\ 클라이언트로\\ 문의해\\ 주세요\\.“타사\\ 클라이언트:\\ 수동\\ 설치\\ 및\\ 바인딩”액세스\\ 플러그인을\\ 스캔하고\\ 바인딩합니다\\.\\ 먼저\\ 공식\\ 데스크톱\\ 버전을\\ 시작하고\\ 데이터\\ 디렉터리를\\ 확인하세요\\.。"):
                 adapter.call('list')
             self.assertFalse((root/'home/profiles/desktop').exists())
             self.assertFalse(adapter.directory.exists())
             desktop = root/'home/profiles/desktop/cordis.patch.yml'
             desktop.parent.mkdir()
             desktop.write_text('[]')
-            with self.assertRaisesRegex(BridgeUnavailable, 'DeepSeek 桌面未连接'):
+            with self.assertRaisesRegex(BridgeUnavailable, "DeepSeek\\ 데스크톱이\\ 연결되지\\ 않았습니다\\.\\ 액세스\\ 플러그인을\\ 설치하고\\ 다시\\ 열어주세요\\.\\ Harness"):
                 adapter.call('list')
 
 
@@ -99,11 +99,11 @@ class DeepSeekTransportTests(unittest.TestCase):
         self.assertEqual(self.forwarded, [])
 
     def test_native_project_mentions_keep_the_existing_plugin_protocol(self):
-        body = {'id': 'fixture-id', 'text': '检查文件', 'resolvedReferences': [
-            {'path': '/project/中文 文件.md', 'kind': 'file'}, {'path': '/project/folder', 'kind': 'directory'}]}
+        body = {'id': 'fixture-id', 'text': '파일 확인', 'resolvedReferences': [
+            {'path': '/project/중국 문서.md', 'kind': 'file'}, {'path': '/project/folder', 'kind': 'directory'}]}
         self.adapter.call('send', 'native-chat', body)
         self.assertEqual(self.bodies, [{'action': 'send', 'sid': 'native-chat', 'body': {
-            'id': 'fixture-id', 'text': '检查文件\n\n@"/project/中文 文件.md"\n@/project/folder/'}}])
+            'id': 'fixture-id', 'text': '파일 확인\n\n@"/project/중국 문서.md"\n@/project/folder/'}}])
         self.assertIn('resolvedReferences', body)
 
 

@@ -34,7 +34,7 @@ test('Linux ignores relative XDG_CONFIG_HOME and rejects an unstable executable'
     const startup=createLoginStartup({isPackaged:true},options);startup.set(true);
     assert.ok(fs.existsSync(path.join(root,'.config/autostart/codex-mobile-bridge.desktop')));
     const unstable=createLoginStartup({isPackaged:true},{...options,executable:'/tmp/.mount_bridge/bridge'});
-    assert.throws(()=>unstable.set(true),/固定目录/);
+    assert.throws(()=>unstable.set(true),/로그인 시작을 활성화하기 전에 영구 위치에 앱을 설치하십시오\./);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

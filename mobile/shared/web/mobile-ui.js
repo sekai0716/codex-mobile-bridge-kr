@@ -137,7 +137,7 @@
     caption.append(title, hint); option.append(caption, toggle); section.append(legend, option, forget, retry);
     const end = uuDialog.querySelector('.appearance-actions');
     (end?.parentNode || uuDialog).insertBefore(section, end);
-    const label = (zh, en) => document.documentElement.lang.startsWith('en') ? en : zh;
+    const label = (ko, en) => document.documentElement.lang.startsWith('en') ? en : ko;
     let timer = 0, timedOut = false;
     function render(action = 'read') {
       const value = state(action);
@@ -145,18 +145,18 @@
       if (ready || unsupported) timedOut = false;
       const unavailable = value.availability === 'unavailable' || timedOut;
       section.hidden = app.hidden;
-      legend.textContent = label('远程控制', 'Remote control');
-      title.textContent = label('使用 UU 远程', 'Use UU Remote');
-      hint.textContent = ready ? label('需要 UU 远程 4.42 或更高版本。首次使用时在 UU 中选择这台电脑。',
+      legend.textContent = label('원격 제어', 'Remote control');
+      title.textContent = label("UU Remote 사용", 'Use UU Remote');
+      hint.textContent = ready ? label("UU Remote 4.42 이상이 필요합니다. 처음 사용할 때 UU Remote에서 이 컴퓨터를 선택하세요.",
         'Requires UU Remote 4.42 or later. Select this computer in UU the first time.')
-        : unsupported ? label('当前电脑暂不支持 UU 远程接入。', 'UU Remote is unavailable for this computer.')
-        : unavailable ? label('未能确认当前电脑的远控状态，请重新检查。', 'Could not verify remote control for this computer. Check again.')
-        : label('正在确认当前电脑的远控状态…', 'Checking remote control for this computer…');
+        : unsupported ? label("이 컴퓨터에서는 UU Remote를 지원하지 않습니다.", 'UU Remote is unavailable for this computer.')
+        : unavailable ? label("현재 컴퓨터의 원격 제어 상태를 확인할 수 없습니다. 다시 확인하세요.", 'Could not verify remote control for this computer. Check again.')
+        : label("현재 컴퓨터의 원격 제어 상태를 확인 중입니다…", 'Checking remote control for this computer…');
       toggle.disabled = !ready;
       if (ready) toggle.checked = value.enabled === true;
       forget.disabled = !ready; forget.hidden = !ready || !toggle.checked || !value.bound;
-      forget.textContent = label('解除 UU 设备绑定', 'Unlink UU device');
-      retry.textContent = label('重新检查', 'Check again'); retry.hidden = ready || unsupported || !unavailable;
+      forget.textContent = label("UU Remote 기기 연결 해제", 'Unlink UU device');
+      retry.textContent = label("다시 확인", 'Check again'); retry.hidden = ready || unsupported || !unavailable;
       if (ready || unsupported || unavailable || app.hidden) { clearTimeout(timer); timer = 0; }
       else if (!timer && uuDialog.open) timer = setTimeout(() => { timer = 0; timedOut = true; if (uuDialog.open) render(); }, 8000);
       return value;
@@ -169,8 +169,8 @@
       menu(value) {
         if (app.hidden || !value.supported || !value.enabled) return [];
         const actions = [];
-        if (value.pip) actions.push({mode:'pip', title:label('小窗显示电脑画面','View computer in a small window')});
-        actions.push({mode:'full', title:label('发起远程控制','Control computer')});
+        if (value.pip) actions.push({mode:'pip', title:label("작은 화면으로 컴퓨터 보기",'View computer in a small window')});
+        actions.push({mode:'full', title:label("컴퓨터 원격 제어",'Control computer')});
         return actions;
       }
     };
@@ -183,8 +183,8 @@
   const account = document.getElementById('accounts-button');
   if (account) {
     const labelAccount = () => {
-      if (account.getAttribute('data-i18n') === '账号与额度') {
-        const label = document.documentElement.lang.startsWith('en') ? 'Official account' : '官方账号';
+      if (account.getAttribute('data-i18n') === "계정 및 할당량") {
+        const label = document.documentElement.lang.startsWith('en') ? 'Official account' : '공식 계정';
         if (account.textContent !== label) account.textContent = label;
       }
     };
@@ -194,7 +194,7 @@
   const footer = document.querySelector('.sidebar-foot');
   if (footer && !document.querySelector('.client-navigation')) {
     document.body.appendChild(footer);
-    const home = document.createElement('a'); home.href = 'codexbridge://home'; home.className = 'plain bridge-home'; home.dataset.i18n = '返回电脑列表'; home.textContent = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t('返回电脑列表') : '返回电脑列表';
+    const home = document.createElement('a'); home.href = 'codexbridge://home'; home.className = 'plain bridge-home'; home.dataset.i18n = "컴퓨터 목록으로 돌아가기"; home.textContent = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t("컴퓨터 목록으로 돌아가기") : "컴퓨터 목록으로 돌아가기";
     footer.appendChild(home);
   }
   // The native shell only accepts published addresses and verifies the chosen peer again.
@@ -212,15 +212,15 @@
       const section=document.createElement('section');section.className='channel-picker-section';
       const en=document.documentElement.lang.startsWith('en');
       const heading=document.createElement('h3'),modes=document.createElement('div'),options=document.createElement('div');
-      heading.textContent=en?'Connection channels':'连接信道';
+      heading.textContent=en?'Connection channels':'연결 채널';
       const refresh=document.createElement('button');refresh.type='button';refresh.className='channel-refresh';
-      refresh.textContent='↻';refresh.title=en?'Refresh channel latency':'刷新信道延迟';refresh.setAttribute('aria-label',refresh.title);
+      refresh.textContent='↻';refresh.title=en?'Refresh channel latency':'새로 고침 채널 지연';refresh.setAttribute('aria-label',refresh.title);
       refresh.onclick=()=>{if(navigator.userActivation?.isActive)render('probe');};
       heading.append(refresh);
-      modes.className='channel-modes';modes.setAttribute('role','group');modes.setAttribute('aria-label',en?'Switching mode':'切换模式');
+      modes.className='channel-modes';modes.setAttribute('role','group');modes.setAttribute('aria-label',en?'Switching mode':'스위치 모드');
       options.className='client-picker-options channel-options';section.append(heading,modes,options);
       const modeButtons=new Map(), entries=new Map();
-      for(const [value,title] of [['auto',en?'Automatic':'自动切换'],['manual',en?'Manual':'手动切换']]){
+      for(const [value,title] of [['auto',en?'Automatic':'자동 전환'],['manual',en?'Manual':'수동 스위치']]){
         const button=document.createElement('button');button.type='button';button.textContent=title;
         button.onclick=()=>{if(navigator.userActivation?.isActive){render('mode:'+value);if(value==='auto')window.BridgeChannelLink?.check('network');}};
         modes.append(button);modeButtons.set(value,button);
@@ -269,7 +269,7 @@
       const render = () => {
         const actual = computer.dataset.deviceName || location.host;
         name.textContent = bound ? (window.BridgeChannelLink?.address||location.origin) : device ? actual : connectionName;
-        const text = device ? '点击显示连接名称' : '点击显示电脑真实名称';
+        const text = device ? "저장된 연결 이름 표시" : "컴퓨터의 장치 이름 표시";
         const hint = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t(text) : text;
         computer.title = hint + ' · ' + (device ? connectionName : actual);
         computer.setAttribute('aria-label', name.textContent + ' · ' + hint);

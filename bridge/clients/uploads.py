@@ -13,13 +13,13 @@ class DesktopUploads:
     @staticmethod
     def scope(provider, sid):
         if provider not in ('claude', 'deepseek', 'zcode', 'antigravity') or not isinstance(sid, str) or not sid or len(sid) > 512:
-            raise ValueError('会话标识无效')
+            raise ValueError("잘못된 세션 식별자")
         return str(uuid.uuid5(uuid.NAMESPACE_URL, 'desktop-attachment:'+provider+':'+sid))
 
     def resolve(self, provider, sid, identifiers, *, local_claude_cli=False, native_files=False):
         rows = self.store.resolve(self.scope(provider, sid), identifiers)
         if any(not row.get('image') for row in rows) and not (provider == 'claude' and local_claude_cli or provider in ('zcode', 'antigravity') and native_files):
-            raise ValueError('此应用的消息附件仅支持图片；其他文件请使用文件传输。')
+            raise ValueError("이 앱은 이미지 첨부를 허용합니다. 다른 파일에는 파일 전송을 사용하십시오.")
         if provider == 'antigravity' and native_files:
             # Original server consumes local @file references. Keep every
             # uploaded image/file as its verified gateway path, never drop it.

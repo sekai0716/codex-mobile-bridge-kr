@@ -29,16 +29,16 @@ for(const transport of ['cdp','file'])test(`${transport}: Code and Cowork rename
     const capabilities=transport==='cdp'?window.__claudeMobileBridge.status().surfaces:response.surfaces;
     for(const kind of ['code','cowork']){
       assert.ok(capabilities[kind].includes('mobileRename'));
-      const reply=await invoke(kind,'  用户标题  ');
-      assert.deepEqual(reply.result,{status:'confirmed',scope:'native',result:{id:rows[kind].sessionId,title:'用户标题'}});
-      assert.deepEqual(calls.at(-1),{kind,id:rows[kind].sessionId,options:{title:'用户标题',titleSource:'user'}});
+      const reply=await invoke(kind,'  사용자 직함  ');
+      assert.deepEqual(reply.result,{status:'confirmed',scope:'native',result:{id:rows[kind].sessionId,title:'사용자 직함'}});
+      assert.deepEqual(calls.at(-1),{kind,id:rows[kind].sessionId,options:{title:'사용자 직함',titleSource:'user'}});
     }
     const before=calls.length;
     for(const title of [null,{},'', 'x'.repeat(121),'a\nb','\na'])assert.ok((await invoke('code',title)).error);
     assert.equal(calls.length,before);
-    wrongIdentity=true;assert.match((await invoke('code','Wrong identity')).error,/目标无法确认/);assert.equal(calls.length,before);
+    wrongIdentity=true;assert.match((await invoke('code','Wrong identity')).error,/이름 변경 대상을 확인할 수 없으며 아직 수정 사항이 전송되지 않았습니다\./);assert.equal(calls.length,before);
     wrongIdentity=false;ignoreWrite=true;
-    assert.match((await invoke('code','Unknown outcome')).error,/结果待核对/);
+    assert.match((await invoke('code','Unknown outcome')).error,/(?:이름 변경 결과를 확인해야 합니다\. 원래 클라이언트를 확인하세요\. 중복 제출은 되지 않습니다|작업 결과 미확인)/);
     assert.equal(calls.length,before+1);
     assert.equal(rows.code.cwd,'/synthetic');assert.deepEqual(rows.cowork.userSelectedFolders,['/synthetic']);
   }finally{window.__claudeMobileBridge.stop();await running;}

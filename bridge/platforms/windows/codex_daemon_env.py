@@ -258,7 +258,7 @@ def bridge_maintenance_lock(home):
     private = directory(_private_maintenance(Path(home).resolve()), create=True)
     with _operation_lock(private / 'maintenance.lock', create=True) as acquired:
         if not acquired:
-            raise ValueError('共享接入仍在使用或退出中，请稍后重试')
+            raise ValueError('공유 액세스가 아직 사용 중이거나 종료되었습니다. 나중에 다시 시도해 주세요.')
         yield
 
 
@@ -350,7 +350,7 @@ class WindowsDaemonDrain:
 
     def wait(self, timeout):
         if self.kernel.WaitForSingleObject(self.handle, int(timeout * 1000)) != WAIT_EXITED:
-            raise OSError('原 CLI 的退出尚未确认；不会重发关闭请求或强制退出')
+            raise OSError('기존 CLI 출구는 아직 확인되지 않았습니다. 종료 요청이 재발행되지 않거나 강제로 종료되지 않습니다.')
 
 
 @contextmanager
@@ -398,9 +398,9 @@ def windows_daemon_drain(home, executable, generation):
 def force_daemon_exit_windows(home, executable, generation, checkpoint, timeout):
     with _verified_daemon_handle(home, executable, generation) as (_home, kernel, handle):
         if kernel.WaitForSingleObject(handle, 0) != WAIT_RUNNING:
-            raise OSError('CLI 原生进程已变化，未强制退出')
+            raise OSError('CLI 기본 프로세스가 변경되었으며 강제로 종료되지 않았습니다.')
         checkpoint()
         kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
         kernel.TerminateProcess.restype = wintypes.BOOL
         if not kernel.TerminateProcess(handle, 1) or kernel.WaitForSingleObject(handle, int(timeout * 1000)) != WAIT_EXITED:
-            raise OSError('CLI 原生进程退出结果待核对；不会重复强制退出')
+            raise OSError('CLI 기본 프로세스의 종료 결과를 확인해야 합니다. 반복되는 강제 종료는 없습니다.')

@@ -76,7 +76,7 @@ final class SettingsUi {
  final class ToggleRow {
   final LinearLayout row;private final AnimatedSwitch toggle;private final String title;
   ToggleRow(LinearLayout row,AnimatedSwitch toggle,String title){this.row=row;this.toggle=toggle;this.title=title;}
-  void checked(boolean checked){toggle.setChecked(checked);row.setContentDescription(L(title)+", "+L(checked?"已开启":"已关闭"));}
+  void checked(boolean checked){toggle.setChecked(checked);row.setContentDescription(L(title)+", "+L(checked?"켜짐":"꺼짐"));}
  }
  private final class AnimatedSwitch extends Switch {
   private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);

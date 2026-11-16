@@ -61,7 +61,7 @@ class DesktopAccountBoundary(unittest.TestCase):
                     self.assertTrue(detail['capabilities']['send'])
                     self.assertFalse(detail['capabilities']['models'])
                     self.assertEqual((detail['modelCatalogIdentity'], detail['draftAccountIdentity']), ('', ''))
-                    self.assertIn('暂不可用', store.public()['notice'])
+                    self.assertIn("Claude의 로그인 데이터베이스를 일시적으로 읽을 수 없습니다. 계정 작업을 사용할 수 없습니다.", store.public()['notice'])
                     native.reset_mock()
                     for extra in ({}, {'modelCatalogIdentity': identity}):
                         with self.assertRaises(ClaudeLoginDatabaseUnavailable):
@@ -78,7 +78,7 @@ class DesktopAccountBoundary(unittest.TestCase):
             root = Path(temp)
             settings = root/'desktop-sessions/settings.json'
             discovery = root/'claude/discovery.json'
-            for path, value in [(settings, {'claudeHome':'工作区'}), (discovery, {'dataHome':'工作区'})]:
+            for path, value in [(settings, {'claudeHome':'작업 공간'}), (discovery, {'dataHome':'작업 공간'})]:
                 path.parent.mkdir()
                 path.write_text(json.dumps(value, ensure_ascii=False), encoding='utf-8-sig')
             original_read = Path.read_text
@@ -89,8 +89,8 @@ class DesktopAccountBoundary(unittest.TestCase):
                 cleanup.callback(manager.close)
                 adapter = Claude(discovery.parent, auto_connect=False)
                 cleanup.callback(adapter.close)
-                self.assertEqual(manager.config['claudeHome'], '工作区')
-                self.assertEqual(adapter.discovery['dataHome'], '工作区')
+                self.assertEqual(manager.config['claudeHome'], '작업 공간')
+                self.assertEqual(adapter.discovery['dataHome'], '작업 공간')
 
     def test_msix_only_redirects_the_exact_observed_roaming_profile(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as temp:

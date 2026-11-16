@@ -48,13 +48,13 @@ class ConnectionRetry:
     def check(self):
         with self.lock:
             if self.failures or self.checking:
-                raise self.unavailable('SSH 主机暂不可用，正在退避重试；可在账号管理中手动重试。')
+                raise self.unavailable('SSH 호스트를 일시적으로 사용할 수 없으며 다시 시도하기 위해 물러나는 중입니다. 계정 관리에서 수동으로 다시 시도할 수 있습니다.。')
 
     @contextmanager
     def attempt(self, *, manual=False):
         with self.lock:
             if self.checking or self.failures and not manual and self.clock() < self.retry_at:
-                raise self.unavailable('SSH 主机暂不可用，正在退避重试；可在账号管理中手动重试。')
+                raise self.unavailable('SSH 호스트를 일시적으로 사용할 수 없으며 다시 시도하기 위해 물러나는 중입니다. 계정 관리에서 수동으로 다시 시도할 수 있습니다.。')
             probe = manual or bool(self.failures)
             if probe:
                 self.generation += 1

@@ -42,12 +42,12 @@ export async function nativeRequest(request, environment) {
   const handshake = async () => {
     if (!['helloConversationV4', 'getWorkspaceRuntimeIdentity', 'sendConversationCommandV4',
           'queryConversationCommandsV4'].every(name => typeof agent[name] === 'function'))
-      throw Error('ZCode 原 App 缺少会话服务接口');
+      throw Error('ZCode 기존 App 세션 서비스 인터페이스 누락');
     const hello = await agent.helloConversationV4();
     if (hello == null && request.action === 'application') return null;
     if (hello?.protocolVersion !== 3 || hello.clientMode !== (environment ? 'web-remote-replayable' : 'desktop-continuous') ||
         typeof hello.connectionId !== 'string' || !hello.connectionId)
-      throw Error('ZCode 原 App 会话服务协议不兼容');
+      throw Error('ZCode 기존 App 세션 서비스 프로토콜이 호환되지 않습니다');
     return hello;
   };
   const hasModels = typeof services.modelSelectionService?.getView === 'function';
@@ -58,10 +58,10 @@ export async function nativeRequest(request, environment) {
     const check = async stage => {
       if (!await handshake()) return { ready: false, stage: 'handshake' };
       stage?.('projects');
-      if (typeof services.projectService?.readTree !== 'function') throw Error('ZCode 原 App 缺少项目会话服务接口');
+      if (typeof services.projectService?.readTree !== 'function') throw Error('ZCode 기존 App 프로젝트 세션 서비스 인터페이스 누락');
       const tree = await services.projectService.readTree({});
       if (tree == null) return { ready: false, stage: 'projects' };
-      if (!Array.isArray(tree.tasks)) throw Error('ZCode 原 App 的项目会话服务协议不兼容');
+      if (!Array.isArray(tree.tasks)) throw Error('ZCode 기존 App 프로젝트 세션 서비스 프로토콜이 호환되지 않습니다');
       const canCreate = typeof services.projectService.prepareSession === 'function' &&
         typeof services.projectService.readProjects === 'function' && hasModels;
       return { ready: true, ...(canCreate ? { canCreate: true } : {}) };
@@ -74,7 +74,7 @@ export async function nativeRequest(request, environment) {
       if (job) clearTimeout(job.timer);
       job = window[slot] = { id, agent };
       const stage = value => {
-        if (window[slot] !== job) throw Error('ZCode 原生启动观察已失效');
+        if (window[slot] !== job) throw Error('ZCode 기본 시작 관찰이 만료되었습니다.');
         job.stage = value;
         clearTimeout(job.timer);
         job.timer = setTimeout(() => { if (window[slot] === job) delete window[slot]; }, 180000);
@@ -88,7 +88,7 @@ export async function nativeRequest(request, environment) {
     try {
       await Promise.race([job.work, new Promise(resolve => { timer = setTimeout(resolve, 80); })]);
     } finally { clearTimeout(timer); }
-    if (window[slot] !== job) throw Error('ZCode 原生启动观察已失效');
+    if (window[slot] !== job) throw Error('ZCode 기본 시작 관찰이 만료되었습니다.');
     if (!job.reply && !job.error) return { ready: false, stage: job.stage };
     delete window[slot]; clearTimeout(job.timer);
     if (job.error) throw job.error;
@@ -99,7 +99,7 @@ export async function nativeRequest(request, environment) {
   const targetTask = tree => {
     const rows = tree.tasks.filter(row => row.taskId === request.sessionId && !row.deleted &&
       !row.archived && (!row.hostId || row.hostId === 'local'));
-    if (rows.length !== 1) throw Error('原 App 中找不到唯一的本机会话，请刷新列表');
+    if (rows.length !== 1) throw Error('기존 App 고유한 로컬 세션을 찾을 수 없습니다. 목록을 새로 고치십시오.');
     return rows[0];
   };
   const listTasks = (tree, snapshotFor) => ({ sessions: tree.tasks.filter(row => !row.deleted && (!row.hostId || row.hostId === 'local'))
@@ -112,12 +112,12 @@ export async function nativeRequest(request, environment) {
   if (request.action === 'rename') {
     const title = request.body?.title;
     if (typeof title !== 'string' || !title.trim() || [...title.trim()].length > 120 || /[\u0000-\u001f\u007f]/u.test(title))
-      throw Error('标题为 1–120 字，不能包含控制字符');
+      throw Error('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.');
     if (typeof services.zcodeTaskService?.renameTask !== 'function')
-      return { notSent: true, message: '原 App 未提供已验证的原生改名接口' };
+      return { notSent: true, message: '기존 App 확인된 기본 이름 바꾸기 인터페이스가 제공되지 않습니다.' };
     const before = targetTask(await services.projectService.readTree({}));
     if (before.workspacePath !== request.workspace)
-      return { notSent: true, message: '原会话工作目录已变化，未执行改名' };
+      return { notSent: true, message: '원래 세션 작업 디렉터리가 변경되었으며 이름 변경이 수행되지 않았습니다.' };
     checkDeadline();
     const renamed = await services.zcodeTaskService.renameTask({ taskId: request.sessionId,
       workspacePath: request.workspace, title: title.trim() });
@@ -126,7 +126,7 @@ export async function nativeRequest(request, environment) {
     const after = targetTask(await services.projectService.readTree({}));
     if (renamed?.taskId !== request.sessionId || renamed.workspacePath !== before.workspacePath ||
         renamed.title !== title.trim() || after.title !== title.trim() || after.workspacePath !== before.workspacePath)
-      throw Error('改名结果待核对，请检查原客户端；不会重复提交');
+      throw Error('이름 변경 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요. 중복 제출은 되지 않습니다');
     return { status: 'confirmed', scope: 'native', result: { id: request.sessionId, title: title.trim() } };
   }
   if (['projects', 'target'].includes(request.action) || request.action === 'list' && !request.sessionId) {
@@ -149,7 +149,7 @@ export async function nativeRequest(request, environment) {
       provider, name: profile.name || profile.displayName || profile.email || 'ZCode', email: profile.email || '' };
   };
   const models = async (knownView) => {
-    if (!hasModels) throw Error('ZCode 原 App 未提供模型目录');
+    if (!hasModels) throw Error('ZCode 기존 App 제공된 모델 디렉터리가 없습니다.');
     const view = knownView || await services.modelSelectionService.getView();
     return view.providers.flatMap(provider => provider.models.filter(model => model.config.enabled !== false).map(model => ({
       id: provider.providerId + '/' + model.modelId, name: model.modelId + ' · ' + provider.providerName,
@@ -168,20 +168,20 @@ export async function nativeRequest(request, environment) {
     const body = request.body || {};
     if (Object.keys(body).some(key => key !== 'refresh') ||
         body.refresh !== undefined && typeof body.refresh !== 'boolean')
-      throw Error('ZCode 额度查询参数无效');
+      throw Error('ZCode 할당량 쿼리 매개변수가 잘못되었습니다.');
     const current = await account();
     if (!current.identity || !['zai', 'bigmodel'].includes(current.provider))
-      throw Error('请先在 ZCode 原 App 登录官方账号');
+      throw Error('먼저 부탁드립니다 ZCode 기존 App 공식 계정에 로그인');
     if (typeof services.providerSettingsService?.getView !== 'function' ||
         typeof services.usageStatsService?.getEntitlementSnapshot !== 'function')
-      throw Error('ZCode 原 App 未提供额度查询接口');
+      throw Error('ZCode 기존 App 할당량 쿼리 인터페이스가 제공되지 않습니다.');
     const providerId = 'account:' + current.provider + '-start-plan';
     const view = await services.providerSettingsService.getView();
     const selected = view?.providers?.find(row => row.providerId === providerId);
     const access = selected?.effectiveConfig?.access;
     if (access?.type !== 'zhipu-account' || access.accountType !== current.provider ||
         access.mode !== 'start-plan' || typeof access.entitled !== 'boolean')
-      throw Error('原 App 尚未确认当前账号的 Start Plan 连接');
+      throw Error('기존 App 현재 계좌가 아직 확인되지 않았습니다. Start Plan 연결');
     checkDeadline();
     const snapshot = await services.usageStatsService.getEntitlementSnapshot({
       preferredProviderId: providerId,
@@ -191,7 +191,7 @@ export async function nativeRequest(request, environment) {
     });
     const after = await account();
     if (after.identity !== current.identity || after.provider !== current.provider)
-      throw Error('ZCode 登录正在变化，请稍后重试');
+      throw Error('ZCode 로그인이 변경됩니다. 나중에 다시 시도해 주세요.');
     checkDeadline();
     return { account: after, quota: snapshot };
   }
@@ -289,35 +289,35 @@ export async function nativeRequest(request, environment) {
     const restores = window[key + 'Restores'] ||= new Map();
     let job = restores.get(sid);
     if (job && (job.ticket !== ticket || job.workspace !== workspace))
-      throw Error('此聊天有另一次接续，请等待其完成');
+      throw Error('이 채팅에는 다른 연결이 있습니다. 완료될 때까지 기다려 주세요.');
     const previous = states.get(sid);
     const verifyTarget = async () => {
       if (targetTask(await services.projectService.readTree({})).workspacePath !== workspace)
-        throw Error('原 App 会话或项目已变化，请刷新列表');
+        throw Error('기존 App 세션 또는 프로젝트가 변경되었습니다. 목록을 새로고침하세요.');
     };
     if (!job) {
-      if (observing && previous?.ticket !== ticket) throw Error('接续已失效，请重新连接');
+      if (observing && previous?.ticket !== ticket) throw Error('연결이 만료되었습니다. 다시 연결해 주세요.');
       await verifyTarget();
       const loaded = previous?.lease.store.getState();
       if (loaded?.status === 'live' && loaded.snapshot?.sessionId === sid) {
         const current = await identity();
         if (same(previous.binding, current)) return { binding: current, subscriptionId: loaded.subscriptionId };
       }
-      if (observing) throw Error('原 App 连接已变化，请重新接续');
+      if (observing) throw Error('기존 App 연결이 변경되었습니다. 다시 시도해 주세요.');
     }
     const client = ticket ? await clientIdentity() : null;
     checkDeadline();
     // Native acquire starts restoring the original workspace even from the home screen.
     if (!job) {
-      if (restores.has(sid)) throw Error('此聊天正在接续，请刷新状态');
-      if (ticket && restores.size >= 16) throw Error('正在接续的聊天较多，请稍后重试');
+      if (restores.has(sid)) throw Error('이 채팅은 계속됩니다. 상태를 새로고침해 주세요.');
+      if (ticket && restores.size >= 16) throw Error('진행 중인 채팅이 많습니다. 나중에 다시 시도해 주세요.');
       const workspaceLease = acquireWorkspace?.({ workspacePath: workspace }, agent);
       const existing = contexts.find(context => context.layer.entries.has('conversation/' + sid));
       const layer = workspaceLease?.layer || existing?.layer ||
         (window[key]?.binding?.runtime?.workspaceKey === workspace ? window[key].layer : null);
       let lease;
       try {
-        if (!layer || layer.disposed) throw Error('ZCode 原生连接入口不可用，请在应用管理中恢复接入');
+        if (!layer || layer.disposed) throw Error('ZCode 기본 연결 입구를 사용할 수 없습니다. 애플리케이션 관리에서 접근 권한을 복원하세요.');
         lease = layer.acquire(sid);
         if (lease.store.getState().status === 'error') void lease.store.retry();
       } catch (error) { lease?.release(); workspaceLease?.release(); throw error; }
@@ -352,10 +352,10 @@ export async function nativeRequest(request, environment) {
     try {
       if (ticket) {
         if (restores.get(sid) !== job || Date.now() >= job.until() || !same(job.client, client))
-          throw Error('原 App 连接或接续已失效，请重新连接');
+          throw Error('기존 App 연결 또는 연결에 실패했습니다. 다시 연결해 주세요.');
         job.lastSeen = Date.now(); job.track();
         const value = store.getState();
-        if (['error','closed'].includes(value.status)) throw Error(value.lastError || 'ZCode 原生聊天恢复失败');
+        if (['error','closed'].includes(value.status)) throw Error(value.lastError || 'ZCode 기본 채팅 복구 실패');
         if (value.status !== 'live' || !value.subscriptionId) return { status: 'pending', stage: 'restoring', progress: job.progress };
         await verifyTarget();
       } else if (store.getState().status !== 'live') await new Promise((resolve, reject) => {
@@ -363,9 +363,9 @@ export async function nativeRequest(request, environment) {
         const inspect = () => {
           const value = store.getState();
           if (value.status === 'live') finish();
-          else if (['error','closed'].includes(value.status)) finish(Error(value.lastError || 'ZCode 原生聊天恢复失败'));
+          else if (['error','closed'].includes(value.status)) finish(Error(value.lastError || 'ZCode 기본 채팅 복구 실패'));
         };
-        const timer = setTimeout(() => finish(Error('ZCode 原生聊天恢复超时，请重新连接')), Math.max(1, request.expiresAt - Date.now() - 250));
+        const timer = setTimeout(() => finish(Error('ZCode 기본 채팅 복구 시간이 초과되었습니다. 다시 연결하세요.')), Math.max(1, request.expiresAt - Date.now() - 250));
         const off = store.subscribe(inspect);
         inspect();
       });
@@ -374,7 +374,7 @@ export async function nativeRequest(request, environment) {
       const value = store.getState();
       if (value.status !== 'live' || value.snapshot?.sessionId !== sid ||
           ticket && (restores.get(sid) !== job || current.clientId !== client.clientId || current.connectionId !== client.connectionId))
-        throw Error('原 App 会话或连接已变化，请重新接续');
+        throw Error('기존 App 세션이나 연결이 변경되었습니다. 다시 시도해 주세요.');
       checkDeadline();
       previous?.lease.release(); previous?.workspaceLease?.release();
       const sessions = window[key]?.sessions || states;
@@ -394,33 +394,33 @@ export async function nativeRequest(request, environment) {
     // A bare draft is not a durable chat and cannot receive native goal/rename commands yet.
     const body = request.body;
     if (typeof body.firstMessage !== 'string' || !body.firstMessage.trim() || body.firstMessage.length > 100000)
-      throw Error('请输入首条消息');
+      throw Error('첫 번째 메시지를 입력하세요.');
     const sid = 'sess_' + body.id;
     let workspacePath = request.workspace, projectId = null;
     if (body.directoryProject || body.projectKey && body.projectKey !== request.workspace) {
       if (typeof acquireWorkspace !== 'function' ||
           typeof services.projectService?.prepareSession !== 'function' ||
           typeof services.projectService[body.directoryProject ? 'saveProject' : 'readProjects'] !== 'function')
-        throw Error('ZCode 原生多项目连接尚不可用');
+        throw Error('ZCode 기본 다중 프로젝트 연결은 아직 사용할 수 없습니다.');
       const project = body.directoryProject ? await services.projectService.saveProject({ hostId: 'local',
         roots: [body.directoryProject.cwd], reuseExistingRoot: true }) :
         (await services.projectService.readProjects({ hostId: 'local' })).find(row => row.id === body.projectKey && !row.deleted);
-      if (!project || project.hostId !== 'local') throw Error('原生项目已变化，请重新选择');
+      if (!project || project.hostId !== 'local') throw Error('원래 프로젝트가 변경되었습니다. 다시 선택하세요.');
       const prepared = await services.projectService.prepareSession({ projectId: project.id, hostId: 'local' });
       const expected = body.directoryProject?.cwd || project.roots.find(root => root.isPrimary)?.rootPath;
       if (prepared.workspacePath !== expected || prepared.projectId !== project.id || prepared.workspaceIdentity)
-        throw Error('原生项目目录已变化，请重新选择');
+        throw Error('원래 프로젝트 디렉터리가 변경되었습니다. 다시 선택하세요.');
       workspacePath = prepared.workspacePath; projectId = prepared.projectId;
     }
     let view;
     try { view = await services.modelSelectionService.getView(); } catch (error) { if (body.model === undefined) throw error; }
     const previous = anchor?.lease.store.getState();
     if (anchor && (previous.status !== 'live' || previous.snapshot?.sessionId !== request.sessionId))
-      throw Error('ZCode 原生会话连接尚未就绪');
+      throw Error('ZCode 기본 세션 연결이 아직 준비되지 않았습니다.');
     let selection;
     if (body.model !== undefined) {
       const slash = typeof body.model === 'string' ? body.model.indexOf('/') : -1;
-      if (slash < 1 || slash === body.model.length-1 || /[\s\x00-\x1f\x7f]/.test(body.model)) throw Error('请选择原 App 的完整 provider/model 标识');
+      if (slash < 1 || slash === body.model.length-1 || /[\s\x00-\x1f\x7f]/.test(body.model)) throw Error('원본을 선택해주세요 App 완전한 provider/model 심벌 마크');
       selection = { providerId: body.model.slice(0, slash), modelId: body.model.slice(slash + 1),
                     options: { reasoningLevel: body.effort } };
     } else if (previous) {
@@ -438,7 +438,7 @@ export async function nativeRequest(request, environment) {
     const thought = selection?.options?.reasoningLevel || levels.at(-1) || '';
     if ((!model && body.model === undefined) || model?.config.enabled === false ||
         levels.length && !levels.includes(thought) || thought && !/^[A-Za-z0-9_-]{1,64}$/.test(thought))
-      throw Error('请先在 ZCode 选择有效的模型和思考深度');
+      throw Error('먼저 부탁드립니다 ZCode 효과적인 모델을 선택하고 깊이 생각해 보세요.');
     if (!same(anchor ? await identity() : await clientIdentity(), current)) throw Error('ZCode owner changed before create');
     checkDeadline();
     const ack = await agent.sendConversationCommandV4({ workspacePath, projectId,
@@ -447,13 +447,13 @@ export async function nativeRequest(request, environment) {
           config: { provider: selection.providerId, model: selection.modelId, thought, mode: 'build' },
           firstInput: { text: body.firstMessage, modelSelection: { providerId: selection.providerId, modelId: selection.modelId, options: { reasoningLevel: thought } }, mode: 'build', planEnabled: false } }, issuedAt: Date.now() } });
     if (ack.status !== 'accepted' || ack.result?.sessionId !== sid)
-      return { status: ack.status === 'accepted' ? 'unknown' : ack.status, message: ack.message || '原生创建结果待核对，请查看 ZCode 会话列表；不会自动重试', nativeAck: ack };
+      return { status: ack.status === 'accepted' ? 'unknown' : ack.status, message: ack.message || '네이티브 생성 결과를 확인해야 합니다. 확인하세요. ZCode 세션 목록; 자동 재시도 없음', nativeAck: ack };
     let notice, binding, workspaceLease;
     try {
       binding = await identity(workspacePath, sid);
       workspaceLease = acquireWorkspace?.({ workspacePath }, agent);
       const layer = workspaceLease?.layer || (workspacePath === request.workspace ? anchor?.layer : null);
-      if (!layer || layer.disposed) throw Error('原生会话已创建，请点击继续会话完成接入');
+      if (!layer || layer.disposed) throw Error('기본 세션이 생성되었습니다. 세션 계속을 클릭하여 액세스를 완료하세요.');
       const lease = layer.acquire(sid);
       const created = { binding, sessionId: sid, lease, layer, workspaceLease, sessions: states };
       states.set(sid, created);
@@ -463,7 +463,7 @@ export async function nativeRequest(request, environment) {
       ...(notice ? { message: notice } : {}) };
   };
   if (request.action === 'create' && !request.sessionId) {
-    if (!request.body?.projectKey) throw Error('请选择 ZCode 项目');
+    if (!request.body?.projectKey) throw Error('선택해주세요 ZCode 프로젝트');
     return create(await clientIdentity(true), null);
   }
   const current = await identity();
@@ -503,7 +503,7 @@ export async function nativeRequest(request, environment) {
   }
   const projection = state.lease.store.getState();
   if (!projection.snapshot || projection.status !== 'live')
-    throw Error('ZCode 原生会话连接尚未就绪，请在原 App 核对后重新连接');
+    throw Error('ZCode 기본 세션 연결이 아직 준비되지 않았습니다. App 확인하고 다시 연결하세요');
   const before = projection.snapshot;
   if (before.sessionId !== request.sessionId) throw Error('Wrong native snapshot');
   if (request.action === 'create') return create(current, state);
@@ -520,9 +520,9 @@ export async function nativeRequest(request, environment) {
   })) };
   const body = request.body || {};
   const skills = async () => {
-    if (!hasSkills) throw Error('ZCode 原 App 未提供 Skill 目录');
+    if (!hasSkills) throw Error('ZCode 기존 App 제공되지 않음 Skill 폴더');
     const catalog = await agent.getSkillReferenceCatalog({ ...target, runtimePolicy: 'existing-only' });
-    if (catalog.authority !== 'session') throw Error('ZCode 会话 Skill 目录尚未就绪');
+    if (catalog.authority !== 'session') throw Error('ZCode 대화 Skill 디렉터리가 아직 준비되지 않았습니다.');
     return catalog.skills.filter(skill => skill.enabled).map(skill => ({
       id: skill.id, name: skill.name, description: skill.description, path: skill.path, selectable: true,
     }));
@@ -546,14 +546,14 @@ export async function nativeRequest(request, environment) {
     if (body.plugins?.length) {
       const catalog = await skills();
       const selected = body.plugins.map(id => catalog.find(skill => skill.id === id));
-      if (selected.some(skill => !skill)) throw Error('所选 Skill 已变化，请重新选择');
+      if (selected.some(skill => !skill)) throw Error('선택된 Skill 변경되었습니다. 다시 선택해 주세요.');
       // Same native mention representation as ZCode's composer; no copied skill body.
       const label = text => text.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]');
       const destination = text => text.replaceAll('\\', '\\\\').replaceAll('>', '\\>');
       payload.text = selected.map(skill => '[' + label('$' + skill.name) + '](' + destination(skill.path) + ')').join('\n') + '\n\n' + body.text;
     }
     const attachments = [];
-    if (body.files?.length && !hasAttachments) throw Error('ZCode 原 App 未提供完整的附件上传接口');
+    if (body.files?.length && !hasAttachments) throw Error('ZCode 기존 App 완전한 첨부 파일 업로드 인터페이스가 제공되지 않습니다.');
     for (const file of body.files || []) {
       checkDeadline();
       const uploadId = crypto.randomUUID();
@@ -586,50 +586,50 @@ export async function nativeRequest(request, environment) {
     const edit = request.action === 'edit-message', target = body.target;
     const row = before.rows.window.find(row => row.rowId === target?.rowId && row.entityId === target?.entityId);
     if (target?.logEpoch !== before.logEpoch || !row || row.kind !== (edit ? 'userInput' : 'assistantText') ||
-        row.actions?.[edit ? 'canEdit' : 'canFork'] !== true) throw Error('消息已变化或不支持此操作，请刷新后重新选择');
-    if (edit && (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 100000)) throw Error('请输入 1–100000 字的消息');
+        row.actions?.[edit ? 'canEdit' : 'canFork'] !== true) throw Error('메시지가 변경되었거나 이 작업이 지원되지 않습니다. 새로고침한 후 다시 선택하세요.');
+    if (edit && (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 100000)) throw Error('입력해주세요 1–100000 단어 메시지');
     type = edit ? 'editUserQuery' : 'forkAssistant';
     payload = { target: { rowId: row.rowId, entityId: row.entityId }, ...(edit ? {
       newText: body.text, workspaceMode: 'preserve', ...(row.attachments?.length ? { attachments: row.attachments } : {}),
     } : {}) };
   } else if (request.action === 'compact') {
     if (before.availability?.compact?.allowed !== true || before.control.activeWorks.length ||
-        before.pendingInteractions.length || before.queue.items.length) throw Error('请等待当前任务和队列结束后再压缩上下文');
+        before.pendingInteractions.length || before.queue.items.length) throw Error('컨텍스트를 압축하기 전에 현재 작업과 대기열이 끝날 때까지 기다리십시오.');
     type = 'compact'; payload = {};
   } else if (request.action === 'stop-task') {
     const work = before.backgroundWorks?.find(work => work.workId === body.taskId);
-    if (!work || work.status !== 'running' || work.cancellable !== true) throw Error('后台任务已结束或不支持独立停止');
+    if (!work || work.status !== 'running' || work.cancellable !== true) throw Error('백그라운드 작업이 종료되었거나 독립적인 중지가 지원되지 않습니다.');
     type = 'cancelBackgroundWork'; payload = { workId: work.workId };
   } else if (request.action === 'access') {
     if (!['build','guarded','yolo'].includes(before.config.mode) || !['build','guarded','yolo'].includes(body.mode) ||
-        (body.mode === 'yolo' && body.confirmed !== true)) throw Error('请确认本次权限切换');
+        (body.mode === 'yolo' && body.confirmed !== true)) throw Error('이 권한 스위치를 확인해 주세요.');
     if (before.config.mode === body.mode) return { status: 'accepted' };
     if (before.control.activeWorks.length || before.pendingInteractions.length || before.queue.items.length || before.config.planEnabled)
-      throw Error('请先结束当前任务并退出计划模式');
+      throw Error('현재 작업을 종료하고 먼저 계획 모드를 종료하십시오.');
     type = 'switchCollaborationMode'; payload = { mode: body.mode };
   } else if (request.action === 'work-mode') {
-    if (!['default', 'plan'].includes(body.mode)) throw Error('工作模式无效');
+    if (!['default', 'plan'].includes(body.mode)) throw Error('잘못된 작업 모드');
     const planning = before.config.planEnabled || before.config.mode === 'plan';
     if (planning === (body.mode === 'plan')) return { status: 'accepted' };
     if (before.control.activeWorks.length || before.pendingInteractions.length || before.queue.items.length)
-      throw Error('请等待当前任务结束后再切换模式');
+      throw Error('모드를 전환하기 전에 현재 작업이 끝날 때까지 기다리십시오.');
     type = 'switchCollaborationMode';
     payload = { mode: body.mode === 'plan' ? 'plan' : (['guarded','yolo'].includes(before.config.mode) ? before.config.mode : 'build') };
   } else if (request.action === 'goal') {
-    if (!['set', 'pause', 'resume', 'clear'].includes(body.operation)) throw Error('目标操作无效');
+    if (!['set', 'pause', 'resume', 'clear'].includes(body.operation)) throw Error('잘못된 대상 작업');
     if (body.operation !== 'set' && (!before.goal || body.expected?.goalId !== before.goal.targetId ||
-        body.expected?.objective !== before.goal.objective)) throw Error('目标已变化，请刷新后操作');
+        body.expected?.objective !== before.goal.objective)) throw Error('대상이 변경되었습니다. 새로고침 후 진행해주세요.');
     if (['set', 'resume'].includes(body.operation) && (before.control.activeWorks.length || before.pendingInteractions.length ||
         before.queue.items.length || before.config.planEnabled || before.config.mode === 'plan'))
-      throw Error('请结束当前任务并退出计划模式后再开启目标');
+      throw Error('대상을 열기 전에 현재 작업을 종료하고 계획 모드를 종료하십시오.');
     if (body.operation === 'set') {
-      if (before.goal && before.goal.status !== 'verified') throw Error('请先关闭当前目标');
+      if (before.goal && before.goal.status !== 'verified') throw Error('먼저 현재 대상을 닫으세요.');
       type = 'sendGoalCommand'; payload = { text: body.objective };
     } else if (body.operation === 'clear') {
       // Use the App's structured native goal operation; never send a slash prompt.
       if (!same(await identity(), current)) throw Error('ZCode owner changed before dispatch');
       const latest = await read();
-      if (latest.session.target?.targetId !== before.goal.targetId) throw Error('目标已变化，请刷新后操作');
+      if (latest.session.target?.targetId !== before.goal.targetId) throw Error('대상이 변경되었습니다. 새로고침 후 진행해주세요.');
       checkDeadline();
       await services.zcodeTaskService.goalSession({ taskId: request.sessionId, workspacePath: request.workspace,
         inputId: body.id, action: 'clear', expectedRevision: latest.runtime.stateRevision });
@@ -637,15 +637,15 @@ export async function nativeRequest(request, environment) {
     } else { type = body.operation === 'pause' ? 'pauseGoal' : 'resumeGoal'; payload = {}; }
   } else if (request.action === 'settings') {
     if (before.control.activeWorks.length || before.pendingInteractions.length || before.queue.items.length)
-      throw Error('请等待当前任务结束后再切换模型');
+      throw Error('모델을 전환하기 전에 현재 작업이 끝날 때까지 기다리십시오.');
     const slash = typeof body.model === 'string' ? body.model.indexOf('/') : -1;
     if (slash < 1 || slash === body.model.length-1 || /[\s\x00-\x1f\x7f]/.test(body.model))
-      throw Error('请选择原 App 的完整 provider/model 标识');
+      throw Error('원본을 선택해주세요 App 완전한 provider/model 심벌 마크');
     let rows = [];
     try { rows = await models(); } catch { /* Discovery failure does not replace an explicit native selection. */ }
     const row = rows.find(model => model.id === body.model);
     if (body.effort && (!/^[A-Za-z0-9_-]{1,64}$/.test(body.effort) || row?.efforts.length && !row.efforts.includes(body.effort)))
-      throw Error('请选择原 App 当前提供的思考深度');
+      throw Error('원본을 선택해주세요 App 현재 제공되는 사고의 깊이');
     type = 'switchModelConfig'; payload = { provider: body.model.slice(0, slash), model: body.model.slice(slash+1), thought: body.effort || '' };
   } else if (request.action === 'stop') {
     if (!body.executionId || !before.control.canStop ||

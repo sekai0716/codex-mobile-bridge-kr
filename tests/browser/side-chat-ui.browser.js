@@ -17,7 +17,7 @@ async function runSideChatTests(){
    if(body?.action==='create-temporary'){temporary=true;return{id:temporaryId,host:'local',temporary:true,parentId:parent};}
    if(body?.action==='close'){check(body.id===temporaryId,'Ending is scoped to the temporary child');temporary=false;wb.current=null;return{closed:true};}
    if(body){if(failCreation){failCreation=false;throw Error('Response lost');}return{id:child,host:'local',parentId:parent};}
-   return{parentId:parent,chats:[...(temporary?[{id:temporaryId,host:'local',title:'临时侧边聊天',temporary:true}]:[]),{id:child,host:'local',title:'原生侧边聊天',attachedParentId:parent,archived:false},{id:'archived-child',host:'local',title:'已归档的侧边聊天',archived:true}]};
+   return{parentId:parent,chats:[...(temporary?[{id:temporaryId,host:'local',title:'임시 사이드 채팅',temporary:true}]:[]),{id:child,host:'local',title:'네이티브 사이드 채팅',attachedParentId:parent,archived:false},{id:'archived-child',host:'local',title:'보관된 사이드 채팅',archived:true}]};
   };
   document.querySelector('#message').value='parent draft';
   wb.sideChat();let panel=wb.current.files.find(t=>t.id==='sidechat').sideChat;
@@ -26,7 +26,7 @@ async function runSideChatTests(){
   check(!panel.tab.body.querySelector('textarea,form'),'Directory does not maintain a duplicate chat stack');
   panel.list.querySelector('button').click();
   check(opened[0].id===child&&opened[0].host==='local','Selecting a child enters the standard full chat route with its native identity');
-  panel.list.querySelector('[aria-label="聊天菜单"]').click();
+  panel.list.querySelector('[aria-label="채팅 메뉴"]').click();
   check(menus[0].id===child&&menus[0].attachedParentId===parent,'Child lifecycle uses the shared native session menu');
   await panel.create();await panel.create();
   const writes=calls.filter(call=>call.body);
@@ -40,7 +40,7 @@ async function runSideChatTests(){
   wb.sideChat();panel=wb.current.files.find(t=>t.id==='sidechat').sideChat;await wait(()=>panel.chats);
   check(panel.chats[0].id===child,'Reopening discovers the same persistent child');
   await wb.close('sidechat');
-  wb.open(child,'local',{rootId:parent,title:'原生侧边聊天'});
+  wb.open(child,'local',{rootId:parent,title:'네이티브 사이드 채팅'});
   check(wb.current.id===parent&&wb.current.chatId===child,'Native child retains the parent workspace');
   wb.tabs.querySelector('[data-tab="chat"] button').click();
   await wb.close('child:'+child);
@@ -50,7 +50,7 @@ async function runSideChatTests(){
   panel=wb.current.files.find(t=>t.id==='sidechat').sideChat;
   await panel.create(true);
   check(opened.at(-1).id===temporaryId,'Temporary child uses the same normal chat navigation');
-  check(!!panel.list.querySelector('[aria-label="结束临时侧聊"]'),'Temporary lifecycle is explicit');
+  check(!!panel.list.querySelector('[aria-label="일상적인 채팅 종료"]'),'Temporary lifecycle is explicit');
   window.confirm=()=>true;
   let cleaned=false;
   wb.temporaryCleanup=(id,host)=>{check(id===temporaryId&&host==='local','Cleanup captures original identity before close');return()=>{cleaned=true;};};

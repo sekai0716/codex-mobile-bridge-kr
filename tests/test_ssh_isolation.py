@@ -25,7 +25,7 @@ class SshIsolationTests(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 5)
 
     def test_file_input_preserves_utf8_and_binary_output(self):
-        value = '项目 / 空格\n'
+        value = '프로젝트 / 공간\n'
         result = run_with_input([sys.executable, '-c',
             'import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())'], value,
             timeout=5, capture_output=True)
@@ -143,7 +143,7 @@ class SshIsolationTests(unittest.TestCase):
         self.assertEqual([(row['host'], row['cwd']) for row in rows], [('ssh', '/fixture/remote')])
         bridge.for_host.assert_called_once_with('ssh')
         remote.list.assert_called_once_with(limit=500)
-        with self.assertRaisesRegex(ValueError, '项目环境不存在'):
+        with self.assertRaisesRegex(ValueError, '프로젝트 환경이 존재하지 않습니다.'):
             bridge.projects(host='unknown')
 
     def test_manual_retry_bypasses_backoff_and_coalesces(self):

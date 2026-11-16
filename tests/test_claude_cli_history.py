@@ -149,10 +149,10 @@ class ClaudeCliHistory(unittest.TestCase):
         with self.path.open('a') as target:
             target.write(json.dumps({'type': 'assistant', 'uuid': 'new', 'cwd': str(self.root),
                                      'message': {'role': 'assistant', 'content': 'new'}}) + '\n')
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ 기록이\\ 변경되었습니다\\.\\ 최근\\ 기록을\\ 다시\\ 로드하세요\\."):
             self.cli.call('detail', self.sid, {'historyBefore': cursor})
         self.write(60)
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ 기록이\\ 변경되었습니다\\.\\ 최근\\ 기록을\\ 다시\\ 로드하세요\\."):
             self.cli.call('detail', self.sid, {'historyBefore': cursor})
 
     def test_unknown_permission_stays_unknown_outside_recent_page(self):
@@ -161,7 +161,7 @@ class ClaudeCliHistory(unittest.TestCase):
         self.path.write_text(raw)
         result = self.cli.call('detail', self.sid, {})
         self.assertFalse(result['capabilities']['resume'])
-        self.assertIn('权限模式', result['notice'])
+        self.assertIn('권한 모드', result['notice'])
 
     def test_old_permission_metadata_is_not_lost_when_recent_page_excludes_it(self):
         self.write(200)
@@ -175,7 +175,7 @@ class ClaudeCliHistory(unittest.TestCase):
         self.write(80)
         cursor = self.cli.call('detail', self.sid, {})['history']['before']
         from bridge.clients.claude.history import page
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ 기록이\\ 변경되었습니다\\.\\ 최근\\ 기록을\\ 다시\\ 로드하세요\\."):
             page(self.path, 'different-session', cursor)
 
     def test_long_log_still_lists_and_recent_page_is_bounded(self):
@@ -225,7 +225,7 @@ class ClaudeCliHistory(unittest.TestCase):
         data = self.path.read_bytes().replace(b'a70', b'z70')
         self.path.write_bytes(data)
         os.utime(self.path, ns=(original.st_atime_ns, original.st_mtime_ns))
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ 기록이\\ 변경되었습니다\\.\\ 최근\\ 기록을\\ 다시\\ 로드하세요\\."):
             self.cli.call('detail', self.sid, {'historyBefore': cursor})
 
     def test_replacement_during_open_is_not_returned_as_current_history(self):
@@ -246,7 +246,7 @@ class ClaudeCliHistory(unittest.TestCase):
                 return original_open(old, *args, **kwargs)
             return original_open(path, *args, **kwargs)
         with patch.object(Path, 'open', replace_after_open):
-            with self.assertRaisesRegex(ValueError, '发生变化'):
+            with self.assertRaisesRegex(ValueError, "Claude\\ 기록을\\ 읽는\\ 동안\\ 변경사항이\\ 발생했습니다\\."):
                 page(self.path, self.sid)
 
     def test_same_size_mtime_rollback_refreshes_cached_metadata(self):

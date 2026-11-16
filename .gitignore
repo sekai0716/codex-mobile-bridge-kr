@@ -1,16 +1,16 @@
-# 本机运行数据、登录凭据、聊天快照与下载的外部程序
+# 기본 운영 데이터, 로그인 자격 증명, 채팅 스냅샷 및 다운로드한 외부 프로그램
 .local/
 .tmp/
 .env
 .env.*
 !.env.example
 
-# Python 和系统文件
+# Python 및 시스템 파일
 __pycache__/
 *.py[cod]
 .DS_Store
 
-# 本地开发记录，不作为项目文档发布
+# 프로젝트 문서로 게시되지 않은 지역 개발 기록
 /task_plan.md
 /findings.md
 /progress.md

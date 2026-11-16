@@ -40,7 +40,7 @@ class QuotaTests(unittest.TestCase):
         event = {'providerId': 'account:'+provider+'-start-plan', 'success': True, 'payload': {'data': data, 'code': 0},
                  'url': 'https://zcode.z.ai/api/v1/zcode-plan/billing/balance?app_version=3.17.2'}
         text = (f'[{self.date_text}] [info] [pid:123] [main] [host-log] ({host}) [host] '
-                f'[{self.date_text}] [pid:234] [usage-stats] billing/balance 请求完成 ')
+                f'[{self.date_text}] [pid:234] [usage-stats] billing/balance 요청 완료 ')
         self.path.write_text(text+json.dumps(event)+'\n', encoding='utf-8')
 
     def details(self):
@@ -55,7 +55,7 @@ class QuotaTests(unittest.TestCase):
         self.assertEqual([(b['name'], b['windows'][0]['remaining']) for b in usage['limits']],
                          [('GLM-5.3', 0), ('GLM-5.3-Flash', 750)])
         self.assertNotIn('enc:v1', json.dumps(self.store.public()))
-        with self.assertRaisesRegex(ValueError, '仅支持查看当前'):
+        with self.assertRaisesRegex(ValueError, "현재\\ ZCode\\ 계정의\\ 할당량만\\ 사용할\\ 수\\ 있습니다\\."):
             self.store.details('inactive', True)
 
     def test_new_login_remote_host_wrong_family_and_expired_bucket_hide_receipts(self):
@@ -87,7 +87,7 @@ class QuotaTests(unittest.TestCase):
             self.credentials.write_text(json.dumps({**self.login, 'oauth:zai:user_info': 'enc:v1:another'}))
             return result
         with patch.object(quota, 'regular', same_tick), patch.object(quota, 'latest', switched), \
-                self.assertRaisesRegex(ValueError, '正在变化'):
+                self.assertRaisesRegex(ValueError, "ZCode\\ 로그인이\\ 변경됩니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\."):
             self.details()
         self.assertIsNone(self.store.quota_cache)
 
@@ -190,7 +190,7 @@ class NativeQuotaTests(unittest.TestCase):
             self.current['identity'] = 'b'*64
             return {'account': old, 'quota': self.snapshot}
         self.store.quota_reader = switch
-        with self.assertRaisesRegex(ValueError, '登录正在变化'):
+        with self.assertRaisesRegex(ValueError, '로그인이 변경됩니다'):
             self.store.details('current', True)
         self.assertIsNone(self.store.quota_cache)
 
@@ -201,17 +201,17 @@ class NativeQuotaTests(unittest.TestCase):
             self.current['identity'] = 'b'*64
             raise ValueError('upstream failed after switch')
         self.store.quota_reader = changed
-        with self.assertRaisesRegex(ValueError, '登录正在变化'):
+        with self.assertRaisesRegex(ValueError, '로그인이 변경됩니다'):
             self.store.details('current', True)
         self.assertIsNone(self.store.quota_cache)
         self.store.quota_reader = lambda _refresh: {'account': {**self.current, 'identity': 'a'*64}, 'quota': self.snapshot}
-        with self.assertRaisesRegex(ValueError, '登录正在变化'):
+        with self.assertRaisesRegex(ValueError, '로그인이 변경됩니다'):
             self.store.public()
         self.assertIsNone(self.store.quota_cache)
 
     def test_native_parser_requires_selected_family_daily_tokens_and_actual_remaining(self):
         wrong = {**self.snapshot, 'provider': {'id': 'account:bigmodel-start-plan'}}
-        with self.assertRaisesRegex(ValueError, '当前官方账号'):
+        with self.assertRaisesRegex(ValueError, '현재 공식 계정'):
             quota.native_snapshot(wrong, 'zai', self.now)
         self.snapshot['quota']['limits'][0]['period'] = 'one_time'
         self.snapshot['quota']['limits'][1]['remaining'] = 0

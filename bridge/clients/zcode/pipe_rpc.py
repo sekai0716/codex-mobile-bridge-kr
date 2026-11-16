@@ -162,7 +162,7 @@ class PipeTransport:
                 continue
             if reply.get("error"):
                 if method == "Browser.close" and reply["error"].get("code") == -32601:
-                    raise QuitUnsupported("ZCode 没有提供原生退出命令")
+                    raise QuitUnsupported("ZCode 기본 종료 명령이 제공되지 않습니다.")
                 raise ValueError("ZCode DevTools: " + str(reply["error"].get("message"))[:400])
             return reply["result"]
 
@@ -177,12 +177,12 @@ class PipeTransport:
         if not matches and request["action"] == "application":
             return {"ready": False, "stage": "window"}
         if len(matches) != 1 or not matches[0].get("targetId"):
-            raise ValueError("原 ZCode 窗口尚未就绪或无法唯一定位")
+            raise ValueError("기존 ZCode 창이 준비되지 않았거나 고유하게 위치를 지정할 수 없습니다.")
         session = self._rpc(
             "Target.attachToTarget", {"targetId": matches[0]["targetId"], "flatten": True}, deadline
         )["sessionId"]
         if not isinstance(session, str) or not session:
-            raise ValueError("原 ZCode 窗口没有返回调试会话")
+            raise ValueError("기존 ZCode 창이 디버깅 세션을 반환하지 않습니다.")
 
         def page(method, params):
             if method == "Runtime.evaluate":
@@ -192,7 +192,7 @@ class PipeTransport:
                     **params,
                     "expression": '(() => { if (location.href.split("?")[0].split("#")[0] !== '
                     + guard
-                    + ') throw Error("原窗口地址已变化"); return '
+                    + ') throw Error("원래 창 주소가 변경되었습니다."); return '
                     + value
                     + "; })()",
                 }
@@ -221,7 +221,7 @@ class PipeTransport:
 
     def call(self, request):
         if not isinstance(request, dict) or request.get("action") not in ACTIONS:
-            raise ValueError("未知的 ZCode 原生操作")
+            raise ValueError("알려지지 않은 ZCode 기본 작동")
         now = time.time()
         limit = operation_timeout(request["action"])
         expiry = request.get("expiresAt", int((now + limit) * 1000))
@@ -246,7 +246,7 @@ class PipeTransport:
         # Called only through the separately authorized lifecycle operation.
         deadline = time.monotonic() + 5
         if not self._lock.acquire(timeout=remaining(deadline)):
-            raise TimeoutError("ZCode 管道正忙，未提交退出")
+            raise TimeoutError("ZCode 파이프라인이 사용 중이어서 제출하지 않고 종료되었습니다.")
         try:
             self._rpc("Browser.close", {}, deadline)
         finally:
@@ -255,5 +255,5 @@ class PipeTransport:
     def probe(self):
         value = self.call({"action": "application"})
         if not isinstance(value, dict) or value.get("ready") is not True:
-            raise ValueError("ZCode 原 App 会话服务尚未就绪")
+            raise ValueError("ZCode 기존 App 세션 서비스가 아직 준비되지 않았습니다.")
         return value

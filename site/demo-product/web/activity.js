@@ -16,9 +16,9 @@ class SessionActivity {
   read(key){if(this.rows[key]){this.rows[key].pending=null;this.save();}}
   indicator(key){
     const row=this.rows[key];if(!row)return null;
-    if(row.offline)return {kind:'unknown',label:'运行状态暂不可用'};
-    if(row.status==='active')return {kind:row.offline?'unknown':'running',label:row.offline?'运行状态暂不可用':'运行中'};
-    if(row.pending)return {kind:row.turnStatus==='completed'?'completed':'ended',label:row.turnStatus==='completed'?'已完成，未查看':row.turnStatus==='failed'?'运行失败，未查看':'已停止，未查看'};
+    if(row.offline)return {kind:'unknown',label:'실행 상태를 일시적으로 사용할 수 없습니다.'};
+    if(row.status==='active')return {kind:row.offline?'unknown':'running',label:row.offline?'실행 상태를 일시적으로 사용할 수 없습니다.':"실행 중"};
+    if(row.pending)return {kind:row.turnStatus==='completed'?'completed':'ended',label:row.turnStatus==='completed'?"완료됨, 읽지 않음":row.turnStatus==='failed'?"실행 실패, 읽지 않음":"중지됨, 읽지 않음"};
     return null;
   }
   clear(){this.rows={};this.storage.removeItem(this.key);}

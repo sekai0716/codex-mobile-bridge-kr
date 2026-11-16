@@ -311,7 +311,7 @@ class Relay:
             raise ValueError('A bounded Content-Length is required')
         ws = self.devices.get(phone['device'])
         if ws is None:
-            return web.json_response({'error': '电脑离线，请保持 Codex 和电脑网关运行。', 'code': 'device_offline'}, status=503)
+            return web.json_response({'error': '컴퓨터가 오프라인 상태입니다. 계속 유지하세요. Codex 컴퓨터 게이트웨이로 실행。', 'code': 'device_offline'}, status=503)
         if len(self.pending) >= 64 or sum(i['device'] == phone['device'] for i in self.pending.values()) >= 12:
             raise web.HTTPTooManyRequests()
         if self.buffered + length > 128 * 1024 * 1024:
@@ -361,7 +361,7 @@ class Relay:
             return self.renew(request, web.Response(status=status, body=response, headers=headers), phone)
         except (asyncio.TimeoutError, ConnectionError, OSError):
             unknown = request.method == 'POST'
-            return web.json_response({'error': '连接中断，操作结果待确认，请先查看状态，勿重复提交。' if unknown else '电脑连接中断，请稍后刷新。',
+            return web.json_response({'error': '연결이 중단되었으며 작업 결과를 확인해야 합니다. 먼저 상태를 확인하신 후 다시 제출하지 마시기 바랍니다.。' if unknown else '컴퓨터 연결이 중단되었습니다. 나중에 새로고침하세요.。',
                                       'code': 'outcome_unknown' if unknown else 'device_offline'}, status=504 if unknown else 503)
         finally:
             self.pending.pop(identifier, None)

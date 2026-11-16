@@ -118,23 +118,23 @@ class ForecastTests(unittest.TestCase):
         opener = Mock()
         opener.open.side_effect = [response(payload(official_signal={'at': iso(NOW-60), 'url': url, 'summary': 'Source summary'})),
                                   response({'fetched_at': iso(NOW), 'stale': False, 'tweets': [
-                                      {'id': '456', 'text': 'Unrelated post', 'localized_text': '无关译文', 'translation_status': 'translated'},
-                                      {'id': '123', 'text': 'Original announcement', 'localized_text': '来源提供的译文', 'translation_status': 'translated'}]})]
+                                      {'id': '456', 'text': 'Unrelated post', 'localized_text': '관련 없는 번역', 'translation_status': 'translated'},
+                                      {'id': '123', 'text': 'Original announcement', 'localized_text': '출처에서 번역 제공', 'translation_status': 'translated'}]})]
         with patch('bridge.features.accounts.reset_forecast.build_opener', return_value=opener), patch('bridge.features.accounts.reset_forecast.time.time', return_value=NOW):
             forecast.request()
             forecast.worker.join(2)
             forecast.request()
             self.assertEqual(opener.open.call_count, 2)
             self.assertEqual(forecast.status()['officialSignal']['text'], 'Original announcement')
-            self.assertEqual(forecast.status()['officialSignal']['translation'], {'locale': 'zh', 'text': '来源提供的译文'})
+            self.assertEqual(forecast.status()['officialSignal']['translation'], {'locale': 'ko', 'text': '출처에서 번역 제공'})
             self.assertEqual(forecast.status()['officialSignal']['url'], url)
-            self.assertEqual(opener.open.call_args.args[0].full_url, SOURCE + 'api/feed?locale=zh')
+            self.assertEqual(opener.open.call_args.args[0].full_url, SOURCE + 'api/feed?locale=ko')
             self.assertEqual(opener.open.call_args.args[0].get_header('User-agent'), USER_AGENT)
         forecast.close()
 
     def test_missing_or_unfinished_translation_preserves_original_post(self):
         for translated, status in ((None, None), ('', 'translated'), ('  ', 'translated'),
-                                   ({'text': 'invalid'}, 'translated'), ('待翻译文本', 'pending'), ('失败文本', 'failed')):
+                                   ({'text': 'invalid'}, 'translated'), ('번역할 텍스트', 'pending'), ('실패 텍스트', 'failed')):
             response = Mock()
             response.__enter__ = Mock(return_value=response)
             response.__exit__ = Mock(return_value=False)
@@ -378,8 +378,8 @@ class GlobalReminderTests(unittest.TestCase):
             self.monitor.scan()
             self.monitor.scan()
             send.assert_called_once()
-            self.assertEqual(send.call_args.args[1], 'Codex 重置预告动态')
-            self.assertIn('第三方来源', send.call_args.args[2])
+            self.assertEqual(send.call_args.args[1], 'Codex 미리보기 역학 재설정')
+            self.assertIn("타사 소스에 재설정 미리보기가 포함되어 있지만 아직 완료되었는지 확인되지 않았습니다.。\n데이터：", send.call_args.args[2])
 
     def test_stale_data_and_disabled_notifications_are_silent(self):
         with patch('bridge.features.accounts.monitor.time.time', return_value=NOW):
@@ -403,7 +403,7 @@ class GlobalReminderTests(unittest.TestCase):
             self.monitor.scan()
             value.update(officialSignal=None, lastResetAt=NOW+2)
             self.monitor.scan()
-            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 重置预告动态', 'Codex 重置动态'])
+            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 미리보기 역학 재설정', 'Codex 활동 재설정'])
         self.monitor.configure({'globalResetSignal': False})
         self.assertFalse(self.monitor.preferences['globalReset'])
         self.assertFalse(self.monitor.preferences['globalResetSignal'])

@@ -13,8 +13,8 @@
 (function () {
   var resources = new Map(), groups = new Map(), resourceNodes = new Map(), backgroundGroups = new Map(), prefetchScheduled = false;
   function unavailable(slow) {
-    var zh = slow ? '组件加载时间较长，请重试' : '组件暂不可用，请重试';
-    return new Error(typeof BridgeI18n !== 'undefined' ? BridgeI18n.t(zh) : slow ? 'Component is taking too long to load. Please retry.' : 'Component unavailable. Please retry.');
+    var ko = slow ? '구성요소를 로드하는 데 너무 오랜 시간이 걸립니다. 다시 시도해 주세요.' : '구성요소를 사용할 수 없습니다. 다시 시도해 주세요.';
+    return new Error(typeof BridgeI18n !== 'undefined' ? BridgeI18n.t(ko) : slow ? 'Component is taking too long to load. Please retry.' : 'Component unavailable. Please retry.');
   }
   function resource(placeholder, background) {
     if (resources.has(placeholder)) return resources.get(placeholder);
@@ -98,7 +98,7 @@
   var english = false;
   try { english = localStorage.getItem('bridge-language') === 'en'; } catch (_) {}
   if (/(?:^|[?&])lang=en(?:&|$)/.test(location.search)) english = true;
-  function text(zh, en) { return english ? en : zh; }
+  function text(ko, en) { return english ? en : ko; }
   function assetPath(value) {
     // Never display a query, pairing fragment, origin or arbitrary error text.
     var path = String(value || '').split(/[?#]/)[0].replace(/^https?:\/\/[^/]+/i, '');
@@ -159,14 +159,14 @@
     if (typeof Object.fromEntries !== 'function') missing.push('Object.fromEntries');
     if (typeof Object.hasOwn !== 'function') missing.push('Object.hasOwn');
     if (typeof Element !== 'undefined' && typeof Element.prototype.replaceChildren !== 'function') missing.push('replaceChildren');
-    var lines = [text('启动诊断', 'Startup diagnostics'),
-      text('阶段：', 'Phase: ') + phase + ' / ' + Math.round((Date.now() - started) / 1000) + 's'];
-    if (lastFailure) lines.push(text('错误：', 'Error: ') + lastFailure.kind +
+    var lines = [text('진단 시작', 'Startup diagnostics'),
+      text('단계：', 'Phase: ') + phase + ' / ' + Math.round((Date.now() - started) / 1000) + 's'];
+    if (lastFailure) lines.push(text('실수：', 'Error: ') + lastFailure.kind +
       (lastFailure.path ? ' @ ' + lastFailure.path : '') + (lastFailure.line ? ':' + lastFailure.line : ''));
-    if (lastFailure && lastFailure.attempts) lines.push(text('资源尝试：', 'Resource attempts: ') + lastFailure.attempts + ' / 3');
-    if (lastUnattributed) lines.push(text('未归属错误（未中断启动）：', 'Unattributed error (startup continued): ') + lastUnattributed.kind + ' / ' + lastUnattributed.event);
-    if (pendingResources.length) lines.push(text('等待资源：', 'Waiting for: ') + pendingResources.map(assetPath).filter(Boolean).join(', '));
-    if (missing.length) lines.push(text('浏览器缺少能力：', 'Missing browser features: ') + missing.join(', '));
+    if (lastFailure && lastFailure.attempts) lines.push(text('리소스 시도：', 'Resource attempts: ') + lastFailure.attempts + ' / 3');
+    if (lastUnattributed) lines.push(text('소유되지 않은 오류（중단되지 않은 시작）：', 'Unattributed error (startup continued): ') + lastUnattributed.kind + ' / ' + lastUnattributed.event);
+    if (pendingResources.length) lines.push(text('리소스를 기다리는 중：', 'Waiting for: ') + pendingResources.map(assetPath).filter(Boolean).join(', '));
+    if (missing.length) lines.push(text('브라우저에 기능이 부족함：', 'Missing browser features: ') + missing.join(', '));
     if (typeof navigator !== 'undefined') lines.push(String(navigator.userAgent || '').slice(0, 256));
     return lines.join('\n');
   }
@@ -179,14 +179,14 @@
     root.hidden = false;
     root.setAttribute('data-state', 'failed');
     root.setAttribute('aria-busy', 'false');
-    title.textContent = text('工作台尚未加载完成', 'The workspace has not finished loading');
+    title.textContent = text('워크벤치가 아직 로드되지 않았습니다.', 'The workspace has not finished loading');
     message.textContent = phase === 'pairing'
-      ? text('配对请求结果尚未确认。可重新加载查看连接状态；若仍未登录，请重新扫描新的配对码。', 'The pairing result is not confirmed. Reload to check the connection; if you are still signed out, scan a new pairing code.')
+      ? text('페어링 요청 결과는 아직 확인되지 않았습니다. 다시 로드하여 연결 상태를 확인할 수 있습니다. 아직 로그인하지 않은 경우 새 페어링 코드를 다시 스캔하세요.。', 'The pairing result is not confirmed. Reload to check the connection; if you are still signed out, scan a new pairing code.')
       : kind === 'script'
-      ? text('部分页面组件未能启动。请重新加载；若仍失败，请检查网络或更新浏览器。', 'Some page components could not start. Reload the page; if it still fails, check your connection or update your browser.')
+      ? text('일부 페이지 구성 요소를 시작하지 못했습니다. 새로고침하세요. 그래도 실패하면 네트워크를 확인하거나 브라우저를 업데이트하세요.。', 'Some page components could not start. Reload the page; if it still fails, check your connection or update your browser.')
       : phase === 'auth'
-        ? text('等待网关响应时间较长。请检查网络和电脑网关，再重新加载。', 'The gateway is taking longer to respond. Check your connection and computer gateway, then reload.')
-        : text('页面资源加载时间较长。请检查网络后重新加载。', 'Page resources are taking longer to load. Check your connection, then reload.');
+        ? text('게이트웨이가 응답할 때까지 기다리는 데 오랜 시간이 걸립니다. 네트워크와 컴퓨터 게이트웨이를 확인하고 다시 로드하세요.。', 'The gateway is taking longer to respond. Check your connection and computer gateway, then reload.')
+        : text('페이지 리소스를 로드하는 데 시간이 오래 걸립니다. 네트워크를 확인하고 새로고침하세요.。', 'Page resources are taking longer to load. Check your connection, then reload.');
     diagnosticText.textContent = diagnostics();
     details.hidden = false;
     return true;
@@ -195,8 +195,8 @@
     if (complete || stopped) return;
     root.setAttribute('data-state', 'recovering');
     root.setAttribute('aria-busy', 'true');
-    title.textContent = text('正在恢复连接…', 'Restoring your connection…');
-    message.textContent = text('连接暂时较慢，正在等待恢复，请稍候。', 'The connection is taking a moment. Waiting for it to recover.');
+    title.textContent = text('연결 복원…', 'Restoring your connection…');
+    message.textContent = text('연결이 일시적으로 느려지고 복원을 기다리고 있습니다. 기다리세요.。', 'The connection is taking a moment. Waiting for it to recover.');
   }
   function progress() {
     if (complete || stopped) return;
@@ -413,11 +413,11 @@
     window.removeEventListener('error', onError, true);
     window.removeEventListener('unhandledrejection', onRejection);
   }
-  title.textContent = text('聊天', 'Chats');
-  message.textContent = text('正在连接…', 'Connecting…');
-  document.getElementById('bootstrap-details-label').textContent = text('查看详情', 'View details');
+  title.textContent = text('채팅', 'Chats');
+  message.textContent = text('연결 중…', 'Connecting…');
+  document.getElementById('bootstrap-details-label').textContent = text('세부정보 보기', 'View details');
   details.hidden = true;
-  retry.textContent = text('重新加载', 'Reload');
+  retry.textContent = text('다시 불러오기', 'Reload');
   retry.disabled = false;
   retry.onclick = function () {
     // app.js removes a pairing fragment before network access. Restore it only

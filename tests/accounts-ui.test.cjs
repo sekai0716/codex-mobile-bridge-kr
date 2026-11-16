@@ -20,11 +20,11 @@ test('native login card survives an empty saved list without enrollment or switc
  ui.panel.onReset=()=>{};
  ui.setValue({...ui.value(),accounts:[],loginAccount:login,current:{status:'ready',kind:'api',name:'API · custom'}});
  await ui.panel.refresh();
- assert.match(ui.text(),/current@example.test/);assert.match(ui.text(),/已登录/);assert.match(ui.text(),/2 张可用/);
+ assert.match(ui.text(),/current@example.test/);assert.match(ui.text(),/로그인됨/);assert.match(ui.text(),/2개 사용 가능/);
  assert.equal(ui.all().filter(n=>n.tag==='section'&&n.className==='account-bucket').length,1);
- assert.equal(ui.all().some(n=>['切换到此接入','删除','修改'].includes(n.textContent)),false);
- assert.ok(ui.all().find(n=>n.tag==='button'&&n.textContent==='使用重置卡'));
- const modelsButton=ui.all().find(n=>n.textContent==='查看可用模型');assert.equal(modelsButton.parent.className,'accounts-card-footer');
+ assert.equal(ui.all().some(n=>['이 계정으로 전환','삭제','편집'].includes(n.textContent)),false);
+ assert.ok(ui.all().find(n=>n.tag==='button'&&n.textContent==='재설정 사용'));
+ const modelsButton=ui.all().find(n=>n.textContent==='사용 가능한 모델 보기');assert.equal(modelsButton.parent.className,'accounts-card-footer');
  ui.panel.accept({...ui.value(),accounts:[{...login,transient:false}],loginAccount:{...login,transient:false}});
  assert.equal(ui.all().filter(n=>n.tag==='section'&&n.className==='account-bucket').length,1);
 });
@@ -33,22 +33,22 @@ test('web exposes saved account selection without enrollment or credential input
  const ui=fixture();await ui.panel.refresh();assert.equal(ui.all().some(n=>n.tag==='input'&&n.type!=='checkbox'),false);assert.match(ui.text(),/API <script>/);assert.equal(ui.all().some(n=>n.tag==='script'),false);
  ui.confirm(false);await ui.panel.choose(ui.value().accounts[0]);assert.equal(ui.requests.length,0);
  ui.confirm(true);await ui.panel.choose(ui.value().accounts[0]);assert.deepEqual(Object.keys(ui.requests[0]).sort(),['action','confirmed','id','requestId','syncLocalCli','tasksConfirmed']);
- assert.equal(ui.requests[0].tasksConfirmed,true);assert.match(ui.prompts[0],/未在网页显示/);
+ assert.equal(ui.requests[0].tasksConfirmed,true);assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
 });
 
 for(const desktop of [false,true])test(`${desktop?'desktop':'web'} retries the selected offline SSH host from accounts`,async()=>{
  const ui=fixture(desktop);ui.setValue({...ui.value(),sshHosts:[{host:'remote:one',label:'Offline server',state:'offline',nextRetryAt:ui.now()/1000+60}]});await ui.panel.refresh();
- assert.match(ui.text(),/SSH 连接/);assert.match(ui.text(),/下次自动重试/);
- await ui.all().find(n=>n.textContent==='重试 SSH 连接').onclick();
+ assert.match(ui.text(),/SSH 연결 목록/);assert.match(ui.text(),/다음 자동 재시도:/);
+ await ui.all().find(n=>n.textContent==='SSH 연결 재시도').onclick();
  assert.deepEqual({...ui.requests[0]},{action:'retrySsh',host:'remote:one'});
  ui.panel.accept({...ui.value(),sshHosts:[{host:'remote:one',label:'Offline server',state:'checking'}]});
- assert.equal(ui.all().find(n=>n.textContent==='重试 SSH 连接').disabled,true);
+ assert.equal(ui.all().find(n=>n.textContent==='SSH 연결 재시도').disabled,true);
  ui.panel.clear();assert.equal(ui.panel.sshHosts.hidden,true);assert.equal(ui.panel.sshHosts.children.length,0);
 });
 test('Codex switch always requests CLI verification without an opt-in checkbox',async()=>{
  const ui=fixture();await ui.panel.refresh();
- assert.match(ui.text(),/Desktop 与 CLI 共用接入/);
- assert.equal(ui.all().some(n=>n.textContent==='同时应用到本机 CLI'),false);
+ assert.match(ui.text(),/Codex 데스크톱 및 CLI는 이 컴퓨터에 대한 액세스를 공유합니다\. 전환하면 Desktop이 실행 중일 때 다시 시작됩니다\./);
+ assert.equal(ui.all().some(n=>n.textContent==='로컬 CLI에도 적용'),false);
  await ui.panel.choose(ui.value().accounts[0]);assert.equal(ui.requests[0].syncLocalCli,true);
 });
 
@@ -62,18 +62,18 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} merges import
  ui.panel.accept({...ui.value(),accounts:[other,api,login],loginAccount:login,activeId:api.id,current:{kind:'api',id:api.id,status:'ready',name:api.name}});
  const cards=ui.panel.rows.children.filter(n=>n.className==='account-bucket');
  assert.equal(cards.length,3);assert.equal(ui.all(cards[0]).find(n=>n.tag==='h3').textContent,login.name);
- assert.equal(ui.all().filter(n=>n.textContent==='已登录').length,1);
- assert.equal(ui.all().filter(n=>n.textContent==='当前接入').length,1);
+ assert.equal(ui.all().filter(n=>n.textContent==='로그인됨').length,1);
+ assert.equal(ui.all().filter(n=>n.textContent==='현재 계정').length,1);
  assert.equal(ui.all().filter(n=>n.tag==='progress').length,2);
- assert.equal(ui.all().filter(n=>n.tag==='button'&&n.textContent==='使用重置卡').length,2);
+ assert.equal(ui.all().filter(n=>n.tag==='button'&&n.textContent==='재설정 사용').length,2);
  const transient={...login,id:'current-login',transient:true};
  ui.panel.accept({...ui.value(),accounts:[],activeId:null,loginAccount:transient});
  assert.equal(ui.panel.rows.children.filter(n=>n.className==='account-bucket').length,1);
- assert.equal(ui.all().some(n=>['切换到此接入','当前接入'].includes(n.textContent)),false);
+ assert.equal(ui.all().some(n=>['이 계정으로 전환','현재 계정'].includes(n.textContent)),false);
 });
 test('passwordless web disables switching and explains the desktop alternative',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),canSwitch:false});await ui.panel.refresh();
- assert.equal(ui.all().find(n=>n.textContent==='切换到此接入').disabled,true);assert.match(ui.text(),/免密访问不能切换/);
+ assert.equal(ui.all().find(n=>n.textContent==='이 계정으로 전환').disabled,true);assert.match(ui.text(),/인증 없이는 계정 전환이 불가능합니다\. 데스크톱 앱을 사용하세요\./);
 });
 for(const desktop of [false,true])test(`${desktop?'desktop':'web'} explicitly initializes the shared native connection`,async()=>{
  const ui=fixture(desktop);ui.setValue({...ui.value(),desktopRuntime:{supported:true,configured:false}});await ui.panel.refresh();
@@ -81,9 +81,9 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} explicitly in
  ui.confirm(false);await ui.panel.initializeRuntime.onclick();assert.equal(ui.requests.length,0);
  ui.confirm(true);await ui.panel.initializeRuntime.onclick();assert.deepEqual({...ui.requests[0]},{action:'initializeDesktopRuntime',requestId:'11111111-1111-4111-8111-111111111111',confirmed:true,tasksConfirmed:true});
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true},switch:{phase:'verifying',operation:'desktopRuntime'}});
- assert.equal(ui.panel.initializeRuntime.disabled,true);assert.match(ui.panel.status.textContent,/核验原生连接/);
+ assert.equal(ui.panel.initializeRuntime.disabled,true);assert.match(ui.panel.status.textContent,/네이티브 연결 확인 중/);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true},switch:{phase:'failed',operation:'desktopRuntime',error:'test failure'}});
- assert.equal(ui.panel.initializeRuntime.disabled,false);assert.equal(ui.panel.initializeRuntime.textContent,'重新准备连接');assert.match(ui.panel.status.textContent,/原生连接初始化未完成/);
+ assert.equal(ui.panel.initializeRuntime.disabled,false);assert.equal(ui.panel.initializeRuntime.textContent,'다시 연결 준비');assert.match(ui.panel.status.textContent,/네이티브 연결 초기화를 완료하지 못했습니다\./);
  ui.panel.accept({...ui.value(),scope:'profile'});assert.equal(ui.panel.desktopRuntime.hidden,true);
  ui.panel.clear();assert.equal(ui.panel.desktopRuntime.hidden,true);
 });
@@ -93,11 +93,11 @@ test('native initialization remains unavailable for passwordless remote access',
 });
 test('automatic native preparation stays passive and offers unknown-task recovery',()=>{
  const ui=fixture();ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,preparation:{state:'checking'}}});
- assert.match(ui.panel.runtimeStatus.textContent,/自动检查/);assert.equal(ui.requests.length,0);
+ assert.match(ui.panel.runtimeStatus.textContent,/자동 확인/);assert.equal(ui.requests.length,0);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,preparation:{state:'waiting',taskStateUnavailable:true}}});
- assert.match(ui.panel.runtimeStatus.textContent,/空闲后自动准备/);assert.equal(ui.panel.forceInitializeRuntime.hidden,false);
+ assert.match(ui.panel.runtimeStatus.textContent,/데스크톱이 사용 가능해지면 자동으로 준비합니다\. 기존 채팅은 계속 사용할 수 있습니다/);assert.equal(ui.panel.forceInitializeRuntime.hidden,false);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true,preparation:{state:'ready'}}});
- assert.match(ui.panel.runtimeStatus.textContent,/准备好/);assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
+ assert.match(ui.panel.runtimeStatus.textContent,/기본 사이드 채팅 연결이 준비되었습니다\./);assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
  assert.equal(ui.requests.length,0);
 });
 
@@ -105,7 +105,7 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} offers a conf
  const ui=fixture(desktop),state={...ui.value(),desktopRuntime:{supported:true},switch:{phase:'failed',operation:'desktopRuntime',taskStateUnavailable:true}};
  ui.panel.accept(state);assert.equal(ui.panel.forceInitializeRuntime.hidden,false);assert.equal(ui.panel.forceInitializeRuntime.disabled,false);
  ui.confirm(false);await ui.panel.forceInitializeRuntime.onclick();assert.equal(ui.requests.length,0);
- ui.confirm(true);await ui.panel.forceInitializeRuntime.onclick();assert.equal(ui.requests[0].acknowledgeUnavailable,true);assert.match(ui.prompts[0],/正常重启.*可能中断/);
+ ui.confirm(true);await ui.panel.forceInitializeRuntime.onclick();assert.equal(ui.requests[0].acknowledgeUnavailable,true);assert.match(ui.prompts[0],/일부 작업 상태를 확인하지 못했습니다\. 계속하면 Codex 앱이 정상 종료 후 재시작되며, 해당 작업이나 대기 중인 승인이 중단될 수 있습니다\. 채팅 기록은 보존되며 나중에 이어갈 수 있습니다\. 계속하시겠습니까\?/);
  ui.panel.accept({...state,switch:{phase:'failed',operation:'desktopRuntime',error:'known busy'}});assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
  ui.panel.accept({...state,switch:{...state.switch,phase:'verifying'}});assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
  if(!desktop){ui.panel.accept({...state,canSwitch:false});assert.equal(ui.panel.forceInitializeRuntime.disabled,true);}
@@ -114,26 +114,26 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} offers a conf
 
 test('external Magpie management disables configuration replacement on both surfaces',async()=>{
  for(const desktop of [false,true]){
-  const ui=fixture(desktop);ui.setValue({...ui.value(),management:{mode:'auto',external:true,reason:'由 Magpie 管理'}});await ui.panel.refresh();
-  assert.equal(ui.all().find(n=>n.textContent==='切换到此接入').disabled,true);assert.match(ui.text(),/由 Magpie 管理/);
+  const ui=fixture(desktop);ui.setValue({...ui.value(),management:{mode:'auto',external:true,reason:'의존하다 Magpie 관리하다'}});await ui.panel.refresh();
+  assert.equal(ui.all().find(n=>n.textContent==='이 계정으로 전환').disabled,true);assert.match(ui.text(),/의존하다 Magpie 관리/);
   if(desktop){assert.equal(ui.panel.recover.disabled,true);assert.equal(ui.panel.managementMode.value,'auto');}
  }
 });
 test('switch phases disable repeat actions and recovery only exists on desktop',async()=>{
  const ui=fixture(true);ui.setValue({...ui.value(),switch:{phase:'verifying'}});await ui.panel.refresh();
- assert.equal(ui.all().find(n=>n.textContent==='切换到此接入').disabled,true);assert.equal(ui.panel.submit.disabled,true);assert.equal(ui.panel.recover.disabled,true);
+ assert.equal(ui.all().find(n=>n.textContent==='이 계정으로 전환').disabled,true);assert.equal(ui.panel.submit.disabled,true);assert.equal(ui.panel.recover.disabled,true);
  ui.setValue({...ui.value(),switch:{phase:'interrupted'}});await ui.panel.refresh();assert.equal(ui.panel.recover.disabled,false);
 });
 test('desktop masks API keys and never prepopulates a saved key',async()=>{
  const ui=fixture(true);await ui.panel.refresh();assert.equal(ui.panel.key.input.type,'password');
- ui.all().find(n=>n.textContent==='修改').onclick();assert.equal(ui.panel.key.input.value,'');assert.equal(ui.panel.url.input.value,'https://example.test/v1');
+ ui.all().find(n=>n.textContent==='편집').onclick();assert.equal(ui.panel.key.input.value,'');assert.equal(ui.panel.url.input.value,'https://example.test/v1');
 });
 test('official login is opened by trusted desktop IPC, not arbitrary browser navigation',async()=>{
  const ui=fixture(true);ui.setValue({...ui.value(),enrollment:{phase:'waiting',authUrl:'https://auth.openai.com/authorize?fixture=1'}});await ui.panel.refresh();
- assert.equal(ui.all().some(n=>n.tag==='a'),false);await ui.all().find(n=>n.textContent==='打开官方登录').onclick();assert.equal(ui.requests[0].action,'openLogin');
+ assert.equal(ui.all().some(n=>n.tag==='a'),false);await ui.all().find(n=>n.textContent==='공식 로그인 열기').onclick();assert.equal(ui.requests[0].action,'openLogin');
 });
 test('desktop renames through an inline form without unsupported native prompts',async()=>{
- const ui=fixture(true);await ui.panel.refresh();ui.all().find(n=>n.textContent==='重命名').onclick();
+ const ui=fixture(true);await ui.panel.refresh();ui.all().find(n=>n.textContent==='이름 바꾸기').onclick();
  assert.equal(ui.panel.renameForm.hidden,false);assert.equal(ui.panel.renameName.input.value,'API <script>');
  ui.panel.renameName.input.value='New name';await ui.panel.renameForm.onsubmit({preventDefault(){}});
  assert.equal(ui.requests[0].action,'rename');assert.equal(ui.requests[0].name,'New name');assert.equal(ui.panel.renameForm.hidden,true);
@@ -152,7 +152,7 @@ test('a read started before an account mutation cannot resurrect a deleted row',
 });
 test('desktop scanner imports official logins without displaying credentials',async()=>{
  const ui=fixture(true);ui.setValue({...ui.value(),discovery:{source:'/fixture/home',candidates:[{id:'official',kind:'chatgpt',name:'Local login',canImport:true}]}});await ui.panel.refresh();
- await ui.all().find(n=>n.textContent==='导入账号').onclick();assert.equal(ui.requests[0].action,'import');assert.equal(ui.requests[0].candidateId,'official');
+ await ui.all().find(n=>n.textContent==='계정 가져오기').onclick();assert.equal(ui.requests[0].action,'import');assert.equal(ui.requests[0].candidateId,'official');
  assert.equal(ui.requests[0].apiKey,undefined);
 });
 test('scanned APIs fetch models using opaque candidate IDs and import the selected model',async()=>{
@@ -184,8 +184,8 @@ test('a delayed model response does not refill a changed API form',async()=>{
  finish({...ui.value(),models:['old-provider-model']});await pending;assert.equal(ui.panel.modelOptions.hidden,true);
 });
 test('model-fetch errors remain visible after status refresh and manual entry stays available',async()=>{
- const ui=fixture(true);await ui.panel.refresh();ui.panel.kind.value='api';ui.panel.kind.onchange();ui.setRequest(async()=>{throw Error('上游拒绝访问，请检查 API Key 和模型列表权限');});
- await ui.panel.modelsButton.onclick();await ui.panel.refresh();assert.match(ui.panel.error.textContent,/上游拒绝/);assert.equal(ui.panel.model.wrap.hidden,false);
+ const ui=fixture(true);await ui.panel.refresh();ui.panel.kind.value='api';ui.panel.kind.onchange();ui.setRequest(async()=>{throw Error('액세스가 거부되었습니다. API 키 및 모델 목록 권한을 확인하세요.');});
+ await ui.panel.modelsButton.onclick();await ui.panel.refresh();assert.match(ui.panel.error.textContent,/액세스가 거부되었습니다\. API 키 및 모델 목록 권한을 확인하세요\./);assert.equal(ui.panel.model.wrap.hidden,false);
 });
 test('LAN HTTP switching works without crypto.randomUUID and reports failures',async()=>{
  const ui=fixture();await ui.panel.refresh();ui.noRandomUUID();
@@ -195,12 +195,12 @@ test('LAN HTTP switching works without crypto.randomUUID and reports failures',a
 });
 test('actual current account is named and cannot be selected again',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),activeId:'a',current:{status:'ready',id:'a',kind:'api',name:'Imported current'}});await ui.panel.refresh();
- assert.match(ui.panel.current.textContent,/Imported current/);assert.equal(ui.all().find(n=>n.textContent==='当前接入').disabled,true);
+ assert.match(ui.panel.current.textContent,/Imported current/);assert.equal(ui.all().find(n=>n.textContent==='현재 계정').disabled,true);
 });
 test('official rows show compact quota and reset count, while API rows only offer models',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),accounts:[...ui.value().accounts,{id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',checkedAt:Date.now()/1000,limits:[{name:'Codex',windows:[{remainingPercent:75,windowDurationMins:300}]}],resetCredits:{availableCount:2}},models:{status:'ready',models:[{id:'model-1',name:'Model one'}]}}}]});
- await ui.panel.refresh();assert.match(ui.text(),/剩余 75%/);assert.match(ui.text(),/重置卡 · 2/);assert.equal(ui.all().filter(n=>n.tag==='progress').length,1);
- assert.equal(ui.all().filter(n=>n.textContent==='查看可用模型').length,2);
+ await ui.panel.refresh();assert.match(ui.text(),/남은75%/);assert.match(ui.text(),/사용량 재설정 · 2/);assert.equal(ui.all().filter(n=>n.tag==='progress').length,1);
+ assert.equal(ui.all().filter(n=>n.textContent==='사용 가능한 모델 보기').length,2);
  ui.panel.expandedModels.add('official');ui.panel.render();assert.match(ui.text(),/Model one · model-1/);
 });
 test('blockers show the concrete running or pending chat instead of a generic warning',async()=>{
@@ -216,9 +216,9 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} automatically
  ui.ancestorHidden(false);await ui.panel.refresh();assert.equal(ui.requests.length,1);
  assert.equal(ui.requests[0].section,'usage');assert.equal(ui.requests[0].id,'official');
  assert.equal(ui.all(ui.panel.rows.children[0]).find(n=>n.tag==='h3').textContent,'Official');
- assert.equal(ui.all(ui.panel.rows.children[0]).find(n=>n.textContent==='当前接入').disabled,true);
+ assert.equal(ui.all(ui.panel.rows.children[0]).find(n=>n.textContent==='현재 계정').disabled,true);
  ui.advance(120000);await ui.panel.refresh();assert.equal(ui.requests.length,1);
- await ui.all().find(n=>n.attributes['aria-label']==='查看剩余额度').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
+ await ui.all().find(n=>n.attributes['aria-label']==='남은 할당량 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
  ui.advance(180000);await ui.panel.refresh();assert.equal(ui.requests.length,2,'old five-minute deadline is cancelled');
  ui.advance(119000);await ui.panel.refresh();assert.equal(ui.requests.length,2);
  ui.advance(2000);ui.hidden(true);await ui.panel.refresh();assert.equal(ui.requests.length,2);
@@ -228,8 +228,8 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} automatically
 test('quota and reset count precede account switching',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',checkedAt:Date.now()/1000,limits:[],resetCredits:{availableCount:2}}}}]});
  await ui.panel.refresh();const nodes=ui.all(ui.panel.rows.children[0]);
- assert.ok(nodes.findIndex(n=>n.textContent==='重置卡 · 2 张可用')<nodes.findIndex(n=>n.textContent==='切换到此接入'));
- const refresh=nodes.find(n=>n.attributes['aria-label']==='查看剩余额度');assert.equal(refresh.textContent,'');assert.match(refresh.innerHTML,/<svg[^>]*viewBox="0 0 24 24"/);assert.equal(refresh.parent.className,'accounts-usage-controls');assert.equal(refresh.parent.parent,nodes.find(n=>n.className==='accounts-card-footer'));assert.ok(!nodes.some(n=>n.textContent==='刷新额度'));
+ assert.ok(nodes.findIndex(n=>n.textContent==='카드 재설정 · 2 장케커')<nodes.findIndex(n=>n.textContent==='이 계정으로 전환'));
+ const refresh=nodes.find(n=>n.attributes['aria-label']==='남은 할당량 보기');assert.equal(refresh.textContent,'');assert.match(refresh.innerHTML,/<svg[^>]*viewBox="0 0 24 24"/);assert.equal(refresh.parent.className,'accounts-usage-controls');assert.equal(refresh.parent.parent,nodes.find(n=>n.className==='accounts-card-footer'));assert.ok(!nodes.some(n=>n.textContent==='새로고침 할당량'));
 });
 
 for(const desktop of [false,true])test(`${desktop?'desktop':'web'} groups reset count, next usable expiry and the selected account action`,()=>{
@@ -238,20 +238,20 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} groups reset 
  const official={id:'official',kind:'chatgpt',name:'Official',email:'official@test',details:{usage:{status:'ready',updatedAt:now,limits:[],subscription:{periodEndsAt:now+86400,source:'online'},resetCredits:{availableCount:2,credits:[card('later',expiry+86400),card('expired',now-1),card('other',now+10,{resetType:'other'}),card('used',now+20,{status:'used'}),card('next',expiry)]}}}};
  ui.panel.accept({...ui.value(),accounts:[...ui.value().accounts,official]});
  const nodes=ui.all(ui.panel.rows.children[1]),group=nodes.find(n=>n.className==='accounts-reset-summary'),grouped=ui.all(group);
- assert.match(grouped.map(n=>n.textContent).join('\n'),/重置卡 · 2 张可用/);
- const time=grouped.find(n=>n.tag==='time');assert.equal(time.dateTime,new Date(expiry*1000).toISOString());assert.equal(time.title,new Date(expiry*1000).toLocaleString('zh-CN'));
+ assert.match(grouped.map(n=>n.textContent).join('\n'),/사용량 재설정 · 2개 사용 가능/);
+ const time=grouped.find(n=>n.tag==='time');assert.equal(time.dateTime,new Date(expiry*1000).toISOString());assert.equal(time.title,new Date(expiry*1000).toLocaleString('ko-KR'));
  const use=grouped.find(n=>n.tag==='button');assert.equal(use.parent,group);use.onclick();assert.equal(chosen,'official');assert.equal(ui.requests.length,0);
  assert.equal(ui.all(ui.panel.rows.children[0]).some(n=>n.className==='accounts-reset-summary'),false);
- const note=nodes.find(n=>n.className==='account-muted account-subscription-note'),info=nodes.find(n=>n.attributes['aria-label']==='订阅日期说明');assert.equal(note.hidden,true);info.onclick();assert.equal(note.hidden,false);assert.equal(info.attributes['aria-expanded'],'true');
- assert.equal(info.parent.parent.className,'accounts-name');assert.equal(info.textContent,'订阅周期至 '+new Date(expiry*1000).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}));assert.ok(info.title.includes(new Date(expiry*1000).toLocaleString('zh-CN')));assert.ok(!nodes.some(n=>n.textContent==='ⓘ'));
+ const note=nodes.find(n=>n.className==='account-muted account-subscription-note'),info=nodes.find(n=>n.attributes['aria-label']==='구독 날짜에 대해');assert.equal(note.hidden,true);info.onclick();assert.equal(note.hidden,false);assert.equal(info.attributes['aria-expanded'],'true');
+ assert.equal(info.parent.parent.className,'accounts-name');assert.equal(info.textContent,'구독 기간 종료'+new Date(expiry*1000).toLocaleDateString('ko-KR',{month:'short',day:'numeric'}));assert.ok(info.title.includes(new Date(expiry*1000).toLocaleString('ko-KR')));assert.ok(!nodes.some(n=>n.textContent==='ⓘ'));
  ui.panel.render();assert.equal(ui.all().find(n=>n.className==='account-muted account-subscription-note').hidden,false);
- const updated=nodes.find(n=>n.className==='account-updated account-muted'),refresh=nodes.find(n=>n.attributes['aria-label']==='查看剩余额度');assert.equal(updated.textContent,new Date(now*1000).toLocaleString('zh-CN',{hour:'2-digit',minute:'2-digit'})+' 更新');assert.equal(updated.parent,refresh.parent);assert.equal(updated.parent.parent.className,'accounts-card-footer');assert.equal(updated.parent.children.at(-1),refresh);assert.equal(updated.title,new Date(now*1000).toLocaleString('zh-CN'));
+ const updated=nodes.find(n=>n.className==='account-updated account-muted'),refresh=nodes.find(n=>n.attributes['aria-label']==='남은 할당량 보기');assert.equal(updated.textContent,'업데이트됨 '+new Date(now*1000).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit'}));assert.equal(updated.parent,refresh.parent);assert.equal(updated.parent.parent.className,'accounts-card-footer');assert.equal(updated.parent.children.at(-1),refresh);assert.equal(updated.title,new Date(now*1000).toLocaleString('ko-KR'));
  ui.language();assert.match(ui.text(),/Usage resets · 2 available/);assert.match(ui.text(),/Subscription period ends:/);
 });
 
 test('official credits retain zero and unlimited balances and omit missing values',()=>{
  const ui=fixture();ui.panel.accept({...ui.value(),accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',limits:[{name:'Missing',credits:{balance:null}},{name:'Empty',credits:{balance:' '}},{name:'Zero',credits:{balance:0}},{name:'Paid',credits:{balance:'12.5'}},{name:'Unlimited',credits:{unlimited:true}}]}}}]});
- assert.doesNotMatch(ui.text(),/Missing · Credits:|Empty · Credits:/);assert.match(ui.text(),/Zero · Credits: 0/);assert.match(ui.text(),/Paid · Credits: 12.5/);assert.match(ui.text(),/Unlimited · Credits: 不限量/);
+ assert.doesNotMatch(ui.text(),/Missing · Credits:|Empty · Credits:/);assert.match(ui.text(),/Zero · Credits: 0/);assert.match(ui.text(),/Paid · Credits: 12.5/);assert.match(ui.text(),/Unlimited · Credits: 제한 없는/);
 });
 test('viewed quotas refresh at five minutes only while the account page is visible',async()=>{
  const ui=fixture();const official={id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',checkedAt:Date.now()/1000-299,limits:[]}}};
@@ -262,7 +262,7 @@ test('viewed quotas refresh at five minutes only while the account page is visib
  ui.root.closest=()=>null;
  ui.setRequest(async()=>{official.details.usage.checkedAt=Date.now()/1000;return structuredClone(ui.value());});
  await ui.panel.refresh();assert.equal(ui.requests.length,1);assert.equal(ui.requests[0].section,'usage');assert.equal(ui.requests[0].refresh,undefined);
- await ui.all().find(n=>n.attributes['aria-label']==='查看剩余额度').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
+ await ui.all().find(n=>n.attributes['aria-label']==='남은 할당량 보기').onclick();assert.equal(ui.requests.length,2);assert.equal(ui.requests[1].refresh,true);
 });
 
 test('desktop Codex configuration stops polling while hidden and resumes on return',async()=>{
@@ -327,30 +327,30 @@ test('first account read failure stays visible and retries after ten seconds',as
 test('desktop and web can ignore only the selected unknown submission',async()=>{
  for(const desktop of [false,true]){
   const ui=fixture(desktop);ui.setValue({...ui.value(),blockers:[{reason:'unknown',title:'Chat',id:'thread',submissionId:'message',host:'local'},{reason:'running',title:'Busy',id:'busy'}]});
-  await ui.panel.refresh();assert.equal(ui.all().filter(n=>n.textContent==='忽略').length,1);
-  ui.confirm(false);await ui.all().find(n=>n.textContent==='忽略').onclick();assert.equal(ui.requests.length,0);
-  ui.confirm(true);await ui.all().find(n=>n.textContent==='忽略').onclick();
+  await ui.panel.refresh();assert.equal(ui.all().filter(n=>n.textContent==='무시하다').length,1);
+  ui.confirm(false);await ui.all().find(n=>n.textContent==='무시하다').onclick();assert.equal(ui.requests.length,0);
+  ui.confirm(true);await ui.all().find(n=>n.textContent==='무시하다').onclick();
   assert.deepEqual(JSON.parse(JSON.stringify(ui.requests[0])),{action:'ignoreSubmission',threadId:'thread',submissionId:'message',host:'local'});
  }
 });
 
 test('loading and failed refresh retain percentages, cards and the last successful time',()=>{
  const ui=fixture();const usage={status:'ready',updatedAt:1900000000,limits:[{name:'Codex',windows:[{remainingPercent:75,windowDurationMins:300,resetsAt:2000000000}]}],resetCredits:{availableCount:2}};
- for(const status of ['ready','loading','error']){ui.panel.accept({...ui.value(),accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{...usage,status,error:status==='error'?'查询失败':undefined}}}]});
- assert.match(ui.text(),/剩余 75%/);assert.match(ui.text(),/重置卡 · 2/);assert.match(ui.all().find(n=>n.className==='account-updated account-muted').textContent,/更新/);assert.match(ui.text(),/后恢复|等待刷新/);
- if(status==='loading')assert.match(ui.text(),/查询中/);if(status==='error')assert.match(ui.text(),/保留上次结果/);}
- ui.panel.accept({...ui.value(),accounts:[{id:'other',kind:'chatgpt',name:'Different',details:{usage:{status:'loading'}}}]});assert.doesNotMatch(ui.text(),/剩余 75%|重置卡 · 2/);
+ for(const status of ['ready','loading','error']){ui.panel.accept({...ui.value(),accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{...usage,status,error:status==='error'?'쿼리 실패':undefined}}}]});
+ assert.match(ui.text(),/남은75%/);assert.match(ui.text(),/사용량 재설정 · 2/);assert.match(ui.all().find(n=>n.className==='account-updated account-muted').textContent,/업데이트/);assert.match(ui.text(),/재설정될 때까지|새로고침을 기다리는 중/);
+ if(status==='loading')assert.match(ui.text(),/확인 중…/);if(status==='error')assert.match(ui.text(),/마지막 결과를 표시합니다\. 데이터가 업데이트되지 않았습니다/);}
+ ui.panel.accept({...ui.value(),accounts:[{id:'other',kind:'chatgpt',name:'Different',details:{usage:{status:'loading'}}}]});assert.doesNotMatch(ui.text(),/남은75%|사용량 재설정 · 2/);
 });
 test('saved official card has a direct reset entry and API cards have no subscription quota',()=>{
  const ui=fixture();let chosen;ui.panel.openReset=row=>chosen=row.id;
  ui.panel.accept({...ui.value(),activeId:'official',accounts:[{id:'official',kind:'chatgpt',name:'Official',details:{usage:{status:'ready',limits:[],resetCredits:{availableCount:2}}}}]});
- ui.all().find(n=>n.tag==='button'&&n.textContent==='使用重置卡'&&!n.hidden).onclick();assert.equal(chosen,'official');
+ ui.all().find(n=>n.tag==='button'&&n.textContent==='재설정 사용'&&!n.hidden).onclick();assert.equal(chosen,'official');
 });
 
 test('active official account exposes reset entry before quota details load',()=>{
  const ui=fixture();let chosen;ui.panel.openReset=row=>chosen=row.id;
  ui.panel.accept({...ui.value(),activeId:'official',current:{kind:'chatgpt',status:'ready',id:'official'},accounts:[{id:'official',kind:'chatgpt',name:'Official'}]});
- const reset=ui.all().find(n=>n.tag==='button'&&n.textContent==='使用重置卡'&&!n.hidden);assert.ok(reset);reset.onclick();assert.equal(chosen,'official');
+ const reset=ui.all().find(n=>n.tag==='button'&&n.textContent==='재설정 사용'&&!n.hidden);assert.ok(reset);reset.onclick();assert.equal(chosen,'official');
 });
 
 
@@ -359,10 +359,10 @@ test('both saved-account views treat stale subscription claims as unknown',()=>{
   const ui=fixture(desktop);
   const accounts=[1790147934,1788250708].map((periodEndsAt,i)=>({id:'official-'+i,kind:'chatgpt',name:'Account '+i,details:{usage:{status:'ready',checkedAt:ui.now()/1000,updatedAt:ui.now()/1000,limits:[],subscription:{periodEndsAt,source:'login'}}}}));
   ui.panel.accept({...ui.value(),accounts});
-  assert.equal(ui.all().filter(n=>n.textContent==='订阅有效期暂未确认').length,2);
-  assert.doesNotMatch(ui.text(),/当前订阅周期|已到记录日期|后结束/);
+  assert.equal(ui.all().filter(n=>n.textContent==='구독 종료 날짜가 확인되지 않았습니다.').length,2);
+  assert.doesNotMatch(ui.text(),/현재 구독 기간|기록 날짜 도달|다음 이후에 종료/);
   accounts[0].details.usage.subscription.periodEndsAt=ui.now()/1000+86400;ui.panel.render();
-  assert.match(ui.text(),/登录记录中的订阅日期（非实时）：/);assert.match(ui.text(),/请以 ChatGPT 订阅页面为准/);
+  assert.match(ui.text(),/로그인 기록의 구독 날짜\(실시간 아님\):/);assert.match(ui.text(),/로그인 기록이 오래되었을 수 있습니다\. ChatGPT 구독 페이지를 참조하세요\./);
   ui.language();assert.match(ui.text(),/Subscription date in login record \(not live\):/);
   ui.advance(86401000);ui.panel.render();assert.equal(ui.all().filter(n=>n.textContent==='Subscription end date is unconfirmed').length,2);
  }
@@ -372,12 +372,12 @@ test('every saved official account opens its own reset dialog without switching'
  const ui=fixture();
  const saved={...ui.value(),activeId:'api',current:{kind:'api',status:'ready'},accounts:[...ui.value().accounts,{id:'one',kind:'chatgpt',name:'One'},{id:'two',kind:'chatgpt',name:'Two'}]};
  ui.panel.accept(saved);
- assert.equal(ui.all().filter(n=>n.textContent==='使用重置卡').length,2);
+ assert.equal(ui.all().filter(n=>n.textContent==='재설정 사용').length,2);
  ui.setRequest(async value=>value.action==='account'?{visible:true,email:value.id+'@test',accountKey:'a'.repeat(64),limits:[],canReset:true,resetCredits:{availableCount:0,credits:[]}}:saved);
  await ui.panel.openReset(saved.accounts[2]);
  assert.equal(ui.requests[0].action,'account');assert.equal(ui.requests[0].id,'two');assert.equal(ui.requests[0].operation,'read');
  assert.equal(ui.panel.resetPanel.value.email,'two@test');assert.ok(ui.panel.resetDialog.open);
- assert.equal(ui.panel.resetPanel.resetOnly,true);const dialogText=ui.all(ui.panel.resetDialog).map(n=>n.textContent).join('\n');assert.doesNotMatch(dialogText,/订阅|额度|更新于/);
+ assert.equal(ui.panel.resetPanel.resetOnly,true);const dialogText=ui.all(ui.panel.resetDialog).map(n=>n.textContent).join('\n');assert.doesNotMatch(dialogText,/신청|몫|업데이트 날짜/);
  assert.equal(ui.requests.some(r=>r.action==='switch'),false);
  ui.panel.resetDialog.close();assert.equal(ui.panel.resetPanel,null);
 });
@@ -389,17 +389,17 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} reset invento
  ui.panel.accept({...ui.value(),accounts:[row]});let resolveRead;
  ui.setRequest(()=>new Promise(resolve=>resolveRead=resolve));const opening=ui.panel.openReset(row),panel=ui.panel.resetPanel;
  const text=()=>ui.all(ui.panel.resetDialog).map(n=>n.textContent).join('\n');
- assert.match(text(),/Cached reset/);assert.match(text(),/可用数量：2/);assert.match(text(),/查询中/);assert.doesNotMatch(text(),/此账号暂不可使用/);
+ assert.match(text(),/Cached reset/);assert.match(text(),/사용 가능:2/);assert.match(text(),/확인 중…/);assert.doesNotMatch(text(),/이 계정에서는 크레딧 재설정을 사용할 수 없습니다\. 새로고침하고 다시 시도하세요\./);
  assert.equal(panel.loading,true);assert.equal(panel.canRedeem('credit'),false);await panel.redeem('credit');assert.equal(ui.requests.length,1);assert.equal(ui.requests[0].refresh,false);
  resolveRead({visible:true,email:'saved@test',accountKey:'a'.repeat(64),limits:[],canReset:true,resetCredits:cards});await opening;
- assert.equal(panel.loading,false);assert.equal(panel.canRedeem('credit'),true);assert.doesNotMatch(text(),/查询中/);
+ assert.equal(panel.loading,false);assert.equal(panel.canRedeem('credit'),true);assert.doesNotMatch(text(),/확인 중…/);
  ui.panel.resetDialog.close();
 });
 
 test('first reset load shows progress and a closed dialog cannot be repopulated by a late read',async()=>{
  const ui=fixture(),row={id:'official',kind:'chatgpt',name:'Official'};ui.panel.onReset=()=>{};ui.panel.accept({...ui.value(),accounts:[row]});
  let resolveRead;ui.setRequest(()=>new Promise(resolve=>resolveRead=resolve));const opening=ui.panel.openReset(row),panel=ui.panel.resetPanel;
- const nodes=ui.all(ui.panel.resetDialog);assert.ok(nodes.some(n=>n.textContent==='查询中…'&&n.attributes.role==='status'));
+ const nodes=ui.all(ui.panel.resetDialog);assert.ok(nodes.some(n=>n.textContent==='확인 중…'&&n.attributes.role==='status'));
  ui.panel.resetDialog.close();resolveRead({visible:true,email:'saved@test',accountKey:'a'.repeat(64),limits:[],canReset:true,resetCredits:{availableCount:0,credits:[]}});await opening;
  assert.equal(ui.panel.resetPanel,null);assert.equal(panel.value,null);assert.equal(panel.root.children.length,0);
 });
@@ -407,19 +407,19 @@ test('first reset load shows progress and a closed dialog cannot be repopulated 
 test('desktop updates distinguish remote version checks from computer-side installation',async()=>{
  for(const desktop of [false,true]){
   const ui=fixture(desktop);ui.setValue({...ui.value(),desktopUpdate:{state:'available',canRequest:true,currentBuild:'1',currentVersion:'1',targetVersion:'2'}});await ui.panel.refresh();
-  assert.match(ui.text(),/下载和安装仍需在电脑端确认/);
-  await ui.all().find(n=>n.textContent==='查看 Codex 新版本').onclick();
+  assert.match(ui.text(),/원격으로 새 버전을 확인할 수 있습니다\. 다운로드 및 설치에는 여전히 컴퓨터에서 확인이 필요합니다\./);
+  await ui.all().find(n=>n.textContent==='새로운 Codex 버전 확인').onclick();
   assert.deepEqual(JSON.parse(JSON.stringify(ui.requests)),[{action:'checkDesktopUpdate'}]);assert.equal(ui.prompts.length,0);
-  ui.confirm(false);await ui.all().find(n=>n.textContent==='打开电脑端更新窗口').onclick();assert.equal(ui.requests.length,1);
-  ui.confirm(true);await ui.all().find(n=>n.textContent==='打开电脑端更新窗口').onclick();assert.equal(ui.requests[1].action,'requestDesktopUpdate');assert.equal(ui.requests[1].tasksConfirmed,true);
+  ui.confirm(false);await ui.all().find(n=>n.textContent==='컴퓨터에서 업데이터를 엽니다.').onclick();assert.equal(ui.requests.length,1);
+  ui.confirm(true);await ui.all().find(n=>n.textContent==='컴퓨터에서 업데이터를 엽니다.').onclick();assert.equal(ui.requests[1].action,'requestDesktopUpdate');assert.equal(ui.requests[1].tasksConfirmed,true);
   ui.language();assert.match(ui.text(),/installing still require confirmation on the computer/);
  }
 });
 
 
 test('native update completion is shown only after the installed build is verified',async()=>{
- const ui=fixture();ui.setValue({...ui.value(),desktopUpdate:{state:'needsDesktop',installation:{state:'pending',previousBuild:'100',currentBuild:'101'}}});await ui.panel.refresh();assert.doesNotMatch(ui.text(),/已核验电脑端安装版本已更新/);
- ui.setValue({...ui.value(),desktopUpdate:{state:'checked',installation:{state:'verified',previousBuild:'100',currentBuild:'101'}}});await ui.panel.refresh();assert.match(ui.text(),/已核验电脑端安装版本已更新 · 100 → 101/);
+ const ui=fixture();ui.setValue({...ui.value(),desktopUpdate:{state:'needsDesktop',installation:{state:'pending',previousBuild:'100',currentBuild:'101'}}});await ui.panel.refresh();assert.doesNotMatch(ui.text(),/설치된 데스크톱 버전이 업데이트된 것으로 확인되었습니다\./);
+ ui.setValue({...ui.value(),desktopUpdate:{state:'checked',installation:{state:'verified',previousBuild:'100',currentBuild:'101'}}});await ui.panel.refresh();assert.match(ui.text(),/설치된 데스크톱 버전이 업데이트된 것으로 확인되었습니다\. · 100 → 101/);
  ui.language();assert.match(ui.text(),/verified as updated · 100 → 101/);
 });
 
@@ -437,7 +437,7 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} hides success
 test('account models retain cached names and efforts when explicit refresh fails',async()=>{
  const ui=fixture(),account={...ui.value().accounts[0],details:{models:{status:'error',error:'Refresh failed',cache:{updatedAt:1000},models:[{id:'route/model',name:'Concrete model',efforts:['low','high']}]}}};
  ui.setValue({...ui.value(),accounts:[account]});ui.panel.expandedModels.add(account.id);await ui.panel.refresh();assert.match(ui.text(),/Concrete model/);assert.match(ui.text(),/low.*high/);assert.match(ui.text(),/Refresh failed/);
- await ui.all().find(node=>node.tag==='button'&&node.textContent==='刷新模型').onclick();assert.equal(ui.requests.at(-1).refresh,true);assert.equal(ui.requests.at(-1).section,'models');
+ await ui.all().find(node=>node.tag==='button'&&node.textContent==='모델 새로 고침').onclick();assert.equal(ui.requests.at(-1).refresh,true);assert.equal(ui.requests.at(-1).section,'models');
 });
 
 test('idle account reads do not poll every two seconds; pending account work does',async()=>{
@@ -467,23 +467,23 @@ test('one inventory delegates API edit and probes to the editor before reminders
  const ui=fixture(),details=ui.panel.node('details'),calls=[];
  ui.panel.attachApiAccess({edit:(...args)=>calls.push(args),probe:(...args)=>calls.push(args)},details);
  await ui.panel.refresh();assert.ok(ui.panel.management.children.indexOf(details)<ui.panel.management.children.indexOf(ui.panel.tools));
- ui.all().find(node=>node.textContent==='修改').onclick();assert.equal(details.open,true);assert.equal(calls[0][0],'codex');
- ui.all().find(node=>node.textContent==='测试模型接口').onclick();assert.equal(details.open,true);assert.equal(calls[1][1],'test');
+ ui.all().find(node=>node.textContent==='편집').onclick();assert.equal(details.open,true);assert.equal(calls[0][0],'codex');
+ ui.all().find(node=>node.textContent==='테스트 모델 엔드포인트').onclick();assert.equal(details.open,true);assert.equal(calls[1][1],'test');
  assert.equal(ui.all().filter(node=>node.className==='account-bucket').length,1);
 });
 
 test('desktop API edit opens the outer editor even with a nested article and respects switch locks',async()=>{
  const ui=fixture(true),details=ui.panel.node('details'),article=ui.panel.node('article'),root=ui.panel.node('div'),calls=[];article.append(root);details.append(article);
  ui.panel.attachApiAccess({root,edit:()=>calls.push('edit'),probe:()=>{}},details);await ui.panel.refresh();
- const edits=()=>ui.all().filter(node=>node.textContent==='修改'&&!node.hidden);assert.equal(edits().length,1);edits()[0].onclick();assert.equal(details.open,true);assert.deepEqual(calls,['edit']);
- ui.setValue({...ui.value(),switch:{phase:'applying'}});await ui.panel.refresh();assert.equal(edits()[0].disabled,true);assert.equal(ui.all().find(node=>node.textContent==='测试模型接口').disabled,true);
+ const edits=()=>ui.all().filter(node=>node.textContent==='편집'&&!node.hidden);assert.equal(edits().length,1);edits()[0].onclick();assert.equal(details.open,true);assert.deepEqual(calls,['edit']);
+ ui.setValue({...ui.value(),switch:{phase:'applying'}});await ui.panel.refresh();assert.equal(edits()[0].disabled,true);assert.equal(ui.all().find(node=>node.textContent==='테스트 모델 엔드포인트').disabled,true);
 });
 
 test('reset outlook follows the shared feature switch on web and desktop',()=>{
  for(const desktop of [false,true]){
   const ui=fixture(desktop),base=ui.value(),forecast={state:'ready',source:'https://codex-reset.com/',probabilities:{h24:25,h48:50},updatedAt:ui.now()/1000};
   ui.panel.accept({...base,resetDynamicEnabled:false,globalReset:null});assert.equal(ui.panel.globalReset.hidden,true);
-  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:forecast});assert.equal(ui.panel.globalReset.hidden,false);assert.match(ui.text(),/24 小时内\n25%/);
+  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:forecast});assert.equal(ui.panel.globalReset.hidden,false);assert.match(ui.text(),/24시간 이내\n25%/);
   ui.panel.accept({...base,resetDynamicEnabled:false,globalReset:null});assert.equal(ui.panel.globalReset.hidden,true);
  }
 });
@@ -496,28 +496,28 @@ test('manual reset refresh tracks async completion and cooldown',async()=>{
  await ui.panel.refreshGlobalReset();assert.equal(forceArg,true);assert.equal(ui.panel.globalResetRefreshIntent.id,2);
  assert.ok(ui.timers.some(t=>!t.cancelled&&t.ms===2000));
  ui.setRead(async()=>value({...initial,id:2,checking:false,changed:true}));await ui.fireTimer(2000);
- assert.equal(ui.panel.globalResetRefreshIntent,null);assert.match(ui.text(),/已更新/);
+ assert.equal(ui.panel.globalResetRefreshIntent,null);assert.match(ui.text(),/업데이트됨/);
  ui.setRead(async()=>value({...initial,id:2,cooldownUntil:stamp+30}));await ui.panel.refreshGlobalReset();
- assert.match(ui.text(),/30 秒后可刷新/);
+ assert.match(ui.text(),/30초 후에 다시 새로고침/);
 });
 
 test('reset outlook switches at local midnight and prioritizes announcements',async()=>{
  const ui=fixture(),base=ui.value(),now=ui.now(),midnight=new Date(now);midnight.setHours(24,0,0,0);
  const forecast={state:'ready',source:'https://codex-reset.com/',lastResetAt:now/1000,updatedAt:now/1000,probabilities:{h24:49,h48:74}};
  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:forecast});
- assert.match(ui.text(),/今日已全局重置/);assert.doesNotMatch(ui.text(),/24 小时内|当前暂无官方预告/);assert.match(ui.text(),/来源 codex-reset.com ↗/);
+ assert.match(ui.text(),/오늘 글로벌 리셋/);assert.doesNotMatch(ui.text(),/24시간 이내|아직 공식적인 발표는 없습니다/);assert.match(ui.text(),/출처: codex-reset\.com ↗/);
  const delay=midnight.getTime()-now;ui.advance(delay);await ui.fireTimer(delay);
- assert.match(ui.text(),/上次全局重置 · 昨天 /);assert.match(ui.text(),/24 小时内\n49%/);
- ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:{...forecast,officialSignal:{summary:'官方公告'}}});
- assert.match(ui.text(),/上次全局重置/);assert.match(ui.text(),/官方已预告/);assert.doesNotMatch(ui.text(),/24 小时内/);
+ assert.match(ui.text(),/마지막 전역 재설정 · 어제/);assert.match(ui.text(),/24시간 이내\n49%/);
+ ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:{...forecast,officialSignal:{summary:'공식 발표'}}});
+ assert.match(ui.text(),/마지막 전역 재설정/);assert.match(ui.text(),/공식 발표/);assert.doesNotMatch(ui.text(),/24시간 이내/);
  ui.panel.accept({...base,resetDynamicEnabled:true,globalReset:{...forecast,state:'error',stale:true}});
- assert.match(ui.text(),/上次全局重置/);assert.match(ui.text(),/数据延迟/);assert.doesNotMatch(ui.text(),/24 小时内/);
+ assert.match(ui.text(),/마지막 전역 재설정/);assert.match(ui.text(),/데이터 지연 · 업데이트 대기 중/);assert.doesNotMatch(ui.text(),/24시간 이내/);
 });
 
 test('reset relative time omits duplicate date while account timestamps retain dates',()=>{
  const ui=fixture(),now=new Date(ui.now()),yesterday=new Date(now);yesterday.setDate(now.getDate()-1);const stamp=yesterday.getTime()/1000;
  const relative=ui.panel.globalTime(stamp),account=ui.panel.shortTime(stamp,true);
- assert.match(relative,/^昨天 /);assert.doesNotMatch(relative,/月|日/);assert.match(account,/月/);
+ assert.match(relative,/^어제/);assert.doesNotMatch(relative,/월|일/);assert.match(account,/월/);
 });
 
 test('reset outlook follows current connection and its status on both hosts',()=>{
@@ -533,7 +533,7 @@ test('reset outlook follows current connection and its status on both hosts',()=
 test('account actions and model control share one footer on both hosts',async()=>{
  for(const desktop of [false,true]){
   const ui=fixture(desktop);await ui.panel.refresh();
-  const choose=ui.all().find(n=>n.textContent==='切换到此接入'),models=ui.all().find(n=>n.textContent==='查看可用模型');
+  const choose=ui.all().find(n=>n.textContent==='이 계정으로 전환'),models=ui.all().find(n=>n.textContent==='사용 가능한 모델 보기');
   assert.equal(choose.parent,models.parent);assert.equal(models.parent.className,'accounts-card-footer');
  }
 });
@@ -543,11 +543,11 @@ test('unknown API auth exposes only a same-request read-only verification on web
  for(const desktop of [false,true]){
   const ui=fixture(desktop),requestId='22222222-2222-4222-8222-222222222222';
   ui.setValue({...ui.value(),accounts:[...ui.value().accounts,{id:'other',kind:'api',name:'Other'}],
-    switch:{phase:'authUnknown',operation:'cliAuth',targetId:'a',requestId,error:'账号同步结果待核验'}});
+    switch:{phase:'authUnknown',operation:'cliAuth',targetId:'a',requestId,error:'계정 동기화 결과가 확인 대기 중입니다.'}});
   await ui.panel.refresh();
-  const verify=ui.all().find(n=>n.tag==='button'&&n.textContent==='核验账号同步');
+  const verify=ui.all().find(n=>n.tag==='button'&&n.textContent==='계정 동기화 확인');
   assert.ok(verify);assert.equal(verify.disabled,false);
-  assert.equal(ui.all().find(n=>n.tag==='button'&&n.textContent==='切换到此接入').disabled,true);
+  assert.equal(ui.all().find(n=>n.tag==='button'&&n.textContent==='이 계정으로 전환').disabled,true);
   ui.confirm(false);await verify.onclick();
   assert.equal(ui.prompts.length,0);
   assert.deepEqual(JSON.parse(JSON.stringify(ui.requests[0])),{action:'switch',id:'a',requestId,confirmed:true,tasksConfirmed:true});
@@ -557,6 +557,6 @@ test('unknown API auth exposes only a same-request read-only verification on web
 
 test('shared account confirmation keeps other clients quiet until synchronization completes',async()=>{
  const ui=fixture();await ui.panel.refresh();await ui.panel.choose(ui.value().accounts[0]);
- assert.match(ui.prompts[0],/切换完成前请勿从其他客户端发起任务/);
- assert.match(ui.prompts[0],/仅在需要时/);
+ assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
+ assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
 });

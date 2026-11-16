@@ -27,15 +27,15 @@ function renderPairingEntry(entry){
   const remaining=grant?Math.max(0,Math.ceil(grant.expires-Date.now()/1000)):0;
   const state=grant?.state==='active'&&!remaining?'expired':grant?.state;
   const active=entry.node.open&&state==='active';
-  entry.summary.textContent=t('扫码登录')+(entry.running?'':t(' · 网关未启动'));
-  entry.image.alt=t('扫码登录');entry.image.hidden=!active;
+  entry.summary.textContent=t("스캔하여 로그인")+(entry.running?'':t("· 게이트웨이가 중지되었습니다."));
+  entry.image.alt=t("스캔하여 로그인");entry.image.hidden=!active;
   if(active&&entry.image.src!==grant.image)entry.image.src=grant.image;
   if(!active)entry.image.removeAttribute('src');
-  entry.status.textContent=entry.busy?t('正在检查连接并生成二维码…'):state==='used'?t('手机已登录，此二维码已失效。'):state==='expired'?t('二维码已过期，请刷新。'):active?t('剩余有效时间：')+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0'):'';
+  entry.status.textContent=entry.busy?t("연결을 확인하고 QR 코드를 생성하는 중…"):state==='used'?t("휴대폰이 로그인되었습니다. 이 QR 코드는 더 이상 유효하지 않습니다."):state==='expired'?t("QR 코드가 만료되었습니다. 새로고침하세요."):active?t("만료 날짜:")+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0'):'';
   entry.error.textContent=t(entry.errorMessage||'');entry.error.hidden=!entry.errorMessage;
-  entry.hint.textContent=t('使用手机 App 的“扫码连接电脑”扫描后即可登录，无需输入网关密码。也可以使用手机相机在浏览器中打开。手机需要能访问此地址。');
-  entry.privacy.textContent=t('二维码 5 分钟内有效，仅可使用一次。持有码即可登录，请勿分享截图；收起或刷新会撤销旧码。手机 App 绑定后可持续使用，直到退出登录或在“登录设备”中撤销；浏览器遵循登录有效期设置。');
-  entry.refresh.textContent=t('刷新二维码');entry.refresh.disabled=entry.busy||!entry.running;
+  entry.hint.textContent=t("스캔을 사용하여 모바일 앱에 연결하여 게이트웨이 비밀번호 없이 로그인하거나 휴대폰 카메라로 스캔하여 브라우저에서 엽니다. 휴대전화가 이 주소에 접속할 수 있어야 합니다.");
+  entry.privacy.textContent=t("5분간 유효하며 1회 사용 가능합니다. 이 코드가 있으면 누구나 로그인할 수 있습니다. 비공개로 유지하세요. 축소하거나 새로 고치면 취소됩니다. 모바일 앱은 로그인된 장치에서 로그아웃하거나 취소할 때까지 로그인 상태를 유지합니다. 브라우저는 구성된 세션 기간을 따릅니다.");
+  entry.refresh.textContent=t('QR 코드 새로 고침');entry.refresh.disabled=entry.busy||!entry.running;
 }
 function renderPairing(){for(const entry of qrEntries.values())renderPairingEntry(entry);}
 function refreshPairing(entry){

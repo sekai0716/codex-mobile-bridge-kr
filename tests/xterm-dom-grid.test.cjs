@@ -41,14 +41,14 @@ function fixture(cells,{customGlyphs=true,focused=false}={}){
     {forEachDecorationAtCell(){}},{colors});
   const line={getNoBgTrimmedLength:()=>cells.length,loadCell(index,target){Object.assign(target,cells[index]);}};
   const render=(options={})=>factory.createRow(line,0,!!options.cursor,'block','outline',options.cursorColumn??0,false,
-    9.375,{get:(chars,bold)=>chars==='中'?19.1:bold?10.2:9.6},options.underlineStart??-1,options.underlineEnd??-1);
+    9.375,{get:(chars,bold)=>chars==='중간'?19.1:bold?10.2:9.6},options.underlineStart??-1,options.underlineEnd??-1);
   return {factory,render,spans};
 }
 
 test('merged runs and double-width glyphs use absolute fractional grid positions',()=>{
-  const f=fixture([cell('a'),cell('b'),cell('中',2),cell('',0),cell('c'),cell('d')]);
+  const f=fixture([cell('a'),cell('b'),cell('중간',2),cell('',0),cell('c'),cell('d')]);
   const row=f.render();
-  assert.deepEqual(Array.from(row,span=>span.textContent),['ab','中','cd']);
+  assert.deepEqual(Array.from(row,span=>span.textContent),['ab','중간','cd']);
   assert.deepEqual(Array.from(row,span=>[span.style.position,span.style.left,span.style.width]),[
     ['absolute','0px','18.75px'],['absolute','18.75px','18.75px'],['absolute','37.5px','18.75px']]);
   assert.ok(Math.abs(parseFloat(row[1].style.letterSpacing)+0.35)<1e-9);

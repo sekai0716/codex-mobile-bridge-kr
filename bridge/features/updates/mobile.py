@@ -14,8 +14,8 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHand
 from bridge.features.auth.tls import client_context
 from bridge.features.workspace.workspace import download_range
 
-REPO = 'https://github.com/try2love/codex-mobile-bridge'
-API = 'https://api.github.com/repos/try2love/codex-mobile-bridge/releases?per_page=100'
+REPO = 'https://github.com/sekai0716/codex-mobile-bridge-kr'
+API = 'https://api.github.com/repos/sekai0716/codex-mobile-bridge-kr/releases?per_page=100'
 MAX_SIZE = 512 * 1024 * 1024
 MAX_METADATA = 4 * 1024 * 1024
 CACHE_SECONDS = 24 * 60 * 60
@@ -24,7 +24,7 @@ CACHE_SECONDS = 24 * 60 * 60
 def version_key(value):
     match = re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|preview|rc)\.(0|[1-9]\d*))?', value if isinstance(value, str) and len(value) <= 80 else '')
     if not match:
-        raise ValueError('更新版本无效')
+        raise ValueError('업데이트된 버전이 잘못되었습니다.')
     return tuple(int(match[i]) for i in (1, 2, 3)) + (('alpha', 'beta', 'preview', 'rc').index(match[4]) if match[4] else 4, int(match[5] or 0))
 
 
@@ -52,7 +52,7 @@ class ReleaseRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # Metadata is never redirected; APK redirects never carry gateway credentials.
         if req.full_url == API or not redirect_allowed(newurl):
-            raise ValueError('更新下载地址发生不允许的跳转')
+            raise ValueError('다운로드 주소를 업데이트하는 동안 허용되지 않는 리디렉션이 발생했습니다.')
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -79,13 +79,13 @@ class MobileUpdates:
             try:
                 with self._open(API) as response:
                     if response.status != 200:
-                        raise ValueError('GitHub 版本信息不可用')
+                        raise ValueError('GitHub 버전 정보를 사용할 수 없습니다.')
                     raw = response.read(MAX_METADATA + 1)
                 if len(raw) > MAX_METADATA:
-                    raise ValueError('GitHub 版本信息过大')
+                    raise ValueError('GitHub 버전 정보가 너무 큽니다.')
                 rows = json.loads(raw)
                 if not isinstance(rows, list):
-                    raise ValueError('GitHub 版本信息无效')
+                    raise ValueError('GitHub 잘못된 버전 정보')
                 releases = []
                 for row in rows:
                     if not isinstance(row, dict) or row.get('draft') is not False:
@@ -112,7 +112,7 @@ class MobileUpdates:
                 self.catalog, self.catalog_time = releases, time.monotonic()
                 return releases
             except (OSError, ValueError, HTTPException) as exc:
-                raise ValueError('电脑无法获取 GitHub 版本信息，请检查电脑网络后重试') from exc
+                raise ValueError('컴퓨터가 얻을 수 없습니다 GitHub 버전 정보, 컴퓨터 네트워크를 확인하신 후 다시 시도해 주세요.') from exc
 
     def check(self, current):
         key = version_key(current)
@@ -120,7 +120,7 @@ class MobileUpdates:
                       and ('-' in current or not r['prerelease'])]
         selected = max(candidates, key=lambda r: version_key(r['version'])) if candidates else None
         if selected and (selected['size'] <= 0 or selected['sha256'] is None):
-            raise ValueError('发布信息已变化或缺少校验信息，请重新检查更新')
+            raise ValueError('출시정보가 변경되었거나 인증정보가 누락되었습니다. 업데이트 내용을 다시 확인해주세요.')
         return {'supported': True, 'release': selected}
 
     def _cleanup(self):
@@ -140,30 +140,30 @@ class MobileUpdates:
 
     def prepare(self, value):
         if not isinstance(value, dict) or set(value) != {'version', 'size', 'sha256'}:
-            raise ValueError('更新请求无效')
+            raise ValueError('잘못된 업데이트 요청')
         version_key(value['version'])
         if type(value['size']) is not int or not isinstance(value['sha256'], str):
-            raise ValueError('更新请求无效')
+            raise ValueError('잘못된 업데이트 요청')
         release = next((r for r in self.releases() if r['size'] > 0 and r['sha256'] is not None and all(r[k] == value[k] for k in value)), None)
         if release is None:
-            raise ValueError('发布信息已变化或缺少校验信息，请重新检查更新')
+            raise ValueError('출시정보가 변경되었거나 인증정보가 누락되었습니다. 업데이트 내용을 다시 확인해주세요.')
         identifier = hashlib.sha256((release['version'] + ':' + release['sha256']).encode()).hexdigest()
         with self.lock:
             if self.closed.is_set():
-                raise ValueError('网关正在关闭')
+                raise ValueError('게이트웨이가 종료됩니다')
             self._cleanup()
             old = self.jobs.get(identifier)
             if old and old['state'] != 'failed':
                 old['used'] = time.time()
                 return self._status(old)
             if any(j['state'] == 'downloading' for j in self.jobs.values()):
-                raise ValueError('电脑正在下载其他更新，请稍后重试')
+                raise ValueError('컴퓨터가 다른 업데이트를 다운로드하는 중입니다. 나중에 다시 시도해 주세요.')
             if old:
                 del self.jobs[identifier]
             while len(self.jobs) >= 2:
                 idle = [j for j in self.jobs.values() if not j['readers']]
                 if not idle:
-                    raise ValueError('电脑正在传送更新，请稍后重试')
+                    raise ValueError('컴퓨터에서 업데이트를 보내는 중입니다. 나중에 다시 시도해 주세요.')
                 oldest = min(idle, key=lambda j: j['used'])
                 del self.jobs[oldest['id']]
             self._cleanup()
@@ -181,20 +181,20 @@ class MobileUpdates:
             digest, count, deadline = hashlib.sha256(), 0, time.monotonic() + 600
             with self._open(asset_url(job['version'])) as response:
                 if response.status != 200 or response.headers.get('Content-Encoding', 'identity') != 'identity':
-                    raise ValueError('安装包下载响应无效')
+                    raise ValueError('설치 패키지 다운로드 응답이 잘못되었습니다.')
                 length = response.headers.get('Content-Length')
                 if length is not None and int(length) != job['size']:
-                    raise ValueError('安装包大小与发布信息不一致')
+                    raise ValueError('설치 패키지 크기가 릴리스 정보와 일치하지 않습니다.')
                 with os.fdopen(os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as output:
                     while True:
                         if self.closed.is_set() or time.monotonic() > deadline:
-                            raise ValueError('安装包下载超时或网关已关闭')
+                            raise ValueError('설치 패키지 다운로드 시간이 초과되었거나 게이트웨이가 닫혔습니다.')
                         block = response.read(65536)
                         if not block:
                             break
                         count += len(block)
                         if count > job['size']:
-                            raise ValueError('安装包大小与发布信息不一致')
+                            raise ValueError('설치 패키지 크기가 릴리스 정보와 일치하지 않습니다.')
                         output.write(block)
                         digest.update(block)
                         with self.lock:
@@ -202,17 +202,17 @@ class MobileUpdates:
                     output.flush()
                     os.fsync(output.fileno())
             if count != job['size'] or digest.hexdigest() != job['sha256']:
-                raise ValueError('安装包校验失败，请重新检查更新')
+                raise ValueError('설치 패키지 확인에 실패했습니다. 업데이트를 다시 확인하세요.')
             staging.replace(target)
         except (OSError, ValueError, HTTPException) as exc:
-            error = str(exc) if isinstance(exc, ValueError) else '电脑下载失败，请检查电脑网络和存储后重试'
+            error = str(exc) if isinstance(exc, ValueError) else '컴퓨터 다운로드에 실패했습니다. 컴퓨터 네트워크와 저장공간을 확인한 후 다시 시도해 주세요.'
         finally:
             # Keep the job non-retryable until its old staging file is gone.
             # Otherwise an old worker can unlink the replacement attempt's file.
             try:
                 staging.unlink(missing_ok=True)
             except OSError:
-                error = '电脑下载失败，请检查电脑网络和存储后重试'
+                error = '컴퓨터 다운로드에 실패했습니다. 컴퓨터 네트워크와 저장공간을 확인한 후 다시 시도해 주세요.'
             with self.lock:
                 job['state'], job['error'], job['used'] = 'failed' if error else 'ready', error, time.time()
 
@@ -220,7 +220,7 @@ class MobileUpdates:
         with self.lock:
             job = self.jobs.get(identifier)
             if job is None or time.time() - job['used'] > CACHE_SECONDS:
-                raise ValueError('更新缓存已过期，请重新下载')
+                raise ValueError('업데이트 캐시가 만료되었습니다. 다시 다운로드하세요.')
             job['used'] = time.time()
             return self._status(job)
 
@@ -230,14 +230,14 @@ class MobileUpdates:
             self.status(identifier)
             job = self.jobs[identifier]
             if job['state'] != 'ready':
-                raise ValueError('电脑尚未完成更新下载')
+                raise ValueError('컴퓨터에서 업데이트 다운로드가 완료되지 않았습니다.')
             path = self.directory / (identifier + '.apk')
             if path.is_symlink():
-                raise ValueError('更新缓存无效')
+                raise ValueError('업데이트 캐시가 잘못되었습니다.')
             stream = path.open('rb')
             if os.fstat(stream.fileno()).st_size != job['size']:
                 stream.close()
-                raise ValueError('更新缓存已变化，请重新下载')
+                raise ValueError('업데이트 캐시가 변경되었습니다. 다시 다운로드하세요.')
             job['readers'] += 1
             selection = download_range(job['size'], '"sha256-' + job['sha256'] + '"', range_header, if_range)
         try:

@@ -81,7 +81,7 @@ def start(executable, home, environment, *, arguments=(), new_instance=False, en
         # and can activate the default instance instead of creating this one.
         launcher = application_execution_alias(executable)
         if launcher is None:
-            raise ValueError('无法确认所选应用的独立启动别名，尚未启动默认配置')
+            raise ValueError('선택한 앱의 독립 실행형 실행 별칭을 확인할 수 없습니다. 기본 구성이 아직 실행되지 않았습니다.')
     removed = {name.upper() for name in environment_unset}
     inherited = {key: value for key, value in os.environ.items() if key.upper() not in removed}
     return subprocess.Popen([str(launcher), *arguments], cwd=home,

@@ -86,7 +86,7 @@ async function runTimelineTests() {
   second.apply({...page(1,2,4),rows:[long]},true);
   second.loadOlder(100);
   await until(()=>second.retryCount>0);
-  check(second.older.textContent===timelineText('历史加载失败，点击重试'),'Failed history exposes a retry button');
+  check(second.older.textContent===timelineText('기록을 로드하지 못했습니다. 다시 시도하려면 클릭하세요.'),'Failed history exposes a retry button');
   fail=false;await second.loadOlder(100);
   check(!second.hasMore&&second.older.hidden,'EOF stops history loading');
   check(detailCalls===0,'Collapsed tool bodies are not fetched');
@@ -151,8 +151,8 @@ async function runTimelineVisibilityTests() {
   check(requested===1&&!backfill.nodes.get('final').node.hidden,'Earlier replies remain available on demand');
   check(!backfill.hasMore,'Filtered history still stops at the end');
   backfill.dispose();
-  const empty=new ChatTimeline({url:action=>'/fixture/'+action+'?host=local',request:async()=>page([{key:'empty-image',role:'activity',kind:'imageView',title:'图片预览',text:'',order:0,version:'v1',truncated:false}],1),renderMeta:()=>{},renderText:(node,text)=>node.textContent=text,status:()=>{}});
-  empty.apply(page([{key:'empty-image',role:'activity',kind:'imageView',title:'图片预览',text:'',order:0,version:'v1',truncated:false}],1),true);
+  const empty=new ChatTimeline({url:action=>'/fixture/'+action+'?host=local',request:async()=>page([{key:'empty-image',role:'activity',kind:'imageView',title:'사진 미리보기',text:'',order:0,version:'v1',truncated:false}],1),renderMeta:()=>{},renderText:(node,text)=>node.textContent=text,status:()=>{}});
+  empty.apply(page([{key:'empty-image',role:'activity',kind:'imageView',title:'사진 미리보기',text:'',order:0,version:'v1',truncated:false}],1),true);
   const emptyBody=empty.nodes.get('empty-image').node.querySelector('.activity-body');
   check(emptyBody.hidden&&getComputedStyle(emptyBody).display==='none','Empty image preview body does not reserve space');
   empty.dispose();
@@ -207,7 +207,7 @@ async function runTimelineNativeFileChangesTests(){
   const card=timeline.nodes.get('native-footer').node;
   check(!card.hidden&&card.classList.contains('edited-files-card'),'Native edited-files card stays visible with process hidden');
   check(card.getBoundingClientRect().width>250&&card.scrollWidth<=card.clientWidth,'Native card fits the available message width');
-  check(card.querySelector('.edited-files-basis').textContent===timelineText('累计修改'),'Recorded patch totals are labeled separately from net edits');
+  check(card.querySelector('.edited-files-basis').textContent===timelineText('누적 수정'),'Recorded patch totals are labeled separately from net edits');
   check(!card.open&&card.querySelector('.edited-files-list').textContent.includes('/repo/space name.py'),'Native card starts collapsed and contains per-file paths and counts');
   let detailCalls=0;
   timeline.request=async()=>{detailCalls++;return {key:'native-footer',version:'patch-v1',offset:0,text:nativePatch.slice(0,16000),next:16000};};

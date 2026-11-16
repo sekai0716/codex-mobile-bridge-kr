@@ -23,7 +23,7 @@ class ThreadAccess:
                     params['config'] = {'model_reasoning_effort':effort}
                 result = rpc.request('thread/resume', params)
                 if result.get('modelProvider', result.get('thread', {}).get('modelProvider')) != params['modelProvider']:
-                    raise ValueError('旧聊天接入未能更新，请在电脑端检查')
+                    raise ValueError("기존 채팅에 대한 액세스를 업데이트할 수 없습니다. 데스크톱 앱을 확인하세요.")
                 if model and result.get('model') != model:
-                    raise ValueError('旧聊天模型未能更新，请在电脑端检查')
+                    raise ValueError("기존 채팅의 모델을 업데이트할 수 없습니다. 데스크톱 앱을 확인하세요.")
                 rpc.request('thread/unsubscribe', {'threadId':record['id']})

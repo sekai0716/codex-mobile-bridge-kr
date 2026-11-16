@@ -20,7 +20,7 @@ function fixture({ reply = 'copied', late = false, frame = false, domReadyBefore
   if (domReadyBeforeNative) { context.document.readyState = 'complete'; events.DOMContentLoaded?.(); }
   vm.runInContext(script.replace('__BRIDGE_CLIPBOARD_TOKEN__', 'test-token'), context);
   if (late) { loadWeb(); events.DOMContentLoaded(); }
-  const button = { disabled: false, textContent: '复制' };
+  const button = { disabled: false, textContent: '복사' };
   const click = (trusted = true) => events.click({ isTrusted: trusted, target: { closest: () => button } });
   return { context, events, listeners, button, click, writes, errors, timers };
 }
@@ -33,32 +33,32 @@ test('repeated native injection retains one set of handlers and one-click author
   assert.equal(f.writes.length, 1);
 });
 test('language sync skips unchanged values and retries a rejected native save', () => {
-  let language = 'zh', accepted = false;
+  let language = 'ko', accepted = false;
   const events = {}, writes = [], context = { BridgeI18n: { language: () => language },
     prompt: (command, value) => { writes.push(value); return accepted ? 'saved' : null; },
     document: { addEventListener: (name, fn) => events[name] = fn } };
   context.window = context; context.top = context;
   vm.createContext(context);
-  vm.runInContext(script.replace("'__BRIDGE_NATIVE_LANGUAGE__'", "'zh'"), context);
+  vm.runInContext(script.replace("'__BRIDGE_NATIVE_LANGUAGE__'", "'ko'"), context);
   assert.deepEqual(writes, []);
   events['bridge-language'](); assert.deepEqual(writes, []);
   language = 'en'; events['bridge-language'](); accepted = true; events['bridge-language'](); events['bridge-language']();
   assert.deepEqual(writes, ['en', 'en']);
-  language = 'zh'; events['bridge-language'](); events['bridge-language']();
-  assert.deepEqual(writes, ['en', 'en', 'zh']);
+  language = 'ko'; events['bridge-language'](); events['bridge-language']();
+  assert.deepEqual(writes, ['en', 'en', 'ko']);
 });
 test('copies async full message exactly without browser clipboard or manual dialog', async () => {
   const f = fixture(); f.click();
-  const text = '中文🙂\n```js\nconst value = "quotes\\slashes";\n```\n';
+  const text = '중국어🙂\n```js\nconst value = "quotes\\slashes";\n```\n';
   await f.context.BridgeClipboard.copy(async () => text, f.button);
   assert.deepEqual(f.writes, [{ command: 'codexbridge-copy:test-token', text }]);
-  assert.equal(f.button.textContent, '已复制'); assert.equal(f.button.disabled, false);
-  assert.deepEqual(f.errors, []); f.timers[0](); assert.equal(f.button.textContent, '复制');
+  assert.equal(f.button.textContent, '복사됨'); assert.equal(f.button.disabled, false);
+  assert.deepEqual(f.errors, []); f.timers[0](); assert.equal(f.button.textContent, '복사');
 });
 test('code-copy path uses the same async writer and handles deferred page scripts', async () => {
-  const f = fixture({ late: true }); f.button.textContent = '复制代码'; f.click();
+  const f = fixture({ late: true }); f.button.textContent = '코드 복사'; f.click();
   await f.context.BridgeClipboard.copy(async () => 'a\n b\t', f.button);
-  assert.equal(f.writes[0].text, 'a\n b\t'); assert.equal(f.button.textContent, '已复制');
+  assert.equal(f.writes[0].text, 'a\n b\t'); assert.equal(f.button.textContent, '복사됨');
 });
 test('published native shells can install after DOMContentLoaded with the eager clipboard definition', async () => {
   assert.match(html, /<script src="\/message-actions\.js\?[^\"]+" defer id="bridge-clipboard-script"><\/script>/);
@@ -73,8 +73,8 @@ test('published native shells can install after DOMContentLoaded with the eager 
 test('native rejection does not report copied or open the manual-copy dialog', async () => {
   const f = fixture({ reply: null }); f.click();
   await f.context.BridgeClipboard.copy(() => 'text', f.button);
-  assert.equal(f.button.textContent, '复制'); assert.equal(f.button.disabled, false);
-  assert.deepEqual(f.errors, ['复制失败，请重试']); assert.equal(f.timers.length, 0);
+  assert.equal(f.button.textContent, '복사'); assert.equal(f.button.disabled, false);
+  assert.deepEqual(f.errors, ['복사하지 못했습니다. 다시 시도해 주세요.']); assert.equal(f.timers.length, 0);
 });
 test('no write without a real click, and a click only authorizes one copy', async () => {
   const f = fixture();
@@ -87,14 +87,14 @@ test('no write without a real click, and a click only authorizes one copy', asyn
 });
 test('full-text fetch failure restores the button without copying partial text', async () => {
   const f = fixture(); f.click();
-  await f.context.BridgeClipboard.copy(async () => { throw new Error('读取失败'); }, f.button);
-  assert.deepEqual(f.errors, ['读取失败']); assert.equal(f.writes.length, 0);
-  assert.equal(f.button.disabled, false); assert.equal(f.button.textContent, '复制');
+  await f.context.BridgeClipboard.copy(async () => { throw new Error("로드할 수 없습니다."); }, f.button);
+  assert.deepEqual(f.errors, ["로드할 수 없습니다."]); assert.equal(f.writes.length, 0);
+  assert.equal(f.button.disabled, false); assert.equal(f.button.textContent, '복사');
 });
 test('oversized text is rejected, never silently truncated', async () => {
   const f = fixture(); f.click();
   await f.context.BridgeClipboard.copy(() => 'x'.repeat(262145), f.button);
-  assert.equal(f.writes.length, 0); assert.deepEqual(f.errors, ['内容过长，请分段复制']);
+  assert.equal(f.writes.length, 0); assert.deepEqual(f.errors, ['내용이 너무 길어요. 부분적으로 복사해주세요.']);
 });
 test('embedded frames cannot install the native copy hook', () => {
   const f = fixture({ frame: true }); assert.equal(f.events.click, undefined);

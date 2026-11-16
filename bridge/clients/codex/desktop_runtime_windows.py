@@ -26,10 +26,10 @@ NAME = 'codex-desktop'
 
 def _verify(record):
     if _read(directory(record['home']) / 'active.json') != record:
-        raise ValueError('Codex 原生连接记录已变化')
+        raise ValueError('Codex 기본 연결 레코드가 변경되었습니다.')
     for key in ('app', 'adapter', 'runtime'):
         if process_identity(record[key]['pid']) != record[key]:
-            raise ValueError('Codex 原生连接进程已变化')
+            raise ValueError('Codex 기본 연결 프로세스가 변경되었습니다.')
 
 
 class MetadataClient:
@@ -43,25 +43,25 @@ class MetadataClient:
             value = self.service._exchange({'command': 'status'}, timeout=5)
             if (value.get('generation') != self.record['generation'] or value.get('ready') is not True
                     or value.get('home') != self.record['home']):
-                raise ValueError('原生连接身份不匹配')
+                raise ValueError('기본 연결 ID 불일치')
             _verify(self.record)
         except (OSError, ValueError, EOFError, KeyError, TypeError) as exc:
-            raise AppServerUnavailable('Codex 原生连接尚未就绪，请重新初始化连接') from exc
+            raise AppServerUnavailable('Codex 기본 연결이 아직 준비되지 않았습니다. 연결을 다시 초기화하세요.') from exc
 
     def request(self, method, params, timeout=90):
         if self.closed or method not in METADATA_METHODS or not isinstance(params, dict):
-            raise AppServerRequestNotSent('原生元数据连接不可用')
+            raise AppServerRequestNotSent('기본 메타데이터 연결을 사용할 수 없습니다.')
         try:
             _verify(self.record)
         except (OSError, ValueError, KeyError, TypeError) as exc:
-            raise AppServerRequestNotSent('Codex 原生连接已变化') from exc
+            raise AppServerRequestNotSent('Codex 기본 연결이 변경되었습니다.') from exc
         try:
             response = self.service._exchange({'command': 'call', 'generation': self.record['generation'],
                                                'method': method, 'params': params}, timeout=timeout)
         except LocalRequestNotSent as exc:
             raise AppServerRequestNotSent(str(exc)) from exc
         except (OSError, ValueError, EOFError, KeyError, TypeError) as exc:
-            raise AppServerUnknownResult(str(exc) or '原生操作结果尚未确认，不会重复提交') from exc
+            raise AppServerUnknownResult(str(exc) or '네이티브 작업 결과는 아직 확인되지 않았으며 반복적으로 제출되지 않습니다.') from exc
         return response_result(method, params, response)
 
     def close(self):
@@ -78,7 +78,7 @@ def run(configuration, arguments):
     home = Path(config['home']).resolve()
     if (config.get('version') != VERSION or path != directory(home) / 'settings.json'
             or Path(config['launcher']).resolve() != Path(sys.executable).resolve()):
-        raise ValueError('原生共享连接配置不匹配')
+        raise ValueError('기본 공유 연결 구성 불일치')
     env = dict(os.environ)
     env.pop('CMB_CODEX_DESKTOP_CONFIGURATION', None)
     # Desktop's override bootstrap removes this variable. Preserve the exact
@@ -93,10 +93,10 @@ def run(configuration, arguments):
     app = process_identity(os.getppid())
     if (app['image'] != config['application'] or Path(env.get('CODEX_HOME', '')).resolve() != home
             or Path(env.get('CODEX_SQLITE_HOME') or home).resolve() != home):
-        raise ValueError('原生共享连接与当前 App 或配置目录不匹配')
+        raise ValueError('기본 공유 연결 및 현재 App 또는 구성 디렉터리가 일치하지 않습니다.')
     first = sys.stdin.buffer.readline(MAX_LINE + 2)
     if len(first) > MAX_LINE + 1:
-        raise ValueError('原生初始化消息过大')
+        raise ValueError('기본 초기화 메시지가 너무 큽니다.')
     try:
         initialize = json.loads(first)
     except (ValueError, UnicodeError):
@@ -145,12 +145,12 @@ def _serve(config, app, arguments, initialize, env, native):
         while offset < len(data):
             count = child.stdin.write(data[offset:])
             if not count:
-                raise EOFError('原生桌面连接已关闭')
+                raise EOFError('기본 데스크톱 연결이 닫혔습니다.')
             offset += count
 
     def initialized(result):
         if Path(result.get('codexHome', '')).resolve() != Path(config['home']).resolve():
-            raise ValueError('原生运行时使用了其他配置目录')
+            raise ValueError('기본 런타임은 다른 구성 디렉터리를 사용합니다.')
         _verify(record)
         record['ready'] = True
         _write(active, json.dumps(record))
@@ -172,14 +172,14 @@ def _serve(config, app, arguments, initialize, env, native):
                     _verify(record)
                     request = message.get('request')
                     if stopped.is_set() or not isinstance(request, dict):
-                        raise ValueError('原生桌面连接已关闭')
+                        raise ValueError('기본 데스크톱 연결이 닫혔습니다.')
                     if request.get('command') == 'status':
                         value = {'generation': generation, 'home': config['home'], 'ready': router.ready}
                     elif request.get('command') == 'call' and request.get('generation') == generation:
                         dispatched = True
                         value = router.request_packet(request.get('method'), request.get('params'), timeout=max(.01, deadline-time.monotonic()))
                     else:
-                        raise ValueError('原生元数据请求无效')
+                        raise ValueError('잘못된 기본 메타데이터 요청')
                     response = {'ok': True, 'value': value}
                 except (OSError, ValueError, AppServerError, EOFError) as exc:
                     response = {'ok': False, 'error': str(exc), 'notSent': not dispatched or isinstance(exc, AppServerRequestNotSent)}
@@ -207,10 +207,10 @@ def _serve(config, app, arguments, initialize, env, native):
                 if not line:
                     return
                 if len(line.rstrip(b'\r\n')) > MAX_LINE:
-                    raise ValueError('原生回执超过消息大小限制')
+                    raise ValueError('기본 수신이 메시지 크기 제한을 초과합니다.')
                 message = json.loads(line)
                 if not isinstance(message, dict):
-                    raise ValueError('原生回执格式无效')
+                    raise ValueError('기본 영수증 형식이 잘못되었습니다.')
                 router.from_native(message)
         except (OSError, ValueError, AppServerError):
             pass
@@ -235,7 +235,7 @@ def _serve(config, app, arguments, initialize, env, native):
                                  creationflags=subprocess.CREATE_NO_WINDOW)
         record['runtime'] = process_identity(child.pid)
         if record['runtime']['parent'] != os.getpid() or record['runtime']['image'] != os.path.normcase(config['cli']):
-            raise ValueError('原生运行时子进程身份不匹配')
+            raise ValueError('기본 런타임 하위 프로세스 ID 불일치')
         _write(active, json.dumps(record))
         endpoint = '\\\\.\\pipe\\cmb-rpc-' + NAME + '-' + secrets.token_hex(16)
         listener = native.listener(endpoint)
@@ -257,7 +257,7 @@ def _serve(config, app, arguments, initialize, env, native):
             try:
                 child.wait(timeout=25)
             except subprocess.TimeoutExpired:
-                print('原生运行时仍在正常退出，保留连接记录供下次核验', file=sys.stderr)
+                print('기본 런타임은 여전히 ​​정상적으로 종료되고 있으며 다음 확인을 위해 연결 기록이 유지됩니다.', file=sys.stderr)
                 return 1
         if child is not None and active.exists() and _read(active) == record:
             active.unlink()

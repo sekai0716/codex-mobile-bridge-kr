@@ -102,7 +102,7 @@ public final class MonitorService extends Service {
     String channel = "background-monitor";
     NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     if (manager.getNotificationChannel(channel) == null) {
-      NotificationChannel value = new NotificationChannel(channel, L("后台通知"), NotificationManager.IMPORTANCE_LOW);
+      NotificationChannel value = new NotificationChannel(channel, L("백그라운드 알림"), NotificationManager.IMPORTANCE_LOW);
       value.setSound(null, null);
       value.setShowBadge(false);
       manager.createNotificationChannel(value);
@@ -113,10 +113,10 @@ public final class MonitorService extends Service {
         new Intent(this, MonitorService.class).setAction("pause"), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     Notification notification = new Notification.Builder(this, channel)
         .setSmallIcon(getResources().getIdentifier("ic_notification", "drawable", getPackageName()))
-        .setContentTitle(L("后台通知运行中")).setContentText(text)
+        .setContentTitle(L("백그라운드 알림 사용 중")).setContentText(text)
         .setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PUBLIC)
         .setContentIntent(open)
-        .addAction(new Notification.Action.Builder(null, L("暂停后台通知"), pause).build()).build();
+        .addAction(new Notification.Action.Builder(null, L("백그라운드 알림 일시중지"), pause).build()).build();
     if (foreground) manager.notify(ONGOING, notification);
     else if (Build.VERSION.SDK_INT >= 34) startForeground(ONGOING, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
     else startForeground(ONGOING, notification);
@@ -126,9 +126,9 @@ public final class MonitorService extends Service {
 
   private static String statusText(NotificationReceiver.Status status) {
     switch (status) {
-      case RECEIVING: return "正在接收任务提醒";
-      case RETRYING: return "正在重试";
-      default: return "请重新登录";
+      case RECEIVING: return "작업 알림 수신";
+      case RETRYING: return "재시도 중";
+      default: return "다시 로그인하세요.";
     }
   }
 

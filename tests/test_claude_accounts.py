@@ -188,7 +188,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
             result = self.accounts.models()
         self.assertEqual(result['models'], [])
         self.assertEqual(result['groups'], [])
-        self.assertIn('未提供可离线读取', result['notice'])
+        self.assertIn("Claude의 공식 계정에는 로컬에서 읽을 수 있는 모델 카탈로그가 없습니다. 이전에 캐시된 모델은 Desktop이 연결된 후에도 계속 사용할 수 있습니다.", result['notice'])
         query.assert_not_called()
 
     def test_import_keeps_native_profile_and_excludes_conversations_and_cli(self):
@@ -266,7 +266,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
                 raise OSError('PRIVATE-NATIVE-ERROR')
             return private_json(path, value)
         with patch(MODULE+'private_json', side_effect=fail_once):
-            with self.assertRaisesRegex(ValueError, '已恢复原接入') as caught:
+            with self.assertRaisesRegex(ValueError, "Claude\\ 계정\\ 전환에\\ 실패했습니다\\.\\ 이전\\ 연결이\\ 복원되었습니다\\.") as caught:
                 self.accounts.restore(first)
         self.assertNotIn('PRIVATE-NATIVE-ERROR', str(caught.exception))
         self.assertEqual(self.accounts.public()['activeId'], second)
@@ -393,7 +393,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
         self.gateway()
         identifier = self.save()
         self.assertEqual(set(self.accounts.edit(identifier)), {'id', 'name', 'kind'})
-        with self.assertRaisesRegex(ValueError, '仅支持修改名称'):
+        with self.assertRaisesRegex(ValueError, "이\\ 연결은\\ 데스크톱\\ 클라이언트에\\ 의해\\ 관리됩니다\\.\\ 여기서는\\ 이름만\\ 편집할\\ 수\\ 있습니다\\."):
             self.accounts.save_api(self.api_options(id=identifier))
 
     def test_invalid_ids_and_linked_profile_data_are_rejected(self):
@@ -415,7 +415,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
 
     def test_stale_or_missing_login_is_not_imported(self):
         (self.home/'Cookies').unlink()
-        with self.assertRaisesRegex(ValueError, '已登录'):
+        with self.assertRaisesRegex(ValueError, "로그인한\\ Claude\\ 데스크톱\\ 계정을\\ 찾을\\ 수\\ 없습니다\\.\\ 먼저\\ 클라이언트에\\ 로그인하세요\\."):
             self.save()
         self.assertEqual(self.accounts.public()['accounts'], [])
 
@@ -556,7 +556,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
         accounts = ClaudeAccounts(self.root/'accounts', self.threep, executable=self.executable)
         saved = accounts.import_current()['activeId']
         before = {home: (home/CONFIG).read_bytes() for home in (self.home, self.threep, modern)}
-        with self.assertRaisesRegex(ValueError, '多个.*目录'):
+        with self.assertRaisesRegex(ValueError, "여러\\ 개\\ 감지됨\\ Claude\\ 로그인\\ 디렉터리,\\ 계정을\\ 안전하게\\ 전환할\\ 수\\ 없습니다\\.\\ 설정에서\\ 클라이언트\\ 데이터\\ 디렉터리를\\ 지정하세요\\."):
             accounts.restore(saved)
         self.assertEqual(before, {home: (home/CONFIG).read_bytes() for home in before})
         self.assertFalse((self.root/'accounts/transactions').exists())
@@ -568,7 +568,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
         fallback = self.root/'Roaming/Claude'
         accounts = ClaudeAccounts(self.root/'accounts', fallback, executable=self.executable)
         self.assertIsNone(accounts.public()['current'])
-        with self.assertRaisesRegex(ValueError, '多个.*目录'):
+        with self.assertRaisesRegex(ValueError, "여러\\ 개\\ 감지됨\\ Claude\\ 로그인\\ 디렉터리,\\ 계정을\\ 안전하게\\ 전환할\\ 수\\ 없습니다\\.\\ 설정에서\\ 클라이언트\\ 데이터\\ 디렉터리를\\ 지정하세요\\."):
             accounts.restore('f'*32)
         self.assertFalse(fallback.exists())
         self.assertFalse((self.root/'accounts/transactions').exists())
@@ -725,7 +725,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
 
     def test_quota_certificate_configuration_failure_does_not_fall_back_to_unverified_https(self):
         with patch(MODULE+'client_context', side_effect=OSError('PRIVATE-CA-PATH')), patch(MODULE+'request.build_opener') as build:
-            with self.assertRaisesRegex(ValueError, '稍后重试') as caught:
+            with self.assertRaisesRegex(ValueError, "Claude\\ 남은\\ 사용량을\\ 일시적으로\\ 사용할\\ 수\\ 없습니다\\.\\ 나중에\\ 다시\\ 시도하세요\\.") as caught:
                 _web_json('/api/organizations/test/usage', {'sessionKey': 'fixture'}, 'test')
         build.assert_not_called()
         self.assertNotIn('PRIVATE', str(caught.exception))
@@ -762,7 +762,7 @@ class ClaudeAccountSnapshots(unittest.TestCase):
             native.assert_called_once_with(b'wrapped-fixture-key')
             with self.assertRaises(Exception):
                 _decrypt_cookie(host, encrypted[:-1]+bytes([encrypted[-1]^1]), self.home)
-            with self.assertRaisesRegex(ValueError, '暂不支持'):
+            with self.assertRaisesRegex(ValueError, "사용\\ 확인은\\ 아직\\ 이\\ Claude\\ 자격\\ 증명\\ 암호화\\ 형식을\\ 지원하지\\ 않습니다\\."):
                 _decrypt_cookie(host, b'v20unsupported', self.home)
 
 

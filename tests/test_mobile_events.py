@@ -84,7 +84,7 @@ class MobileEventTests(unittest.TestCase):
         manager = Notifications(None, self.path, lambda: ['https://gateway.example'])
         manager.defaults({'requests': True, 'completion': True})
         row = {'id': THREAD, 'host': 'local'}
-        title = '聊天标题' * 40
+        title = '채팅 제목' * 40
         for completed in (False, True):
             for include_title in (False, True):
                 with self.subTest(completed=completed, include_title=include_title):
@@ -93,10 +93,10 @@ class MobileEventTests(unittest.TestCase):
                     key = manager._delivery_key(row, f'{completed}:{include_title}', target=target)
                     self.assertTrue(manager._send_keys(config, row, title, 'mobile', target, [key], completed))
                     event = manager.mobile.read()['events'][-1]
-                    generic = ('有 1 次运行已完成，请打开聊天查看。' if completed
-                               else '有 1 项请求等待处理，请打开聊天查看。')
+                    generic = ('완료된 실행이 1건 있습니다. 채팅에서 확인하세요.' if completed
+                               else '처리를 기다리는 요청이 1개 있습니다. 채팅에서 확인하세요.')
                     self.assertEqual(event['body'], title[:120] if include_title else generic)
-                    self.assertEqual(event['title'], 'Codex 运行已完成' if completed else 'Codex 需要你的确认')
+                    self.assertEqual(event['title'], 'Codex 실행 완료' if completed else 'Codex 당신의 확인이 필요합니다')
 
     def test_inbox_delivery_preserves_global_policy_and_hides_private_title(self):
         manager = Notifications(None, self.path, lambda: ['https://gateway.example'])

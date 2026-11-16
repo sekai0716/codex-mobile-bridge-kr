@@ -12,7 +12,7 @@ function fixture({durable=true,request,local=storage(),temporary=storage(),coord
   const scope={gateway:'gateway',provider:'codex',account:'account',host:'local',session:'fixture'};
   const nodes={composer:{},message:{value:'same text'},'send-mode':{value:'send'},send:{},'send-error':{}};
   const calls=[];let sequence=0;const tab=++tabSequence;
-  const context={$:id=>nodes[id],t:value=>value,BridgeI18n:{locale:()=> 'zh-CN'},
+  const context={$:id=>nodes[id],t:value=>value,BridgeI18n:{locale:()=> 'ko-KR'},
     codexQuotes:null,sending:false,currentId:'fixture',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
     attachments:{ready:()=>true,ids:()=>['attachment'],references:()=>[],rows:[{id:'attachment'}],setLocked(){},clear(){}},
     workModes:{value:()=> 'default',render(){},submitted(){}},invalidSkills:new Set(),selectedSkills:new Set(['skill']),
@@ -46,7 +46,7 @@ for(const durable of [true,false]){
   });
 
   for(const error of [{status:500,code:'send_not_submitted'},
-    {status:400,message:'Codex 正在执行。请选择「排队发送」或「补充当前任务」。'},
+    {status:400,message:'Codex 실행 중입니다. ”보낼 대기열” 또는 ”현재 작업 보충”을 선택하십시오.」。'},
     {status:409,code:'desktop_unavailable'},{message:'network disconnected'}]){
     test(`${durable?'durable':'legacy'} pending ID survives ${JSON.stringify(error)}`,async()=>{
       const ui=fixture({durable,request:()=>{throw Object.assign(Error('fixture failure'),error);}});
@@ -104,7 +104,7 @@ test('all same-ID attempts explicitly rejected permits queueing',async()=>{
 
 test('legacy imported durable request remains untracked after rejection',async()=>{
   const ui=fixture({request:()=>{throw Object.assign(Error('busy'),{status:400,code:'send_not_submitted'});}});
-  const body={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'zh-CN'};
+  const body={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'ko-KR'};
   ui.drafts.begin(ui.scope,body,'old-page-id');await ui.submit();assert.equal(ui.pending().id,'old-page-id');
 });
 
@@ -157,7 +157,7 @@ test('old confirmations and ignores cannot clear a newer coordinated request',as
 
 test('confirming imported legacy request does not resurrect its old pending record',async()=>{
   const ui=fixture({request:()=>({status:'accepted'})});
-  const body={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'zh-CN'};
+  const body={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'ko-KR'};
   ui.drafts.begin(ui.scope,body,'old-page-id');await ui.submit();assert.equal(ui.drafts.pendingSend(ui.scope),null);
   assert.equal(ui.drafts.pending(ui.scope).id,'old-page-id','Older page storage is untouched');
 });
@@ -247,7 +247,7 @@ test('real handler blocks queue after an old page writes its second unknown',asy
   const first={text:'first'};old.begin(ui.scope,first,'first-id');
   await ui.drafts.beginSend(ui.scope,first,'unused','first-attempt');
   await ui.drafts.settleSend(ui.scope,'first-id','first-attempt','confirm',0);old.confirm(ui.scope,'first-id',0);
-  const second={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'zh-CN'};
+  const second={text:'same text',mode:'send',skills:['skill'],workMode:'default',attachments:['attachment'],uiLocale:'ko-KR'};
   old.begin(ui.scope,second,'second-unknown');
   // The old page's request delivered an unknown response, so it keeps v1 intact.
   ui.nodes['send-mode'].value='queue';await ui.submit();

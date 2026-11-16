@@ -33,7 +33,7 @@ class LocalRpcTests(unittest.TestCase):
             with self.assertRaises(LocalRequestNotSent): service._exchange({})
 
     def test_fragmented_shared_frames_and_size_boundaries(self):
-        value = {'token': 'fixture', 'request': {'text': '中文消息'}}
+        value = {'token': 'fixture', 'request': {'text': '중국 뉴스'}}
         data = packet(value);stream = io.BytesIO(data)
         self.assertEqual(read_packet(lambda count: stream.read(min(count, 3))), value)
         chunks = []
@@ -50,7 +50,7 @@ class LocalRpcTests(unittest.TestCase):
             service.record.write_text('{}');self.assertFalse(service.status()['configured'])
 
     def test_names_cannot_escape_the_service_directory(self):
-        for name in ('../profile', 'UPPER', 'control/pipe', '本机'):
+        for name in ('../profile', 'UPPER', 'control/pipe', "이 컴퓨터"):
             with self.assertRaises(ValueError):LocalService('.tmp', name)
 
 

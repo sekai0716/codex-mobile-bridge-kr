@@ -10,7 +10,7 @@ window.checkBrowserNavigation=async function(){
     if(provider==='codex')await openChat(id,host);else await desktopSessions.open(id);
     const input=provider==='codex'?document.getElementById('message'):desktopSessions.input;
     const wb=provider==='codex'?workbench:desktopSessions.workbench,session=wb.current;
-    input.value='浏览器草稿 '+provider+' '+host;input.dispatchEvent(new Event('input',{bubbles:true}));const draft=input.value;
+    input.value='브라우저 초안 '+provider+' '+host;input.dispatchEvent(new Event('input',{bubbles:true}));const draft=input.value;
     const length=history.length,dialog=document.createElement('dialog');document.body.append(dialog);dialog.showModal();
     history.back();await until(()=>!document.getElementById('app').classList.contains('chat-open'));
     assert(!dialog.open,provider+'/'+host+' back closes detail dialog');dialog.remove();

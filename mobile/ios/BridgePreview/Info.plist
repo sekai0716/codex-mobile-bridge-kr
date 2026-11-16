@@ -53,9 +53,9 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>扫描电脑网关登录二维码。</string>
+	<string>컴퓨터 게이트웨이 로그인 QR 코드를 스캔하세요。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>连接同一网络中的电脑网关，继续你的聊天。</string>
+	<string>채팅을 계속하려면 동일한 네트워크에 있는 컴퓨터 게이트웨이에 연결하세요.。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

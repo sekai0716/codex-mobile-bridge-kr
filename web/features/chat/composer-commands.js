@@ -6,14 +6,14 @@ class ComposerCommands {
   static known=new Set(['model','reasoning','skills','permissions','context','compact','default','plan','goal','status','rename','archive','delete','fork','new','side']);
   static controls({model,skills,permissions,context,workMode}){
     const rows=[];
-    for(const [id,label,button] of [['model','模型',model],['reasoning','思考强度',model],['skills','Skill',skills],['permissions','权限',permissions]]){
+    for(const [id,label,button] of [['model','모델',model],['reasoning','추론 강도',model],['skills','Skill',skills],['permissions','권한',permissions]]){
       if(button&&!button.hidden)rows.push({id,label,enabled:!button.disabled,run:()=>button.click()});
     }
     if(context?.state){
-      rows.push({id:'context',label:'上下文使用量',enabled:true,run:()=>context.open()});
-      if(context.state.capabilities?.compact===true)rows.push({id:'compact',label:'压缩上下文',enabled:!!context.state.connected&&!context.state.busy,run:()=>context.open()});
+      rows.push({id:'context',label:'컨텍스트 사용법',enabled:true,run:()=>context.open()});
+      if(context.state.capabilities?.compact===true)rows.push({id:'compact',label:'컴팩트한 컨텍스트',enabled:!!context.state.connected&&!context.state.busy,run:()=>context.open()});
     }
-    for(const [id,label] of [['default','普通模式'],['plan','计划模式'],['goal','目标模式']]){
+    for(const [id,label] of [['default','기본 모드'],['plan','계획 모드'],['goal','목표 모드']]){
       const option=workMode?.querySelector('[value='+id+']');
       if(option&&!workMode.hidden)rows.push({id,label,enabled:!workMode.disabled&&!option.disabled,args:true,
         run:()=>{workMode.value=id;workMode.dispatchEvent(new Event('change',{bubbles:true}));}});
@@ -22,8 +22,8 @@ class ComposerCommands {
   }
   static session(context,open){
     if(!context)return [];
-    const rows=[{id:'status',label:'会话详情',enabled:true,run:()=>open('details')}];
-    for(const [id,label,capability,view] of [['rename','修改聊天名称','rename','rename'],['archive','归档','archive',context.archived?'main':'archive'],['delete','永久删除聊天','deletion','delete'],['fork','创建聊天分支','fork','main']]){
+    const rows=[{id:'status',label:'채팅 세부정보',enabled:true,run:()=>open('details')}];
+    for(const [id,label,capability,view] of [['rename','채팅 이름 바꾸기','rename','rename'],['archive','보관소','archive',context.archived?'main':'archive'],['delete','채팅을 영구적으로 삭제','deletion','delete'],['fork','채팅 브랜치 생성','fork','main']]){
       if(context[capability])rows.push({id,label,enabled:true,run:()=>open(view)});
     }
     return rows;
@@ -31,7 +31,7 @@ class ComposerCommands {
   constructor({input,scope,actions,onError}){
     Object.assign(this,{input,scope,actions,onError});this.index=0;this.rows=[];
     this.menu=document.createElement('div');this.menu.className='composer-commands';this.menu.id='composer-commands-'+(++ComposerCommands.serial);this.menu.hidden=true;
-    this.menu.setAttribute('role','listbox');this.menu.setAttribute('aria-label',BridgeI18n.t('聊天指令'));input.before(this.menu);
+    this.menu.setAttribute('role','listbox');this.menu.setAttribute('aria-label',BridgeI18n.t('채팅 명령'));input.before(this.menu);
     input.setAttribute('aria-controls',this.menu.id);input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');
     input.addEventListener('input',()=>{this.dismissed=null;this.index=0;this.refresh();});
     input.addEventListener('focus',()=>this.refresh());
@@ -84,7 +84,7 @@ class ComposerCommands {
     if(!match)return false;
     const action=this.actions().find(row=>row.id===match[1]);
     if(!action&&!ComposerCommands.known.has(match[1]))return false;
-    if(!action?.enabled||match[2]&&!action.args){this.onError?.(BridgeI18n.t('此指令当前不可用，请使用菜单中的可用选项。'));return true;}
+    if(!action?.enabled||match[2]&&!action.args){this.onError?.(BridgeI18n.t('이 명령은 현재 사용할 수 없습니다. 메뉴에서 사용 가능한 옵션을 선택하세요.'));return true;}
     // An unavailable known command must remain a draft, never fall through to send.
     this.choose(action.id,this.scope(),match[2]||'');return true;
   }

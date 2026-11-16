@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_FLYBIRD_APP = Path('/Applications/飞鸟加速.app')
+_FLYBIRD_APP = Path('/Applications/새의 속도가 빨라지다.app')
 
 
 def current_user_proxy_settings():

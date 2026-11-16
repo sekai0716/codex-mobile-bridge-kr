@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from bridge.features.auth.auth import password_record
+from bridge.features.auth.auth import password_record, INITIAL_CREDENTIAL_NAMES, initial_credentials_path
 from bridge.api.httpd import GatewayServer
 from bridge.app.lifecycle import GatewayControl
 from bridge.app.service import Bridge
@@ -41,52 +41,53 @@ def main(connections=None, connection_secrets=None):
     # Redirected Windows streams may use a codec that cannot encode Chinese.
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
-    parser = argparse.ArgumentParser(description="Codex App 手机网关")
+    parser = argparse.ArgumentParser(description="Codex App 모바일 게이트웨이")
     parser.add_argument("--config", type=Path, default=ROOT / ".local/config.json")
-    parser.add_argument("--lan", action="store_true", help="监听局域网；默认只监听本机")
-    parser.add_argument("--tunnel", action="store_true", help="同时启动 Cloudflare 临时 HTTPS 外网入口")
-    parser.add_argument("--ssh-target", help="自有服务器的已有 SSH Host 别名或 user@hostname")
-    parser.add_argument("--ssh-remote-port", type=int, default=18787, help="SSH 服务器回环监听端口")
+    parser.add_argument("--lan", action="store_true", help="LAN 주소에서 수신합니다. 기본값은 로컬 수신입니다.")
+    parser.add_argument("--tunnel", action="store_true", help="Cloudflare 임시 HTTPS 터널도 함께 시작합니다.")
+    parser.add_argument("--ssh-target", help="서버의 SSH Host 별칭 또는 user@hostname")
+    parser.add_argument("--ssh-remote-port", type=int, default=18787, help="SSH 서버 루프백 수신 포트")
     tunnel_name = 'cloudflared.exe' if os.name == 'nt' else 'cloudflared'
     tunnel_bin = ROOT / '.local/bin' / tunnel_name
-    parser.add_argument("--cloudflared", type=Path, default=tunnel_bin if tunnel_bin.is_file() else Path(shutil.which(tunnel_name) or str(tunnel_bin)), help="Cloudflare 客户端路径")
-    parser.add_argument("--ipc-path", help="桌面 IPC 地址；Windows 为本机命名管道路径")
-    parser.add_argument("--codex-bin", type=Path, help="桌面 App 的 Codex 可执行文件路径")
+    parser.add_argument("--cloudflared", type=Path, default=tunnel_bin if tunnel_bin.is_file() else Path(shutil.which(tunnel_name) or str(tunnel_bin)), help="Cloudflare 클라이언트 경로")
+    parser.add_argument("--ipc-path", help="데스크톱 IPC 주소. Windows에서는 로컬 명명된 파이프 경로")
+    parser.add_argument("--codex-bin", type=Path, help="데스크톱 앱의 Codex 실행 파일 경로")
     parser.add_argument("--port", type=int, default=8787)
-    parser.add_argument("--origin", action="append", default=[], help="允许的 HTTPS 穿透源，例如 https://codex.example.com")
-    parser.add_argument("--set-password", action="store_true", help="交互式设置登录密码，不启动服务")
-    parser.add_argument("--no-auth", action="store_true", help="本次运行明确关闭账号密码验证")
+    parser.add_argument("--origin", action="append", default=[], help="허용할 HTTPS 출처(예: https://codex.example.com)")
+    parser.add_argument("--set-password", action="store_true", help="서비스를 시작하지 않고 대화형으로 로그인 비밀번호 설정")
+    parser.add_argument("--no-auth", action="store_true", help="이번 실행에서 게이트웨이 로그인을 명시적으로 해제합니다.")
     parser.add_argument("--codex-home", type=Path, default=Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))))
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
-        parser.error("端口必须为 1–65535")
+        parser.error("포트는 1~65535 사이의 정수여야 합니다.")
     if args.ssh_target:
         from bridge.features.network.access import validate
         validate({'sshTarget': args.ssh_target, 'sshRemotePort': args.ssh_remote_port})
     os.umask(0o077)
     args.config.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    first_login = args.config.parent / "首次登录.txt"
+    first_login = initial_credentials_path(args.config.parent)
     if args.config.exists():
         config = json.loads(args.config.read_text(encoding='utf-8'))
     else:
+        first_login = args.config.parent / INITIAL_CREDENTIAL_NAMES[0]
         password = secrets.token_urlsafe(18)
         config = {"auth": {"mode": "password", "username": "admin", **password_record(password)}, "origins": []}
         save_config(args.config, config)
-        first_login.write_text("Codex App 手机网关\n账号：admin\n密码：" + password + "\n\n仅用于此网关，与 Codex 模型登录无关。\n修改密码：python run.py --set-password\n", encoding='utf-8')
+        first_login.write_text("Codex App 모바일 게이트웨이\n계정: admin\n비밀번호: " + password + "\n\n이 로그인 정보는 게이트웨이 전용이며 Codex 모델 로그인과 별개입니다.\n비밀번호 변경: python run.py --set-password\n", encoding='utf-8')
         first_login.chmod(0o600)
     if args.set_password:
-        password = getpass.getpass("新密码（至少 12 位）：")
-        if len(password) < 12 or password != getpass.getpass("再次输入："):
-            parser.error("密码太短或两次输入不一致")
+        password = getpass.getpass("새 비밀번호(최소 12자): ")
+        if len(password) < 12 or password != getpass.getpass("다시 입력: "):
+            parser.error("비밀번호가 너무 짧거나 두 입력이 일치하지 않습니다.")
         config["auth"].update(mode="password", **password_record(password))
         save_config(args.config, config)
         first_login.unlink(missing_ok=True)
-        print("密码已更新。请重新启动网关。")
+        print("비밀번호를 변경했습니다. 게이트웨이를 다시 시작하세요.")
         return
     rows = interfaces.enumerate_interfaces()
     config = migrate_legacy_interfaces(args.config, rows)
     if config["auth"].get("mode") not in ("password", "none"):
-        parser.error("auth.mode 只能为 password 或 none")
+        parser.error("auth.mode는 password 또는 none이어야 합니다.")
     if args.no_auth:
         config["auth"]["mode"] = "none"
     from bridge.features.network.access import validate_connections, public_urls, public_url
@@ -100,7 +101,7 @@ def main(connections=None, connection_secrets=None):
     entries = validate_connections(preferences)
     preferences['connections'] = entries
     if config['auth']['mode'] == 'none' and any(c['enabled'] and c['accessMode'] == 'tailscale' and c['tailscaleMode'] == 'funnel' for c in entries):
-        parser.error('Funnel 公网入口需要启用网关登录验证；手机仍可扫码配对。')
+        parser.error('Funnel 공개 접속 경로에서는 게이트웨이 로그인을 활성화해야 합니다. 휴대폰은 QR 코드로도 페어링할 수 있습니다.')
     args.tunnel = args.tunnel or any(c['enabled'] and c['accessMode'] == 'quick' for c in entries)
     if entries:
         config['publicUrl'] = public_url(preferences)
@@ -108,7 +109,7 @@ def main(connections=None, connection_secrets=None):
     for origin in origins:
         parsed = urlsplit(origin)
         if parsed.scheme != "https" or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
-            parser.error("额外 origin 必须是完整 HTTPS 源且不能有路径")
+            parser.error("추가 origin은 경로가 없는 완전한 HTTPS 주소여야 합니다.")
     if args.lan:
         hosts = ['127.0.0.1', 'localhost'] + network.bindings(preferences, rows)[1:]
     else:
@@ -194,14 +195,14 @@ def main(connections=None, connection_secrets=None):
     except Exception:
         monitor.close()
         raise
-    print("Codex App 手机网关已启动", flush=True)
+    print("Codex App 모바일 게이트웨이가 시작되었습니다.", flush=True)
     for origin in sorted(server.origins):
         if not config.get("localAccess", True) and urlsplit(origin).hostname in ("127.0.0.1", "localhost"):
             continue
         print("  " + origin, flush=True)
-    print("登录方式：" + ("免密（已显式启用）" if config["auth"]["mode"] == "none" else "账号密码"), flush=True)
+    print("로그인 방법: " + ("비밀번호 없음(명시적으로 설정됨)" if config["auth"]["mode"] == "none" else "계정과 비밀번호"), flush=True)
     if first_login.exists():
-        print("首次登录凭据：" + str(first_login), flush=True)
+        print("최초 로그인 정보 파일: " + str(first_login), flush=True)
     try:
         forwards = [c for c in entries if c['enabled'] and c['accessMode'] == 'server']
         if args.ssh_target:
@@ -241,7 +242,7 @@ def main(connections=None, connection_secrets=None):
                 ssh_tunnels.append(named)
                 named.start()
         if args.tunnel:
-            print("正在建立临时 HTTPS 外网连接…", flush=True)
+            print("임시 HTTPS 터널 연결 중…", flush=True)
             quick_origin = None
             def allow_origin(origin):
                 nonlocal quick_origin
@@ -265,9 +266,9 @@ def main(connections=None, connection_secrets=None):
             def connect_tunnel():
                 try:
                     url = tunnel.start()
-                    print("外网地址：" + url, flush=True)
+                    print("외부 접속 주소: " + url, flush=True)
                 except (RuntimeError, OSError) as exc:
-                    tunnel.status('failed', '临时 HTTPS 连接失败，请检查网络并查看 Cloudflare 日志；局域网仍可使用。')
+                    tunnel.status('failed', '임시 HTTPS 터널 연결에 실패했습니다. 네트워크와 Cloudflare 로그를 확인하세요. 로컬 게이트웨이는 계속 실행됩니다.')
                     print(str(exc), flush=True)
             tunnel_thread = threading.Thread(target=connect_tunnel, daemon=True)
             tunnel_thread.start()

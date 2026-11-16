@@ -144,11 +144,11 @@ def selected_interfaces(value):
     if value is None:
         return None
     if not isinstance(value, list) or len(value) > 256:
-        raise ValueError('请选择有效的局域网网卡')
+        raise ValueError('유효한 LAN 카드를 선택하세요.')
     result = []
     for item in value:
         if not isinstance(item, str) or not item.strip() or len(item) > 256:
-            raise ValueError('请选择有效的局域网网卡')
+            raise ValueError('유효한 LAN 카드를 선택하세요.')
         item = item.strip()
         if item not in result:
             result.append(item)

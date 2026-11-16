@@ -9,12 +9,12 @@ function fixture(){
 }
 test('file and folder menus copy target metadata and retain download URLs',async()=>{
   for(const kind of ['file','directory']){
-    const c=fixture(),session={},calls=[],absolutePath='C:\\target\\中文\\item';
+    const c=fixture(),session={},calls=[],absolutePath='C:\\target\\중국어\\item';
     const workbench={current:session,url:(s,action,path)=>'/workspace/'+action+'?path='+path,request:async url=>{calls.push(url);return {absolutePath};}};
-    c.window.BridgeFileActions.menu(workbench,session,{kind,name:'item',path:'中文/item'});
+    c.window.BridgeFileActions.menu(workbench,session,{kind,name:'item',path:'중국어/item'});
     const dialog=c.document.body.children[0],download=dialog.children.find(n=>n.tag==='a'),copy=dialog.children.find(n=>n.tag==='button');
-    assert.equal(download.href,'/workspace/download?path=中文/item&explicit=1'+(kind==='directory'?'&archive=1':''));
-    await copy.onclick();assert.equal(c.copied,absolutePath);assert.deepEqual(calls,['/workspace/info?path=中文/item']);
+    assert.equal(download.href,'/workspace/download?path=중국어/item&explicit=1'+(kind==='directory'?'&archive=1':''));
+    await copy.onclick();assert.equal(c.copied,absolutePath);assert.deepEqual(calls,['/workspace/info?path=중국어/item']);
   }
 });
 test('a changed workspace cannot copy a stale target path',async()=>{
@@ -27,8 +27,8 @@ test('a changed workspace cannot copy a stale target path',async()=>{
 test('reference waits for authorized info and a changed session cannot receive it',async()=>{
  const c=fixture(),session={},references=[],composer={disabled:false},workbench={composer,current:session,url:()=>'/workspace/info',notify(){},request:async()=>({name:'file',path:'file',kind:'file'}),referenceFile:(s,info)=>{references.push(info);return true;}};
  c.window.BridgeFileActions.menu(workbench,session,{kind:'file',name:'file',path:'file'});
- const button=c.document.body.children[0].children.find(n=>n.textContent==='引用到消息');await button.onclick();assert.equal(references.length,1);
+ const button=c.document.body.children[0].children.find(n=>n.textContent==='메시지 내 참조');await button.onclick();assert.equal(references.length,1);
  workbench.current=session;c.window.BridgeFileActions.menu(workbench,session,{kind:'file',name:'file',path:'file'});
  workbench.request=async()=>{workbench.current={};return {name:'secret',path:'secret',kind:'file'};};
- await c.document.body.children[1].children.find(n=>n.textContent==='引用到消息').onclick();assert.equal(references.length,1);
+ await c.document.body.children[1].children.find(n=>n.textContent==='메시지 내 참조').onclick();assert.equal(references.length,1);
 });

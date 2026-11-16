@@ -22,7 +22,7 @@ function createLoginStartup(app,{platform=process.platform,executable=process.ex
   const linuxExecutable=env.APPIMAGE||executable;
   function linuxCommand(){
     if(!path.isAbsolute(linuxExecutable)||/[\r\n\0=]/.test(linuxExecutable)||(!env.APPIMAGE&&linuxExecutable.includes('/.mount_')))
-      throw Error('请将应用安装到固定目录后设置登录自启。');
+      throw Error('로그인 시작을 활성화하기 전에 영구 위치에 앱을 설치하십시오.');
     // Desktop Entry string escaping is applied before Exec argument unquoting.
     const quoted='"'+linuxExecutable.replace(/["`$\\]/g,'\\$&').replace(/%/g,'%%')+'"';
     return quoted.replace(/\\/g,'\\\\')+' '+argument;
@@ -50,8 +50,8 @@ function createLoginStartup(app,{platform=process.platform,executable=process.ex
     return {supported:true,enabled:!!enabled};
   }
   function validate(enabled){
-    if(typeof enabled!=='boolean')throw Error('登录自启开关格式错误');
-    if(!supported)throw Error('请使用已安装的桌面应用设置登录自启。');
+    if(typeof enabled!=='boolean')throw Error('잘못된 로그인 시작 설정');
+    if(!supported)throw Error('설치된 데스크톱 앱에서 로그인 시작을 구성합니다.');
     if(platform==='linux')linuxCommand();
   }
   function set(enabled){
@@ -71,7 +71,7 @@ function createLoginStartup(app,{platform=process.platform,executable=process.ex
       fs.writeFileSync(desktopFile,'[Desktop Entry]\nType=Application\nName=Codex Mobile Bridge\nExec='+linuxCommand()+'\nTerminal=false\nHidden='+!enabled+'\n',{mode:0o600});
     }else app.setLoginItemSettings(platform==='darwin'?{openAtLogin:enabled}:{...options,openAtLogin:enabled});
     const current=status();
-    if(current.enabled!==enabled&&!(enabled&&current.requiresApproval))throw Error('登录自启设置保存失败，请重试。');
+    if(current.enabled!==enabled&&!(enabled&&current.requiresApproval))throw Error('로그인 시작 설정을 저장하지 못했습니다. 다시 시도해 주세요.');
   }
   return {status,validate,set,hidden:(argv,initial=false)=>supported&&platform!=='linux'&&(argv.includes(argument)||(initial&&platform==='darwin'&&!!app.getLoginItemSettings().wasOpenedAtLogin))};
 }

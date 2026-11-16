@@ -241,7 +241,7 @@ class HookIPCServer:
         tool_args = tool_call.get('args') if isinstance(tool_call.get('args'), dict) else {}
         request_id = f'agy-perm-{uuid.uuid4().hex[:12]}'
         kind = 'fileChange' if 'file' in tool_name or 'write' in tool_name or 'edit' in tool_name else 'commandExecution'
-        title = f'Antigravity 请求执行 {tool_name}'
+        title = f'Antigravity 요청 실행 {tool_name}'
         text = format_tool_call({'name': tool_name, 'args': tool_args})
         prompt = {
             'id': request_id,
@@ -257,12 +257,12 @@ class HookIPCServer:
             'questions': [],
             'permissions': {},
             'decisions': [
-                {'id': 'accept', 'label': '允许本次'},
-                {'id': 'decline', 'label': '拒绝'},
+                {'id': 'accept', 'label': "한 번만 허용"},
+                {'id': 'decline', 'label': '거부'},
             ],
             'options': [
-                {'id': 'accept', 'label': '允许 (Allow)'},
-                {'id': 'decline', 'label': '拒绝 (Deny)'},
+                {'id': 'accept', 'label': '허용 (Allow)'},
+                {'id': 'decline', 'label': '거부 (Deny)'},
             ],
         }
         pending = _PendingApproval(request_id, cid, tool_name, tool_args, prompt)
@@ -281,7 +281,7 @@ class HookIPCServer:
                 return {'decision': 'allow'}
             return {
                 'decision': 'deny',
-                'reason': pending.reason or '手机端已拒绝此操作 (Denied from mobile bridge)',
+                'reason': pending.reason or '이 작업은 휴대폰에서 거부되었습니다 (Denied from mobile bridge)',
             }
         finally:
             with self._lock:
@@ -343,7 +343,7 @@ class HookIPCServer:
         combined = '\n\n'.join(texts)
         return {
             'decision': 'continue',
-            'reason': f'手机端发来新追问，请直接继续处理并回复用户：\n\n{combined}',
+            'reason': f'휴대폰에서 새로운 후속 질문이 전송되었습니다. 계속해서 처리하고 사용자에게 직접 답장해 주세요.：\n\n{combined}',
         }
 
     def has_recent_heartbeat(self, conversation_id, ttl=HEARTBEAT_TTL):
@@ -358,7 +358,7 @@ class HookIPCServer:
     def assert_account_idle(self):
         with self._lock:
             if self._pending or any(self._queues.values()):
-                raise ValueError('Antigravity 有待确认或排队消息，请先处理后再切换账号')
+                raise ValueError('Antigravity 확인 또는 대기 중인 메시지가 있습니다. 계정을 전환하기 전에 먼저 처리해 주세요.')
 
     def pending_approvals_for(self, conversation_id):
         with self._lock:
@@ -376,7 +376,7 @@ class HookIPCServer:
         with self._lock:
             pending = self._pending.get(request_id)
             if pending is None or pending.conversation_id != conversation_id:
-                raise ValueError('该审批请求已过期或已在电脑端处理')
+                raise ValueError('승인 요청이 만료되었거나 컴퓨터에서 처리되었습니다.')
             normalized = str(decision_raw or '').strip().lower()
             if normalized in ('accept', 'allow', 'approve', 'approved', 'yes'):
                 pending.decision = 'allow'
@@ -387,7 +387,7 @@ class HookIPCServer:
     def enqueue_follow_up(self, conversation_id, text, mode='queue'):
         cleaned = str(text or '').strip()
         if not cleaned:
-            raise ValueError('消息内容不能为空')
+            raise ValueError('메시지 내용은 비워둘 수 없습니다.')
         normalized_mode = 'steer' if str(mode or '').strip() == 'steer' else 'queue'
         entry = {
             'id': f'q-{uuid.uuid4().hex[:8]}',
@@ -414,9 +414,9 @@ class HookIPCServer:
                 continue
             item_mode = str(item.get('mode') or 'queue')
             title = (
-                '补充当前任务（当前步骤完成后发送）'
+                '현재 작업 보충（현재 단계가 완료된 후 전송됨））'
                 if item_mode == 'steer'
-                else '完成后发送（已排队，当前任务结束后发送）'
+                else '완료 후 전송（대기 중, 현재 작업 종료 후 전송））'
             )
             out.append({
                 'id': str(item.get('id') or f'queued-{idx}'),
@@ -512,7 +512,7 @@ class HookIPCServer:
             for item in list(self._pending.values()):
                 if item.conversation_id == conversation_id:
                     item.decision = 'deny'
-                    item.reason = '手机端已停止当前操作'
+                    item.reason = '현재 작업이 휴대폰에서 중지되었습니다.'
                     item.event.set()
 
     def permission_mode(self, conversation_id):
@@ -522,7 +522,7 @@ class HookIPCServer:
 
     def set_permission_mode(self, conversation_id, mode):
         if mode not in ('desktop', 'mobile-ask', 'auto-allow'):
-            raise ValueError('不支持的审批模式')
+            raise ValueError('지원되지 않는 승인 모드')
         with self._lock:
             self._permissions[conversation_id] = mode
             self._save_json(self.permissions_file, self._permissions)

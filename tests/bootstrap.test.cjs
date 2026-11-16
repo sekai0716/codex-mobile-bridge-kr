@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'web/index.html'),'utf8');
 const workbenchBack=vm.runInNewContext(fs.readFileSync(path.join(root,'web/features/workspace/workbench.js'),'utf8')+'\nWorkbench.prototype.back');
 
-async function fixture({missing='',auth='anonymous',hash='',language='zh',pairPending=false,navigationPending=false,allDisabled=false,cachedProvider=null}={}){
+async function fixture({missing='',auth='anonymous',hash='',language='ko',pairPending=false,navigationPending=false,allDisabled=false,cachedProvider=null}={}){
   const nodes=new Map(),timers=new Map(),listeners=new Map(),requests=[],writes=[],navigation=[];let clock=0,reloads=0,error=null,releaseNavigation;
   const node=(tag='div')=>({tagName:tag.toUpperCase(),value:'',checked:false,disabled:false,hidden:false,open:false,textContent:'',dataset:{},options:[],children:[],parentElement:{},style:{setProperty(){}},scrollTop:0,
     classList:(()=>{const classes=new Set();return {add(...names){names.forEach(name=>classes.add(name));},remove(...names){names.forEach(name=>classes.delete(name));},toggle(name,force){const enabled=force??!classes.has(name);if(enabled)classes.add(name);else classes.delete(name);return enabled;},contains(name){return classes.has(name);}};})(),click(){this.onclick?.();},getBoundingClientRect(){return {width:0};},addEventListener(){},setAttribute(k,v){this[k]=v;},removeAttribute(k){delete this[k];},before(child){this.previousSibling=child;},closest(){return nodes.get('accounts-dialog');},
@@ -38,7 +38,7 @@ async function fixture({missing='',auth='anonymous',hash='',language='zh',pairPe
       }
       if(url==='/api/pair')return pairPending?new Promise(()=>{}):response({csrf:'paired'});
       if(url==='/api/accounts')return response({accounts:[],current:{kind:'api'}});
-      if(url.startsWith('/api/sessions?'))return allDisabled?{ok:false,status:400,json:async()=>({error:'此应用已关闭，请在应用管理中开启'})}:response({sessions:[]});
+      if(url.startsWith('/api/sessions?'))return allDisabled?{ok:false,status:400,json:async()=>({error:'이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요.'})}:response({sessions:[]});
       throw Error('Unexpected fixture request');
     }});
   require('./fixtures/codex-entry-predicates.cjs')(context);
@@ -65,14 +65,14 @@ test('missing dependency fails in the real synchronous app chain before auth and
   for(const missing of ['i18n','activity']){
     const ui=await fixture({missing});assert.ok(ui.error);assert.equal(ui.requests.length,0);
     assert.equal(ui.nodes.get('login').hidden,true);assert.equal(ui.nodes.get('app').hidden,true);
-    assert.equal(ui.nodes.get('bootstrap-status').hidden,false);assert.match(ui.nodes.get('bootstrap-message').textContent,/页面组件/);
+    assert.equal(ui.nodes.get('bootstrap-status').hidden,false);assert.match(ui.nodes.get('bootstrap-message').textContent,/페이지 구성 요소/);
   }
 });
 
 test('auth hard deadline reports failure without submitting writes',async()=>{
   const ui=await fixture({auth:'pending'});ui.timeout();ui.timeout();
   assert.deepEqual(ui.requests,['/api/auth']);assert.equal(ui.writes.length,0);assert.equal(ui.nodes.get('login').hidden,true);
-  assert.match(ui.nodes.get('bootstrap-message').textContent,/等待网关/);
+  assert.match(ui.nodes.get('bootstrap-message').textContent,/게이트웨이가 응답할 때까지 기다리는 데 오랜 시간이 걸립니다\. 네트워크와 컴퓨터 게이트웨이를 확인하고 다시 로드하세요\.。/);
   ui.nodes.get('bootstrap-retry').onclick();assert.equal(ui.reloads,1);assert.equal(ui.location.href,'https://gateway.test/?view=phone');
 });
 
@@ -88,7 +88,7 @@ test('startup diagnostics show script path and error type without URL secrets or
   ui.dispatch('error',{target:ui.window,filename:'https://gateway.test/app.js?token=private-query#private-fragment',lineno:17,
     error:{name:'TypeError',message:'private-exception-text'},message:'private-event-text'});
   const text=ui.nodes.get('bootstrap-diagnostics').textContent;
-  assert.match(text,/启动诊断/);assert.match(text,/TypeError @ \/app\.js:17/);assert.match(text,/auth/);
+  assert.match(text,/진단 시작/);assert.match(text,/TypeError @ \/app\.js:17/);assert.match(text,/auth/);
   assert.doesNotMatch(text,/private-|gateway\.test/);
 });
 
@@ -153,7 +153,7 @@ test('manual retry preserves an unsubmitted pairing fragment after app.js has al
 test('unknown pairing writes are not replayed by reload and instead request a new scan',async()=>{
   const ui=await fixture({hash:'#pair=submitted-token',pairPending:true});ui.timeout();
   assert.equal(ui.location.hash,'');assert.equal(ui.writes.length,1);assert.equal(ui.writes[0].url,'/api/pair');
-  assert.match(ui.nodes.get('bootstrap-message').textContent,/重新扫描新的配对码/);
+  assert.match(ui.nodes.get('bootstrap-message').textContent,/새 페어링 코드를 다시 스캔하세요./);
   ui.nodes.get('bootstrap-retry').onclick();assert.equal(ui.location.hash,'');assert.equal(ui.writes.length,1);assert.equal(ui.reloads,1);
 });
 

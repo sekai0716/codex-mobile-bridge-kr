@@ -8,10 +8,10 @@ function chatMessageDate(value){
 }
 function renderChatMessageTime(container,value,now=new Date()){
   const date=chatMessageDate(value);if(!date||!Number.isFinite(date.getTime()))return;
-  const locale=typeof BridgeI18n==='undefined'?'zh-CN':BridgeI18n.locale();
+  const locale=typeof BridgeI18n==='undefined'?'ko-KR':BridgeI18n.locale();
   const clock=[date.getHours(),date.getMinutes()].map(n=>String(n).padStart(2,'0')).join(':');
   const sameYear=date.getFullYear()===now.getFullYear(),sameDay=sameYear&&date.getMonth()===now.getMonth()&&date.getDate()===now.getDate();
-  const prefix=sameDay?'':(/^zh/.test(locale)?`${sameYear?'':date.getFullYear()+'年'}${date.getMonth()+1}月${date.getDate()}日`:new Intl.DateTimeFormat(locale,{...(sameYear?{}:{year:'numeric'}),month:'numeric',day:'numeric'}).format(date))+' ';
+  const prefix=sameDay?'':(/^ko/.test(locale)?`${sameYear?'':date.getFullYear()+'년도'}${date.getMonth()+1}달${date.getDate()}낮`:new Intl.DateTimeFormat(locale,{...(sameYear?{}:{year:'numeric'}),month:'numeric',day:'numeric'}).format(date))+' ';
   const time=document.createElement('time');time.className='message-time';time.dateTime=date.toISOString();time.textContent=prefix+clock;
   time.title=new Intl.DateTimeFormat(locale,{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'short'}).format(date);
   time.setAttribute('aria-label',time.title);container.append(time);
@@ -74,7 +74,7 @@ function syncChatMessageNodes(container,nodes){
 // All chat surfaces render native task evidence through this shared indicator.
 function renderChatProgress(node,{agentName='',active=false,waiting=false,blocked=false,connected=true,fresh=true}={}){
   const state=!connected||!fresh?'unknown':waiting?'waiting':active?'working':blocked?'blocked':'idle';
-  const text={unknown:'运行状态暂不可用',waiting:'等待你的确认',blocked:'任务受阻，请查看提示',working:'正在工作…',idle:''}[state];
+  const text={unknown:'실행 상태를 일시적으로 사용할 수 없습니다.',waiting:'귀하의 확인을 기다리고 있습니다',blocked:'작업이 차단되었습니다. 공지를 확인해주세요.',working:'일하고 있는…',idle:''}[state];
   node.hidden=state==='idle';node.dataset.state=state;node.setAttribute('role','status');node.setAttribute('aria-live','polite');
   const key=JSON.stringify([state,agentName,BridgeI18n.language()]);if(node.dataset.progress===key)return state;node.dataset.progress=key;
   node.replaceChildren();if(state==='working'){const dot=document.createElement('i');dot.setAttribute('aria-hidden','true');node.append(dot);}
@@ -97,9 +97,9 @@ class SessionActivity {
   read(key){if(this.rows[key]){this.rows[key].pending=null;this.save();}}
   indicator(key){
     const row=this.rows[key];if(!row)return null;
-    if(row.offline)return {kind:'unknown',label:'运行状态暂不可用'};
-    if(row.status==='active')return {kind:row.offline?'unknown':'running',label:row.offline?'运行状态暂不可用':'运行中'};
-    if(row.pending)return {kind:row.turnStatus==='completed'?'completed':'ended',label:row.turnStatus==='completed'?'已完成，未查看':row.turnStatus==='failed'?'运行失败，未查看':'已停止，未查看'};
+    if(row.offline)return {kind:'unknown',label:'실행 상태를 일시적으로 사용할 수 없습니다.'};
+    if(row.status==='active')return {kind:row.offline?'unknown':'running',label:row.offline?'실행 상태를 일시적으로 사용할 수 없습니다.':'실행 중'};
+    if(row.pending)return {kind:row.turnStatus==='completed'?'completed':'ended',label:row.turnStatus==='completed'?'완료됨, 읽지 않음':row.turnStatus==='failed'?'실행 실패, 읽지 않음':'중지됨, 읽지 않음'};
     return null;
   }
   clear(){this.rows={};this.storage.removeItem(this.key);}

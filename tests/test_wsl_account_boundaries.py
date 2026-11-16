@@ -103,7 +103,7 @@ class WslAccountBoundaryTests(unittest.TestCase):
     def test_static_auth_capture_rejects_without_snapshot_or_credentials_mutation(self):
         before = self.static_native('http_headers={"x-openai-actor-authorization"="old-actor-private"}\n')
         with patch.object(worker, '_write', side_effect=AssertionError('capture must not write')):
-            with self.assertRaisesRegex(worker.AccountError, '不能保存为 auth.json'):
+            with self.assertRaisesRegex(worker.AccountError, "이\\ 공급자는\\ 정적\\ 전달자\\ 토큰\\ 또는\\ 인증\\ 헤더를\\ 사용합니다\\.\\ 저장된\\ API로\\ 전환하면\\ 복원을\\ 위해\\ 전체\\ 원래\\ 프로필이\\ 보존됩니다\\."):
                 self.store.change({'action': 'import-current'})
         self.assertEqual(self.store.files(), before)
         self.assertNotIn('native', self.store.store)
@@ -229,8 +229,8 @@ class WslAccountBoundaryTests(unittest.TestCase):
 
     def test_runtime_release_candidate_requires_only_the_standard_running_client_reason(self):
         for reasons, expected in (([worker.ERROR_MESSAGES['runtime_running']], True),
-                                  (['WSL 环境变量覆盖认证，请先在原终端处理'], False),
-                                  (['WSL shell 配置包含认证覆盖，请使用原终端处理'], False),
+                                  (['WSL 환경변수 커버리지 인증, 원래 단말기에서 먼저 처리해주세요'], False),
+                                  (['WSL shell 구성에는 인증 범위가 포함됩니다. 처리하려면 원래 단말기를 사용하십시오.'], False),
                                   ([worker.ERROR_MESSAGES['runtime_unknown']], False), ([], False)):
             with self.subTest(reasons=reasons):
                 self.store.guard = lambda *_: reasons
@@ -435,8 +435,8 @@ class WslAccountRoutingBoundaries(unittest.TestCase):
                 result = self.accounts.read('codex', self.row['id'])
                 self.assertFalse(result['capabilities']['switch'])
                 self.assertFalse(result['capabilities']['restore'])
-                self.assertIn('无法核验' if original == b'invalid receipt json' else '结果待核对', result['blockers'][-1])
-                self.assertNotIn('仍运行', result['blockers'][-1])
+                self.assertIn('확인할 수 없습니다' if original == b'invalid receipt json' else "확인되지 않은 결과", result['blockers'][-1])
+                self.assertNotIn('아직 실행 중', result['blockers'][-1])
                 self.assertEqual(path.read_bytes(), original)
 
     def test_successful_read_is_advisory_and_change_rechecks_receipts(self):
@@ -492,7 +492,7 @@ class WslAccountRoutingBoundaries(unittest.TestCase):
             if request['action'] == 'read':
                 return changed if state['changed'] else old
             state['changed'] = True
-            return {'models': [], 'modelError': '模型接入已变化', 'identityChanged': True}
+            return {'models': [], 'modelError': '모델 액세스 권한이 변경되었습니다.', 'identityChanged': True}
         self.call.side_effect = target
         try:
             result = self.accounts.change(self.request(action='models', refresh=True))

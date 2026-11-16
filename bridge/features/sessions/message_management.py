@@ -7,7 +7,7 @@ import uuid
 
 def snapshot(rows, receipt_ids=(), hidden=(), scope=None):
     if len(receipt_ids) > 16:
-        raise ValueError('最多查询 16 条消息')
+        raise ValueError("한 번에 최대 16개의 메시지를 확인할 수 있습니다.")
     for identifier in receipt_ids:
         uuid.UUID(identifier)
     indexed = dict(rows)
@@ -34,19 +34,19 @@ def snapshot(rows, receipt_ids=(), hidden=(), scope=None):
 def mutate(rows, body, hidden=(), scope=None):
     current = snapshot(rows, hidden=hidden, scope=scope)
     if body.get('version') != current['version']:
-        raise ValueError('消息队列已变化，请刷新后重试')
+        raise ValueError("대기열이 변경되었습니다. 새로고침하고 다시 시도하세요.")
     action = body.get('action')
     allowed = {'action', 'version', 'ids'} if action == 'reorder' else {'action', 'version', 'id'}
     if action == 'edit':
         allowed |= {'text', 'editId'}
     if set(body) != allowed:
-        raise ValueError('消息管理参数无效')
+        raise ValueError("잘못된 메시지 관리 요청입니다.")
     visible = [row['id'] for row in current['queue']]
     result = {}
     if action == 'reorder':
         ids = body['ids']
         if not isinstance(ids, list) or any(not isinstance(i, str) for i in ids) or len(ids) != len(visible) or set(ids) != set(visible):
-            raise ValueError('消息队列已变化，请刷新后重试')
+            raise ValueError("대기열이 변경되었습니다. 새로고침하고 다시 시도하세요.")
         entries = dict(rows)
         order = iter(ids)
         visible_ids = set(visible)
@@ -62,22 +62,22 @@ def mutate(rows, body, hidden=(), scope=None):
         identifier = body['id']; uuid.UUID(identifier)
         permitted = visible if action in ('withdraw', 'edit') else [r['id'] for r in current['unknown']]
         if identifier not in permitted:
-            raise ValueError('此消息已离开队列或状态不可操作')
+            raise ValueError("이 메시지는 더 이상 대기열에 있지 않거나 변경할 수 없습니다.")
         rows = copy.deepcopy(rows)
         entry = dict(rows)[identifier]
         if action == 'edit':
             text = body['text']
             if not isinstance(text, str) or (not text.strip() and not entry.get('attachments')) or len(text) > 100000:
-                raise ValueError('请输入 1–100000 字的消息')
+                raise ValueError("1~100000자의 메시지를 입력하세요.")
             uuid.UUID(body['editId'])
             if entry.get('_editId') == body['editId']:
-                raise ValueError('此编辑请求已处理，请刷新后核对')
+                raise ValueError("이 수정사항은 이미 처리되었습니다. 확인하려면 새로고침하세요.")
             entry['text'] = text
             entry['_editId'] = body['editId']
         else:
             entry['status'] = 'cancelled' if action == 'withdraw' else 'ignored'
     else:
-        raise ValueError('消息管理操作无效')
+        raise ValueError("잘못된 메시지 관리 작업입니다.")
     revision = max((v.get('_managementRevision', 0) for _, v in rows), default=0) + 1
     rows = [(k, {**v, '_managementRevision': revision}) for k, v in rows]
     return rows, result

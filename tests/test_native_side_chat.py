@@ -61,7 +61,7 @@ class NativeAttachedCreationTests(unittest.TestCase):
     def test_unconfirmed_native_parent_does_not_mutate_more_or_retry(self):
         original = self.request
         self.request = lambda method, params: {'data': [], 'nextCursor': None} if method == 'thread/list' else original(method, params)
-        with self.assertRaisesRegex(CreationError, '归属未确认'):
+        with self.assertRaisesRegex(CreationError, "네이티브\\ 보조\\ 채팅\\ 관계가\\ 확인되지\\ 않았습니다\\.\\ 메인\\ 채팅을\\ 확인하세요\\.\\ 다시\\ 생성되지\\ 않습니다\\."):
             self.run_fork()
         self.assertEqual(self.created, [self.child])
         self.assertEqual([method for method, _ in self.calls], ['thread/fork'])
@@ -73,7 +73,7 @@ class NativeAttachedCreationTests(unittest.TestCase):
             if method == 'thread/fork': result['modelProvider'] = 'other'
             return result
         self.request = request
-        with self.assertRaisesRegex(CreationError, '运行配置未确认'): self.run_fork()
+        with self.assertRaisesRegex(CreationError, "보조\\ 채팅\\ 런타임\\ 구성이\\ 확인되지\\ 않았습니다\\.\\ 메인\\ 채팅을\\ 확인하세요\\.\\ 다시\\ 생성되지\\ 않습니다\\."): self.run_fork()
         self.assertEqual(self.created, [self.child])
         self.assertEqual([method for method, _ in self.calls], ['thread/fork'])
 

@@ -29,7 +29,7 @@ class WorkModes {
     this.storage.setItem(storageKey,JSON.stringify(pending));
     this.cancelBusy=kind==='cancel';this.statusBusy=kind==='cancel'?null:kind;this.actionError='';this.render();
     try{await run(pending.payload);this.storage.removeItem(storageKey);if(this.key===key)this.editing=false;}
-    catch(error){if(this.key===key)this.actionError=BridgeI18n.t(error.message||'目标操作失败，请重试');}
+    catch(error){if(this.key===key)this.actionError=BridgeI18n.t(error.message||'목표 작업이 실패했습니다. 다시 시도해 보세요.');}
     finally{if(this.key===key){this.cancelBusy=false;this.statusBusy=null;this.render();}}
   }
   cancel(){return this.action('cancel',{},payload=>this.onCancel(payload));}
@@ -42,7 +42,7 @@ class WorkModes {
     const caps=view?.capabilities,t=BridgeI18n.t,goalSupported=typeof caps?.goal==='boolean'?caps.goal:!!view&&(view.host==='local'
       ?view.goalRuntimeAvailable!==false&&view.access?.canUseGoal!==false
       :view.goalRuntimeAvailable===true&&view.access?.canUseGoal===true);
-    const goalUnavailableReason=caps?.goal===false?'当前客户端未提供原生目标模式':view?.host!=='local'&&view?.access?.runtime==='desktop'?'目标模式暂不支持 SSH 主机':view?.access?.source==='cli'?'当前 Codex 会话暂不支持目标模式':view?.host!=='local'?'目标模式暂不支持 SSH 主机':'未找到桌面 App 的 Codex 运行时';
+    const goalUnavailableReason=caps?.goal===false?'현재 클라이언트는 기본 대상 모드를 제공하지 않습니다.':view?.host!=='local'&&view?.access?.runtime==='desktop'?'SSH 호스트에서는 목표 모드를 아직 사용할 수 없습니다.':view?.access?.source==='cli'?'이 Codex 채팅에서는 목표 모드를 사용할 수 없습니다.':view?.host!=='local'?'SSH 호스트에서는 목표 모드를 아직 사용할 수 없습니다.':'데스크톱 Codex 런타임이 없습니다.';
     this.select.value=this.selection||(view?.collaborationMode==='plan'?'plan':'default');
     const pendingCapabilities=view?.readOnly===true||view?.connectionState==='detached'||view?.runtimeKnown===false;
     if(!goalSupported&&!(pendingCapabilities&&view?.composerCapabilities?.goal===true)&&this.select.value==='goal')this.select.value='default';
@@ -52,7 +52,7 @@ class WorkModes {
     const goalOption=this.select.querySelector('[value=goal]');
     goalOption.disabled=!goalSupported||!!(view?.status==='active'||(view?.goal&&view.goal.status!=='complete')||['pending','unknown'].includes(view?.goalSubmission?.status));
     goalOption.title=t(goalSupported?'':goalUnavailableReason);
-    this.hint.textContent=t(sendMode==='steer'?'补充内容沿用当前任务模式':this.select.value==='plan'?'先讨论并制定计划，确认后执行。':this.select.value==='goal'?(goalSupported?'设定目标后持续执行，直到完成、暂停或取消。':goalUnavailableReason):'');
+    this.hint.textContent=t(sendMode==='steer'?'추가 입력으로 현재 모드 유지':this.select.value==='plan'?'먼저 토론하고 계획하세요. 확인 후 시행합니다.':this.select.value==='goal'?(goalSupported?'완료, 일시 중지 또는 취소될 때까지 목표를 향해 계속 노력하세요.':goalUnavailableReason):'');
     this.hint.hidden=!this.hint.textContent;
     this.select.title=this.hint.textContent;
     const goal=view?.goal,request=view?.goalSubmission;
@@ -66,15 +66,15 @@ class WorkModes {
     const node=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;};
     const button=(text,cls,onclick,disabled)=>{const el=node('button',text,cls);el.type='button';el.disabled=!!disabled;el.onclick=onclick;return el;};
     if(goal){
-      const labels={active:'目标进行中',paused:'目标已暂停',blocked:'目标等待处理',usageLimited:'目标已达到用量限制',budgetLimited:'目标已达到预算限制',complete:'目标已完成'};
+      const labels={active:'목표 활성',paused:'목표가 일시중지됨',blocked:'목표에 주의가 필요함',usageLimited:'목표 사용량 한도 도달',budgetLimited:'목표가 예산 한도에 도달했습니다.',complete:'목표 완료'};
       const details=document.createElement('details');details.open=expanded;
-      details.append(node('summary',t(labels[goal.status]||'目标状态')));
+      details.append(node('summary',t(labels[goal.status]||'목표 상태')));
       details.append(node('p',goal.objective));
-      if(Number.isFinite(goal.tokensUsed))details.append(node('p',t('已用 Token：')+goal.tokensUsed.toLocaleString()+(Number.isFinite(goal.tokenBudget)?' / '+goal.tokenBudget.toLocaleString():''),'muted'));
+      if(Number.isFinite(goal.tokensUsed))details.append(node('p',t('사용된 토큰:')+goal.tokensUsed.toLocaleString()+(Number.isFinite(goal.tokenBudget)?' / '+goal.tokenBudget.toLocaleString():''),'muted'));
       this.goalRoot.append(details);
     }
     if(request){
-      const labels={pending:'正在开启原生目标…',unknown:'目标请求送达结果尚未确认，请查看会话。',unconfirmed:'尚未确认目标已开启，请刷新或查看 Codex。'};
+      const labels={pending:'네이티브 목표 시작 중…',unknown:'목표 전달이 확인되지 않았습니다. 대화를 확인하세요.',unconfirmed:'대상이 열려 있는지 확인되지 않았습니다. 새로고침하거나 확인하세요. Codex。'};
       this.goalRoot.append(node('p',t(labels[request.status]||labels.unknown),'goal-pending'));
     }
     if(this.actionError)this.goalRoot.append(node('p',this.actionError,'error'));
@@ -82,23 +82,23 @@ class WorkModes {
       const actions=node('div','','goal-actions');
       this.goalRoot.append(actions);
       if(caps?.goalPause!==false&&['active','blocked','usageLimited','budgetLimited'].includes(goal.status)){
-        actions.append(button(this.statusBusy==='paused'?t('正在暂停目标…'):t('暂停目标'),'goal-status secondary',()=>this.setStatus('paused'),this.busy()));
+        actions.append(button(this.statusBusy==='paused'?t('목표 일시중지 중…'):t('목표 일시중지'),'goal-status secondary',()=>this.setStatus('paused'),this.busy()));
       }
       if(goal.status==='paused'||caps?.goalResume===true){
-        actions.append(button(this.statusBusy==='active'?t('正在恢复目标…'):t('恢复目标'),'goal-status primary',()=>this.setStatus('active'),this.busy()));
+        actions.append(button(this.statusBusy==='active'?t('목표 재개 중…'):t('목표 재개'),'goal-status primary',()=>this.setStatus('active'),this.busy()));
       }
-      if(goal.status==='paused'&&caps?.goalEdit!==false)actions.append(button(t('修改目标'),'goal-edit secondary',()=>{this.editing=true;this.editText=goal.objective;this.render();this.goalRoot.querySelector('.goal-editor')?.focus();},this.busy()));
-      actions.append(button(this.cancelBusy?t('正在关闭目标…'):t('关闭目标'),'goal-cancel secondary',()=>this.cancel(),this.busy()));
-      this.goalRoot.append(node('p',t(caps?.goalPauseStops?'暂停目标会停止当前目标任务。':'暂停或关闭目标不会停止当前回复；如需立即停止，请点击“停止”。'),'muted'));
-      if(goal.status==='active')this.goalRoot.append(node('p',t('修改目标前请先暂停。'),'muted'));
+      if(goal.status==='paused'&&caps?.goalEdit!==false)actions.append(button(t('목표 수정'),'goal-edit secondary',()=>{this.editing=true;this.editText=goal.objective;this.render();this.goalRoot.querySelector('.goal-editor')?.focus();},this.busy()));
+      actions.append(button(this.cancelBusy?t('목표 삭제 중…'):t('명확한 목표'),'goal-cancel secondary',()=>this.cancel(),this.busy()));
+      this.goalRoot.append(node('p',t(caps?.goalPauseStops?'대상을 일시 중지하면 현재 대상 작업이 중지됩니다.。':'목표를 일시중지하거나 지워도 현재 응답은 중단되지 않습니다. 중지하려면 중지를 사용하세요.'),'muted'));
+      if(goal.status==='active')this.goalRoot.append(node('p',t('목표를 편집하기 전에 일시중지하세요.'),'muted'));
       if(this.editing&&goal.status==='paused'){
-        const input=node('textarea','', 'goal-editor');input.value=this.editText;input.maxLength=4000;input.rows=3;input.disabled=this.busy();input.setAttribute('aria-label',t('目标内容'));input.oninput=()=>{this.editText=input.value;};
-        this.goalRoot.append(input,node('p',t(typeof caps?.goal==='boolean'?'保存后保持暂停。':'修改目标内容会重置用量统计，保存后保持暂停。'),'muted'));
-        this.goalRoot.append(button(t('保存目标'),'goal-save primary',()=>this.saveEdit(),this.busy()),button(t('放弃修改'),'secondary',()=>{this.editing=false;this.render();},this.busy()));
+        const input=node('textarea','', 'goal-editor');input.value=this.editText;input.maxLength=4000;input.rows=3;input.disabled=this.busy();input.setAttribute('aria-label',t('목표 목표'));input.oninput=()=>{this.editText=input.value;};
+        this.goalRoot.append(input,node('p',t(typeof caps?.goal==='boolean'?'저장 후 일시중지 유지。':'목표를 변경하면 사용량이 재설정됩니다. 저장된 목표는 일시중지 상태로 유지됩니다.'),'muted'));
+        this.goalRoot.append(button(t('목표 저장'),'goal-save primary',()=>this.saveEdit(),this.busy()),button(t('변경사항 취소'),'secondary',()=>{this.editing=false;this.render();},this.busy()));
       }
     }
     if(goalIdentity){
-      const close=node('button','×','goal-close');close.type='button';close.title=t('隐藏目标栏');close.setAttribute('aria-label',close.title);
+      const close=node('button','×','goal-close');close.type='button';close.title=t('목표 패널 숨기기');close.setAttribute('aria-label',close.title);
       close.onclick=()=>{this.storage.setItem('hidden-goal:'+this.key,goalIdentity);this.render();this.goalToggle.focus();};
       this.goalRoot.append(close);
     }

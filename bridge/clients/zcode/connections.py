@@ -16,17 +16,17 @@ def connection_modes(config, *, installed, pipe_supported, official, official_su
     return {
         'connectionMode': selected,
         'connectionModes': [
-            {'id': 'private-pipe', 'label': '本机连接',
-             'description': '由网关启动 ZCode，无需额外登录。若已自行启动，请结束任务后通过初始化连接正常重启。',
+            {'id': 'private-pipe', 'label': '로컬 연결',
+             'description': '게이트웨이로 시작됨 ZCode，추가 로그인이 필요하지 않습니다. 자체적으로 시작된 경우 작업을 종료하고 연결을 초기화하여 정상적으로 다시 시작하시기 바랍니다.。',
              'configured': bool(installed and pipe_supported), 'available': bool(installed and pipe_supported),
              'connected': False,
-             'reason': '' if pipe_supported else '当前安装暂不能使用本机连接'},
-            {'id': 'official-remote', 'label': '官方远控',
-             'description': '在电脑网关保存原 App 远控链接并完成同账号登录；会话数据经过 ZCode 官方中继。',
+             'reason': '' if pipe_supported else '현재 설치에서는 로컬 연결을 사용할 수 없습니다.'},
+            {'id': 'official-remote', 'label': "공식 원격 연결",
+             'description': '원본을 컴퓨터 게이트웨이에 저장 App 원격 제어 링크 및 동일한 계정으로 로그인 완료 세션 데이터 전달 ZCode 공식 릴레이。',
              'configured': paired,
              'available': bool(official_supported and paired),
              'connected': selected == 'official-remote' and official.get('connected') is True,
-             'reason': ('此系统暂不支持官方远控' if not official_supported else
-                        '' if paired else '请先在电脑网关配置并登录官方远控')},
+             'reason': ('이 시스템은 현재 공식 원격 제어를 지원하지 않습니다.' if not official_supported else
+                        '' if paired else '먼저 컴퓨터 게이트웨이를 구성하고 공식 원격 제어에 로그인하십시오.')},
         ],
     }

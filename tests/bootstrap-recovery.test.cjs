@@ -43,7 +43,7 @@ test('an unreadable failed shell stylesheet retries instead of aborting startup'
   const sheet={get cssRules(){throw Object.assign(new Error('Cannot access rules'),{name:'SecurityError'});}};
   const ui=fixture({shellSheet:sheet,styles:['/feature.css'],scripts:['/app.js']});
   assert.deepEqual(ui.requests.map(n=>n.href),[retried('/style.css?v=hash',2)]);
-  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
   ui.finish(ui.requests[0]);ui.finish(ui.requests[1]);ui.finish(ui.requests[2]);ui.window.BridgeBootstrap.ready();
   assert.equal(ui.nodes.get('bootstrap-status').hidden,true);
   assert.equal(ui.reloads,0);
@@ -61,7 +61,7 @@ test('an unreadable shell stylesheet keeps the initial request within the three-
   const ui=fixture({shellSheet:sheet,scripts:['/app.js']});
   ui.finish(ui.requests[0],true);await ui.tick(1500);ui.finish(ui.requests[1],true);await ui.tick(60000);
   assert.deepEqual(ui.requests.map(n=>n.href),[retried('/style.css?v=hash',2),retried('/style.css?v=hash',3)]);
-  assert.match(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
 });
 
 test('styles retain cascade order, stay bounded at four and all finish before scripts',()=>{
@@ -81,7 +81,7 @@ test('failed eager clipboard script recovers before downstream execution without
 test('transient stylesheet failure recovers without showing the fatal page or changing its URL',async()=>{
   const ui=fixture({styles:['/a.css?v=hash'],scripts:['/a.js?v=hash']});
   ui.finish(ui.requests[0],true);
-  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
   assert.equal(ui.requests.length,1);await ui.tick(500);
   assert.equal(ui.requests[1].href,retried('/a.css?v=hash',2));ui.finish(ui.requests[1]);
   assert.equal(ui.requests[2].src,'/a.js?v=hash');ui.finish(ui.requests[2]);ui.window.BridgeBootstrap.ready();
@@ -134,7 +134,7 @@ test('explicit resource failures get distinct cache keys without changing path, 
 test('a blocked proxy-injected analytics script does not stop the workspace',()=>{
   const ui=fixture({deferred:true,scripts:['/app.js']});
   ui.dispatch('error',{target:{tagName:'SCRIPT',src:'https://static.cloudflareinsights.com/beacon.min.js'}});
-  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
   ui.domReady();ui.domReady();assert.equal(ui.requests.length,1);ui.finish(ui.requests[0]);ui.window.BridgeBootstrap.ready();
   assert.equal(ui.nodes.get('bootstrap-status').hidden,true);
 });
@@ -142,7 +142,7 @@ test('a blocked proxy-injected analytics script does not stop the workspace',()=
 test('an opaque window error before DOMContentLoaded does not cancel startup at zero seconds',()=>{
   const ui=fixture({deferred:true,scripts:['/app.js']});ui.domReady();
   ui.dispatch('error',{target:ui.window,message:'Script error.',filename:'',lineno:0,error:null});
-  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
   assert.equal(ui.requests.length,0);
   ui.domReady();assert.equal(ui.requests.length,1);ui.finish(ui.requests[0]);ui.window.BridgeBootstrap.ready();
   assert.equal(ui.nodes.get('bootstrap-status').hidden,true);
@@ -161,10 +161,10 @@ test('unknown promise rejections remain nonfatal and never postpone the startup 
   for(const reason of [null,'private-rejection',{name:'Error',message:'private-rejection'},{name:'TypeError',stack:'TypeError: private-message\n    at https://other.test/app.js?private-query:8:2'}]){
     const ui=fixture({scripts:['/app.js']});
     ui.dispatch('unhandledrejection',{reason});
-    assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+    assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
     await ui.tick(29000);ui.dispatch('unhandledrejection',{reason});await ui.tick(1000);
-    assert.match(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
-    assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/页面组件/);
+    assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+    assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/페이지 구성 요소/);
     assert.doesNotMatch(ui.nodes.get('bootstrap-diagnostics').textContent,/private-|other\.test/);
   }
 });
@@ -196,8 +196,8 @@ test('the bootstrap itself remains a required runtime source',()=>{
 test('permanent script failure stops after three attempts and keeps diagnostics collapsed',async()=>{
   const ui=fixture({scripts:['/a.js?v=secret-query','/b.js']});
   ui.finish(ui.requests[0],true);await ui.tick(500);ui.finish(ui.requests[1],true);await ui.tick(1500);ui.finish(ui.requests[2],true);await ui.tick(60000);
-  assert.equal(ui.requests.length,3);assert.match(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
-  assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/resource|fixture-no-secrets|启动诊断/);
+  assert.equal(ui.requests.length,3);assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+  assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/resource|fixture-no-secrets|진단 시작/);
   assert.match(ui.nodes.get('bootstrap-diagnostics').textContent,/resource @ \/a.js/);
   assert.doesNotMatch(ui.nodes.get('bootstrap-diagnostics').textContent,/secret-query|gateway.test/);
   assert.equal(ui.nodes.get('bootstrap-details').open,false);
@@ -205,8 +205,8 @@ test('permanent script failure stops after three attempts and keeps diagnostics 
 
 test('a hanging script is not duplicated at the soft deadline and cannot resume after the hard deadline',async()=>{
   const ui=fixture({scripts:['/a.js','/b.js']}),late=ui.requests[0].onload;
-  await ui.tick(12000);assert.equal(ui.requests.length,1);assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
-  await ui.tick(18000);assert.match(ui.nodes.get('bootstrap-title').textContent,/尚未加载完成/);
+  await ui.tick(12000);assert.equal(ui.requests.length,1);assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
+  await ui.tick(18000);assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
   late();assert.equal(ui.requests.length,1);
 });
 

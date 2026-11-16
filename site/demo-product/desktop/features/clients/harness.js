@@ -12,9 +12,9 @@ class HarnessPanel {
   render(value) {
     this.value=value;
     if(!this.dirty)for(const [key,text] of Object.entries(value.config))this.root.querySelector('[name='+key+']').value=text;
-    const states={stopped:'Harness 未启动',starting:'Harness 正在启动',running:'Harness 运行中',failed:'Harness 启动失败'};
+    const states={stopped:"Harness가 중지되었습니다.",starting:"Harness 시작 중",running:"Harness 실행 중",failed:"Harness를 시작하지 못했습니다."};
     this.root.querySelector('[data-harness-state]').textContent=this.t(states[value.state]||states.failed);
-    this.root.querySelector('pre').textContent=value.logs.join('\n')||this.t('暂无日志');
+    this.root.querySelector('pre').textContent=value.logs.join('\n')||this.t('아직 로그가 없습니다.');
     this.buttons();
   }
   buttons() {
@@ -37,14 +37,14 @@ class HarnessPanel {
     this.busy=true;this.buttons();
     try {
       if(action==='open'){await this.api.open('harness');return;}
-      if(action==='start'&&this.dirty)throw Error('请先保存 Harness 配置');
+      if(action==='start'&&this.dirty)throw Error("먼저 Harness 구성을 저장하세요.");
       const config=Object.fromEntries([...this.root.querySelectorAll('input[name]')].map(input=>[input.name,input.value.trim()]));
       const value=await this.api.harness({action,...(action==='save'?{config}:{})});
       if(action==='save')this.dirty=false;
       this.render(value);
       if(action==='detect'){
         if(value.detected){this.root.querySelector('[name=executable]').value=value.detected;this.dirty=true;}
-        else this.feedback(this.t('未找到 Harness，请选择已安装的程序'),true);
+        else this.feedback(this.t("Harness를 찾을 수 없습니다. 설치된 실행 파일을 선택하십시오."),true);
       }
     }catch(error){this.feedback(error.message,true);}
     finally{this.busy=false;this.buttons();}

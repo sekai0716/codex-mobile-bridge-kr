@@ -214,7 +214,7 @@ class AccountsTests(unittest.TestCase):
         self.assertEqual(self.manager.snapshot_files(),self.original)
 
     def test_api_accepts_unicode_provider_model_id(self):
-        model = 'xmy:日卡/deepseek-v4.1-flash'
+        model = 'xmy:\u65e5\u5361/deepseek-v4.1-flash'
         self.assertEqual(self.api(model=model)['model'], model)
 
     def test_rejects_bad_addresses_keys_ids_and_active_edit(self):
@@ -371,7 +371,7 @@ class AccountsTests(unittest.TestCase):
     def test_unchecked_shared_switch_blocks_joined_cli_before_desktop_shutdown(self):
         row = self.api()
         self.bridge.cli_sessions.joined['fixture'] = object()
-        with self.assertRaisesRegex(ValueError, 'CLI 会话'):
+        with self.assertRaisesRegex(ValueError, "액세스를\\ 전환하기\\ 전에\\ 로컬\\ Codex\\ CLI\\ 채팅을\\ 종료하거나\\ 연결을\\ 끊으세요\\."):
             self.switch(row, syncLocalCli=False)
         self.app.stop.assert_not_called()
         self.assertEqual(self.manager.snapshot_files(), self.original)
@@ -504,7 +504,7 @@ class DesktopAppTests(unittest.TestCase):
             with patch('bridge.clients.desktop_app.sys.platform', 'win32'), \
                     patch('bridge.clients.discovery.discover_clients', return_value={
                         'codex': {'installed': True, 'executable': str(runtime)}}):
-                with self.assertRaisesRegex(ValueError, '命令行运行时'):
+                with self.assertRaisesRegex(ValueError, '명령줄 런타임'):
                     DesktopApp.scan(runtime, folder)
 
     def test_runtime_and_script_cannot_be_used_as_gui(self):

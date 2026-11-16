@@ -10,7 +10,7 @@ test('explicit host file actions preserve the captured host and legacy image rou
  assert.equal(ui.fileUrl({id:'native-image',image:true}),'/api/sessions/chat/files/native-image?host=remote%3Assh');
 });
 test('summary paths resolve inside original POSIX, WSL and SSH workspaces',()=>{
- for(const cwd of ['/repo','/home/fixture/项目']){
+ for(const cwd of ['/repo','/home/fixture/프로젝트']){
   assert.equal(relative(cwd+'/space name.py',cwd),'space name.py');
   assert.equal(relative('./src/../space name.py',cwd),'space name.py');
  }

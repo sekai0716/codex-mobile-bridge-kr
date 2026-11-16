@@ -1,6 +1,6 @@
-# 两端共用的 WebView 脚本
+# Android/iOS 공용 WebView 스크립트
 
-- `web/mobile-ui.js`、`web/mobile-clipboard.js` 和 `web/mobile-system-bars.js` 是 Android/iOS 的唯一源，按 UI、剪贴板、系统区域颜色顺序加载。不要在平台代码生成或复制同一份脚本。
-- 脚本只补充手机原生壳的页面适配；共享聊天功能与布局仍在根目录 `web/`。
-- 保留 token 占位符、剪贴板真实点击/单次消费与主框架保护。原生权限和 origin 校验留在各平台原生桥，不能靠页面自行声明可信。
-- 新增或重命名资源必须同时更新 Android 普通构建、FCM Gradle 和 Xcode 主目标资源清单，并运行 `mobile/tests/resources.test.cjs`。不得把 Android 专有 `mobile-session.js` 纳入 iOS。
+- `web/mobile-ui.js`, `web/mobile-clipboard.js`, `web/mobile-system-bars.js`는 Android/iOS가 사용하는 유일한 공통 소스이며 UI, 클립보드, 시스템 영역 색상 순서로 로드합니다. 플랫폼 코드에서 같은 스크립트를 생성하거나 복제하지 않습니다.
+- 이 스크립트는 모바일 네이티브 셸에 맞춘 페이지 처리를 보완하는 역할만 합니다. 공통 채팅 기능과 레이아웃은 계속 저장소 루트의 `web/`에서 관리합니다.
+- token 자리표시자, 클립보드의 실제 클릭·일회성 사용 제한, 메인 프레임 보호를 유지합니다. 네이티브 권한과 origin 검증은 각 플랫폼의 네이티브 브리지에서 수행하며, 웹페이지가 스스로 신뢰할 수 있다고 선언한 값을 근거로 삼아서는 안 됩니다.
+- 리소스를 추가하거나 이름을 바꿀 때 Android 일반 빌드, FCM Gradle, Xcode 메인 타깃의 리소스 목록을 모두 갱신하고 `mobile/tests/resources.test.cjs`를 실행해야 합니다. Android 전용 `mobile-session.js`를 iOS에 포함해서는 안 됩니다.

@@ -24,7 +24,7 @@ async function serveLocal(profile,name,handler,{worker}={}){
       try{message=JSON.parse(buffer.subarray(4));const supplied=Buffer.from(message.token||'');
         if(supplied.length!==token.length||!timingSafeEqual(supplied,Buffer.from(token)))throw Error('Unauthorized');
       }catch{socket.destroy();return;}buffer=null;
-      Promise.resolve().then(()=>handler(message.request)).then(value=>({ok:true,value}),error=>({ok:false,error:error.publicMessage||'官方远控请求失败，请重新连接并核对原操作结果。'})).then(reply=>{
+      Promise.resolve().then(()=>handler(message.request)).then(value=>({ok:true,value}),error=>({ok:false,error:error.publicMessage||'정식 원격제어 요청이 실패하였습니다. 다시 접속하여 원래의 동작 결과를 확인해 주시기 바랍니다.。'})).then(reply=>{
         if(socket.destroyed)return;const data=Buffer.from(JSON.stringify(reply));if(data.length>MAX){socket.destroy();return;}
         const head=Buffer.alloc(4);head.writeUInt32BE(data.length);socket.end(Buffer.concat([head,data]));
       }).catch(()=>socket.destroy());

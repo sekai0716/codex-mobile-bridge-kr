@@ -16,7 +16,7 @@ class CodexQuitTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.executable = self.root/'Codex 中文/ChatGPT.exe'
+        self.executable = self.root/'Codex 중국어/ChatGPT.exe'
         self.executable.parent.mkdir()
         self.executable.write_bytes(b'fixture')
         self.helper = self.root/'codex-quit-helper.exe'
@@ -64,7 +64,7 @@ class CodexQuitTests(unittest.TestCase):
 
     def receipt(self, state, pid=41, *, marker=True, code=0):
         text = (json.dumps({'quitPhase': 'dispatching', 'pid': pid})+'\n') if marker else ''
-        text += json.dumps({'quitState': state, 'pid': pid, 'reason': '请在电脑端检查后重试'})
+        text += json.dumps({'quitState': state, 'pid': pid, 'reason': '컴퓨터에서 확인한 후 다시 시도해 주세요.'})
         return subprocess.CompletedProcess([], code, text, '')
 
     def test_already_stopped_needs_no_helper(self):
@@ -83,7 +83,7 @@ class CodexQuitTests(unittest.TestCase):
     def test_renderer_alive_after_exited_receipt_is_not_success(self):
         self.runner.return_value = self.receipt('exited')
         self.states = [self.state(41, [42]), self.state(41, [42]), self.state(children=[42])]
-        with self.assertRaisesRegex(ValueError, '重试'):
+        with self.assertRaisesRegex(ValueError, "다시\\ 시도"):
             quit.stop_codex(self.app)
         self.assertEqual(self.clock, quit.BUDGET)
         self.runner.assert_called_once()
@@ -101,7 +101,7 @@ class CodexQuitTests(unittest.TestCase):
 
     def test_initial_renderer_only_does_not_report_live_process_as_success(self):
         self.states = [self.state(children=[42])]
-        with self.assertRaisesRegex(ValueError, '尚未完成'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 정상적인\\ 종료가\\ 완료되지\\ 않았습니다\\.\\ 컴퓨터에서\\ 저장\\ 또는\\ 확인\\ 메시지를\\ 확인하고\\ 나중에\\ 다시\\ 시도하세요\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
@@ -120,7 +120,7 @@ class CodexQuitTests(unittest.TestCase):
 
     def test_wrong_receipt_pid_is_never_trusted_as_exited(self):
         self.runner.return_value = self.receipt('exited', pid=99)
-        with self.assertRaisesRegex(ValueError, '尚未完成'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 정상적인\\ 종료가\\ 완료되지\\ 않았습니다\\.\\ 컴퓨터에서\\ 저장\\ 또는\\ 확인\\ 메시지를\\ 확인하고\\ 나중에\\ 다시\\ 시도하세요\\."):
             quit.stop_codex(self.app)
         self.runner.assert_called_once()
 
@@ -138,38 +138,38 @@ class CodexQuitTests(unittest.TestCase):
 
     def test_new_main_after_dispatch_stops_observation(self):
         self.states = [self.state(41), self.state(41), self.state(77)]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_called_once()
         self.assertEqual(self.clock, 0)
 
     def test_new_main_during_initial_renderer_drain_is_not_targeted(self):
         self.states = [self.state(children=[42]), self.state(77)]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
     def test_same_pid_reused_after_dispatch_is_rejected(self):
         self.created.side_effect = [100, 100, 101]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_called_once()
 
     def test_main_changes_before_helper_is_not_targeted(self):
         self.states = [self.state(41), self.state(77)]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
     def test_unknown_process_after_dispatch_stops_observation(self):
         self.states = [self.state(41), self.state(41), self.state(41, unknown=[77])]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_called_once()
 
     def test_initial_unknown_process_sends_nothing(self):
         self.states = [self.state(41, unknown=[77])]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
@@ -182,37 +182,37 @@ class CodexQuitTests(unittest.TestCase):
     def test_identity_unreadable_with_renderers_remaining_fails_closed(self):
         self.created.side_effect = OSError('unreadable')
         self.states = [self.state(41, [42]), self.state(children=[42])]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
     def test_gui_selection_must_match_unique_main(self):
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app, [77])
         self.runner.assert_not_called()
 
     def test_missing_helper_is_clear_error_and_sends_nothing(self):
         self.helper.unlink()
-        with self.assertRaisesRegex(ValueError, '缺少 Codex 原生退出组件'):
+        with self.assertRaisesRegex(ValueError, "부족\\ Codex\\ 기본\\ 종료\\ 구성\\ 요소입니다\\.\\ 게이트웨이를\\ 다시\\ 빌드하거나\\ 설치하세요\\.\\ App"):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 
     def test_helper_start_error_is_not_raw_oserror(self):
         self.runner.side_effect = OSError('not executable')
-        with self.assertRaisesRegex(ValueError, '无法启动 Codex 原生退出组件'):
+        with self.assertRaisesRegex(ValueError, "시작할\\ 수\\ 없습니다\\ Codex\\ 구성\\ 요소를\\ 기본적으로\\ 종료하려면\\ 게이트웨이\\ 설치를\\ 확인하고\\ 다시\\ 시도하십시오\\."):
             quit.stop_codex(self.app)
         self.runner.assert_called_once()
 
     def test_valid_pre_dispatch_failure_returns_native_reason(self):
         self.runner.return_value = self.receipt('failed', marker=False, code=1)
-        with self.assertRaisesRegex(ValueError, '请在电脑端检查后重试'):
+        with self.assertRaisesRegex(ValueError, '컴퓨터에서 확인한 후 다시 시도해 주세요.'):
             quit.stop_codex(self.app)
         self.assertEqual(self.clock, 0)
         self.runner.assert_called_once()
 
     def test_explicit_pending_confirmation_returns_after_final_process_check(self):
         self.runner.return_value = self.receipt('pending')
-        with self.assertRaisesRegex(ValueError, '请在电脑端检查后重试'):
+        with self.assertRaisesRegex(ValueError, '컴퓨터에서 확인한 후 다시 시도해 주세요.'):
             quit.stop_codex(self.app)
         self.assertEqual(self.clock, 0)
         self.assertEqual(len(self.calls), 3)
@@ -261,7 +261,7 @@ class CodexQuitTests(unittest.TestCase):
         state = self.state(41, [42])
         state['commands'][42] = json.dumps([str(self.executable), '--type=unexpected'])
         self.states = [state]
-        with self.assertRaisesRegex(ValueError, '运行实例已变化'):
+        with self.assertRaisesRegex(ValueError, "Codex\\ 실행\\ 중인\\ 인스턴스가\\ 변경되었거나\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하십시오\\.\\ 종료\\ 명령이\\ 아직\\ 전송되지\\ 않았습니다\\."):
             quit.stop_codex(self.app)
         self.runner.assert_not_called()
 

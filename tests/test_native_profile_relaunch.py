@@ -57,14 +57,14 @@ class ProfileRelaunchTests(unittest.TestCase):
         require_owned(self.descriptor, self.state)
 
     def test_passive_or_normal_lifecycle_never_adopts_new_pid(self):
-        with self.assertRaisesRegex(ValueError, '身份已变化'):
+        with self.assertRaisesRegex(ValueError, "독립\\ 클라이언트\\ 시작\\ ID가\\ 변경되었습니다\\.\\ 구성을\\ 정상적으로\\ 종료한\\ 다음\\ 게이트웨이에서\\ 시작하십시오\\."):
             require_owned(self.descriptor, self.state)
         self.assertEqual(self.stored(), self.previous)
         self.verify.assert_not_called()
 
     def test_missing_receipt_does_not_adopt_even_on_explicit_reconnect(self):
         self.receipt.unlink()
-        with self.assertRaisesRegex(ValueError, '不是由网关启动'):
+        with self.assertRaisesRegex(ValueError, "이\\ 독립적인\\ 구성은\\ 게이트웨이에\\ 의해\\ 시작되지\\ 않습니다\\.\\ 구성을\\ 정상적으로\\ 종료하고\\ 게이트웨이에서\\ 시작하십시오\\."):
             require_owned(self.descriptor, self.state, allow_native_relaunch=True)
         self.assertFalse(self.receipt.exists())
         self.verify.assert_not_called()
@@ -75,7 +75,7 @@ class ProfileRelaunchTests(unittest.TestCase):
             with self.subTest(key=key):
                 saved = {**self.previous, key: value}
                 self.receipt.write_text(json.dumps(saved))
-                with self.assertRaisesRegex(ValueError, '身份无法确认'):
+                with self.assertRaisesRegex(ValueError, "다시\\ 시작한\\ 후에는\\ 독립\\ 클라이언트의\\ ID를\\ 확인할\\ 수\\ 없습니다\\.\\ 구성을\\ 확인하고\\ 다시\\ 연결하십시오\\."):
                     require_owned(self.descriptor, self.state, allow_native_relaunch=True)
                 self.assertEqual(self.stored(), saved)
         self.verify.assert_not_called()
@@ -91,20 +91,20 @@ class ProfileRelaunchTests(unittest.TestCase):
         for state in ({**self.state, 'mainPids': [20, 30]}, {**self.state, 'unknown': True}):
             with self.subTest(state=state):
                 self.inspect.return_value = state
-                with self.assertRaisesRegex(ValueError, '身份无法确认'):
+                with self.assertRaisesRegex(ValueError, "다시\\ 시작한\\ 후에는\\ 독립\\ 클라이언트의\\ ID를\\ 확인할\\ 수\\ 없습니다\\.\\ 구성을\\ 확인하고\\ 다시\\ 연결하십시오\\."):
                     require_owned(self.descriptor, self.state, allow_native_relaunch=True)
                 self.assertEqual(self.stored(), self.previous)
 
     def test_concurrent_receipt_or_cancellation_does_not_get_overwritten(self):
         newer = {**self.current, 'pid': 30}
         self.verify.side_effect = lambda *args: self.receipt.write_text(json.dumps(newer))
-        with self.assertRaisesRegex(ValueError, '身份无法确认'):
+        with self.assertRaisesRegex(ValueError, "다시\\ 시작한\\ 후에는\\ 독립\\ 클라이언트의\\ ID를\\ 확인할\\ 수\\ 없습니다\\.\\ 구성을\\ 확인하고\\ 다시\\ 연결하십시오\\."):
             require_owned(self.descriptor, self.state, allow_native_relaunch=True)
         self.assertEqual(self.stored(), newer)
         self.receipt.write_text(json.dumps(self.previous))
         cancel = threading.Event()
         self.verify.side_effect = lambda *args: cancel.set()
-        with self.assertRaisesRegex(ValueError, '取消'):
+        with self.assertRaisesRegex(ValueError, '취소'):
             require_owned(self.descriptor, self.state, allow_native_relaunch=True, cancelled=cancel)
         self.assertEqual(self.stored(), self.previous)
 
@@ -115,7 +115,7 @@ class ProfileRelaunchTests(unittest.TestCase):
 
     def test_other_platform_remains_strict(self):
         with patch('bridge.clients.profile_process.sys', SimpleNamespace(platform='win32')):
-            with self.assertRaisesRegex(ValueError, '身份已变化'):
+            with self.assertRaisesRegex(ValueError, "독립\\ 클라이언트\\ 시작\\ ID가\\ 변경되었습니다\\.\\ 구성을\\ 정상적으로\\ 종료한\\ 다음\\ 게이트웨이에서\\ 시작하십시오\\."):
                 require_owned(self.descriptor, self.state, allow_native_relaunch=True)
         self.verify.assert_not_called()
 
@@ -170,24 +170,24 @@ class MacRelaunchEvidenceTests(unittest.TestCase):
             with self.subTest(environment=environment):
                 self.native.identity.side_effect = [ProcessLookupError(errno.ESRCH, 'gone'), self.identity]
                 self.read.return_value = environment, ()
-                with self.assertRaisesRegex(ValueError, '环境不一致'):
+                with self.assertRaisesRegex(ValueError, "독립\\ 클라이언트를\\ 다시\\ 시작한\\ 후\\ 구성\\ 환경이\\ 일치하지\\ 않습니다\\."):
                     verify_relaunch(self.exe, self.old, self.current, self.env)
         self.signature.assert_not_called()
 
     def test_unreadable_process_environment_is_not_recoverable(self):
         self.read.side_effect = OSError('launch data unavailable')
-        with self.assertRaisesRegex(ValueError, '身份无法确认'):
+        with self.assertRaisesRegex(ValueError, "다시\\ 시작한\\ 후\\ 독립\\ 클라이언트의\\ 기본\\ ID를\\ 확인할\\ 수\\ 없습니다\\."):
             verify_relaunch(self.exe, self.old, self.current, self.env)
         self.signature.assert_not_called()
 
     def test_signature_failure_or_identity_change_is_rejected(self):
         self.signature.side_effect = OSError('signature unavailable')
-        with self.assertRaisesRegex(ValueError, '签名'):
+        with self.assertRaisesRegex(ValueError, "독립형\\ 클라이언트에\\ 대한\\ 애플리케이션\\ 서명을\\ 확인할\\ 수\\ 없습니다\\."):
             verify_relaunch(self.exe, self.old, self.current, self.env)
         self.signature.side_effect = None
         self.native.identity.side_effect = [ProcessLookupError(errno.ESRCH, 'gone'), self.identity,
                                             {**self.identity, 'birth': (9, 9)}]
-        with self.assertRaisesRegex(ValueError, '身份无法确认'):
+        with self.assertRaisesRegex(ValueError, "다시\\ 시작한\\ 후\\ 독립\\ 클라이언트의\\ 기본\\ ID를\\ 확인할\\ 수\\ 없습니다\\."):
             verify_relaunch(self.exe, self.old, self.current, self.env)
 
 

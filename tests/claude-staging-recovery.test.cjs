@@ -54,5 +54,5 @@ test('an existing connector session keeps its original receipt path',async t=>{
  const ui=runtime(t,{existing:true});await waitFor(()=>ui.stats.writes>0);assert.equal(ui.stats.saves,0);
 });
 test('an untrusted empty workspace still refuses initialization',async t=>{
- const ui=runtime(t,{trusted:false});const result=await ui.completed;assert.match(result.error.message,/尚未信任目录/);assert.equal(ui.stats.saves,0);
+ const ui=runtime(t,{trusted:false});const result=await ui.completed;assert.match(result.error.message,/아직 신뢰할 수 없는 디렉터리/);assert.equal(ui.stats.saves,0);
 });

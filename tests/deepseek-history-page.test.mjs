@@ -18,7 +18,7 @@ test('one native page per request and stable session revision', async () => {
   assert.equal(calls[0].maxMessages,12);
   assert.equal(calls[0].throughSeq,80);
   assert.equal(first.history.hasMore,true);
-  await assert.rejects(readHistoryPage(controller,{sessionId:'other'},{historyBefore:first.history.before}),/历史游标无效/);
+  await assert.rejects(readHistoryPage(controller,{sessionId:'other'},{historyBefore:first.history.before}),/기록 커서가 잘못되었습니다./);
   const second=await readHistoryPage(controller,row,{historyBefore:first.history.before});
   assert.equal(calls.length,2);
   assert.equal(calls[1].throughSeq,80);
@@ -29,5 +29,5 @@ test('one native page per request and stable session revision', async () => {
 test('rejects nonadvancing native cursor', async () => {
   const controller={page:async()=>({records:[{event:{seq:12}}],hasMore:true})};
   const cursor=Buffer.from(JSON.stringify({sid:'one',seq:20,before:12})).toString('base64url');
-  await assert.rejects(readHistoryPage(controller,{sessionId:'one'},{historyBefore:cursor}),/历史分页响应无效/);
+  await assert.rejects(readHistoryPage(controller,{sessionId:'one'},{historyBefore:cursor}),/기록 페이지 매기기 응답이 잘못되었습니다./);
 });

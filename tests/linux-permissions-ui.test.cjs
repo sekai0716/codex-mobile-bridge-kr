@@ -30,9 +30,9 @@ test('unavailable options explain why and stay disabled after a failed or unconf
 test('native CLI picker uses runtime wording while Desktop wording remains unchanged',async()=>{
   const cli=fixture(true);cli.setLoad(async()=>({current:'ask',options:[{preset:'ask',available:true}]}));
   await cli.open();cli.setSave(async()=>({confirmed:false}));await cli.buttons()[0].onclick();
-  assert.match(cli.status().textContent,/CLI 运行时/);assert.doesNotMatch(cli.status().textContent,/桌面/);
+  assert.match(cli.status().textContent,/권한이 제출되었습니다\. CLI 런타임 확인을 기다리는 중입니다\./);assert.doesNotMatch(cli.status().textContent,/데스크탑/);
   const desktop=fixture();await desktop.open();desktop.setSave(async()=>({confirmed:false}));await desktop.buttons()[0].onclick();
-  assert.match(desktop.status().textContent,/桌面确认/);
+  assert.match(desktop.status().textContent,/권한이 제출되었습니다\. 데스크톱 확인을 기다리는 중입니다\./);
 });
 test('a fresh catalog may enable a previously hidden option',async()=>{
   const ui=fixture();await ui.open();ui.setLoad(async()=>({current:'auto-review',options:[{preset:'auto-review',available:true}]}));

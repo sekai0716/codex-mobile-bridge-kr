@@ -44,12 +44,12 @@ def validate(value):
     for key in ('executable', 'workspace', 'home'):
         raw = value.get(key)
         if not isinstance(raw, str) or not raw.strip() or any(ord(c) < 32 for c in raw):
-            raise ValueError('请填写 Harness 程序、工作目录和数据目录')
+            raise ValueError("Harness 실행 파일, 작업 디렉터리 및 데이터 디렉터리를 입력합니다.")
         result[key] = str(Path(raw).expanduser().resolve())
     if not Path(result['executable']).is_file() or not Path(result['workspace']).is_dir():
-        raise ValueError('Harness 程序或工作目录不存在')
+        raise ValueError("Harness 실행 파일 또는 작업 디렉터리가 존재하지 않습니다.")
     if Path(result['home']).exists() and not Path(result['home']).is_dir():
-        raise ValueError('Harness 数据目录必须是文件夹')
+        raise ValueError('Harness 데이터 디렉터리는 폴더여야 합니다.')
     command(result['executable'])
     return result
 
@@ -61,12 +61,12 @@ def command(executable):
         if not node:
             node = next((p for p in ('/opt/homebrew/bin/node', '/usr/local/bin/node') if Path(p).is_file()), None)
         if not node:
-            raise ValueError('未找到 Node.js，请使用 Harness 独立可执行程序')
+            raise ValueError("Node.js를 찾을 수 없습니다. 독립형 Harness 실행 파일을 사용하십시오.")
         return [node, executable]
     if suffix in ('.cmd', '.bat'):
-        raise ValueError('请选择 Harness 可执行程序或 npm 包中的 JavaScript 入口，不支持批处理启动器')
+        raise ValueError("Harness 실행 파일 또는 npm JavaScript 진입점을 선택하세요. 배치 실행기는 지원되지 않습니다.")
     if os.name != 'nt' and not os.access(executable, os.X_OK):
-        raise ValueError('Harness 程序没有执行权限')
+        raise ValueError("Harness 파일을 실행할 수 없습니다.")
     return [executable]
 
 
@@ -108,13 +108,13 @@ class Harness:
         if action == 'detect':
             return {**self.status(True), 'detected': detect()}
         if action not in ('save', 'start', 'stop'):
-            raise ValueError('不支持的 Harness 操作')
+            raise ValueError("지원되지 않는 Harness 작업")
         if not self.operation.acquire(blocking=False):
-            raise ValueError('Harness 正在启动或停止，请稍候')
+            raise ValueError("Harness가 시작 중이거나 중지 중입니다. 기다리세요.")
         try:
             if action == 'save':
                 if self.process and self.process.poll() is None:
-                    raise ValueError('请先停止 Harness 再修改配置')
+                    raise ValueError("구성을 변경하기 전에 Harness를 중지하세요.")
                 save(self.data_dir, value.get('config', {}))
             elif action == 'start':
                 self.start()
@@ -159,7 +159,7 @@ class Harness:
                     cookies.load(value)
             values = [m for key, m in cookies.items() if key.startswith('dsh-auth-')]
             if response.status != 303 or len(values) != 1:
-                raise ValueError('Harness 登录握手失败，请检查版本兼容性')
+                raise ValueError('Harness 로그인 핸드셰이크에 실패했습니다. 버전 호환성을 확인하세요.')
             self.cookie = values[0].OutputString(attrs=[])
             self.cookie_until = time.monotonic() + min(int(values[0]['max-age'] or 3600), 86400) - 60
         finally:
@@ -168,14 +168,14 @@ class Harness:
     def endpoint(self):
         with self.lock:
             if not self.status()['running'] or not self.cookie:
-                raise ValueError('请在电脑 App 中启动 DeepSeek Harness')
+                raise ValueError("데스크톱 앱에서 DeepSeek Harness를 시작하세요.")
             if time.monotonic() >= self.cookie_until:
                 self._authenticate()
             return self.port, self.cookie, self.process
 
     def start(self):
         if self.closed.is_set():
-            raise ValueError('网关正在停止')
+            raise ValueError('게이트웨이가 중지 중입니다.')
         if self.process and self.process.poll() is None:
             return
         config = validate(configuration(self.data_dir))
@@ -197,9 +197,9 @@ class Harness:
             deadline = time.monotonic() + 60
             while not self.ready.wait(.2):
                 if self.closed.is_set() or time.monotonic() > deadline or self.process.poll() is not None:
-                    raise ValueError('Harness 未能就绪，请检查程序版本和配置')
+                    raise ValueError('Harness 준비되지 않았습니다. 프로그램 버전과 구성을 확인하세요.')
             if self.closed.is_set() or not self.launch_token:
-                raise ValueError('Harness 启动失败，请检查程序版本和配置')
+                raise ValueError('Harness 시작하지 못했습니다. 프로그램 버전과 구성을 확인하세요.')
             with self.lock:
                 self._authenticate()
                 self.phase = 'running'
@@ -208,7 +208,7 @@ class Harness:
             self.stop()
             self.phase = 'failed'
             self.logs.append('Harness startup failed')
-            raise ValueError('Harness 启动失败，请检查程序版本、Node.js 和数据目录') from None
+            raise ValueError("Harness를 시작하지 못했습니다. 버전, Node.js 및 데이터 디렉터리를 확인하세요.") from None
 
     def stop(self):
         with self.lock:
@@ -231,7 +231,7 @@ class Harness:
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                raise ValueError('Harness 未能停止，请检查运行进程') from None
+                raise ValueError("Harness가 중지되지 않았습니다. 실행 중인 프로세스를 확인하세요.") from None
             self.process = None
             self.logs.append('Harness stopped')
 

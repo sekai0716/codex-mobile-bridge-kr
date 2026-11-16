@@ -1,25 +1,25 @@
-# Agent Note: ZCode 传输复用网关运行时
+# Agent Note: ZCode 전송 다중화 게이트웨이 런타임
 
 Status: implemented
 
-## 问题
+## 문제
 
-ZCode 原型通过外部 Node 执行 CDP 传输。这是 Bridge 原型引入的依赖，不能要求用户额外安装 Homebrew 或 Node；ZCode 自己的内部运行组件仍由 ZCode 管理。
+ZCode 외부를 통한 프로토타입 Node 구현하다 CDP 전염. 이것은 Bridge 프로토타입에 의해 도입된 종속성은 사용자가 추가로 설치하도록 요구할 수 없습니다. Homebrew 또는 Node；ZCode 자체 내부 실행 구성요소는 여전히 ZCode 관리하다。
 
-## 决策
+## 결정
 
-ZCode 的 loopback 发现与 CDP 请求使用网关已有 Python 运行时。WebSocket 帧处理从 Codex 传输提取到 `bridge/clients/websocket.py`，保留原 Codex 错误类型和调用契约。ZCode 的 renderer 脚本仍在原 App 中执行，沿用原 owner、会话、账号、工作区与未知回执处理。
+ZCode 의 loopback 발견하고 CDP 게이트웨이 사용 요청이 이미 존재합니다. Python 실행 시간。WebSocket 프레임 처리 Codex 추출물을 다음으로 전송 `bridge/clients/websocket.py`，원본 유지 Codex 오류 유형 및 계약 호출。ZCode 의 renderer 스크립트는 여전히 원래 형식으로 유지됩니다. App 에서 실행, 원본 owner、세션, 계정, 작업공간 및 알 수 없는 영수증 처리。
 
-不新增运行依赖、不捆绑 ZCode 的 Node、不修改其安装包。仅接受已核验 renderer 的 127.0.0.1 端点，禁止重定向和代理；模块注册表必须唯一匹配，CDP 对象组在结束时释放。请求保持原有有界超时。
+새로운 실행 종속성 없음, 번들링 없음 ZCode 의 Node、설치 패키지를 수정하지 마십시오. 검증된 것만 수락 renderer 의 127.0.0.1 엔드포인트, 리디렉션 및 프록시는 금지됩니다. 모듈 레지스트리는 고유하게 일치해야 합니다.，CDP 객체 그룹은 마지막에 해제됩니다. 원래 제한 시간 초과를 유지하도록 요청。
 
-## 备选方案
+## 대안
 
-捆绑另一份 Node 也能消除 Homebrew 要求，但增加体积、更新与签名维护。继续使用系统 Node 最省原型改动，却将开发机依赖转嫁给用户。两者均不如复用网关已有运行时。
+다른 것을 묶다 Node 제거할 수도 있습니다 Homebrew 요구 사항이 있지만 크기, 업데이트 및 서명 유지 관리가 증가합니다. 시스템을 계속 사용하세요 Node 프로토타입 변경을 최소화하지만 개발 시스템 의존도를 사용자에게 이전합니다. 이미 런타임이 있는 재사용 게이트웨이만큼 좋지도 않습니다.。
 
-## 影响
+## 영향
 
-删除独立 `transport.mjs` 和资源项，保留原生 renderer 协议。共享 WebSocket、ZCode 适配器及 CDP 约束测试通过；本机真实原会话在配置的 Node 路径故意不存在时仍读取到 37 条消息，未发起模型请求。Windows/Linux 原生适配不由此推定完成。
+독립 삭제 `transport.mjs` 및 리소스 항목은 원본을 유지합니다. renderer 규약. 공유됨 WebSocket、ZCode 어댑터 및 CDP 제약조건 테스트를 통과했습니다. 로컬 머신의 실제 원래 세션은 구성된 Node 의도적으로 존재하지 않는 경우에도 경로를 읽습니다. 37 메시지, 모델 요청이 시작되지 않았습니다.。Windows/Linux 네이티브 적응이 완료되지 않은 것으로 추정됩니다.。
 
-## 相关记录审计
+## 관련 기록 감사
 
-[ZCode 协议原型](../feature/2026-10-31-zcode-native-session-prototype.md) 部分重叠，本文仅替代外部 Node 传输决定，原 App 身份、授权与文件边界不变；共享能力与项目功能的原有记录不被替换。
+[ZCode 프로토콜 프로토타입](../feature/2026-10-31-zcode-native-session-prototype.md) 일부 중복됨, 이 문서는 외부 항목만 대체합니다. Node 전송 결정, 원본 App 신원, 인증 및 파일 경계는 변경되지 않습니다. 공유 기능 및 프로젝트 기능에 대한 원본 기록은 대체되지 않습니다.。

@@ -20,7 +20,7 @@ class WslAccountSources:
         with accounts.lock:
             row = accounts.row(identifier)
             if row['kind'] != 'api':
-                raise ValueError('仅支持显式导入已保存 API，官方登录不能复制到 WSL')
+                raise ValueError('저장된 항목의 명시적 가져오기만 지원됩니다. API，공식 로그인은 복사할 수 없습니다. WSL')
             url, key = accounts.api_credentials({'id': identifier, 'baseUrl': row['baseUrl']})
             return {'name': row['name'], 'baseUrl': url, 'apiKey': key,
                     'model': row['model'], 'authScheme': 'bearer'}
@@ -28,7 +28,7 @@ class WslAccountSources:
     def _claude(self, identifier):
         manager = getattr(self.bridge, 'desktop_sessions', None)
         if manager is None:
-            raise ValueError('Claude Desktop 账号管理器不可用')
+            raise ValueError('Claude Desktop 계정 관리자를 사용할 수 없습니다')
         store = manager._account_store('claude')
         with store.lock:
             return LocalCliSync(self.bridge).import_desktop_claude(identifier, store=store)
@@ -51,7 +51,7 @@ class WslAccountSources:
                 ids = [public['activeId']] if current.get('kind') == 'api' and current.get('saved') else []
             source = 'desktop-claude'
         else:
-            raise ValueError('WSL 客户端无效')
+            raise ValueError('WSL 잘못된 클라이언트')
         for identifier in ids:
             try:
                 value = self._codex(identifier) if provider == 'codex' else self._claude(identifier)
@@ -69,15 +69,15 @@ class WslAccountSources:
         if (not prefix or not isinstance(source, str) or not source.startswith(prefix)
                 or not re.fullmatch('[0-9a-f]{32}', source[len(prefix):])
                 or not isinstance(expected, str) or not re.fullmatch('[0-9a-f]{64}', expected)):
-            raise ValueError('请选择此客户端已保存的 API 来源并刷新身份')
+            raise ValueError('이 클라이언트의 저장된 항목을 선택하세요. API 소스 및 새로 고침 ID')
         identifier = source[len(prefix):]
         value = self._codex(identifier) if provider == 'codex' else self._claude(identifier)
         if not hmac.compare_digest(_identity(source, value), expected):
-            raise ValueError('桌面 API 来源已变化，请刷新后重新选择')
+            raise ValueError('데스크탑 API 소스가 변경되었습니다. 새로고침한 후 다시 선택하세요.')
         name = request.get('name')
         if name is not None:
             if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
-                raise ValueError('接入名称无效')
+                raise ValueError('잘못된 액세스 이름')
             value['name'] = name.strip()
         return value
 

@@ -75,10 +75,10 @@ class MobileEvents:
 
     def acknowledge(self, provider, stream, through):
         if (provider not in (*self.PROVIDERS, 'all') and not desktop_client('desktop:' + str(provider))) or type(through) is not int or through < 0:
-            raise ValueError('通知已读参数无效')
+            raise ValueError('읽기 매개변수가 유효하지 않다는 알림')
         with self.lock:
             if stream != self.value['streamId'] or through > self.value['cursor']:
-                raise ValueError('通知状态已变化，请刷新后重试')
+                raise ValueError('알림 상태가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
             seen = dict(self.value.get('seen', {}))
             known = set(self.PROVIDERS) | {self.client(event) for event in self.value['pending']} | set(seen)
             providers = known if provider == 'all' else (provider,) if provider in known else ()
@@ -98,7 +98,7 @@ class MobileEvents:
 
     def read(self, after=0, allowed=None):
         if type(after) is not int or after < 0:
-            raise ValueError('通知游标格式不正确')
+            raise ValueError('알림 커서 형식이 잘못되었습니다.')
         with self.lock:
             # A bounded snapshot accompanies incremental reads, including stream resets.
             # These are the most recent notifications, not a live task-status claim.

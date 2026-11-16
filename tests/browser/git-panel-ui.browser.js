@@ -11,10 +11,10 @@ async function runGitPanelTests() {
   row('unstaged', 'src/app.py').click(); await wait(() => tab.body.querySelector('.wb-diff-summary'));
   check(tab.body.querySelector('.wb-git-diff').textContent.includes('Hello, workbench'), 'Unstaged selection shows working tree changes');
   check(tab.body.querySelector('.wb-diff-line.added .wb-diff-number:nth-child(2)').textContent !== '', 'Added lines display new line numbers');
-  row('untracked', 'new-image.png').click(); await wait(() => tab.body.textContent.includes('二进制'));
+  row('untracked', 'new-image.png').click(); await wait(() => tab.body.textContent.includes('바이너리'));
   check(!!tab.body.querySelector('.wb-git-diff'), 'Binary files keep the panel and show an explanation');
-  row('staged', 'notes-renamed.txt').click(); await wait(() => tab.body.textContent.includes('没有文本差异'));
-  check(tab.body.textContent.includes('原路径：notes.txt'), 'Renames show original path even without text changes');
+  row('staged', 'notes-renamed.txt').click(); await wait(() => tab.body.textContent.includes('텍스트 차이 없음'));
+  check(tab.body.textContent.includes('원래 경로：notes.txt'), 'Renames show original path even without text changes');
   const input = document.getElementById('message'); workbench.select('chat'); await frames();
   input.value = 'Git review draft'; input.dispatchEvent(new Event('input'));
   const timeline = document.getElementById('timeline'); timeline.scrollTop = 80; await frames(); const position = timeline.scrollTop;
@@ -25,7 +25,7 @@ async function runGitPanelTests() {
   document.getElementById('app').classList.add('chat-open'); workbench.select('git');
   workbench.open(session.id, 'other-host'); check(!workbench.current.files.some(t => t.id === 'git'), 'Git tabs remain isolated by host'); workbench.open(session.id, session.host);
   await tab.git.load(); check(tab.body.querySelector('.wb-git-file.selected')?.dataset.path === 'notes-renamed.txt', 'Refresh restores the selected file when it is still changed');
-  await wait(() => tab.body.textContent.includes('没有文本差异'));
+  await wait(() => tab.body.textContent.includes('텍스트 차이 없음'));
   // Detached test panel covers delayed response races and text-only rendering.
   const body = document.createElement('div'), fakeTab = {body}, pending = [];
   const fake = new GitPanel({node: workbench.node.bind(workbench), button: workbench.button.bind(workbench), url:()=>'/fixture', request:()=>new Promise(resolve=>pending.push(resolve))}, session, fakeTab);
@@ -36,7 +36,7 @@ async function runGitPanelTests() {
   check(body.textContent.includes('<img src=x') && !body.textContent.includes('stale response'), 'Late diff response cannot overwrite newer selection');
   check(!body.querySelector('img'), 'File content is rendered as text, never HTML');
   const clean = fake.load(); pending[2]({available:true,branch:'test',commit:'abc',project:'fixture',scope:'.',entries:[]}); await clean;
-  check(body.textContent.includes('没有未提交'), 'Clean repository has an explicit empty state');
+  check(body.textContent.includes('커밋되지 않음'), 'Clean repository has an explicit empty state');
   fake.dispose();
   return checks;
 }

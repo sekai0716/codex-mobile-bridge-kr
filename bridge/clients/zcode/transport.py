@@ -56,11 +56,11 @@ def bind_workspace_registry(rpc, request):
         if value.get('type') == 'boolean' and value.get('value') is True:
             return
         if probe.get('exceptionDetails') or value.get('type') != 'function':
-            raise ValueError('ZCode 原生工作区连接入口不可用')
+            raise ValueError('ZCode 기본 작업공간 연결 포털을 사용할 수 없습니다.')
         props = rpc('Runtime.getProperties', {'objectId': value['objectId'], 'ownProperties': True})
         scope = next((p for p in props.get('internalProperties', []) if p['name'] == '[[Scopes]]'), None)
         if not scope:
-            raise ValueError('ZCode 原生工作区模块不可用')
+            raise ValueError('ZCode 기본 작업공간 모듈을 사용할 수 없습니다.')
         entries = rpc('Runtime.getProperties', {'objectId': scope['value']['objectId'], 'ownProperties': True})
         matches = []
         for entry in entries['result']:
@@ -71,12 +71,12 @@ def bind_workspace_registry(rpc, request):
                            and all(marker in p['value'].get('description', '') for marker in
                                    ('v4.workspace_connection.reused', 'v4.workspace_connection.created')))
         if len(matches) != 1:
-            raise ValueError('ZCode 原生工作区注册表不唯一或版本已变化')
+            raise ValueError('ZCode 기본 작업공간 레지스트리가 고유하지 않거나 버전이 변경되었습니다.')
         result = rpc('Runtime.callFunctionOn', {'objectId': matches[0]['value']['objectId'],
                      'functionDeclaration': 'function(){window.__codexMobileZCodeAcquireWorkspace=this;return true}',
                      'returnByValue': True})
         if result.get('result', {}).get('value') is not True:
-            raise ValueError('ZCode 原生工作区注册表不可用')
+            raise ValueError('ZCode 기본 작업공간 레지스트리를 사용할 수 없습니다.')
     finally:
         rpc('Runtime.releaseObjectGroup', {'objectGroup': group})
 
@@ -90,7 +90,7 @@ def request_native(request):
     def remaining():
         value = deadline - time.monotonic()
         if value <= 0:
-            raise TimeoutError('ZCode 回执超时，结果待核对；不会自动重放')
+            raise TimeoutError('ZCode 영수증 시간이 초과되어 결과를 확인해야 합니다. 자동으로 재생되지 않습니다.')
         return value
 
     connection = http.client.HTTPConnection('127.0.0.1', port, timeout=min(3, remaining()))

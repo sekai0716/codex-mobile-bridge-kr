@@ -13,8 +13,8 @@ from .desktop import process_inventory
 BUDGET = 25
 CHILD_TYPES = {'renderer', 'gpu-process', 'utility', 'zygote', 'broker',
                'crashpad-handler', 'ppapi', 'ppapi-broker'}
-CHANGED = 'Codex 运行实例已变化或无法核对，请重新扫描后重试；尚未继续发送退出命令'
-PENDING = 'Codex 尚未完成正常退出，请在电脑端检查保存或确认提示，稍后重试'
+CHANGED = 'Codex 실행 중인 인스턴스가 변경되었거나 확인할 수 없습니다. 다시 스캔하고 다시 시도하십시오. 종료 명령이 아직 전송되지 않았습니다.'
+PENDING = 'Codex 정상적인 종료가 완료되지 않았습니다. 컴퓨터에서 저장 또는 확인 메시지를 확인하고 나중에 다시 시도하세요.'
 
 
 def helper_path():
@@ -177,7 +177,7 @@ def stop_private_zcode(executable, main_pids, owner, request_quit):
     if (not isinstance(owner, dict) or original['main'] is None or main_pids != [original['main']]
             or owner.get('pid') != original['main'] or owner.get('created') != original['created']
             or owner.get('image') != os.path.normcase(str(executable))):
-        raise ValueError('ZCode 运行实例已变化，尚未请求退出')
+        raise ValueError('ZCode 실행 중인 인스턴스가 변경되었으며 아직 종료를 요청하지 않았습니다.')
     try:
         supported = request_quit()
     except (OSError, EOFError, ValueError, subprocess.SubprocessError):
@@ -190,7 +190,7 @@ def stop_private_zcode(executable, main_pids, owner, request_quit):
             return True
         if current['main'] == original['main'] and current['created'] == original['created']:
             return False  # The original App definitively did not implement Browser.close.
-    _observe(executable, original, deadline, '尚未确认 ZCode 正常退出，请检查原 App；不会重复请求退出')
+    _observe(executable, original, deadline, '아직 확인되지 않음 ZCode 정상적으로 종료됩니다. 원본을 확인해주세요. App；반복적인 종료 요청이 없습니다.')
     return True
 
 
@@ -199,7 +199,7 @@ def stop_zcode(app, gui_pids=None):
     require_interactive()
     if (app.executable.name.casefold() != 'zcode.exe'
             or not (app.executable.parent/'resources/app.asar').is_file()):
-        raise ValueError('ZCode 安装身份无法确认')
+        raise ValueError('ZCode 설치 ID를 확인할 수 없습니다.')
     try:
         return _stop_menu(app, gui_pids, '--quit-zcode')
     except ValueError as exc:
@@ -209,7 +209,7 @@ def stop_zcode(app, gui_pids=None):
 def _stop_menu(app, gui_pids, mode):
     """An uncertain request is never replayed or escalated to termination."""
     if sys.platform != 'win32':
-        raise ValueError('此系统不支持 Windows Codex 原生退出组件')
+        raise ValueError('이 시스템은 지원하지 않습니다 Windows Codex 네이티브 이탈 구성요소')
     executable, deadline = Path(app.executable).resolve(), time.monotonic() + BUDGET
     original = _snapshot(executable, deadline)
     if not original['pids']:
@@ -221,7 +221,7 @@ def _stop_menu(app, gui_pids, mode):
         raise ValueError(CHANGED)
     helper = helper_path()
     if not helper.is_file():
-        raise ValueError('缺少 Codex 原生退出组件，请重新构建或安装网关 App')
+        raise ValueError('부족 Codex 기본 종료 구성 요소입니다. 게이트웨이를 다시 빌드하거나 설치하세요. App')
     # Recheck the selected instance after helper discovery and before sending.
     current = _snapshot(executable, deadline)
     if not current['pids']:
@@ -246,7 +246,7 @@ def _stop_menu(app, gui_pids, mode):
         interrupted = True
     except OSError:
         return _observe(executable, original, deadline,
-            '无法启动 Codex 原生退出组件，请检查网关安装后重试', wait=False)
+            '시작할 수 없습니다 Codex 구성 요소를 기본적으로 종료하려면 게이트웨이 설치를 확인하고 다시 시도하십시오.', wait=False)
     # Even a successful receipt is not evidence that Electron children exited.
     reason = receipt['reason'].strip() if receipt is not None else ''
     reason = reason[:1000] or PENDING

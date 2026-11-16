@@ -48,7 +48,7 @@ def running_profiles(app):
 def start(executable):
     bundle = next((p for p in executable.parents if p.suffix == '.app'), None)
     if bundle is None:
-        raise ValueError('Claude 桌面程序必须位于应用程序包中')
+        raise ValueError("Claude 실행 파일은 앱 번들 내에 있어야 합니다.")
     subprocess.run(['/usr/bin/open', '-g', '-a', str(bundle)], check=True, timeout=20,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -68,4 +68,4 @@ def helper_result(action, stdout, returncode):
     try:
         return json.loads(stdout.strip().splitlines()[-1])
     except (ValueError, IndexError, AttributeError):
-        return {'setupState': 'failed', 'reason': 'Claude 连接组件未返回有效状态'}
+        return {'setupState': 'failed', 'reason': "Claude 커넥터가 유효한 상태를 반환하지 않았습니다."}

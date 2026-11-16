@@ -18,7 +18,7 @@ test('Claude Code native archive is reversible and preserves worktree; Cowork do
  assert.equal((await ui.invoke('mobileArchive',['root',{archived:false}])).result.status,'accepted');
  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls)),[['archive','root',{cleanupWorktree:false}],['unarchive','root']]);
  await ui.invoke('mobileList',[]);assert.deepEqual(ui.calls.at(-1),['metadata']);
- assert.match((await ui.invoke('mobileArchive',['root',{archived:true}],'cowork')).error,/不支持/);
+ assert.match((await ui.invoke('mobileArchive',['root',{archived:true}],'cowork')).error,/지원되지 않는 데스크톱 작업/);
 });
 test('Claude archive refuses descendants, pending input, background activity and unknown runtime before any native write',async()=>{
  const ui=await claude();ui.child.isRunning=true;

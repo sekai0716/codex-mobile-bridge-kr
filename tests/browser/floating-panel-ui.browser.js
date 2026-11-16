@@ -27,7 +27,7 @@ async function runFloatingPanelTests() {
   win.adjust('bottom',win.actual,9999,9999);
   check(win.actual.y===fixedTop&&win.actual.y+win.actual.h===win.host.clientHeight-6,'Bottom growth stops at container boundary');
   win.adjust('bottom',win.actual,0,-9999);
-  win.element.querySelector('[aria-label="关闭详情"]').click();
+  win.element.querySelector('[aria-label="세부정보 닫기"]').click();
   check(!document.querySelector('.wb-float')&&!panel.selected,'Close clears detail and selection');
   document.querySelector('.wb-git-file').click();await wait(()=>document.querySelector('.wb-float .wb-diff-line'));
   check(panel.floating.actual.h===Math.min(280,panel.floating.host.clientHeight-12),'Reopen retains dimensions');

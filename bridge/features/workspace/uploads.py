@@ -15,7 +15,7 @@ MAX_TOTAL = 100 * 1024 * 1024
 
 def file_name(value):
     if not isinstance(value, str) or not value or len(value.encode('utf-8')) > 200 or value in ('.', '..') or re.search(r'[\\/\x00-\x1f\x7f]', value):
-        raise ValueError('文件名无效')
+        raise ValueError('잘못된 파일 이름')
     return value
 
 
@@ -53,7 +53,7 @@ class Uploads:
     def put(self, thread, identifier, name, data):
         uuid.UUID(thread); uuid.UUID(identifier); file_name(name)
         if not isinstance(data, bytes) or not 0 < len(data) <= MAX_FILE:
-            raise ValueError('每个附件需为 1 字节至 20 MB')
+            raise ValueError("각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.")
         digest = hashlib.sha256(data).hexdigest()
         with self.lock:
             folder = self.root/thread/identifier
@@ -61,14 +61,14 @@ class Uploads:
             if meta.exists():
                 row = self.get(thread, identifier)
                 if row['sha256'] != digest or row['name'] != name:
-                    raise ValueError('同一附件标识不能用于不同文件')
+                    raise ValueError("첨부파일 ID는 다른 파일에 재사용할 수 없습니다.")
                 return self.public(row)
             folder.mkdir(parents=True, exist_ok=True, mode=0o700)
             image = image_type(data)
             internal = _internal_dir(folder, self.root)
             path = internal/('original' + _stored_suffix(name, image))
             if folder.is_symlink() or internal.is_symlink():
-                raise ValueError('附件路径无效')
+                raise ValueError("잘못된 첨부 파일 경로")
             temporary = internal/'original.part'
             # Uploaded names never become executable commands or overwrite project files.
             with temporary.open('wb') as stream:
@@ -93,22 +93,22 @@ class Uploads:
     def set_thumb(self, thread, identifier, data, width, height):
         uuid.UUID(thread); uuid.UUID(identifier)
         if not isinstance(data, bytes) or not 0 < len(data) <= 1024 * 1024:
-            raise ValueError('缩略图需为 1 字节至 1 MB')
+            raise ValueError('썸네일은 다음과 같아야 합니다. 1 바이트 1 MB')
         if not isinstance(width, int) or isinstance(width, bool) or not isinstance(height, int) or isinstance(height, bool) or not 1 <= width <= 8192 or not 1 <= height <= 8192:
-            raise ValueError('缩略图尺寸无效')
+            raise ValueError('썸네일 크기가 잘못되었습니다.')
         mime = image_type(data)
         if mime not in ('image/webp', 'image/jpeg', 'image/png'):
-            raise ValueError('缩略图格式无效')
+            raise ValueError('잘못된 축소판 형식')
         with self.lock:
             row = self.get(thread, identifier)
             if not row.get('image'):
-                raise ValueError('只有图片附件可以生成缩略图')
+                raise ValueError('이미지 첨부만 썸네일을 생성할 수 있습니다.')
             folder = self.root/thread/identifier
             extension = mime.rsplit('/', 1)[-1].replace('jpeg', 'jpg')
             internal = _internal_dir(folder, self.root)
             path = internal/('thumb.'+extension)
             if folder.is_symlink() or internal.is_symlink():
-                raise ValueError('缩略图路径无效')
+                raise ValueError('썸네일 경로가 잘못되었습니다.')
             temporary = internal/'thumb.part'
             with temporary.open('wb') as stream:
                 stream.write(data)
@@ -125,7 +125,7 @@ class Uploads:
     def preview(self, thread, identifier, variant='thumb'):
         row = self.get(thread, identifier)
         if not row.get('image'):
-            raise KeyError('图片附件不存在')
+            raise KeyError('이미지 첨부 파일이 존재하지 않습니다')
         if variant != 'original' and row.get('thumbPath'):
             name = row['thumbPath']
             path = self.root/thread/identifier/'internal'/name
@@ -145,17 +145,17 @@ class Uploads:
             upload_dir = folder.resolve()
             upload_dir.relative_to(self.root.resolve())
             if any(part.is_symlink() for part in (self.root/thread, folder, folder/'internal', meta)):
-                raise ValueError('附件路径无效')
+                raise ValueError("잘못된 첨부 파일 경로")
             resolved = path.resolve()
             try:
                 resolved.relative_to(upload_dir)
             except ValueError:
-                raise ValueError('附件路径无效')
+                raise ValueError("잘못된 첨부 파일 경로")
             if path.is_symlink() or not path.is_file():
-                raise ValueError('附件已不可用，请重新上传')
+                raise ValueError("첨부파일을 사용할 수 없습니다. 다시 업로드하세요.")
             return row
         except (OSError, KeyError):
-            raise ValueError('附件已不可用，请重新上传') from None
+            raise ValueError("첨부파일을 사용할 수 없습니다. 다시 업로드하세요.") from None
 
     def by_path(self, thread, paths):
         """Map exact attachment paths to metadata for safe phone previews."""
@@ -208,8 +208,8 @@ class Uploads:
 
     def resolve(self, thread, identifiers):
         if not isinstance(identifiers, list) or len(identifiers) > MAX_FILES or any(not isinstance(v, str) for v in identifiers) or len(set(identifiers)) != len(identifiers):
-            raise ValueError('每条消息最多添加 10 个不同附件')
+            raise ValueError("메시지당 최대 10개의 파일 첨부")
         rows = [self.get(thread, value) for value in identifiers]
         if sum(row['size'] for row in rows) > MAX_TOTAL:
-            raise ValueError('每条消息的附件总计不能超过 100 MB')
+            raise ValueError("첨부 파일의 총 개수는 메시지당 MB 100개 이하여야 합니다.")
         return rows

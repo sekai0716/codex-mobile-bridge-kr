@@ -2,9 +2,9 @@
 const repo='https://github.com/try2love/codex-mobile-bridge';
 const video=document.getElementById('tour');
 const languageButtons=[...document.querySelectorAll('[data-language]')];
-let language='zh',chapters=[];
-const translations=[...document.querySelectorAll('[data-en]')].map(node=>({node,zh:node.textContent,en:node.dataset.en}));
-const attributes=['alt','aria-label','title'].flatMap(name=>[...document.querySelectorAll('[data-en-'+name+']')].map(node=>({node,name,zh:node.getAttribute(name),en:node.getAttribute('data-en-'+name)})));
+let language='ko',chapters=[];
+const translations=[...document.querySelectorAll('[data-en]')].map(node=>({node,ko:node.textContent,en:node.dataset.en}));
+const attributes=['alt','aria-label','title'].flatMap(name=>[...document.querySelectorAll('[data-en-'+name+']')].map(node=>({node,name,ko:node.getAttribute(name),en:node.getAttribute('data-en-'+name)})));
 function setTracks(){for(const track of video.textTracks)track.mode=track.language===language?'showing':'disabled';}
 function renderChapters(){
   document.getElementById('chapters').replaceChildren(...chapters.map(chapter=>{
@@ -18,14 +18,14 @@ function renderChapters(){
   }));
 }
 function setLanguage(value,persist=false){
-  language=value==='en'?'en':'zh';document.documentElement.lang=language==='en'?'en':'zh-CN';
+  language=value==='en'?'en':'ko';document.documentElement.lang=language==='en'?'en':'ko-KR';
   for(const item of translations)item.node.textContent=item[language];
   for(const item of attributes)item.node.setAttribute(item.name,item[language]);
   languageButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.language===language)));
   document.querySelectorAll('[data-doc-link]').forEach(link=>link.href=language==='en'?repo+'/blob/main/README_EN.md':repo);
   document.querySelectorAll('[data-setup-link]').forEach(link=>{const url=new URL(link.href);url.searchParams.set('lang',language);link.href=url;});
-  const title=language==='en'?'Codex Mobile Bridge | Your workspace, across screens':'Codex Mobile Bridge｜随身接力你的 AI 工作台';
-  const description=language==='en'?'An open-source, self-hosted workspace for Codex, Claude Desktop, DeepSeek Harness and ZCode across Web, Android and iOS. v2.2.0 adds multiple connection routes, native side chats and lower idle resource usage.':'开源、自托管的多客户端远程工作台。从 Web、Android、iOS 继续 Codex、Claude Desktop、DeepSeek Harness 与 ZCode 工作。v2.2.0 带来多信道切换、原生侧边聊天与更低的空闲能耗。';
+  const title=language==='en'?'Codex Mobile Bridge | Your workspace, across screens':'Codex Mobile Bridge | 여러 기기에서 이어지는 작업 공간';
+  const description=language==='en'?'An open-source, self-hosted workspace for Codex, Claude Desktop, DeepSeek Harness and ZCode across Web, Android and iOS. v2.2.0 adds multiple connection routes, native side chats and lower idle resource usage.':'웹, Android, iOS에서 Codex, Claude Desktop, DeepSeek Harness, ZCode를 사용할 수 있는 오픈 소스 자체 호스팅 작업 공간입니다. v2.2.0에는 여러 연결 경로, 네이티브 보조 채팅, 유휴 자원 사용량 개선이 포함됩니다.';
   document.title=title;document.querySelector('meta[name=description]').content=description;document.querySelector('meta[property="og:title"]').content=title;document.querySelector('meta[property="og:description"]').content=description;
   const canonical='https://try2love.github.io/codex-mobile-bridge/'+(language==='en'?'?lang=en':'');
   document.querySelector('link[rel=canonical]').href=canonical;document.querySelector('meta[property="og:url"]').content=canonical;
@@ -45,7 +45,7 @@ routeButtons.forEach((button,i)=>{
   button.onkeydown=event=>{let next;if(event.key==='ArrowRight')next=(i+1)%routeButtons.length;if(event.key==='ArrowLeft')next=(i+routeButtons.length-1)%routeButtons.length;if(event.key==='Home')next=0;if(event.key==='End')next=routeButtons.length-1;if(next!==undefined){event.preventDefault();selectRoute(routeButtons[next].dataset.route,true);}};
 });
 let initial=new URL(location.href).searchParams.get('lang');
-if(!['zh','en'].includes(initial)){try{initial=localStorage.getItem('cmb-site-language');}catch{}if(!['zh','en'].includes(initial))initial=navigator.language.toLowerCase().startsWith('zh')?'zh':'en';}
+if(!['ko','en'].includes(initial)){try{initial=localStorage.getItem('cmb-site-language');}catch{}if(!['ko','en'].includes(initial))initial='ko';}
 setLanguage(initial);
 video.addEventListener('loadedmetadata',setTracks);
 fetch('./assets/tour-chapters.json?v=1.3.0').then(response=>{if(!response.ok)throw Error('Chapters unavailable');return response.json();}).then(value=>{chapters=value;renderChapters();}).catch(()=>{});
@@ -58,16 +58,16 @@ const deviceStage=document.getElementById('device-panel');
 const deviceButtons=[...document.querySelectorAll('[data-device]')];
 let demoPlatform='ios';
 const experienceCopy={
- ios:{name:'iOS APP · V2.0.0',zh:['从电脑列表，走进工作台。','保存你的几台电脑，随时进入同一条聊天。打开更多菜单，还能体验通知、设置和灵动岛示意。',['点选我的工作电脑，进入聊天','点击 ＋，打开文件或侧边聊天','打开更多，查看灵动岛示意'],'iOS 安装需自行签名；灵动岛后台状态可能滞后。'],en:['From your computers to your workspace.','Save several computers and pick up the same chat. Open More to explore notifications, settings and a Live Activity illustration.',['Choose My work computer and open a chat','Use + to open files or a side chat','Open More to preview a Live Activity'],'The iOS App requires your own signing. Background Live Activity state may be stale.']},
- android:{name:'ANDROID APP · V2.0.0',zh:['随身接力，操作更直接。','扫码保存电脑，手机上继续聊天、管理文件和审阅变更。紧凑的界面，把空间留给当前任务。',['选择一台已保存的电脑','发送一句要求，查看模拟回复','打开 Git，试着暂存与提交'],'演示为 v2.0.0；v2.2.0 可在设置中开启 Android 后台通知。'],en:['Pick up your work, wherever you are.','Scan and save computers, continue chats, manage files and review changes. A compact interface leaves room for the task.',['Choose a saved computer','Send an instruction and see a simulated reply','Open Git, then try staging and committing'],'This demo uses v2.0.0; v2.2.0 offers optional Android background notifications in settings.']},
- web:{name:'MOBILE WEB · V2.0.0',zh:['打开浏览器，就到工作现场。','不用安装 App。连接网关后，手机浏览器也能使用文件、终端、Git 与侧边聊天。',['直接在输入框补充要求','切换模型、Skill 与权限','点击 ＋，打开新的工作台标签'],'演示为手机浏览器布局；实际访问需连通电脑网关。'],en:['Open a browser. Get back to work.','No App installation needed. Connect to your gateway to use files, a terminal, Git and side chats from a mobile browser.',['Add an instruction in the composer','Change model, Skills and permissions','Use + to open a workbench tab'],'This illustrates a mobile browser. Real use requires a reachable computer gateway.']},
- desktop:{name:'DESKTOP WEB · V2.0.0',zh:['一边对话，一边完成工作。','宽屏左右分屏：主聊天与工具各占一栏。试着打开侧边聊天或终端，再拖动中间分隔条。',['左侧保留主聊天','右侧打开文件、Git 或终端','拖动分隔条调整两栏比例'],'窄屏会自动保持单栏。'],en:['Keep the conversation beside the work.','Wide browsers split the main chat and tools into two panes. Open a side chat or terminal, then drag the divider.',['Keep the main chat on the left','Open files, Git or a terminal on the right','Drag the divider to resize the panes'],'Narrow screens stay in a single pane.']},
- gateway:{name:'DESKTOP GATEWAY APP · SIMULATION',zh:['电脑端配置，手机端接力。','按照真实电脑端界面添加连接、保存配置并启动演示网关。二维码、网络检测和服务器部署需要在实际 App 中使用。',['打开「网络访问」','添加并配置连接方式','保存后回到「概览」启动'],'进阶服务器配置需按教程自行完成；App 不代执行 sudo。'],en:['Set up on desktop. Pick up on mobile.','Use the actual desktop layout to add a connection, save settings and start a demo gateway. Pairing codes, network checks and deployment require the real App.',['Open Network access','Add and configure a connection','Save, then start from Overview'],'Advanced server preparation follows the guide; the App does not run sudo for you.']}
+ ios:{name:'iOS APP · V2.0.0',ko:['컴퓨터 목록에서 작업대로。','여러 대의 컴퓨터를 저장하고 언제든지 동일한 채팅에 참여하세요. 더 많은 메뉴를 열고 알림, 설정, 스마트 아일랜드 동작을 경험해 보세요.。',['채팅에 들어가려면 내 업무용 컴퓨터를 클릭하세요.','파일이나 사이드 채팅을 열려면 ＋를 클릭하세요.','더 열어서 스마트 아일랜드의 지침을 확인하세요'],'iOS 설치에는 본인이 서명해야 합니다. 스마트 아일랜드의 배경 상태가 뒤쳐질 수 있습니다.。'],en:['From your computers to your workspace.','Save several computers and pick up the same chat. Open More to explore notifications, settings and a Live Activity illustration.',['Choose My work computer and open a chat','Use + to open files or a side chat','Open More to preview a Live Activity'],'The iOS App requires your own signing. Background Live Activity state may be stale.']},
+ android:{name:'ANDROID APP · V2.0.0',ko:['휴대용 릴레이, 보다 직접적인 작동。','QR 코드를 스캔하여 컴퓨터에 저장하고 휴대폰에서 채팅, 파일 관리, 변경 사항 검토를 계속하세요. 컴팩트한 인터페이스로 현재 작업을 위한 공간 확보。',['저장된 컴퓨터 선택','요청을 보내고 시뮬레이션된 응답을 확인하세요.','열려 있는 Git，저장하고 제출해 보세요'],'다음과 같이 시연됨 v2.0.0；v2.2.0 설정에서 켤 수 있습니다 Android 백그라운드 알림。'],en:['Pick up your work, wherever you are.','Scan and save computers, continue chats, manage files and review changes. A compact interface leaves room for the task.',['Choose a saved computer','Send an instruction and see a simulated reply','Open Git, then try staging and committing'],'This demo uses v2.0.0; v2.2.0 offers optional Android background notifications in settings.']},
+ web:{name:'MOBILE WEB · V2.0.0',ko:['브라우저를 열고 작업 현장으로 이동。','설치할 필요가 없습니다 App。게이트웨이 접속 후 모바일 브라우저에서도 파일, 터미널 이용 가능、Git 측과 채팅。',['입력 상자에 직접 요구사항을 추가하세요.','모델 전환、Skill 권한이 있는','＋를 클릭하여 새 워크벤치 탭을 엽니다.'],'데모는 모바일 브라우저 레이아웃입니다. 실제 액세스에는 컴퓨터 게이트웨이에 대한 연결이 필요합니다。'],en:['Open a browser. Get back to work.','No App installation needed. Connect to your gateway to use files, a terminal, Git and side chats from a mobile browser.',['Add an instruction in the composer','Change model, Skills and permissions','Use + to open a workbench tab'],'This illustrates a mobile browser. Real use requires a reachable computer gateway.']},
+ desktop:{name:'DESKTOP WEB · V2.0.0',ko:['대화를 나누면서 동시에 업무를 처리하세요.。','와이드스크린 왼쪽 및 오른쪽 분할 화면: 기본 채팅과 도구가 각각 한 열을 차지합니다. 사이드 채팅이나 터미널을 열고 중간 구분선을 드래그해 보세요.。',['기본 채팅을 왼쪽에 유지','오른쪽 파일 열기、Git 또는 터미널','두 열의 비율을 조정하려면 구분 막대를 드래그하세요.'],'좁은 화면은 자동으로 단일 열을 유지합니다.。'],en:['Keep the conversation beside the work.','Wide browsers split the main chat and tools into two panes. Open a side chat or terminal, then drag the divider.',['Keep the main chat on the left','Open files, Git or a terminal on the right','Drag the divider to resize the panes'],'Narrow screens stay in a single pane.']},
+ gateway:{name:'DESKTOP GATEWAY APP · SIMULATION',ko:['컴퓨터 측 구성, 휴대폰 측 릴레이。','실제 컴퓨터 인터페이스를 따라 연결을 추가하고 구성을 저장하고 데모 게이트웨이를 시작하세요. QR코드, 네트워크 감지, 서버 구축 등 실제 구현 필요 App 에 사용。',['”네트워크 액세스”를 엽니다.」','연결 방법 추가 및 구성','저장 후 ’개요’로 돌아가서 시작하세요.'],'튜토리얼에 따라 고급 서버 구성을 직접 완료해야 합니다.；App 대신하여 실행되지 않음 sudo。'],en:['Set up on desktop. Pick up on mobile.','Use the actual desktop layout to add a connection, save settings and start a demo gateway. Pairing codes, network checks and deployment require the real App.',['Open Network access','Add and configure a connection','Save, then start from Overview'],'Advanced server preparation follows the guide; the App does not run sudo for you.']}
 };
 function refreshExperience(){
  const copy=experienceCopy[demoPlatform][language];
  document.getElementById('stage-title').textContent=copy[0];document.getElementById('stage-description').textContent=copy[1];document.getElementById('stage-steps').replaceChildren(...copy[2].map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));document.getElementById('stage-boundary').textContent=copy[3];document.getElementById('device-name').textContent=experienceCopy[demoPlatform].name;
- demoFrame.title=language==='en'?'Bridge '+experienceCopy[demoPlatform].name+' interactive demo':'Bridge '+experienceCopy[demoPlatform].name+' 交互演示';
+ demoFrame.title=language==='en'?'Bridge '+experienceCopy[demoPlatform].name+' interactive demo':'Bridge '+experienceCopy[demoPlatform].name+' 대화형 데모';
  const demoUrl=new URL(demoFrame.src,location.href);
  if(demoUrl.searchParams.get('lang')!==language){demoUrl.searchParams.set('lang',language);demoFrame.src=demoUrl.href;}else demoFrame.contentWindow?.postMessage({type:'bridge-demo-language',lang:language},'*');
 }

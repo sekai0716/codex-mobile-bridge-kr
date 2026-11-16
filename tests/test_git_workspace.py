@@ -58,7 +58,7 @@ class GitWorkspaceTests(unittest.TestCase):
 
     def test_untracked_ignored_binary_large_and_no_newline(self):
         self.baseline(); (self.root / '.gitignore').write_text('ignored.txt\n'); (self.root / 'ignored.txt').write_text('private')
-        name = '中文 [x].txt' if os.name == 'nt' else '中文 [x]*.txt'
+        name = '중국어 [x].txt' if os.name == 'nt' else '중국어 [x]*.txt'
         (self.root / name).write_text('<img src=x>')
         self.assertIn('+<img src=x>\n\\ No newline', self.diff(name, 'untracked')['text'])
         self.assertNotIn('ignored.txt', [e['path'] for e in self.status()['entries']])
@@ -118,7 +118,7 @@ class GitWorkspaceTests(unittest.TestCase):
         subprocess.run(['git', 'init', '--bare', '-q', str(plain)], check=True)
         self.assertFalse(GitWorkspace(Workspace(plain)).status()['available'])
         with patch('bridge.features.workspace.workspace.subprocess.Popen', side_effect=FileNotFoundError):
-            with self.assertRaisesRegex(ValueError, '未安装 Git'): self.status()
+            with self.assertRaisesRegex(ValueError, "이\\ 컴퓨터나\\ SSH\\ 서버가\\ 설치되지\\ 않았습니다\\ Git"): self.status()
 
     def test_remote_routing_does_not_activate_owner(self):
         self.baseline(); (self.root / 'hello.txt').write_text('remote change\n')
@@ -144,7 +144,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.assertEqual(self.git('show', 'HEAD:hello.txt').stdout, os.linesep.join(['staged version', '']).encode())
         self.assertEqual(path.read_text(), 'later working version\n')
         self.assertEqual(self.status()['entries'][0]['worktree'], 'M')
-        with self.assertRaisesRegex(ValueError, '已发生变化'):
+        with self.assertRaisesRegex(ValueError, "창고가\\ 변경되었습니다\\.\\ 새로고침\\ 후\\ 확인\\ 후\\ 다시\\ 운영하시기\\ 바랍니다\\."):
             GitWorkspace(self.work).mutate('commit', snapshot, message='Do not duplicate')
         self.assertEqual(self.git('rev-list', '--count', 'HEAD').stdout.strip(), b'2')
         self.mutate('stage-all'); self.mutate('unstage-all')
@@ -169,9 +169,9 @@ class GitWorkspaceTests(unittest.TestCase):
         self.assertEqual(self.status()['branch'], 'feature/demo')
         path = self.root / 'hello.txt'; path.write_text('one')
         stale = self.status()['version']; path.write_text('two changed')
-        with self.assertRaisesRegex(ValueError, '已发生变化'):
+        with self.assertRaisesRegex(ValueError, "창고가\\ 변경되었습니다\\.\\ 새로고침\\ 후\\ 확인\\ 후\\ 다시\\ 운영하시기\\ 바랍니다\\."):
             GitWorkspace(self.work).mutate('stage', stale, path='hello.txt')
-        with self.assertRaisesRegex(ValueError, '未提交'):
+        with self.assertRaisesRegex(ValueError, "지점을\\ 운영하기\\ 전에\\ 커밋되지\\ 않은\\ 변경\\ 사항을\\ 컴퓨터에\\ 제출하거나\\ 저장하세요\\."):
             self.mutate('switch-branch', branch='main')
         self.assertEqual(path.read_text(), 'two changed')
         with self.assertRaises(ValueError): self.mutate('reset', branch='main')
@@ -183,7 +183,7 @@ class GitWorkspaceTests(unittest.TestCase):
         (self.root / 'hello.txt').write_text('main\n'); self.mutate('stage-all'); self.mutate('commit', message='Main')
         result = self.mutate('merge', branch='feature/demo')
         self.assertEqual(result['outcome'], 'conflict'); self.assertEqual(self.status()['operation'], 'merge')
-        with self.assertRaisesRegex(ValueError, '冲突'): self.mutate('commit', message='Cannot commit unresolved conflict')
+        with self.assertRaisesRegex(ValueError, "충돌을\\ 해결하고\\ 먼저\\ 파일을\\ 준비하십시오\\."): self.mutate('commit', message='Cannot commit unresolved conflict')
         self.mutate('abort-merge'); self.assertEqual((self.root / 'hello.txt').read_text(), 'main\n')
         self.assertIsNone(self.status()['operation'])
         self.mutate('merge', branch='feature/demo'); (self.root / 'hello.txt').write_text('main\n')
@@ -215,7 +215,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.git('add', 'hello.txt'); (self.root / 'hello.txt').write_text('outside'); self.git('add', 'hello.txt')
         nested = GitWorkspace(Workspace(self.root / 'nested'))
         state = nested.status(); nested.mutate('stage-all', state['version'])
-        with self.assertRaisesRegex(ValueError, '仓库根目录'):
+        with self.assertRaisesRegex(ValueError, "이\\ 작업은\\ 전체\\ 창고에\\ 영향을\\ 미칩니다\\.\\ 창고의\\ 루트디렉토리에\\ 해당하는\\ 채팅에서\\ 작업해주세요\\."):
             nested.mutate('commit', nested.status()['version'], message='Do not include outside files')
         self.assertIn(b'hello.txt', self.git('diff', '--cached', '--name-only').stdout)
         self.assertEqual(self.git('rev-list', '--count', 'HEAD').stdout.strip(), b'1')
@@ -224,7 +224,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.baseline(); hook = self.root / '.git/hooks/pre-commit'
         hook.write_text('#!/bin/sh\nexit 1\n'); hook.chmod(0o700)
         (self.root / 'hello.txt').write_text('pending'); self.mutate('stage-all')
-        with self.assertRaisesRegex(ValueError, '未完成'): self.mutate('commit', message='Blocked by hook')
+        with self.assertRaisesRegex(ValueError, "Git\\ 작업이\\ 완료되지\\ 않았거나\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 상태와\\ 기록을\\ 새로\\ 고치십시오\\.\\ 변경\\ 사항이\\ 없으면\\ 컴퓨터에서\\ 확인하세요\\.\\ Git\\ 신원,\\ 서명、hooks\\ 아니면\\ 창고를\\ 잠근\\ 후\\ 다시\\ 시도해\\ 보세요\\.。"): self.mutate('commit', message='Blocked by hook')
         self.assertEqual(self.git('rev-list', '--count', 'HEAD').stdout.strip(), b'1')
         self.assertEqual(self.status()['entries'][0]['index'], 'M')
 
@@ -249,7 +249,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.baseline(); (self.root / 'hello.txt').write_text('pending')
         owner = GitWorkspace(self.work); state = owner.require_repository()
         with owner.mutation_lock():
-            with self.assertRaisesRegex(ValueError, '另一个 Git 操作'):
+            with self.assertRaisesRegex(ValueError, "또\\ 다른\\ Git\\ 작업이\\ 실행\\ 중입니다\\.\\ 나중에\\ 새로고침하세요\\."):
                 GitWorkspace(self.work).mutate('stage-all', state['version'])
         self.assertEqual(self.git('diff', '--cached').stdout, b'')
 

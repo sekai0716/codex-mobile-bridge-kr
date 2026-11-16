@@ -192,7 +192,7 @@ def normalize_item(item, *, image_cache=None):
                 path = url2pathname(file_path)
         except ValueError:
             path = raw
-        row.update(role="activity", title="图片预览", text="", phase="commentary")
+        row.update(role="activity", title="사진 미리보기", text="", phase="commentary")
         if path:
             row["attachments"] = [{"type": "localImage", "path": path, "name": Path(path).name}]
     elif kind == "reasoning":
@@ -201,11 +201,11 @@ def normalize_item(item, *, image_cache=None):
         # chain of thought in `content` only. Fall back to it so the row is not
         # an expandable but visually empty panel.
         content = [x for x in item.get("content", []) if isinstance(x, str) and x.strip()] if isinstance(item.get("content"), list) else []
-        row.update(role="activity", title="思考摘要", text="\n".join(summary or content))
+        row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
-        row.update(role="activity", title="执行命令", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
+        row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
     elif kind in ("fileChange", "FileChange"):
-        row.update(role="activity", title="文件变更", text="\n\n".join(c["path"] + "\n" + c["diff"] for c in native_file_changes([item])))
+        row.update(role="activity", title="파일 변경", text="\n\n".join(c["path"] + "\n" + c["diff"] for c in native_file_changes([item])))
     elif kind in ("mcpToolCall", "dynamicToolCall"):
         extract = image_cache.extract if image_cache is not None else extract_tool_images
         source = item.get("result", item.get("contentItems", item.get("content", item.get("error", ""))))
@@ -219,9 +219,9 @@ def normalize_item(item, *, image_cache=None):
         if images:
             row['attachments'] = images
     elif kind == "error":
-        row.update(role="error", text=item.get("message", "执行失败"))
+        row.update(role="error", text=item.get("message", "실행 실패"))
     elif kind == "planImplementation":
-        row.update(role="assistant", title="计划", text=item.get("planContent", ""))
+        row.update(role="assistant", title="계획", text=item.get("planContent", ""))
     else:
         row.update(role="activity", title=kind, text=json.dumps(item, ensure_ascii=False, indent=2))
     # Preserve non-text attachment descriptors. They are not fetched from arbitrary URLs.
@@ -345,7 +345,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
             kind = item.get('type')
             if kind in ('function_call', 'custom_tool_call'):
                 message = {'id': item.get('call_id', item.get('id')), 'kind': 'storedToolEvent',
-                           'role': 'activity', 'title': item.get('name') or '工具调用',
+                           'role': 'activity', 'title': item.get('name') or '도구 호출',
                            'text': str(item.get('arguments', item.get('input', '')))}
                 calls[message['id']] = message
             elif kind in ('function_call_output', 'custom_tool_call_output') and item.get('call_id') in calls:
@@ -393,7 +393,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
     history = state.get("turnHistory", {}).get("history", {})
     settings = state.get('latestThreadSettings') or {}
     tier = settings if 'serviceTier' in settings else (turns[-1].get('params') or {}) if turns else {}
-    return {"id": state.get("id", state.get("sessionId")), "title": state.get("title") or "未命名聊天",
+    return {"id": state.get("id", state.get("sessionId")), "title": state.get("title") or "이름없는 채팅",
             "cwd": state.get("cwd"), "model": state.get("latestModel"), "provider": state.get("modelProvider"), "effort": state.get("latestReasoningEffort") or (state.get("latestThreadSettings") or {}).get("effort"),
             "connected": connected, "status": state.get("threadRuntimeStatus", {}).get("type", "idle"),
             "permissionMode": permission_mode(state),
@@ -466,7 +466,7 @@ def normalize_request(request):
             if computer:
                 result['params']['computerUse'] = computer
     else:
-        result["params"] = {"message": "请在桌面 App 处理此请求"}
+        result["params"] = {"message": "데스크톱 앱에서 이 요청을 처리하세요."}
     return result
 
 

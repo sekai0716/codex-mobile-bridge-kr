@@ -21,7 +21,7 @@ class ListSync {
         this.frame=0;
         if(this.distance<=10){this.setPull(0);this.hide();return;}
         const pull=Math.min(64,this.distance*.5);
-        this.setPull(pull,true);this.show(this.distance>=72?'松开刷新聊天列表':'下拉刷新聊天列表',pull);
+        this.setPull(pull,true);this.show(this.distance>=72?'채팅을 새로고침하려면 버튼을 놓으세요.':'당겨서 채팅 새로고침',pull);
       });
     },{passive:false});
     root.addEventListener('touchend',()=>this.endPull());
@@ -49,7 +49,7 @@ class ListSync {
   reportFailure(error,explicit=false){
     if(error?.status===401){this.failureVisible=false;this.hide();return;}
     this.automaticFailures++;
-    if(explicit||this.automaticFailures>=3||!this.root.children?.length){this.failureVisible=true;this.show('列表暂未更新，点击重试');}
+    if(explicit||this.automaticFailures>=3||!this.root.children?.length){this.failureVisible=true;this.show('새로고침할 수 없습니다. 다시 시도하려면 탭하세요.');}
   }
   schedule(){clearTimeout(this.timer);this.timer=setTimeout(async()=>{await this.update();this.schedule();},15000);}
   async update(explicit=false){
@@ -58,8 +58,8 @@ class ListSync {
       if(explicit){this.setPull(0);this.hide();}return;
     }
     this.busy=true;this.recoveredWhileBusy=false;const revision=this.revision;
-    if(explicit){this.setPull(32);this.show('正在刷新聊天列表…',32);}
-    try{const updated=await this.refresh();if(revision!==this.revision)return;if(updated===false){this.setPull(0);this.hide();return;}const hadFailure=this.failureVisible;this.acknowledgeSuccess();if(explicit){this.setPull(0);this.show('聊天列表已更新');this.hideTimer=setTimeout(()=>this.hide(),500);}else if(hadFailure||this.recoveredWhileBusy)this.hide();}
+    if(explicit){this.setPull(32);this.show('채팅 새로고침…',32);}
+    try{const updated=await this.refresh();if(revision!==this.revision)return;if(updated===false){this.setPull(0);this.hide();return;}const hadFailure=this.failureVisible;this.acknowledgeSuccess();if(explicit){this.setPull(0);this.show('채팅이 업데이트되었습니다.');this.hideTimer=setTimeout(()=>this.hide(),500);}else if(hadFailure||this.recoveredWhileBusy)this.hide();}
     catch(e){if(revision===this.revision){this.setPull(0);this.reportFailure(e,explicit);}}
     finally{if(revision===this.revision){this.busy=false;this.recoveredWhileBusy=false;}}
   }
@@ -87,11 +87,11 @@ class LocalSessionPins {
   value(identity,server){const entry=this.scope&&this.state.entries[this.key(identity)];return entry?entry.pinned:!!server;}
   pending(identity){return !!(this.scope&&this.state.entries[this.key(identity)]?.pending);}
   set(identity,pinned){
-    if(!this.scope)throw Error('登录状态暂不可用');
-    try{if(!this.clientId){const client=this.storage.getItem('bridge-session-pins-client')||this.newId();this.storage.setItem('bridge-session-pins-client',client);this.clientId=client;}}catch{throw Error('无法保存此设备的置顶设置');}
+    if(!this.scope)throw Error('로그인 상태를 알 수 없음');
+    try{if(!this.clientId){const client=this.storage.getItem('bridge-session-pins-client')||this.newId();this.storage.setItem('bridge-session-pins-client',client);this.clientId=client;}}catch{throw Error('이 기기에 핀 환경설정을 저장할 수 없습니다.');}
     const key=this.key(identity),previous=this.state.entries[key];
     this.state.clock++;this.epoch++;this.state.entries[key]={identity:{provider:identity.provider,host:identity.host||'local',id:identity.id},pinned:!!pinned,revision:this.state.clock,pending:true,attempts:0};
-    try{this.save();}catch(error){if(previous)this.state.entries[key]=previous;else delete this.state.entries[key];throw Error('无法保存此设备的置顶设置');}
+    try{this.save();}catch(error){if(previous)this.state.entries[key]=previous;else delete this.state.entries[key];throw Error('이 기기에 핀 환경설정을 저장할 수 없습니다.');}
     if(this.timers.has(key)){this.clearTimer(this.timers.get(key));this.timers.delete(key);}
     this.onChange();this.flushKey(key);
   }
@@ -107,7 +107,7 @@ class LocalSessionPins {
     const token=this.capture(),revision=entry.revision,pinned=entry.pinned,flights=this.inflight;flights.set(key,true);
     Promise.resolve().then(()=>{if(this.current(token)&&this.state.entries[key]?.revision===revision)return this.send(entry.identity,{pinned,clientId:this.clientId,revision},token);}).then(result=>{
       if(!this.current(token)||this.state.entries[key]?.revision!==revision)return;
-      if(result.id!==entry.identity.id||result.clientId!==this.clientId||!Number.isSafeInteger(result.revision)||result.revision<revision)throw Error('置顶同步结果不匹配');
+      if(result.id!==entry.identity.id||result.clientId!==this.clientId||!Number.isSafeInteger(result.revision)||result.revision<revision)throw Error('고정된 동기화 결과가 일치하지 않습니다.');
       if(result.revision>revision||result.bridgePinned!==pinned){this.state.clock=Math.max(this.state.clock,result.revision)+1;entry.revision=this.state.clock;this.save();return;}
       entry.pending=false;entry.attempts=0;this.barriers.set(key,++this.epoch);this.save();this.onChange();
     }).catch(error=>{

@@ -27,16 +27,16 @@ class ContextUsageControl {
     const known=Number.isFinite(usage?.usedTokens)&&usage.usedTokens>=0&&Number.isFinite(usage.contextWindow)&&usage.contextWindow>0;
     const percent=known?Math.round(usage.usedTokens/usage.contextWindow*100):null;
     this.ring.style.setProperty('--context-percent',known?Math.min(percent,100)+'%':'0%');this.ring.classList.toggle('unknown',!known);
-    this.button.title=BridgeI18n.t('上下文使用量')+' · '+(known?percent+'%':BridgeI18n.t('暂未提供'));this.button.setAttribute('aria-label',this.button.title);
+    this.button.title=BridgeI18n.t('컨텍스트 사용법')+' · '+(known?percent+'%':BridgeI18n.t("사용할 수 없음"));this.button.setAttribute('aria-label',this.button.title);
   }
   open(){
     if(!this.state)return;this.dialog?.remove();const dialog=this.dialog=document.createElement('dialog');dialog.className='picker';
-    const title=document.createElement('h2');title.textContent=BridgeI18n.t('上下文使用量');
-    const close=document.createElement('button');close.type='button';close.className='icon-button';close.textContent='×';close.setAttribute('aria-label',BridgeI18n.t('关闭'));close.onclick=()=>dialog.close();const head=document.createElement('div');head.className='picker-head';head.append(title,close);dialog.append(head);
+    const title=document.createElement('h2');title.textContent=BridgeI18n.t('컨텍스트 사용법');
+    const close=document.createElement('button');close.type='button';close.className='icon-button';close.textContent='×';close.setAttribute('aria-label',BridgeI18n.t('닫기'));close.onclick=()=>dialog.close();const head=document.createElement('div');head.className='picker-head';head.append(title,close);dialog.append(head);
     const line=(label,value)=>{const p=document.createElement('p');p.textContent=BridgeI18n.t(label)+(value===undefined?'':' · '+value);dialog.append(p);};
-    const usage=this.state.contextUsage,number=value=>Number.isFinite(value)&&value>=0?value.toLocaleString(BridgeI18n.locale()):BridgeI18n.t('暂未提供');
-    if(!usage)line('当前客户端尚未提供此会话的上下文用量。');
-    else {line('已用 Token',number(usage.usedTokens));line('上下文容量',number(usage.contextWindow));if(usage.contextWindow>0)line('使用占比',(usage.usedTokens/usage.contextWindow*100).toFixed(1)+'%');if(usage.cached||!this.state.connected)line('当前为缓存数据，连接恢复后更新。');}
+    const usage=this.state.contextUsage,number=value=>Number.isFinite(value)&&value>=0?value.toLocaleString(BridgeI18n.locale()):BridgeI18n.t("사용할 수 없음");
+    if(!usage)line("이 클라이언트는 이 세션에 대한 컨텍스트 사용을 제공하지 않았습니다.");
+    else {line("사용된 토큰",number(usage.usedTokens));line("컨텍스트 용량",number(usage.contextWindow));if(usage.contextWindow>0)line("사용된 컨텍스트",(usage.usedTokens/usage.contextWindow*100).toFixed(1)+'%');if(usage.cached||!this.state.connected)line("캐시된 데이터. 연결이 재개되면 업데이트됩니다.");}
     dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
   }
   dispose(){this.dialog?.remove();this.button.remove();}
@@ -45,36 +45,36 @@ class ContextUsageControl {
 // Local Linux capability picker; other platforms keep their existing flow.
 async function permissionPicker(dialog,{load,save,isCurrent,onSaved}){
   const t=BridgeI18n.t,options=document.createElement('div'),status=document.createElement('p'),refresh=document.createElement('button');
-  status.className='muted';status.setAttribute('role','status');refresh.type='button';refresh.textContent=t('刷新');
+  status.className='muted';status.setAttribute('role','status');refresh.type='button';refresh.textContent=t('새로 고치다');
   dialog.append(options,status,refresh);
   let busy=false,revision=0,buttons=[];
   const valid=()=>dialog.open&&isCurrent();
   const setBusy=value=>{busy=value;refresh.disabled=value;for(const [button,available] of buttons)button.disabled=value||!available;};
-  const labels={ask:['请求批准','需要额外权限时询问你。'],'auto-review':['帮我批准','由 Codex 审核需要额外权限的操作。'],'full-access':['完全访问权限','允许访问工作区外的文件和网络，无需逐次批准。']};
+  const labels={ask:['승인 요청',"추가 권한이 필요할 때 물어보세요."],'auto-review':["승인해 주세요","Codex는 추가 권한이 필요한 작업을 검토합니다."],'full-access':['전체 액세스',"개별 승인 없이 작업 공간 및 네트워크 외부의 파일에 대한 액세스를 허용합니다."]};
   const reload=async()=>{
     if(busy||!valid())return;
-    const version=++revision;options.replaceChildren();buttons=[];setBusy(true);status.textContent=t('正在读取权限选项…');
+    const version=++revision;options.replaceChildren();buttons=[];setBusy(true);status.textContent=t('읽기 권한 옵션…');
     try{
       const result=await load();if(version!==revision||!valid())return;
       options.replaceChildren();buttons=[];
       for(const option of result.options||[]){
         const preset=option.preset;if(!Object.hasOwn(labels,preset))continue;
         const [label,help]=labels[preset],available=option.available===true;
-        const button=permissionOption(document.createElement('button'),preset,label,available?help:option.reason||'无法确认当前权限能力，请在桌面检查设置后重新打开此面板。',result.current===preset);
+        const button=permissionOption(document.createElement('button'),preset,label,available?help:option.reason||"권한 기능을 확인할 수 없습니다. 데스크탑 설정을 확인한 후 이 패널을 다시 여십시오.",result.current===preset);
         buttons.push([button,available]);button.disabled=!available;
         button.onclick=async()=>{
           if(busy||!available||!valid())return;
-          if(preset==='full-access'&&!confirm(t('允许此会话完全访问电脑文件和网络？请仅在信任任务内容时开启。')))return;
+          if(preset==='full-access'&&!confirm(t("이 채팅에 컴퓨터 파일 및 네트워크에 대한 전체 액세스를 허용하시겠습니까? 신뢰하는 작업에 대해서만 활성화하세요.")))return;
           setBusy(true);status.textContent='';
           try{
             const response=await save(preset);if(!valid())return;
             if(response.confirmed===true){onSaved(response);dialog.close();}
-            else status.textContent=t('已提交权限设置，等待桌面确认。');
+            else status.textContent=t("권한이 제출되었습니다. 데스크톱 확인을 기다리는 중입니다.");
           }catch(e){if(valid())status.textContent=t(e.message);}
           finally{setBusy(false);}
         };options.append(button);
       }
-      status.textContent=buttons.length?'':t('无法确认当前权限能力，请在桌面检查设置后重新打开此面板。');
+      status.textContent=buttons.length?'':t("권한 기능을 확인할 수 없습니다. 데스크탑 설정을 확인한 후 이 패널을 다시 여십시오.");
     }catch(e){if(valid())status.textContent=t(e.message);}
     finally{setBusy(false);}
   };

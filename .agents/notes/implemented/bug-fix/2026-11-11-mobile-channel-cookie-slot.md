@@ -1,49 +1,49 @@
-# Agent Note: 手机同网关信道共用 Cookie 存储位置的迁移
+# Agent Note: 휴대폰은 게이트웨이와 채널을 공유합니다. Cookie 저장 위치 마이그레이션
 
 Status: implemented
 
-## 问题
+## 문제
 
-iOS 打开已保存电脑与活动页换线都先验对端 HMAC，再写目标 origin 派生 Cookie。同主机的不同端口共用按 domain/path/name 标识的 Cookie 位置，Secure 还会改变 HTTP 下的可见性。旧目标冲突检查把可解释的源值当成陌生绑定；即使通过，目标写入改变源 Cookie 后，旧来源快照又会拒绝迁移。Android 的同一流程也需准确处理该变化及异步代次。不同域的对照成功，不能据此把主机名当作网关身份。用户最新明确绑定反馈来自 Android；实际地址尚未取得，本缺陷不代表全部连接失败的原因，iOS WK 实测也不替代该手机验收。
+iOS 저장된 컴퓨터를 열고 활성 페이지를 전환하는 것은 모두 선험적으로 반대되는 목적입니다. HMAC，목표를 다시 작성하세요 origin 파생된 Cookie。동일한 호스트의 다른 포트에 대한 공유 버튼 domain/path/name 확인됨 Cookie 위치，Secure 바뀔 것이다 HTTP 아래 가시성. 이전 대상 충돌 검사에서는 해석 가능한 소스 값을 익숙하지 않은 바인딩으로 처리했습니다. 통과하더라도 대상은 변경된 소스를 씁니다. Cookie 이후에는 이전 소스 스냅샷이 마이그레이션을 다시 거부합니다.。Android 또한 동일한 프로세스가 이러한 변경과 비동기 생성을 정확하게 처리해야 합니다. 서로 다른 도메인 간의 비교가 성공했으며 이를 기반으로 호스트 이름을 게이트웨이 ID로 사용할 수 없습니다. 사용자의 최신 명확한 바인딩 피드백은 다음에서 나옵니다. Android；실제 주소는 아직 확보되지 않았습니다. 이 결함이 모든 연결 실패의 원인을 나타내는 것은 아닙니다.，iOS WK 실제 테스트는 휴대폰 승인을 대체하지 않습니다.。
 
-## 决策
+## 결정
 
-候选仍须通过原信道 HMAC 挑战。迁移只接受当前绑定清单允许的目标，并在写入前、写入回调、peer 提交时复核页面/票据、完整根凭据名称和值、原锚点和当前清单。主文档导航复用现有信道票据使旧操作失效；iOS 仅当前主 WebView 的 didCommit 生效，Android 仅当前主 WebView 的 onPageStarted 生效，隐藏目标页不改变源票据。
+후보자는 여전히 원래 채널을 통과해야 합니다. HMAC 도전. 마이그레이션은 현재 바인딩 목록에서 허용하는 대상만 허용하고 작성하기 전에 콜백을 작성합니다.、peer 제출 시 검토 페이지/티켓, 전체 루트 자격 증명 이름 및 값, 원래 앵커 및 현재 매니페스트. 마스터 문서 탐색은 기존 채널 티켓을 재사용하여 이전 작업을 무효화합니다.；iOS 현재 소유자만 WebView 의 didCommit 효력을 발휘하다，Android 현재 소유자만 WebView 의 onPageStarted 효과적으로, 대상 페이지를 숨겨도 소스 티켓은 변경되지 않습니다.。
 
-目标存储位置已有值必须可由同网关的当前根派生值或已核验保存凭据解释。不同 gateway 的目标记录、名字不一致或未知 Cookie 仍拒绝，即使主机相同或值碰巧相等也不覆盖。iOS 按完整存储位置检查全部 Cookie；Android 以同一 host 的 HTTPS Cookie 视图检查 HTTP 下不可见的 Secure 值。它只读取原生 jar，不发 HTTPS 请求；token 仍绑定原目标 origin。写入也通过该存储视图提交，Secure 属性仍按原目标 scheme 设置，不把 HTTP 目标改成 HTTPS 网络地址。[Android CookieManager 官方文档](https://developer.android.com/reference/android/webkit/CookieManager)明确按 host/path/name 替换，Secure 值的写入 URL 必须为 HTTPS。
+대상 스토리지 위치에는 동일한 게이트웨이의 현재 루트 파생 값 또는 확인된 저장 자격 증명으로 설명할 수 있는 값이 이미 있어야 합니다. 다른 gateway 대상 레코드, 이름이 일치하지 않거나 알 수 없습니다. Cookie 호스트가 동일하거나 값이 동일하더라도 여전히 거부되고 재정의되지 않습니다.。iOS 전체 저장 위치별로 모두 확인 Cookie；Android 같은 host 의 HTTPS Cookie 확인보기 HTTP 보이지 않는 Secure 값. 원시로만 읽혀요 jar，전송되지 않음 HTTPS 묻다；token 여전히 원래 대상에 바인딩되어 있습니다. origin。쓰기도 이 스토리지 뷰를 통해 커밋됩니다.，Secure 속성은 원래 대상에 따라 유지됩니다. scheme 설정, 넣지 마세요 HTTP 대상이 다음으로 변경됩니다. HTTPS 네트워크 주소。[Android CookieManager 공식 문서](https://developer.android.com/reference/android/webkit/CookieManager)명시적으로 누르기 host/path/name 바꾸다，Secure 가치의 글쓰기 URL 반드시 HTTPS。
 
-写后目标必须是本次派生值。源和目标共用位置时，源只接受这一次写入可解释的变化，包括 HTTPS 写入使 HTTP 源不可见；不同位置仍须保持原来源快照。失败恢复与提交资格分开：页面/票据失效拒绝提交，但根、锚点、目标保存凭据及实际写值未变且本次仍拥有目标位置时，仍可恢复自有写入，避免给原地址留下目标 token。每次写入只在内存以 UUID 声明目标位置和依赖的来源位置，新操作会接管；即使新旧 token 相同也不能由旧回滚覆盖。iOS 在 MainActor 上同步复核并调用 SDK 完成回调式 setter，将恢复入队后才撤销本次 owner，避免异步 overlay 入场前失去所有权；Android 使用同一排队顺序。完成或失败只清自己的 owner，页面清理、退后台和旧 peer 接替也触发受保护回滚。后到的新 Cookie、凭据或新操作优先，不清除绑定以绕过冲突。
+쓰기 후 대상은 이 파생 값이어야 합니다. 소스와 타겟이 위치를 공유하는 경우 소스는 다음을 포함하여 이 쓰기로 해석될 수 있는 변경 사항만 허용합니다. HTTPS 만들기 위해 글을 쓴다 HTTP 소스가 표시되지 않습니다. 원본 소스 스냅샷은 계속해서 다른 위치에 유지되어야 합니다. 제출 자격과 별도로 오류 복구: 페이지/티켓이 만료되어 제출을 거부했지만 루트, 앵커 포인트, 대상 저장소 자격 증명 및 실제 쓰기 값이 변경되지 않았고 이번에도 대상 위치가 여전히 소유되어 있는 경우 대상이 원래 주소에 남아 있는 것을 방지하기 위해 자체 쓰기를 계속 복원할 수 있습니다. token。각 쓰기는 다음으로 시작하는 메모리에만 있습니다. UUID 대상 위치와 종속 소스 위치를 선언하면 새 작업이 대신됩니다. 비록 낡고 새로운 것임에도 불구하고 token 이전 롤백으로 덮어쓸 수 없습니다.。iOS 에서 MainActor 동시에 검토하고 전화하세요. SDK 콜백 완료 setter，이번 취소 전 팀에 복귀 예정 owner，비동기를 피하라 overlay 입학 전 소유권 상실；Android 동일한 대기열 순서를 사용합니다. 완료 또는 실패하면 자신의 것만 지워집니다. owner，페이지 청소, 배경 및 이전 peer 승계는 또한 보호된 롤백을 트리거합니다. 최신 도착 Cookie、자격 증명 또는 새 작업이 우선 적용되며 충돌을 우회하기 위해 바인딩이 지워지지 않습니다.。
 
-iOS peer ready 通过现有原生 prompt 等待 WKStore 复读后再提交，不改共享 Web 消息格式。原 prompt 只答复一次，四秒未完成先返回 expired；较晚的 Cookie 回调不能再提交或再次答复。等待中重新核对当前 WebView、原 URL、连接 token 和前台状态。原私有 moveChannel 返回本来创建的 Task，生产调用方忽略它；原样提取夹具可等待真实任务完成，不另建任务管理器或重试通路。[Apple WKHTTPCookieStore 文档](https://developer.apple.com/documentation/webkit/wkhttpcookiestore)提供异步读写及完成回调；实际 prompt 与 Cookie 回调是否相互阻塞由本轮原生验证确认。
+iOS peer ready 기존 네이티브를 통해 prompt 기다리다 WKStore 공유 변경 없이 다시 읽어본 후 제출 Web 메시지 형식. 원래의 prompt 한 번만 응답하고, 4초 이내에 완료되지 않으면 반환하십시오. expired；나중에 Cookie 콜백을 다시 제출하거나 응답할 수 없습니다. 기다리는 동안 전류를 다시 확인하세요. WebView、기존 URL、연결 token 그리고 전경 상태. 원래는 비공개 moveChannel 원래 생성된 것을 반환합니다. Task，프로덕션 호출자는 이를 무시합니다. 새로운 작업 관리자를 생성하거나 패스를 재시도하지 않고도 실제 작업이 완료될 때까지 기다릴 수 있는 그대로 픽스쳐를 추출합니다.。[Apple WKHTTPCookieStore 문서](https://developer.apple.com/documentation/webkit/wkhttpcookiestore)비동기식 읽기, 쓰기 및 완료 콜백을 제공합니다. 실제 prompt 및 Cookie 콜백이 서로를 차단하는지 여부는 이 기본 확인 라운드를 통해 확인됩니다.。
 
-## 备选方案
+## 대안
 
-单按 hostname 放行能消除提示，却会合并同一 Mac 上不同网关或陌生 Cookie。只删除来源快照检查会掩盖新登录与旧操作覆盖，因此改为准确的写后投影并保留根、票据和目标复核。清空绑定重配会丢失原电脑和账号关系，不采用。复制共享 Web 的 handoff 或另建迁移管理器会扩大协议，本点沿用原 peer 和消息合同。
+한 번 누르기 hostname 릴리스는 프롬프트를 제거할 수 있지만 동일한 내용을 병합합니다. Mac 다른 게이트웨이나 익숙하지 않은 게이트웨이에서 Cookie。소스 스냅샷 확인만 제거하면 새 로그인이 기존 작업을 덮어쓰지 못하도록 가려지므로 정확한 쓰기 후 예측으로 전환하고 루트, 티켓 및 대상 검토를 보존하세요. 바인딩을 지우고 재구성하면 원래 컴퓨터와 계정 관계가 손실되므로 사용되지 않습니다. 복사 공유 Web 의 handoff 또는 다른 마이그레이션 관리자를 구축하면 계약이 확장됩니다. 이 점은 원본을 따릅니다. peer 및 메시지 계약。
 
-## 验证
+## 검증
 
-原诊断提取原样 Swift 方法，用真实 Foundation 临时 jar 连续 20 次复现两阶段失败及根凭据 await 竞态，结果保留，不重复未变复现。修后在现成 iOS 26.2 iPhone 17 模拟器的独立测试 bundle 中，原样提取 moveChannel、peer 提交与源 didCommit，Cookie 由真实非持久 WKHTTPCookieStore 保存，系统偏好/凭据只用内存替身，无正式手机或 Keychain 数据。
+원본 진단 추출 샘플 Swift 방법, 현실을 활용하다 Foundation 일시적인 jar 마디 없는 20 2단계 실패 및 루트 자격 증명의 반복 await 경쟁 조건에서는 결과가 유지되고 중복 없이 다시 나타납니다. 수리 후 기성품 iOS 26.2 iPhone 17 에뮬레이터의 독립적인 테스트 bundle , 있는 그대로 추출됨 moveChannel、peer 커밋 및 소스 didCommit，Cookie 진짜 비지속적 WKHTTPCookieStore 저장, 시스템 환경설정/자격증명은 메모리 대체일 뿐 공식 휴대폰이나 공인인증서는 없습니다. Keychain 데이터。
 
-原生分段回执覆盖打开/活动两入口的同 host 跨端口、HTTP/HTTPS 双向和不同域同网关；不同 gateway 与未知值仍零写入，取 Cookie 时换根也零写入。其余段确认新登录的 Cookie 被接受后才保存新根，旧写入回调与真实同步 prompt 均保留新根和新 Cookie；旧操作没有提交目标绑定。失败恢复源值、后到 Cookie 保留、旧票据/锚点拒绝、隐藏目标页加载不取消合法切换、同 URL 主文档刷新拒旧提交、四秒期限后的迟回调只答复一次，以及两个切换仅最新票据写入/提交均通过。
+기본 분할 영수증 재정의가 켜져 있습니다./이벤트의 두 입구는 동일합니다. host 포트 간、HTTP/HTTPS 양방향 도메인과 다른 도메인은 동일한 게이트웨이를 갖습니다. 다른 gateway 알 수 없는 값이 여전히 0으로 쓰여진 상태에서 Cookie 루트를 변경하면 0이 기록됩니다. 나머지 세그먼트는 새로 로그인한 것을 확인합니다. Cookie 새 루트는 승인된 후에만 저장되며 이전 쓰기 콜백은 실제 루트와 동기화됩니다. prompt 둘 다 새 루트와 새 루트를 유지합니다. Cookie；이전 작업에서 대상 바인딩을 커밋하지 않았습니다. 장애 복구 소스 값, 나중에 Cookie 보관하세요, 오래된 지폐/앵커거부, 숨겨진 대상 페이지 로딩은 적법한 전환을 취소하지 않으며, 동일 URL 기본 문서 새로 ​​고침은 이전 커밋을 거부하고, 4초 후 지연 콜백은 한 번만 응답하며, 스위치 2개는 최신 티켓만 기록합니다./모든 제출물이 통과되었습니다.。
 
-前三次未完成的原生报告保持原样：前两次用非 HttpOnly 的假登录 Cookie 替换生产 HttpOnly Cookie，被 WK 拒绝；第三次的原源 Cookie 也有相同夹具属性差异。仅改 HttpOnly 一项的原生对照确认替换行为，随后正常源与登录播种对齐服务端 name/domain/path/Secure/HttpOnly，完整登录顺序先 Cookie 再根，不放宽断言。并发段最初把第二目标漏出合成允许清单，拒绝是正确结果；补齐夹具后仅补该段。它们不是产品修复证据的替代。
+처음 세 개의 미완성 기본 보고서는 그대로 유지됩니다. 처음 두 개는 non HttpOnly 가짜 로그인 Cookie 교체 생산 HttpOnly Cookie，이불 WK 배제; 세 번째의 유래 Cookie 동일한 고정 장치의 속성에도 차이가 있습니다. 변화만 HttpOnly 기본 검사를 통해 교체 동작을 확인한 다음 일반 소스가 로그인 시딩 서버와 정렬됩니다. name/domain/path/Secure/HttpOnly，먼저 로그인 순서를 완료하세요. Cookie 다시 뿌리를 내리고 주장을 완화하지 마십시오. 동시 세그먼트는 처음에 합성 허용 목록에서 두 번째 대상을 유출하고 거부가 올바른 결과입니다. 조명기가 채워진 후에는 이 세그먼트만 채워집니다. 이는 제품 수리 증빙을 대신할 수 없습니다.。
 
-复审另发现旧票据同时阻止回滚的 P1；新增四个真实 WK 受控反例确认：只有票据改变时源 Cookie 恢复到保存绑定；新操作写相同 token 时旧回滚不写；回滚已入队但回调未返回时插入新操作仍提交成功；同窗口的新登录 Cookie、源保存绑定与根均保持新值。各段最终 owner 表为空，不据最终页面未提交代替 Cookie/凭据一致性。
+또한 검토 결과 오래된 티켓이 롤백을 방지하는 것으로 나타났습니다. P1；4개의 새로운 실제 항목이 추가되었습니다. WK 제어된 반례 확인: 소스가 변경된 경우에만 메모 변경 Cookie 저장된 바인딩으로 되돌립니다. 새로운 작업은 동일하게 씁니다. token 이전 롤백은 기록되지 않습니다. 롤백이 대기열에 추가되었지만 콜백이 반환되지 않은 경우에도 새 작업은 성공적으로 제출됩니다. 같은 창에서 새로 로그인 Cookie、소스는 바인딩과 루트를 새 값으로 저장합니다. 각 단락이 끝납니다 owner 테이블은 비어 있으며 제출되지 않은 최종 페이지에 따라 교체되지 않습니다. Cookie/자격 증명 일관성。
 
-P1 修后完整 iOS 模拟器目标无签名增量编译通过，受影响的回调/回滚/prompt 组通过；既有 channel-link/handoff、连接入口与资源定向 20 项通过。未重复未变的 enrollment/HMAC proof 检查。
+P1 수리 후 완료 iOS 시뮬레이터 대상 서명되지 않은 증분 컴파일 패스, 영향을 받는 콜백/롤백/prompt 그룹을 통과했습니다. 기존의 channel-link/handoff、연결 포털 및 리소스 방향 20 항목이 통과되었습니다. 반복되지 않고 변하지 않음 enrollment/HMAC proof 조사하다。
 
-Android 原样 moveChannel/rollbackPeer/Peer 在项目内官方来源 JDK 17 的 fresh 私有 home/tmp 下完成 22 项，通过单/双向 scheme、两个入口、不同身份/未知值拒绝、后到登录、回滚、同值新 owner 与并发检查。测试用真实 JDK jar 匹配 domain/path/Secure，并把其 RFC2965 的引号及 `$Version` 元数据转换成 Android getCookie 的头格式；此前最小对照已确认值本身未变。JSON stand-in 缺 quote、模板引号转义及完整目标 URL 期望的早期失败分别保留，产品未为它们放宽断言。最终冻结包为 `android-handoff-r7.zip`，产品 SHA 始终与 r3 相同；javac/java 均正常 exit0，原始 PID 以实际 result 为准。Windows 传输被审批拒绝后未改工具或路径重试，而采用无出站的本机运行；Windows 从未暂存或执行。该证据仍不是 Android WebView、APK 或真机验收。
+Android 있는 그대로 moveChannel/rollbackPeer/Peer 프로젝트 내 공식 소스 JDK 17 의 fresh 사적인 home/tmp 다음 완료 22 아이템, 싱글을 통해/양방향 scheme、두 개의 입구, 다른 정체성/알 수 없는 값 거부, 로그인으로 돌아가기, 롤백, 동일한 값 신규 owner 동시성 검사로. 실제 테스트 JDK jar 성냥 domain/path/Secure，그리고 넣어 RFC2965 따옴표와 `$Version` 메타데이터는 다음으로 변환됩니다. Android getCookie 헤더 형식; 이전 최소 비교에서는 값 자체가 변경되지 않았음을 확인했습니다.。JSON stand-in 부족 quote、템플릿 견적 이스케이프 및 전체 대상 URL 예상되는 초기 실패는 별도로 보관되며 제품은 이에 대한 어설션을 완화하지 않습니다. 최종 냉동 패키지는 다음과 같습니다. `android-handoff-r7.zip`，제품 SHA 항상 함께 r3 같은；javac/java 모두 정상 exit0，원래의 PID 실제로는 result 대상。Windows 승인을 위해 전송이 거부된 후에는 도구나 경로가 변경되지 않고 재시도가 수행되지만 아웃바운드가 없는 로컬 작업이 사용됩니다.；Windows 결코 연출되거나 실행되지 않습니다. 이 증거는 아직 밝혀지지 않았습니다 Android WebView、APK 아니면 실제 기계 수용。
 
-分段日志、生成源码、属性/头格式对照和最终本机 `java-local-r7-receipt.json` 均保留在 `.tmp/feedback-20261111-10/mobile-binding/`。
+분할된 로그, 생성된 소스 코드, 속성/헤더 형식 비교 및 ​​최종 네이티브 `java-local-r7-receipt.json` 에 유지됩니다 `.tmp/feedback-20261111-10/mobile-binding/`。
 
-2026-11-12 复用旧 Android 35 Pixel 8 虚拟设备，以只读、不保存快照方式启动。独立包原样提取 moveChannel、rollbackPeer 和 Peer，使用真实 Android CookieManager、WebView 124.0.6367.219、SharedPreferences 与 Android Keystore，仅保存合成凭据。十五项通过：打开/活动两入口跨端口、HTTP/HTTPS 双向与不同域迁移，陌生网关/未知 Cookie 拒绝，失败与旧票据回滚，以及新登录优先。连接回调是受控结果收集器，本组未执行真实网关 HMAC 探测或网页 handoff。v2.2.0 原样 moveChannel 在同环境第一项 HTTPS 同主机跨端口即返回原地址，目标提交断言失败；不是单凭新版通过推断旧版有问题。回执在 `.tmp/feedback-20261112/android-native/result.json` 与 `baseline-result.json`，旧设备与实体手机未覆盖安装。
+2026-11-12 오래된 재사용 Android 35 Pixel 8 가상 장치는 읽기 전용으로 시작되며 스냅샷을 저장하지 않습니다. 독립 실행형 패키지를 있는 그대로 추출합니다. moveChannel、rollbackPeer 및 Peer，진짜를 사용하다 Android CookieManager、WebView 124.0.6367.219、SharedPreferences 및 Android Keystore，합성 자격 증명만 저장됩니다. 15개 패스: 공개/항구를 가로지르는 활성 출입구 2개、HTTP/HTTPS 양방향 및 다른 도메인 마이그레이션, 낯선 게이트웨이/알려지지 않은 Cookie 거부, 기존 티켓 롤백 실패, 새 로그인이 우선 적용됩니다. 연결 콜백은 제어된 결과 수집기입니다. 이 그룹은 실제 게이트웨이를 실행하지 않습니다. HMAC 프로브 또는 웹페이지 handoff。v2.2.0 있는 그대로 moveChannel 동일한 환경의 첫 번째 항목 HTTPS 동일한 호스트가 포트를 통과하면 원래 주소가 반환되고 대상 제출 어설션이 실패합니다. 새 버전만으로는 이전 버전에 문제가 있다고 유추할 수 없습니다. 영수증은 다음 위치에 있습니다. `.tmp/feedback-20261112/android-native/result.json` 및 `baseline-result.json`，오래된 장치 및 실제 휴대폰에는 설치가 적용되지 않습니다.。
 
-## 影响
+## 영향
 
-同网关的已证明别名可以正确使用共享 Cookie 位置，未知值与不同身份仍保持拒绝。旧异步操作不获得覆盖新根或新票据的提交权限，正常聊天和草稿继续沿既有页面 handoff。此改动属于原生手机壳，桌面包更新不能使已安装手机 App 获得修复；本点没有发布或安装正式手机版本，也未宣称真实手机报告已经完整复现或解决。
+동일한 게이트웨이의 입증된 별칭이 공유와 올바르게 작동합니다. Cookie 위치, 알 수 없는 값 및 다른 ID는 거부된 상태로 유지됩니다. 이전 비동기 작업은 새 루트 또는 새 티켓을 덮어쓸 수 있는 제출 권한을 얻지 못하며 일반 채팅 및 초안은 기존 페이지를 따라 계속됩니다. handoff。이번 변경 사항은 기본 휴대폰 케이스에 해당하며, 설치된 휴대폰에서는 데스크톱 패키지 업데이트를 사용할 수 없습니다. App 고쳐주세요. 현재 공식 모바일 버전은 출시되거나 설치되지 않았으며, 실제 모바일 보고서가 완전히 재현되거나 해결되었다고 주장하지도 않습니다.。
 
-## 相关记录审计
+## 관련 기록 감사
 
-- [按网关绑定选择访问地址](../architecture/2026-11-02-mobile-gateway-channels.md)：部分重叠，保留 HMAC/根/锚点和原页面交接，只校正原生 Cookie 位置与异步提交条件。
-- [已连接手机优先回局域网](../feature/2026-11-02-prefer-lan-channel.md)：选择策略不变，已过 Wi-Fi/公网反馈不重复或扩展为本点验收。
-- TCC、远端 CLI、DSH 和正常退出草稿与本点无关，保持原样。
+- [게이트웨이 바인딩으로 액세스 주소 선택](../architecture/2026-11-02-mobile-gateway-channels.md)：부분 중복, 예약됨 HMAC/뿌리/기준점이 원본 페이지에 연결되어 원본 페이지만 수정됩니다. Cookie 위치 및 비동기 제출 조건。
+- [연결된 휴대폰이 먼저 LAN으로 돌아옵니다.](../feature/2026-11-02-prefer-lan-channel.md)：선발 전략은 변함없이 그대로 통과됐다. Wi-Fi/공용 네트워크 피드백은 수용을 위해 이 시점까지 반복되거나 확장되어서는 안 됩니다.。
+- TCC、원격 CLI、DSH 초안을 종료하는 것은 일반적으로 이 점과 관련이 없으며 그대로 둡니다.。

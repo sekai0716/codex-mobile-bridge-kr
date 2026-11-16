@@ -297,7 +297,7 @@ class OwnedControlTests(unittest.TestCase):
         first = self.capture()
         client = self.client(first)
         row = client.cli_connections()[0]
-        self.assertEqual(row['configurationLabel'], '本机 Claude CLI · '+self.profile['directory'])
+        self.assertEqual(row['configurationLabel'], '로컬 머신 Claude CLI · '+self.profile['directory'])
         self.assertNotIn('scopeKey', row)
         self.assertNotIn('sharedHome', row)
         self.assertFalse(any(name.startswith('_scope_') for name in row))

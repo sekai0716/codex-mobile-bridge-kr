@@ -87,9 +87,9 @@ class DshNativeQuitTests(unittest.TestCase):
 
     def test_old_plugin_does_not_fall_back_to_process_termination(self):
         self.status.pop('nativeQuit')
-        with patch('bridge.platforms.windows.dsh_quit.installer_quit_command', side_effect=ValueError('无后台退出通道')), \
+        with patch('bridge.platforms.windows.dsh_quit.installer_quit_command', side_effect=ValueError('백그라운드 이탈 채널 없음')), \
                 patch('bridge.clients.lifecycle._commands', return_value={}):
-            with self.assertRaisesRegex(ValueError, '后台退出通道'):
+            with self.assertRaisesRegex(ValueError, '백그라운드 이탈 채널 없음'):
                 self.stop()
         self.assertEqual(self.adapter.call.call_count, 1)
         self.app.stop.assert_not_called()
@@ -127,19 +127,19 @@ class DshNativeQuitTests(unittest.TestCase):
 
     def test_replaced_endpoint_never_receives_quit(self):
         (self.directory/'endpoint.json').write_text(json.dumps({**self.endpoint, 'pid': 99}))
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.stop()
         self.assertEqual(self.adapter.call.call_count, 1)
 
     def test_new_process_before_request_is_rejected(self):
         self.inspect.side_effect = [self.state, {**self.state, 'pids': [11, 12, 13]}]
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.stop()
         self.assertEqual(self.adapter.call.call_count, 1)
 
     def test_unconfirmed_native_response_does_not_report_success(self):
         self.adapter.call.side_effect = [self.status, {'status': 'accepted', 'pid': 99}]
-        with self.assertRaisesRegex(ValueError, '确认退出'):
+        with self.assertRaisesRegex(ValueError, "Harness가\\ 종료\\ 요청을\\ 승인하지\\ 않았습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
             self.stop()
         self.app.processes.assert_not_called()
 
@@ -153,7 +153,7 @@ class DshNativeQuitTests(unittest.TestCase):
             return call(*args, **kwargs)
         self.adapter.call.side_effect = other_clock_reader
         with patch('bridge.clients.lifecycle.time.monotonic', side_effect=[0, 30]):
-            with self.assertRaisesRegex(ValueError, '尚未退出'):
+            with self.assertRaisesRegex(ValueError, "Harness가\\ 종료되지\\ 않았습니다\\.\\ 컴퓨터에서\\ 프롬프트\\ 종료를\\ 처리하고\\ 다시\\ 시도하세요\\.\\ 강제\\ 종료된\\ 프로세스가\\ 없습니다\\."):
                 self.stop()
         self.app.stop.assert_not_called()
 

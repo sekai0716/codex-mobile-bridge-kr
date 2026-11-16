@@ -33,9 +33,9 @@ class WslPlatformScopeTests(unittest.TestCase):
                         self.assertIsNone(bridge.wsl_accounts)
                         self.assertIsNone(manager.claude_wsl)
                         self.assertIsInstance(manager.adapters['claude'].remote_cli, RemoteClaudeCli)
-                        with self.assertRaisesRegex(ValueError, '不支持 WSL'):
+                        with self.assertRaisesRegex(ValueError, "현재\\ 컴퓨터는\\ 지원하지\\ 않습니다\\.\\ WSL\\ 애플리케이션"):
                             manager.scan_wsl()
-                        with self.assertRaisesRegex(ValueError, '不支持 WSL'):
+                        with self.assertRaisesRegex(ValueError, '현재 컴퓨터는 지원하지 않습니다.*WSL 애플리케이션'):
                             manager.toggle_client({'provider': 'wsl-claude:fixture', 'enabled': True})
                     finally:
                         manager.close()

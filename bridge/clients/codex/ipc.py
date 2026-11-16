@@ -146,14 +146,14 @@ class DesktopIPC:
                 else:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise IPCError("桌面读取超时；尚未取得实时会话状态。")
+                        raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
                     sock = connect_stream(self.path, timeout=min(5, remaining))
             except OSError as exc:
-                raise IPCError("桌面 App 未连接，请打开 Codex App。") from exc
+                raise IPCError("데스크탑 App 연결되지 않았습니다. 열어주세요. Codex App。") from exc
             with self.lock:
                 if generation != self.generation or deadline is not None and time.monotonic() >= deadline:
                     sock.close()
-                    raise IPCError("桌面读取超时；尚未取得实时会话状态。")
+                    raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
                 self.socket = sock
                 self.endpoint_identity = identity
             threading.Thread(target=self._read_loop, args=(sock,), daemon=True).start()
@@ -162,7 +162,7 @@ class DesktopIPC:
                 with self.lock:
                     if (generation != self.generation or self.socket is not sock or
                             deadline is not None and time.monotonic() >= deadline):
-                        raise IPCError("桌面读取超时；尚未取得实时会话状态。")
+                        raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
                     self.client_id = result["result"]["clientId"]
             except Exception:
                 self.close()
@@ -171,23 +171,23 @@ class DesktopIPC:
     def _send(self, message):
         data = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode()
         if len(data) > self.MAX_REQUEST:
-            raise IPCError("消息过大")
+            raise IPCError("소식이 너무 커")
         with self.write_lock:
             sock = self.socket
             if not sock:
-                raise IPCError("桌面连接已断开")
+                raise IPCError("데스크톱 연결이 끊어졌습니다.")
             try:
                 sock.sendall(struct.pack("<I", len(data)) + data)
             except OSError as exc:
-                raise IPCError("桌面连接已断开；请检查会话后再决定是否重发。") from exc
+                raise IPCError("데스크톱 연결이 끊어졌습니다. 재전송 여부를 결정하기 전에 세션을 확인하십시오.。") from exc
 
     def request(self, method, params, target=None, host="local", timeout=15, *, deadline=None):
         if method not in self.VERSIONS:
-            raise IPCError("不支持的桌面操作")
+            raise IPCError("지원되지 않는 데스크톱 작업")
         if deadline is not None:
             timeout = min(timeout, max(0, deadline - time.monotonic()))
             if timeout <= 0:
-                raise IPCError("桌面读取超时；尚未取得实时会话状态。")
+                raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
         request_id = str(uuid.uuid4())
         future = Future()
         with self.lock:
@@ -209,12 +209,12 @@ class DesktopIPC:
             wait = timeout + 1 if deadline is None else min(timeout, max(0, deadline - time.monotonic()))
             response = future.result(timeout=wait)
             if response.get("resultType") != "success":
-                raise IPCError(response.get("error", "桌面请求未完成"))
+                raise IPCError(response.get("error", "데스크톱 요청이 완료되지 않았습니다."))
             return response
         except TimeoutError as exc:
             if method in ("initialize", "thread-owner-discovery", "thread-follower-load-complete-history"):
-                raise IPCError("桌面读取超时；尚未取得实时会话状态。") from exc
-            raise IPCError("桌面响应超时；操作可能已提交，请查看会话后再决定是否重发。") from exc
+                raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。") from exc
+            raise IPCError("데스크톱 응답 시간이 초과되었습니다. 작업이 제출되었을 수 있습니다. 다시 보낼지 여부를 결정하기 전에 세션을 확인하세요.。") from exc
         finally:
             with self.lock:
                 self.pending.pop(request_id, None)
@@ -258,7 +258,7 @@ class DesktopIPC:
                 if not 0 < length <= self.MAX_FRAME:
                     logging.getLogger(__name__).warning(
                         "Codex desktop IPC frame rejected: bytes=%s limit=%s", length, self.MAX_FRAME)
-                    raise IPCError("桌面 IPC 帧长度不兼容")
+                    raise IPCError("데스크탑 IPC 프레임 길이가 호환되지 않습니다.")
                 message = json.loads(self._exact(sock, length))
                 if message.get("type") == "response":
                     with self.lock:
@@ -307,6 +307,6 @@ class DesktopIPC:
                     self.endpoint_identity = None
                     for future in self.pending.values():
                         if not future.done():
-                            future.set_exception(IPCError("桌面连接已断开"))
+                            future.set_exception(IPCError("데스크톱 연결이 끊어졌습니다."))
             if disconnected:
                 self.on_disconnect()

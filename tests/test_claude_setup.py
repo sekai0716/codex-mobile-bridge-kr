@@ -111,7 +111,7 @@ class ClaudeDiscovery(unittest.TestCase):
 
     @patch('bridge.clients.claude.adapter.sys.platform', 'darwin')
     def test_prerequisites_do_not_prepare_launch_or_change_trust(self):
-        adapter = Claude(self.root/'中文 连接', auto_connect=False)
+        adapter = Claude(self.root/'중국어 연결', auto_connect=False)
         adapter.discovery = {'installed': True, 'dataHome': str(self.root/'profile')}
         with patch('bridge.clients.claude.adapter.native_action', return_value={'setupState': 'needs-permission'}) as native, \
              patch.object(adapter, 'prepare') as prepare, patch.object(adapter, 'connect') as connect:
@@ -141,7 +141,7 @@ class ClaudeDiscovery(unittest.TestCase):
             native.assert_not_called()
 
     def test_generated_console_passes_unicode_directory_to_claude_and_trust_error(self):
-        adapter = Claude(self.root/'本地文稿'/'想法 😀', auto_connect=False)
+        adapter = Claude(self.root/'로컬 텍스트'/'아이디어 😀', auto_connect=False)
         self.addCleanup(adapter.close)
         prepared = adapter.prepare()
         # Run the actual transformed/injected source; do not just compare JSON text.
@@ -156,7 +156,7 @@ checkTrust:async path=>{checked=path;return {trusted:false};},
 start:async()=>{throw Error('must not start a model turn');}};
 (async()=>{await assert.rejects(vm.runInNewContext(script,{window:{'claude.web':{LocalSessions:api}},
 TextEncoder,Uint8Array,crypto:require('node:crypto').webcrypto,console,setTimeout,clearTimeout}),error=>{
-assert.ok(error.message.includes(cwd));assert.ok(error.message.includes('尚未信任目录'));return true;});
+assert.ok(error.message.includes(cwd));assert.ok(error.message.includes('아직 신뢰할 수 없는 디렉터리'));return true;});
 assert.equal(checked,cwd);})();
 '''
         # Include cold Node/WebCrypto startup in the process budget; the test
@@ -169,7 +169,7 @@ assert.equal(checked,cwd);})();
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
 
     def test_prepare_reads_utf8_connector_under_windows_legacy_locale(self):
-        adapter = Claude(self.root/'网关 连接', auto_connect=False)
+        adapter = Claude(self.root/'게이트웨이 연결', auto_connect=False)
         self.addCleanup(adapter.close)
         original_open = Path.open
 
@@ -326,7 +326,7 @@ class ClaudeWindowsProfiles(unittest.TestCase):
         return claude_setup.claude_data_home(self.executable, fallback or self.default, 'win32', env=self.env)
 
     def test_live_exact_executable_commands_select_unicode_profile(self):
-        active = self.root/'Claude 数据/配置'
+        active = self.root/'Claude 데이터/설정'
         self.inventory.return_value = {self.executable: {'pids': [1, 2, 3], 'commands': {
             1: f'"{self.executable}"',
             2: f'"{self.executable}" --type=renderer --user-data-dir="{active}"',
@@ -487,13 +487,13 @@ class ClaudeNativeConnection(unittest.TestCase):
                        {'setupState': 'ready'}, {'setupState': 'ready'}])
         def existing(executable, data_home, **kwargs):
             self.assertFalse(kwargs['allow_launch'])
-            raise ValueError('请先在电脑端打开 Claude，再重新连接')
+            raise ValueError("다시 연결하기 전에 컴퓨터에서 Claude를 엽니다.")
         with patch('bridge.clients.claude.adapter.native_action', side_effect=lambda *a, **k: next(states)), \
              patch('bridge.clients.claude.adapter.running_app', side_effect=existing), \
              patch.object(self.adapter.setup_cancel, 'wait', return_value=False):
             self.adapter._connect_native(False, self.cancel_path, existing_only=True)
         self.assertEqual(self.adapter.status()['setupState'], 'failed')
-        self.assertEqual(self.adapter.status()['reason'], '请先在电脑端打开 Claude，再重新连接')
+        self.assertEqual(self.adapter.status()['reason'], "다시 연결하기 전에 컴퓨터에서 Claude를 엽니다.")
 
     def test_permission_prompt_does_not_launch_or_inject_without_permission(self):
         action = Mock(return_value={'setupState': 'needs-permission', 'reason': 'permission required'})
@@ -575,7 +575,7 @@ class ClaudeNativeConnection(unittest.TestCase):
                 return {'setupState': 'connected'}
             if action == 'inspect-error':
                 if conflict:
-                    return {'setupState': 'owner-conflict', 'reason': 'Claude 桥接连接被其他网关占用，请先停止旧网关；旧版连接还需重新加载 Claude'}
+                    return {'setupState': 'owner-conflict', 'reason': "다른 게이트웨이는 Claude의 브리지를 사용하고 있습니다. 이전 게이트웨이를 먼저 중지하십시오. 레거시 연결에도 Claude를 다시 로드해야 합니다."}
                 return {'setupState': 'needs-trust' if trust else 'failed', 'reason': 'trust required'}
             return {'setupState': 'ready'}
         # Keep the four synthetic ticks private to the adapter, not the process event loops.
@@ -618,7 +618,7 @@ class ClaudeNativeConnection(unittest.TestCase):
         self.adapter.desktop = self.idle_desktop(connected=True)
         self.adapter.setup_thread = Mock()
         with patch.object(self.adapter, 'call', return_value={'sessions': [{'status': 'active'}]}):
-            with self.assertRaisesRegex(ValueError, '任务运行'):
+            with self.assertRaisesRegex(ValueError, "Claude에는\\ 실행\\ 중인\\ 작업이\\ 있거나\\ 승인이\\ 보류\\ 중입니다\\.\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
                 self.adapter.connect(restart=True)
         self.assertFalse(self.adapter.setup_cancel.is_set())
         self.adapter.setup_thread.join.assert_not_called()
@@ -674,7 +674,7 @@ class ClaudeNativeConnection(unittest.TestCase):
         monitor = self.adapter.setup_thread = Mock()
         monitor.is_alive.return_value = True
         with patch('bridge.clients.claude.adapter.threading.Thread') as worker:
-            with self.assertRaisesRegex(ValueError, '取消'):
+            with self.assertRaisesRegex(ValueError, '취소'):
                 self.adapter.connect()
         monitor.join.assert_called_once_with(timeout=5)
         worker.assert_not_called()
@@ -809,7 +809,7 @@ class ClaudeNativeConnection(unittest.TestCase):
 
     def test_connected_cleanup_notice_survives_status_rendering(self):
         self.adapter.desktop = self.idle_desktop(connected=True)
-        reason = 'Claude 已连接；开发者工具未自动关闭，请手动关闭'
+        reason = "Claude가 연결되었습니다. 개발자 도구 창을 수동으로 닫아주세요."
         self.adapter._setup_state('connected', reason, consoleCleanupPending=True)
         self.assertEqual(self.adapter.status()['reason'], reason)
 
@@ -831,11 +831,11 @@ class ClaudeNativeConnection(unittest.TestCase):
         self.assertEqual([call.args[0] for call in action.call_args_list], ['check', 'connect', 'close-devtools'])
         self.assertTrue(self.adapter.status()['connected'])
         self.assertTrue(self.adapter.status()['consoleCleanupPending'])
-        self.assertIn('手动关闭', self.adapter.status()['reason'])
+        self.assertIn("Claude가 연결되었습니다. 개발자 도구 창을 수동으로 닫아주세요.", self.adapter.status()['reason'])
 
     def test_user_interruption_requires_explicit_retry_without_reopening_console(self):
         self.adapter.desktop = self.idle_desktop(connected=False)
-        interrupted = {'setupState': 'needs-attention', 'reason': '焦点已离开 Claude，自动连接已停止，请重试'}
+        interrupted = {'setupState': 'needs-attention', 'reason': "초점이 Claude에서 멀어졌습니다. 자동 연결이 중지되었습니다. 다시 시도해 보세요."}
         with patch('bridge.clients.claude.adapter.native_action', side_effect=[{'setupState': 'ready'}, interrupted]) as native, \
              patch('bridge.clients.claude.adapter.running_app', return_value=42), \
              patch('bridge.clients.claude.adapter.developer_mode_enabled', return_value=True), \
@@ -912,12 +912,12 @@ class ClaudeNativeConnection(unittest.TestCase):
                 self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
 
     def test_console_transform_preserves_configuration_string_whitespace(self):
-        config = {'cwd': 'C:/two  spaces/中文', 'token': 'private'}
+        config = {'cwd': 'C:/two  spaces/중국어', 'token': 'private'}
         self.assertIn(json.dumps(config, ensure_ascii=True), console_source('const config=__BRIDGE_CONFIG__;', config))
 
     def test_bounded_console_lines_preserve_single_line_source_and_config(self):
         source = (ROOT/'bridge/clients/claude/connector.js').read_text(encoding='utf-8')
-        config = {'cwd': 'C:/two  spaces/中文`', 'token': 'quote"\\line\n😀'}
+        config = {'cwd': 'C:/two  spaces/중국어`', 'token': 'quote"\\line\n😀'}
         single = console_source(source, config)
         multiline = console_source(source, config, multiline=True)
         self.assertNotIn('\n', single)
@@ -947,7 +947,7 @@ class NativeHelperProcess(unittest.TestCase):
     @patch('bridge.clients.claude.setup.sys.platform', 'win32')
     def test_native_quit_unavailable_is_unsubmitted_without_retry_or_force(self):
         expected = {'quitState': 'failed', 'pid': 42,
-                    'reason': 'Claude 当前没有可验证的后台退出入口，尚未提交退出；请在电脑端正常退出，或另行确认强制退出'}
+                    'reason': 'Claude 현재 검증 가능한 백엔드 엑시트가 없으며 엑시트가 아직 제출되지 않았습니다. 컴퓨터에서 정상적으로 종료하시거나, 강제종료를 별도로 확인해 주시기 바랍니다.'}
         process = Mock(returncode=1)
         process.communicate.return_value = (json.dumps(expected), '')
         with patch('bridge.clients.claude.setup.helper_path', return_value=Path(__file__)), \
@@ -975,7 +975,7 @@ class NativeHelperProcess(unittest.TestCase):
         with patch('bridge.clients.claude.setup.subprocess.Popen') as spawn:
             result = native_action('quit', pid=42, executable='C:/Claude.exe', cancelled=cancel)
         self.assertEqual(result['quitState'], 'failed')
-        self.assertIn('取消', result['reason'])
+        self.assertIn('취소', result['reason'])
         spawn.assert_not_called()
 
     @patch('bridge.clients.claude.setup.sys.platform', 'win32')
@@ -991,7 +991,7 @@ class NativeHelperProcess(unittest.TestCase):
                     result = native_action('quit', pid=42, executable='C:/Claude.exe')
                 self.assertEqual(result['quitState'], 'submitted')
                 self.assertEqual(result['pid'], 42)
-                self.assertIn('回执中断', result['reason'])
+                self.assertIn("Claude 종료 명령 수신이 중단되었습니다. 저장 및 종료가 완료되기를 기다리는 중입니다.", result['reason'])
                 spawn.assert_called_once()
                 process.terminate.assert_not_called()
 
@@ -1049,7 +1049,7 @@ class NativeHelperProcess(unittest.TestCase):
 
     def test_native_action_rejects_actions_outside_allowlist(self):
         with patch('bridge.clients.claude.setup.subprocess.Popen') as spawn:
-            with self.assertRaisesRegex(ValueError, '不支持'):
+            with self.assertRaisesRegex(ValueError, '지원되지 않음'):
                 native_action('force-quit', pid=42, executable='C:/Claude.exe')
         spawn.assert_not_called()
 

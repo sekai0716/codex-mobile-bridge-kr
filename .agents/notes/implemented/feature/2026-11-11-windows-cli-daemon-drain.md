@@ -1,43 +1,43 @@
-# Agent Note: Windows 共享 CLI 正常排空
+# Agent Note: Windows 공유됨 CLI 정상적인 비우기
 
 Status: implemented
 
-## 问题
+## 문제
 
-Windows 原生 daemon 的 `stop` 和 `restart` 先请求排空，到达期限后可能调用 `TerminateProcess`。原账号跟随在 Windows 缺少只等待正常退出的通路；仅凭连接断开或 socket 消失也不能确认共享会话的写入者已退出。
+Windows 네이티브 daemon 의 `stop` 및 `restart` 먼저 비우기를 요청하고 만료일에 도달한 후에 호출될 수 있습니다. `TerminateProcess`。원래 계정은 다음과 같습니다 Windows 우아한 종료를 기다리는 방법이 부족합니다. 그냥 연결이 끊어졌거나 socket 사라져도 공유 세션의 작성자가 종료되었음을 확인하지 않습니다.。
 
-## 决策
+## 결정
 
-Windows 本机受管 CLI 的已核验版本为 `0.167.0-alpha.3.2`。网关沿用[原待闲恢复事务](2026-11-11-cli-recovery-waits-for-idle.md)，只在原接入需要重建或用户明确确认维护时使用该通路。只读历史、通知、远端配置与未核验版本不启用它。服务确认原生 home、进程拥有者 SID、映像、PID 出生时间和受管关闭标记；控制 socket 的系统 peer PID 必须属于同一仍存活的进程句柄。
+Windows 이 기계는 관리됩니다 CLI 확인된 버전은 다음과 같습니다. `0.167.0-alpha.3.2`。게이트웨이 상속[원래 유휴 복구 트랜잭션](2026-11-11-cli-recovery-waits-for-idle.md)，이 경로는 원래 액세스를 다시 구축해야 하거나 사용자가 유지 관리를 명시적으로 확인한 경우에만 사용됩니다. 읽기 전용 기록, 알림, 원격 구성 및 확인되지 않은 버전은 이를 활성화하지 않습니다. 서비스 확인 기본 home、프로세스 소유자 SID、영상、PID 출생 시간 및 관리되는 종료 플래그 제어 socket 체계 peer PID 아직 살아있는 동일한 프로세스 핸들에 속해야 합니다.。
 
-确认重建或释放时使用同 home 的网关维护锁；Windows 原生排空还使用 [Codex 同一个操作锁](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/app-server-daemon/src/backend/windows.rs#L38-L66)与字节范围，以便和原生 stop/restart/updater 串行。持原生锁完成最后闲态核验，随后在该 home 的私有 Bridge 目录持久化此代已经请求关闭，再对[原生本机 WebSocket](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/app-server-daemon/src/client.rs#L63-L97)最多发送一次 PID。共享 home 但数据目录不同的网关也读同一标记。原生锁被占用、观察到同代 `serverShuttingDown` 或已有同代派发标记时只观察，回执丢失不重发。原生锁持有到观察退出或该轮观察结束；释放锁后才可调用会重新取得该锁的原生 start。
+재구축이나 해제를 확인할 때도 동일한 방법을 사용하세요. home 게이트웨이 유지 관리 잠금；Windows 기본 배수도 다음을 사용합니다. [Codex 동일한 작업 잠금](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/app-server-daemon/src/backend/windows.rs#L38-L66)바이트 범위를 사용하여 기본적으로 stop/restart/updater 연속물. 기본 잠금을 유지하여 최종 유휴 상태 확인을 완료한 후 다음을 수행합니다. home 사적인 Bridge 이 디렉터리 지속성 세대를 닫도록 요청한 다음[원주민 WebSocket](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/app-server-daemon/src/client.rs#L63-L97)최대 한 번만 보내세요. PID。공유됨 home 그러나 다른 데이터 디렉터리를 가진 게이트웨이도 동일한 태그를 읽습니다. 기본 잠금이 점유되고 동일한 세대가 관찰됩니다. `serverShuttingDown` 또는 이미 최신 유통 마크가 있는 경우에만 관찰하세요. 영수증이 분실된 경우 재발송되지 않습니다. 기본 잠금은 관찰이 종료되거나 관찰 라운드가 끝날 때까지 유지됩니다. 잠금을 다시 획득할 기본 잠금은 잠금이 해제된 후에만 호출할 수 있습니다. start。
 
-WebSocket 回显只确认收到了请求，旧进程退出由原句柄确认。退出后仍需核对没有另一代原生写入者；Windows PID 文件残留只有在确证对应进程已退出、PID 不存在或已被别的出生代次复用时才可视为过期。通过 FILETIME 和配置文件时间判断网关没有基线时的账号变更。
+WebSocket 에코는 요청 수신을 확인하고 이전 프로세스의 종료는 원래 핸들에 의해 확인됩니다. 종료 후에도 다른 세대의 원어민 작가가 없는지 확인해야합니다.；Windows PID 해당 프로세스가 종료되었음을 확인한 후에만 파일이 남습니다.、PID 존재하지 않거나 다른 출생 세대가 재사용한 경우에만 만료된 것으로 간주될 수 있습니다. 통과하다 FILETIME 게이트웨이에 기준이 없을 때 계정 변경 사항을 확인하기 위한 구성 파일 시간。
 
-## 备选方案
+## 대안
 
-直接调用 `daemon stop` 或 `restart` 会引入超时强制兜底，不能用于默认维护。POSIX 的 `SIGHUP` 是原生明确区分的正常排空信号，Windows 没有相同的信号通路；Windows shutdown 文件仅供 updater 使用。原生 socket 的第二个关闭请求会升级为强制，故不能以重试解决未知回执。临时开新 daemon 或只退订会话无法证明原生写入者已解除。
+직접 전화하다 `daemon stop` 또는 `restart` 수익을 강제하기 위해 시간 제한이 도입되며 기본 유지 관리에는 사용할 수 없습니다.。POSIX 의 `SIGHUP` 이는 기본적으로 명확하게 구분되는 정상적인 비우기 신호입니다.，Windows 동일한 신호 전달 경로가 없음；Windows shutdown 파일만 updater 사용. 토종의 socket 두 번째 종료 요청은 강제로 업그레이드되므로 알 수 없는 수신은 재시도를 통해 해결할 수 없습니다. 임시개관 daemon 또는 세션 구독을 취소하는 것만으로는 네이티브 작성자가 구독을 취소했음을 증명할 수 없습니다.。
 
-## 验证
+## 검증
 
-140 项定向回归通过，覆盖准确版本、FILETIME、进程和 socket 代次、原生锁占用只观察、已知排空状态、同 home 派发回执、错误或丢失 PID 回显、未确认退出时不启动替代服务，以及 macOS/Linux 既有维护入口。模块边界、打包静态导入和决策笔记检查通过。
+140 정확한 버전을 포괄하는 항목 방향 회귀가 통과되었습니다.、FILETIME、프로세스와 socket 생성, 기본 잠금 점유만 관찰, 알려진 비움 상태, 동시 home 배송 수령, 오류 또는 분실 PID 에코, 확인되지 않은 종료 시 대체 서비스를 시작하지 않음 macOS/Linux 기존 정비 출입구. 모듈 경계, 패키지된 정적 가져오기 및 결정 메모 확인 통과。
 
-Windows 实机的现有 Python 3.11.1 已创建并关闭数值 `AF_UNIX` 套接字。两个隔离尝试都用同一已核验签名的 `0.167.0-alpha.3.2`，均停在原生 `daemon start`。首轮只得到退出码 1；诊断轮证明进程虽使用 session 1 普通令牌，仍在任务计划程序的 Windows Job 内。原生程序明确报告启动器限制后台进程存活并返回 Win32 拒绝访问 5。事后检查时未发现隔离 daemon PID 记录或 socket，没有模型请求，现场确认自有进程均已退出。证据见 `.tmp/feedback-20261111-10/windows-w07-{socket-preflight,r1-result,r2-result}.json`。
+Windows 기존실기 Python 3.11.1 가치 창출 및 마감 `AF_UNIX` 소켓. 두 격리 시도 모두 동일한 확인된 서명을 사용합니다. `0.167.0-alpha.3.2`，모두 네이티브에서 중지 `daemon start`。첫 번째 라운드에서는 종료 코드만 얻습니다. 1；진단 휠은 프로세스가 사용함을 증명합니다. session 1 일반 토큰, 아직 작업 스케줄러에 있음 Windows Job 내부에. 기본 프로그램은 실행 프로그램이 백그라운드 프로세스를 생존하고 반환하도록 제한한다고 명시적으로 보고합니다. Win32 접근 불가 5。사후검사 결과 격리 발견되지 않음 daemon PID 녹음하거나 socket，모델요청은 없으며, 모든 공정이 종료된 것으로 현장에서 확인됩니다. 증거 보기 `.tmp/feedback-20261111-10/windows-w07-{socket-preflight,r1-result,r2-result}.json`。
 
-上述 Job 启动失败没有进入 Bridge 维护，不能据此判断关闭协议成功或失败。通过现有 Explorer 启动后，隔离 daemon 实际启动、FILETIME 和原生锁核验通过。随后实机只读检查同一 socket 的 `SIO_AF_UNIX_GETPEERPID`：返回成功，在四字节 ULONG 中写入与所持进程句柄匹配的 PID，但报告字节数为 0。没有发送任何 WebSocket 应用数据。证据为 `.tmp/feedback-20261111-10/explorer-r4-r3/peer-pid-readonly.json`。
+～ 위에 Job 시작하지 못하여 들어가지 못했습니다. Bridge 이를 기반으로 유지 관리, 종료 프로토콜의 성공 또는 실패를 판단할 수 없습니다. 기존을 통해 Explorer 시동 후 격리 daemon 실제 시작、FILETIME 기본 잠금으로 확인을 통과했습니다. 그런 다음 실제 머신 읽기 전용도 동일한 내용을 확인합니다. socket 의 `SIO_AF_UNIX_GETPEERPID`：4바이트 단위로 성공을 반환합니다. ULONG 보유 프로세스와 일치하는 프로세스 핸들을 작성합니다. PID，그러나 보고된 바이트 수는 0。하나도 보내지 않았어 WebSocket 응용 프로그램 데이터. 증거는 `.tmp/feedback-20261111-10/explorer-r4-r3/peer-pid-readonly.json`。
 
-[同版 Codex 的原生 Windows 核验](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/uds/src/windows_peer.rs#L24-L46)也支持该回执。Bridge 现在接受 ioctl 成功、非零 PID、报告长度 0 或 4 的组合，仍须对端 PID 与持有的原进程句柄匹配；错误返回、零 PID 或其它长度拒绝。定向回归覆盖这些边界、对端变更和回执丢失。
+[동일한 버전 Codex 원주민의 Windows 확인하다](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/uds/src/windows_peer.rs#L24-L46)이 영수증도 지원됩니다。Bridge 지금 수락 ioctl 성공, 0이 아님 PID、보고서 길이 0 또는 4 조합은 여전히 ​​반대여야 합니다. PID 보유된 원래 프로세스 핸들과 일치합니다. 오류 반환, 0 PID 또는 다른 길이는 거부됩니다. 방향 회귀는 이러한 경계, 피어 변경 및 수신 손실을 다룹니다.。
 
-修正 peer 回执后，同一冻结产品源的 Windows 实机验收由两轮分段完成九项检查。基础轮通过 FILETIME 对照、外部原生锁占用只观察、首代正常退出、回执丢失时活跃任务仍存活、不同网关数据目录共享同 home 的派发标记五项。该轮因夹具没有开启原生 INFO 日志而停在排空准入检查，原始失败结果保留；代理拒绝计数也混合了 CONNECT 和非预期 POST，不能据此宣称整轮通过。后续聚焦轮只补剩余四项：同代关闭回执、带一个活跃任务进入排空、`serverShuttingDown` 拒绝新 steer、任务正常完成后持原句柄确认退出。独立原生日志核验得到一次进入排空、一次等待任务、一次正常完成、零强制结束。证据见 `.tmp/feedback-20261111-10/windows-w07-maintenance-acceptance.md`、`explorer-r5-r4/observe.json` 及 `windows-focused-drain/{observe,verify-native-log}.json`。
+보정 peer 수령 후, 동일한 냉동제품 원산지 Windows 실제 기계 승인은 2회에 걸쳐 9번의 검사로 구성됩니다. 기본 라운드 통과 FILETIME 비교, 외부 기본 잠금 점유만 관찰되고 1세대는 정상적으로 종료되며 영수증이 손실되어도 활성 작업은 계속 유지되며 다른 게이트웨이 데이터 디렉터리는 동일하게 공유됩니다. home 분포는 5개 항목으로 표시됩니다. 클램프가 열리지 않아 휠이 기본이 아닙니다. INFO 승인 확인을 드레이닝하는 동안 로그는 중지되고 원래 실패 결과는 유지됩니다. 프록시 거부 횟수도 혼합되어 있습니다. CONNECT 그리고 예상치 못한 POST，이를 토대로 전체 라운드가 통과되었다고 선언할 수 없습니다. 후속 포커스 라운드에서는 나머지 4개 항목, 즉 동일한 세대의 수신을 종료하고 활성 작업을 비우기 프로세스로 가져오는 것만 보충합니다.、`serverShuttingDown` 새로운 것을 거부하다 steer、정상적으로 작업이 완료된 후 원래의 핸들로 종료를 확인합니다. 독립적인 기본 로그 확인 결과 비우기 항목 1개, 대기 작업 1개, 정상 완료 1개, 강제 종료 0개가 발생합니다. 증거 보기 `.tmp/feedback-20261111-10/windows-w07-maintenance-acceptance.md`、`explorer-r5-r4/observe.json` 그리고 `windows-focused-drain/{observe,verify-native-log}.json`。
 
-实际 Explorer 启动的隔离进程仍可属于 Windows Job；Job 成员布尔值本身不能证明后台启动失败，应以原生启动结果和具体限制为准。两轮均只用自有 home、合成凭据和回环模型上游，分别接受一个预期 POST，无有意外部或付费模型请求。聚焦轮另记录零非预期 POST、五个回环 CONNECT 拒绝；这些代理计数不能证明整个进程网络层零外发。全部记录的隔离 PID、活动映像和 socket 均已独立确认消失，旧 PID 文件保留为证据，临时任务已移除，正式 App、账号和现有 daemon 未操作。
+실제 Explorer 시작된 격리 프로세스는 계속해서 속할 수 있습니다. Windows Job；Job 멤버 부울 값 자체는 백그라운드 시작이 실패했음을 증명할 수 없으며 기본 시작 결과 및 특정 제한 사항이 우선해야 합니다. 두 라운드 모두에 자신의 것을 사용하십시오 home、합성 자격 증명 및 루프백 모델 업스트림은 각각 예상되는 POST，의도된 외부 또는 유료 모델 요청이 없습니다. 포커스 휠도 예상치 못한 0을 기록합니다. POST、다섯 개의 루프 CONNECT 배제; 이러한 프록시 수는 전체 프로세스 네트워크 계층에 대한 아웃바운드가 0임을 증명하지 않습니다. 모든 기록의 격리 PID、활동적인 이미지와 socket 자체적으로 사라진 것으로 확인되었습니다. 오래된 PID 문서는 증거로 보관하고, 임시업무는 삭제하고, 공식적으로 App、계정 및 기존 daemon 운영되지 않음。
 
-## 影响
+## 영향
 
-已核验的 Windows 本机 CLI 可以复用账号恢复和共享释放逻辑。Bridge 在原生互斥下发一次请求，超时不调用 OS 强杀。原生协议没有独立的 Windows `GracefulOnly` 事件或原子只读排空查询。正常原生命令在持锁时不会和 Bridge 同时派发；直接绕过原生锁的外部客户端，或发出关闭请求后释放锁但原进程仍在排空的外部崩溃，超出了该互斥所能证明的范围。已有可见排空证据时只观察。未知写入保持待核对，不在重建时重发原工作。
+검증됨 Windows 로컬 머신 CLI 계정 복구 및 공유 릴리스 로직을 재사용할 수 있습니다.。Bridge 기본 상호 배제 상태에서 요청을 보내고 시간 초과 후에는 호출하지 마세요. OS 강제로 죽여라. 기본 프로토콜에는 독립적인 프로토콜이 없습니다. Windows `GracefulOnly` 이벤트 또는 원자성 읽기 전용 드레인 쿼리입니다. 일반 기본 명령은 잠금을 유지할 때 잠금과 상호 작용하지 않습니다. Bridge 동시 파견; 기본 잠금을 직접 우회하는 외부 클라이언트 또는 닫기 요청을 발행한 후 잠금을 해제하지만 원래 프로세스가 여전히 소모되는 외부 충돌은 이 뮤텍스가 정당화할 수 있는 범위를 벗어납니다. 눈에 보이는 비움의 증거가 있을 때만 관찰하십시오. 알 수 없는 쓰기 작업은 검증 대기 중으로 남아 있으며 원본 작업은 재구성 중에 재발행되지 않습니다.。
 
-## 相关记录审计
+## 관련 기록 감사
 
-- [CLI 跟随同一原生配置的账号与接入](2026-11-11-cli-follows-native-account.md)：保留同 home 与 provider 准入规则；此处补齐原 note 提及的 Windows 正常排空通路。
-- [已确认恢复等待共享任务](2026-11-11-cli-recovery-waits-for-idle.md)：沿用同一个待闲事务，不为 Windows 新建任务队列。
-- [CLI 释放与安全恢复](../bug-fix/2026-11-10-cli-release-and-safe-recovery.md)：等待原生写入者退出，保留未知派发证据。后续显式强制与批量释放另行决定。
+- [CLI 동일한 기본 구성을 따르는 계정 및 액세스](2026-11-11-cli-follows-native-account.md)：동일하게 유지 home 및 provider 입학규칙 여기서 원본을 완성하세요 note 말하는 Windows 일반 배수 경로。
+- [공유 작업을 기다리는 복구 확인됨](2026-11-11-cli-recovery-waits-for-idle.md)：대신 동일한 유휴 트랜잭션을 사용하십시오. Windows 새 작업 대기열 만들기。
+- [CLI 석방 및 안전한 회복](../bug-fix/2026-11-10-cli-release-and-safe-recovery.md)：알 수 없는 디스패치의 증거를 유지하면서 네이티브 작성자가 종료될 때까지 기다립니다. 이후의 명시적 강제 및 일괄 릴리스는 별도로 결정됩니다.。

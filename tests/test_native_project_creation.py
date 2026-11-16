@@ -42,7 +42,7 @@ class NativeCodexProjects(unittest.TestCase):
             return create_empty('fixture', self.cwd, self.cwd, 'A chat', project=project)
 
     def test_runtime_only_project_does_not_claim_native_sidebar_registration(self):
-        with self.assertRaisesRegex(CreationUnavailable, '电脑 App 项目与运行时'):
+        with self.assertRaisesRegex(CreationUnavailable, "데스크톱\\ 프로젝트와\\ 런타임이\\ 아직\\ 일치하지\\ 않습니다\\.\\ Codex\\ 앱과\\ 런타임\\ 구성을\\ 확인한\\ 후\\ 다시\\ 시도하세요\\."):
             self.create({'name': 'Project', 'required': True})
         self.assertEqual(self.calls, [('project/list', {'cursor': None, 'limit': 100})])
 
@@ -58,14 +58,14 @@ class NativeCodexProjects(unittest.TestCase):
 
     def test_ambiguous_same_directory_projects_never_start_a_thread(self):
         self.pages = [{'data': [{'id': value, 'name': value, 'roots': [{'path': self.cwd}]} for value in ('one', 'two')]}]
-        with self.assertRaisesRegex(CreationError, '多个原生项目'):
+        with self.assertRaisesRegex(CreationError, '여러 네이티브 프로젝트'):
             self.create({'name': 'Unmatched', 'required': True})
         self.assertEqual([method for method, _ in self.calls], ['project/list'])
 
     def test_unconfirmed_assignment_keeps_uncertain_outcome_without_retry(self):
         self.confirmed = None
         self.pages = [{'data': [{'id': 'native-project', 'name': 'Project', 'roots': [{'path': self.cwd}]}]}]
-        with self.assertRaisesRegex(CreationError, '不要重复创建'):
+        with self.assertRaisesRegex(CreationError, "채팅이\\ 생성되었지만\\ 해당\\ 프로젝트가\\ 확인되지\\ 않았습니다\\.\\ 데스크톱\\ 앱을\\ 확인하세요\\.\\ 다시\\ 생성하지\\ 마십시오\\."):
             self.create({'name': 'Project', 'required': True})
         self.assertEqual(sum(method == 'thread/start' for method, _ in self.calls), 1)
 
@@ -79,7 +79,7 @@ class NativeCodexProjects(unittest.TestCase):
         from bridge.features.sessions.create import _native_project_support
         with patch('bridge.features.sessions.create.subprocess.run', return_value=Mock(returncode=0)), \
              patch('bridge.features.sessions.create._runtime_operation') as runtime:
-            with self.assertRaisesRegex(CreationUnavailable, '原生项目关联'):
+            with self.assertRaisesRegex(CreationUnavailable, "이\\ Codex\\ 런타임은\\ 네이티브\\ 프로젝트\\ 할당을\\ 지원하지\\ 않습니다\\.\\ Codex\\ 데스크톱을\\ 업데이트하거나\\ 앱에\\ 프로젝트를\\ 추가하고\\ 다시\\ 선택하세요\\."):
                 create_empty('old-runtime', self.cwd, self.cwd, 'New', project={'required': True})
             runtime.assert_not_called()
             self.assertFalse(_native_project_support('old-runtime', False))
@@ -146,7 +146,7 @@ class NativeSidebarRegistration(unittest.TestCase):
         with patch('bridge.app.service.open_project_in_desktop') as launch, \
              patch('bridge.app.service.time', clock), \
              patch('bridge.app.service.create_empty') as create:
-            with self.assertRaisesRegex(CreationError, '尚未创建聊天'):
+            with self.assertRaisesRegex(CreationError, "데스크톱\\ 앱에서\\ 프로젝트\\ 폴더를\\ 확인한\\ 후\\ 이\\ 요청을\\ 다시\\ 시도하세요\\.\\ 채팅이\\ 생성되지\\ 않았습니다\\.\\ 등록은\\ 반복되지\\ 않습니다\\."):
                 self.bridge.create_chat(self.project['key'], 'Chat', self.rid)
             launch.assert_called_once()
             create.assert_not_called()
@@ -160,7 +160,7 @@ class NativeSidebarRegistration(unittest.TestCase):
             with self.assertRaisesRegex(CreationError, 'read timed out'):
                 self.bridge.create_chat(self.project['key'], 'Chat', self.rid)
             self.assertEqual(self.bridge.creations[self.rid]['phase'], 'creating-thread')
-            with self.assertRaisesRegex(CreationError, '上次创建结果尚不确定'):
+            with self.assertRaisesRegex(CreationError, "마지막\\ 생성\\ 결과가\\ 불확실합니다\\.\\ 채팅\\ 목록을\\ 새로고침한\\ 후\\ 컴퓨터를\\ 먼저\\ 확인해\\ 주세요\\.\\ App，중복\\ 생성\\ 방지"):
                 self.bridge.create_chat(self.project['key'], 'Chat', self.rid)
             create.assert_called_once()
             relaunch.assert_not_called()
@@ -169,7 +169,7 @@ class NativeSidebarRegistration(unittest.TestCase):
         with patch('bridge.app.service.open_project_in_desktop', side_effect=OSError('unknown launch')) as launch, \
              patch('bridge.app.service.create_empty') as create:
             for _ in range(2):
-                with self.assertRaisesRegex(CreationError, '尚未创建聊天'):
+                with self.assertRaisesRegex(CreationError, r'프로젝트 (?:등록이|열기가) 확인되지 않았습니다'):
                     self.bridge.create_chat(self.project['key'], 'Chat', self.rid)
             launch.assert_called_once()
             create.assert_not_called()
@@ -227,8 +227,8 @@ class ClaudeProjectTrust(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(temporary.cleanup)
         adapter = Claude(Path(temporary.name))
         adapter.desktop = Mock()
-        adapter.desktop.call = AsyncMock(side_effect=BridgeUnavailable('Claude Desktop 响应超时'))
-        with self.assertRaisesRegex(BridgeUnavailable, '响应超时'):
+        adapter.desktop.call = AsyncMock(side_effect=BridgeUnavailable('Claude Desktop 응답 시간 초과'))
+        with self.assertRaisesRegex(BridgeUnavailable, '응답 시간 초과'):
             await adapter._start_desktop_project({'surface': 'code', 'cwd': temporary.name}, {'message': 'draft'})
         adapter.desktop.call.assert_awaited_once()
 

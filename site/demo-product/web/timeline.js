@@ -59,14 +59,14 @@ class ChatTimeline {
   async start(){
     if(this.starting||this.abort.signal.aborted)return;
     clearTimeout(this.startRetry);this.starting=true;
-    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText('正在读取最近内容…');
+    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText("최근 콘텐츠 로드 중…");
     try{
       const page=await this.read('timeline',{limit:20});
       if(this.abort.signal.aborted)return;
       this.apply(page,true);this.updates();
       // Give the first 20 records a paint before quietly filling the 100-row window.
       requestAnimationFrame(()=>requestAnimationFrame(()=>this.fillRecent()));
-    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText('读取失败，点击重试');this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
+    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText("로드할 수 없습니다. 다시 시도하려면 클릭하세요.");this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
     finally{this.starting=false;}
   }
   fillRecent(){
@@ -74,7 +74,7 @@ class ChatTimeline {
     const count=filtered?[...this.nodes.values()].filter(({node})=>!node.hidden).length:this.rows.size;
     if(!this.abort.signal.aborted&&this.rows.size>0&&count<target&&!this.retryCount)this.loadOlder(filtered?100:target-count);
   }
-  historyStatus(){this.older.hidden=!this.hasMore;this.older.disabled=this.busy;this.older.textContent=this.busy?timelineText('正在读取更早内容…'):this.retryCount?timelineText('历史加载失败，点击重试'):timelineText('查看更早内容');}
+  historyStatus(){this.older.hidden=!this.hasMore;this.older.disabled=this.busy;this.older.textContent=this.busy?timelineText("이전 콘텐츠 로드 중…"):this.retryCount?timelineText("기록을 로드할 수 없습니다. 다시 시도하려면 클릭하세요."):timelineText("오래된 콘텐츠 로드");}
   async loadOlder(count){
     if(this.busy||!this.hasMore||this.abort.signal.aborted)return;
     const generation=this.generation,before=this.before;
@@ -111,14 +111,14 @@ class ChatTimeline {
     for(const row of ordered){const node=this.nodes.get(row.key).node;if(node===position)position=position.nextSibling;else this.container.insertBefore(node,position);}
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
-    if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('有待确认请求 ↓'):timelineText('有新内容 ↓');this.newer.hidden=false;}
+    if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText("확인 필요 ↓"):timelineText("새로운 콘텐츠 ↓");this.newer.hidden=false;}
     if(reset)requestAnimationFrame(()=>this.fillRecent());
   }
   renderRow(row,open){
     const activity=row.role==='activity',node=document.createElement(activity?'details':'div');
     node.className=activity?'activity timeline-row':'message timeline-row '+row.role;
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
-    heading.textContent=activity?(row.title||row.kind)+(row.status==='inProgress'?timelineText(' · 进行中'):''):row.role==='user'?timelineText('你'):row.role==='error'?timelineText('执行错误'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');node.append(heading);
+    heading.textContent=activity?(row.title||row.kind)+(row.status==='inProgress'?timelineText("· 진행중"):''):row.role==='user'?timelineText("사용자"):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');node.append(heading);
     const body=document.createElement(activity?'pre':'div');body.className=activity?'activity-body':'message-body';
     const more=document.createElement('button');more.className='plain detail-more';more.type='button';
     const cached=this.details.get(row.key);
@@ -128,24 +128,24 @@ class ChatTimeline {
       body.replaceChildren();if(activity)body.textContent=text;else this.renderText(body,text,[...this.files.values()],()=>this.fullText(row));
       if(activity)body.hidden=!text;
       more.hidden=detail?detail.next===null:!row.truncated;
-      more.textContent=detail?timelineText('继续加载正文'):timelineText('展开完整内容');
+      more.textContent=detail?timelineText("더 많은 텍스트 로드"):timelineText("전체 콘텐츠 표시");
     };
     const load=async()=>{
       if(more.disabled||this.abort.signal.aborted)return;
       const prior=this.details.get(row.key);if(prior?.next===null)return;
-      more.disabled=true;more.textContent=timelineText('正在读取…');
+      more.disabled=true;more.textContent=timelineText("로드 중…");
       try{
         const detail=await this.read('detail',{key:this.epoch+'.'+row.key,offset:prior?.next||0,version:prior?.version||row.version});
         if(this.abort.signal.aborted||!node.isConnected||this.rows.get(row.key)?.row.version!==detail.version)return;
         for(const file of detail.files||[])this.files.set(file.id,file);
         this.details.set(row.key,{version:detail.version,text:(detail.offset?prior?.text||'':'')+detail.text,next:detail.next});paint();
-      }catch(e){if(!this.abort.signal.aborted){more.hidden=false;more.textContent=timelineText('读取失败，点击重试');}}
+      }catch(e){if(!this.abort.signal.aborted){more.hidden=false;more.textContent=timelineText("로드할 수 없습니다. 다시 시도하려면 클릭하세요.");}}
       finally{more.disabled=false;}
     };
     more.onclick=load;node.append(body,more);paint();
     if(row.role==='user'||row.role==='assistant'){
       const actions=document.createElement('div');actions.className='message-actions';
-      const copy=document.createElement('button');copy.type='button';copy.className='plain message-copy';copy.textContent=timelineText('复制');copy.onclick=()=>window.BridgeClipboard?.copy(()=>this.fullText(row),copy);actions.append(copy);node.append(actions);
+      const copy=document.createElement('button');copy.type='button';copy.className='plain message-copy';copy.textContent=timelineText('복사');copy.onclick=()=>window.BridgeClipboard?.copy(()=>this.fullText(row),copy);actions.append(copy);node.append(actions);
     }
     if(row.attachments?.length){
       const attachments=document.createElement('div');attachments.className='timeline-attachments';
@@ -158,14 +158,14 @@ class ChatTimeline {
             ?source+'&variant=original'
             :source;
           const link=document.createElement('a');link.href=original;link.target='_blank';link.rel='noopener';
-          link.dataset.imagePreview=original;link.dataset.imageName=item.name||timelineText('图片附件');
-          const image=document.createElement('img');image.className='attachment-image';image.alt=item.name||timelineText('图片附件');
+          link.dataset.imagePreview=original;link.dataset.imageName=item.name||timelineText("이미지 첨부");
+          const image=document.createElement('img');image.className='attachment-image';image.alt=item.name||timelineText("이미지 첨부");
           image.loading='lazy';image.decoding='async';image.src=source;
           image.onerror=()=>link.remove();link.append(image);attachments.append(link);
         }
       }
       const attachment=document.createElement('small');attachment.className='muted';
-      attachment.textContent=timelineText('附件：')+row.attachments.map(a=>a.name||a.type).join('、');
+      attachment.textContent=timelineText("부착:")+row.attachments.map(a=>a.name||a.type).join('、');
       attachments.append(attachment);node.append(attachments);
     }
     if(activity){node.open=!!open;node.ontoggle=()=>{if(node.open&&!this.details.has(row.key))load();};}
@@ -173,15 +173,15 @@ class ChatTimeline {
   }
   async fullText(row){
     const valid=()=>!this.abort.signal.aborted&&this.rows.get(row.key)?.row.version===row.version;
-    if(!valid())throw Error(timelineText('消息内容已变化，请重新打开编辑'));
+    if(!valid())throw Error(timelineText("메시지가 변경되었습니다. 다시 열어보세요."));
     if(!row.truncated)return row.text;
     let text='',offset=0;
     do{
       const detail=await this.read('detail',{key:this.epoch+'.'+row.key,offset,version:row.version});
-      if(!valid()||detail.version!==row.version||detail.offset!==offset||detail.key!==row.key)throw Error(timelineText('消息内容已变化，请重新打开编辑'));
+      if(!valid()||detail.version!==row.version||detail.offset!==offset||detail.key!==row.key)throw Error(timelineText("메시지가 변경되었습니다. 다시 열어보세요."));
       text+=detail.text;
       if(detail.next===null)return text;
-      if(detail.next<=offset)throw Error(timelineText('读取完整正文失败，请重试'));
+      if(detail.next<=offset)throw Error(timelineText("전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요."));
       offset=detail.next;
     }while(true);
   }
@@ -190,25 +190,25 @@ class ChatTimeline {
       const row=this.rows.get(key)?.row,bar=node.querySelector('.message-actions');if(!bar||!row)continue;
       if(!this.onAction)continue;
       const add=(action,label,disabled)=>{const cls=action==='fork'?'message-fork':'message-edit';let b=bar.querySelector('.'+cls);if(!b){b=document.createElement('button');b.type='button';b.className='plain '+cls;bar.append(b);}b.textContent=timelineText(label);b.disabled=disabled;b.onclick=()=>this.onAction(action,row,this);};
-      if(row.editable){const latest=this.meta?.latestUserTurnId===row.turnId;add(latest?'edit':'edit-fork',latest?'编辑并重新发送':'编辑并新建分支',row.turnStatus==='inProgress'||latest&&this.meta?.status==='active');}
-      if(row.forkable)add('fork','从这里分支',false);
+      if(row.editable){const latest=this.meta?.latestUserTurnId===row.turnId;add(latest?'edit':'edit-fork',latest?'수정하고 다시 보내기':"새 지점에서 편집",row.turnStatus==='inProgress'||latest&&this.meta?.status==='active');}
+      if(row.forkable)add('fork','여기에서 분기',false);
     }
   }
   relabel(){
     this.refreshActions();
-    this.container.querySelectorAll('.message-copy').forEach(n=>n.textContent=timelineText('复制'));
-    this.container.querySelectorAll('.code-copy').forEach(n=>n.textContent=timelineText('复制代码'));
+    this.container.querySelectorAll('.message-copy').forEach(n=>n.textContent=timelineText('복사'));
+    this.container.querySelectorAll('.code-copy').forEach(n=>n.textContent=timelineText('코드 복사'));
     this.historyStatus();
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key)?.row;if(!row)continue;
       const node=entry.node,heading=node.firstElementChild;
-      if(heading)heading.textContent=row.role==='activity'?(row.title||row.kind)+(row.status==='inProgress'?timelineText(' · 进行中'):''):row.role==='user'?timelineText('你'):row.role==='error'?timelineText('执行错误'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      if(heading)heading.textContent=row.role==='activity'?(row.title||row.kind)+(row.status==='inProgress'?timelineText("· 진행중"):''):row.role==='user'?timelineText("사용자"):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       const more=node.querySelector('.detail-more');
-      if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'继续加载正文':'展开完整内容');
+      if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?"더 많은 텍스트 로드":"전체 콘텐츠 표시");
       const attachment=node.querySelector('.timeline-attachments small.muted');
-      if(attachment)attachment.textContent=timelineText('附件：')+row.attachments.map(a=>a.name||a.type).join('、');
+      if(attachment)attachment.textContent=timelineText("부착:")+row.attachments.map(a=>a.name||a.type).join('、');
     }
-    this.newer.textContent=timelineText(this.pendingRequests?'有待确认请求 ↓':'有新内容 ↓');
+    this.newer.textContent=timelineText(this.pendingRequests?"확인 필요 ↓":"새로운 콘텐츠 ↓");
   }
   async updates(){
     while(!this.abort.signal.aborted){
@@ -222,7 +222,7 @@ class ChatTimeline {
         // Polls never replace the oldest loaded cursor.
         this.apply(page,!!page.reset);this.fillRecent();
         await this.pause(200);
-      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('重新连接中'));await this.pause(3000);}
+      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('다시 연결하는 중'));await this.pause(3000);}
     }
   }
   pause(ms){return new Promise(resolve=>{const done=()=>{clearTimeout(timer);this.abort.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,ms);this.abort.signal.addEventListener('abort',done,{once:true});});}

@@ -11,7 +11,7 @@ async function readEventually(file){
 }
 async function fixture(t){
   await fs.mkdir(path.join(root,'.tmp'),{recursive:true});
-  const work=await fs.mkdtemp(path.join(root,'.tmp/update-handoff-中文 '));
+  const work=await fs.mkdtemp(path.join(root,'.tmp/update-handoff-중국어 '));
   const target=path.join(work,'Codex Mobile Bridge'),transaction=path.join(work,'.cmb-update-test'),data=path.join(work,'data');
   await Promise.all([target,transaction,data].map(p=>fs.mkdir(p)));
   await fs.writeFile(path.join(target,'version'),'old');

@@ -57,22 +57,22 @@ func copiedId(_ item: Node) throws -> String {
         let copy = NSPasteboardItem()
         for type in entry.types {
             guard let bytes = entry.data(forType:type), bytes.count <= 4*1024*1024-size else {
-                throw Failure("剪贴板正被其他内容占用，未更改聊天")
+                throw Failure("클립보드가 다른 콘텐츠로 채워져 있습니다. 채팅은 변경되지 않았습니다.")
             }
             size += bytes.count
-            guard copy.setData(bytes,forType:type) else { throw Failure("无法保留当前剪贴板") }
+            guard copy.setData(bytes,forType:type) else { throw Failure("현재 클립보드를 유지할 수 없습니다.") }
         }
         restore.append(copy)
     }
-    guard board.changeCount == previous else { throw Failure("剪贴板正在变化，已取消") }
-    try press(item,"ZCode 未提供原生会话标识")
+    guard board.changeCount == previous else { throw Failure("클립보드 변경 중, 취소됨") }
+    try press(item,"ZCode 기본 세션 ID가 제공되지 않았습니다.")
     guard let (id, version) = until(0.9, { () -> (String,Int)? in
         let v = board.changeCount
         guard v != previous, let s = board.string(forType:.string),
               s.hasPrefix("sess_"), UUID(uuidString:String(s.dropFirst(5))) != nil,
               v == board.changeCount else { return nil }
         return (s,v)
-    }) else { throw Failure("未取得 ZCode 原生会话标识") }
+    }) else { throw Failure("획득하지 못함 ZCode 기본 세션 ID") }
     if board.changeCount == version {
         board.clearContents()
         if !restore.isEmpty { board.writeObjects(restore) }
@@ -85,30 +85,30 @@ final class Conversation {
     init(_ r: Request) throws {
         self.r = r
         guard r.action == "resume", !r.title.isEmpty, r.sessionId.hasPrefix("sess_"),
-              UUID(uuidString:String(r.sessionId.dropFirst(5))) != nil else { throw Failure("原会话标识无效") }
+              UUID(uuidString:String(r.sessionId.dropFirst(5))) != nil else { throw Failure("원래 세션 ID가 유효하지 않습니다.") }
         let path = URL(fileURLWithPath:r.executable).resolvingSymlinksInPath()
         let found = NSRunningApplication.runningApplications(withBundleIdentifier:"dev.zcode.app").filter {
             !$0.isTerminated && $0.executableURL?.resolvingSymlinksInPath() == path
         }
         guard found.count == 1, let a = found.first, r.expectedPid == nil || r.expectedPid == a.processIdentifier else {
-            throw Failure("ZCode 进程已变化，请重新接入会话")
+            throw Failure("ZCode 프로세스가 변경되었습니다. 세션에 다시 연결하세요.")
         }
-        guard AXIsProcessTrusted() else { throw Failure("请在 Mac 的辅助功能中允许当前网关操作 ZCode") }
+        guard AXIsProcessTrusted() else { throw Failure("제발 Mac 접근성에서 현재 게이트웨이 작업 허용 ZCode") }
         let session = CGSessionCopyCurrentDictionary() as? [String:Any]
         guard session?[kCGSessionOnConsoleKey as String] as? Bool == true,
-              session?["CGSSessionScreenIsLocked"] as? Bool != true else { throw Failure("Mac 已锁定，暂不能操作 ZCode 原窗口") }
+              session?["CGSSessionScreenIsLocked"] as? Bool != true else { throw Failure("Mac 잠겨 있어 일시적으로 작동할 수 없음 ZCode 원래 창") }
         app = a; root = AXUIElementCreateApplication(a.processIdentifier)
         AXUIElementSetMessagingTimeout(root,0.4)
         a.activate(options:[])
         guard until(1,{ NSWorkspace.shared.frontmostApplication?.processIdentifier == a.processIdentifier ? true : nil }) != nil,
               let w = el(root,"AXFocusedWindow"), str(w,"AXSubrole") == "AXStandardWindow" else {
-            throw Failure("未取得 ZCode 原窗口")
+            throw Failure("획득하지 못함 ZCode 원래 창")
         }
         window = w
     }
     func checkWindow() throws {
         guard !app.isTerminated, NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let w = el(root,"AXFocusedWindow"), CFEqual(w,window) else { throw Failure("窗口已切换，已停止操作") }
+              let w = el(root,"AXFocusedWindow"), CFEqual(w,window) else { throw Failure("창이 전환되어 작동이 중지되었습니다.") }
     }
     func heading() -> Node? {
         let hits = find(window) { role($0) == "AXHeading" && named($0,r.title) && (attr($0,"AXValue") as? NSNumber)?.intValue == 1 }
@@ -129,21 +129,22 @@ final class Conversation {
             }
             return nil
         }
-        let row = try one(rows,"未能唯一定位原窗口中的聊天，请先在 ZCode 侧栏显示该聊天")
-        try checkWindow(); try press(row,"无法选择 ZCode 原聊天")
-        guard until(1,{self.heading()}) != nil else { throw Failure("ZCode 没有打开指定聊天") }
+        let row = try one(rows,"원래 창에서 채팅을 고유하게 찾을 수 없습니다. 먼저 ZCode 사이드바에 채팅 표시")
+        try checkWindow(); try press(row,"선택할 수 없습니다 ZCode 원래 채팅")
+        guard until(1,{self.heading()}) != nil else { throw Failure("ZCode 지정된 채팅이 열리지 않았습니다") }
     }
+    // ZCode의 실제 접근성 메뉴 이름은 외부 계약이므로 번역하지 않습니다.
     func verifyId() throws {
         try checkWindow()
-        guard let h = heading(), let p = el(h,"AXParent") else { throw Failure("聊天已变化，已停止操作") }
-        let menu = try one(children(p).filter { role($0) == "AXPopUpButton" && named($0,"更多") },"未找到原会话菜单")
-        try press(menu,"无法打开会话菜单")
-        guard let copy = until(0.8,{find(self.window) { role($0) == "AXMenuItem" && named($0,"复制会话 ID") }.first}) else {
-            throw Failure("原窗口没有提供会话 ID")
+        guard let h = heading(), let p = el(h,"AXParent") else { throw Failure("채팅이 변경되어 더 이상 운영되지 않습니다.") }
+        let menu = try one(children(p).filter { role($0) == "AXPopUpButton" && named($0,"\u{66f4}\u{591a}") },"원래 세션 메뉴를 찾을 수 없습니다.")
+        try press(menu,"세션 메뉴를 열 수 없습니다")
+        guard let copy = until(0.8,{find(self.window) { role($0) == "AXMenuItem" && named($0,"\u{590d}\u{5236}\u{4f1a}\u{8bdd} ID") }.first}) else {
+            throw Failure("원래 창에서는 세션을 제공하지 않습니다. ID")
         }
         try checkWindow()
-        guard try copiedId(copy) == r.sessionId else { throw Failure("原生会话 ID 不一致，已停止操作") }
-        guard until(0.8,{self.heading()}) != nil else { throw Failure("聊天已切换，已停止操作") }
+        guard try copiedId(copy) == r.sessionId else { throw Failure("기본 세션 ID 일관성이 없어 작업이 중지되었습니다.") }
+        guard until(0.8,{self.heading()}) != nil else { throw Failure("채팅이 전환되어 작업이 중지되었습니다.") }
     }
     func perform() throws -> String {
         try select(); try verifyId()
@@ -161,7 +162,7 @@ do {
     let connection = try Conversation(req)
     payload = ["status":try connection.perform(),"pid":connection.app.processIdentifier]
 } catch {
-    payload = ["status":"failed","reason":(error as? Failure)?.message ?? "无法读取 ZCode 操作"]
+    payload = ["status":"failed","reason":(error as? Failure)?.message ?? "읽을 수 없음 ZCode 작동하다"]
 }
 let result = try JSONSerialization.data(withJSONObject:payload)
 FileHandle.standardOutput.write(result)

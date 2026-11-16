@@ -34,9 +34,9 @@ final class DshMobileController: UIViewController, WKNavigationDelegate, WKUIDel
         navigationItem.largeTitleDisplayMode = .never
         navigationController?.navigationBar.tintColor = .label
         navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "desktopcomputer"), style: .plain, target: self, action: #selector(close))
-        navigationItem.leftBarButtonItem?.accessibilityLabel = MobileStrings.text("我的电脑")
+        navigationItem.leftBarButtonItem?.accessibilityLabel = MobileStrings.text("내 컴퓨터")
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .refresh, target: self, action: #selector(refresh))
-        navigationItem.rightBarButtonItem?.accessibilityLabel = MobileStrings.text("刷新")
+        navigationItem.rightBarButtonItem?.accessibilityLabel = MobileStrings.text("새로 고치다")
         let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()
         web = WKWebView(frame: .zero, configuration: config); web.navigationDelegate = self; web.uiDelegate = self; web.allowsBackForwardNavigationGestures = true
         web.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(web)
@@ -50,13 +50,13 @@ final class DshMobileController: UIViewController, WKNavigationDelegate, WKUIDel
         if DshMobileURL.same(url, entry), action.targetFrame != nil { decisionHandler(.allow); return }
         decisionHandler(.cancel)
         guard action.navigationType == .linkActivated, action.targetFrame?.isMainFrame != false, ["https", "http"].contains(url.scheme ?? "") else { return }
-        let alert = UIAlertController(title: MobileStrings.text("在浏览器打开外部链接？"), message: url.host, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-        alert.addAction(UIAlertAction(title: MobileStrings.text("打开"), style: .default) { _ in UIApplication.shared.open(url) }); present(alert, animated: true)
+        let alert = UIAlertController(title: MobileStrings.text("브라우저에서 외부 링크를 열까요?"), message: url.host, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+        alert.addAction(UIAlertAction(title: MobileStrings.text("열기"), style: .default) { _ in UIApplication.shared.open(url) }); present(alert, animated: true)
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         guard (error as NSError).code != NSURLErrorCancelled else { return }
-        let alert = UIAlertController(title: MobileStrings.text(MobileStrings.text("连接失败，请刷新重试")), message: nil, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: MobileStrings.text("确定"), style: .default)); present(alert, animated: true)
+        let alert = UIAlertController(title: MobileStrings.text(MobileStrings.text("연결에 실패했습니다. 다시 시도하려면 새로고침하세요.")), message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: MobileStrings.text("확인"), style: .default)); present(alert, animated: true)
     }
 }

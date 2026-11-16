@@ -71,10 +71,10 @@ def entry_urls(preferences, hosts, quick_url='', external_status=None, lan_addre
 
 
 def address_message(config, urls, first=False, test=False):
-    title = 'Codex Mobile Bridge · ' + ('入口通知测试' if test else '网关已启动' if first else '访问入口已更新')
+    title = 'Codex Mobile Bridge · ' + ('접속 주소 알림 테스트' if test else '게이트웨이 시작' if first else '접속 주소 변경')
     name = config.get('addressName') or 'Codex Mobile Bridge'
-    body = name + ('已启动。' if first else '的当前访问入口如下。')
-    body += '\n访问地址：\n' + '\n'.join(urls) + '\n局域网地址需在同一网络访问；固定域名需要先完成部署。\n请使用原网关登录方式访问。'
+    body = name + ('를 시작했습니다.' if first else '의 현재 접속 주소입니다.')
+    body += '\n접속 주소:\n' + '\n'.join(urls) + '\nLAN 주소는 같은 네트워크에서만 사용할 수 있습니다. 고정 도메인은 먼저 설정해야 합니다.\n기존 게이트웨이 로그인 정보로 접속하세요.'
     return title, body
 
 
@@ -138,7 +138,7 @@ class AddressNotifications:
                 attempts = record.get('attempts', 0) + 1
                 records[target] = {'delivered': False, 'attempts': attempts, 'time': now,
                                    'next': now + min(300, 5 * 2 ** min(attempts, 6)), 'channel': channel,
-                                   'error': '入口通知发送失败，将在入口仍有效且通知开启时重试。'}
+                                   'error': '포털 알림을 보내지 못했습니다. 포털이 여전히 유효하고 알림이 활성화되면 다시 시도됩니다.。'}
             write_json(self.path, self.state)
 
     def start(self):

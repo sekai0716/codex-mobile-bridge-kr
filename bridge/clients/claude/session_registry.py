@@ -10,8 +10,8 @@ from pathlib import Path
 from bridge.clients.errors import BridgeUnavailable
 
 
-_UNKNOWN = '无法确认原 Claude Code 会话是否仍在其他终端运行，请在电脑端检查后重试'
-_RUNNING = '原 Claude Code 会话仍在其他终端运行，请先在原终端结束会话'
+_UNKNOWN = "이 Claude Code 채팅이 다른 터미널에 아직 열려 있는지 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도하세요."
+_RUNNING = "이 Claude Code 채팅은 아직 다른 터미널에 열려 있습니다. 계속하기 전에 여기를 닫으세요."
 
 
 def _pid_domain():

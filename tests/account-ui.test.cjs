@@ -31,26 +31,26 @@ function fixture(resetOnly=false){
 
 test('official account shows limits, authoritative card count and refresh stays usable',async()=>{
   const ui=fixture();await ui.panel.refresh();
-  assert.equal(ui.button.hidden,false);assert.match(ui.text(),/75%/);assert.match(ui.text(),/可用数量：3/);
-  assert.equal(ui.all().find(n=>n.textContent==='查看剩余额度').disabled,false);
+  assert.equal(ui.button.hidden,false);assert.match(ui.text(),/75%/);assert.match(ui.text(),/사용 가능:3/);
+  assert.equal(ui.all().find(n=>n.textContent==='남은 할당량 보기').disabled,false);
   assert.equal(ui.all().find(n=>n.tag==='progress').value,75);
-  assert.equal(ui.panel.countdown(2523),'1 天 18 小时 3 分钟');
+  assert.equal(ui.panel.countdown(2523),'1일 18시간 3분');
   ui.language();assert.match(ui.text(),/Remaining 75%/);assert.match(ui.text(),/Shared account limits/);
 });
 
 test('reset-only view retains cards and confirmation while quota and subscription stay in the account card',async()=>{
  const ui=fixture(true);ui.setValue({...ui.value(),subscription:{source:'online',periodEndsAt:2000000000},limits:[{...ui.value().limits[0],credits:{balance:12}}]});await ui.panel.refresh();
- assert.match(ui.text(),/test@example.test/);assert.match(ui.text(),/可用数量：3/);assert.match(ui.text(),/Test reset/);assert.match(ui.text(),/未提供到期时间/);assert.equal(ui.all().find(n=>n.textContent==='刷新重置卡').disabled,false);
- assert.doesNotMatch(ui.text(),/共享额度|剩余 75%|Credits:|订阅|更新于/);assert.equal(ui.all().some(n=>n.tag==='progress'),false);
+ assert.match(ui.text(),/test@example.test/);assert.match(ui.text(),/사용 가능:3/);assert.match(ui.text(),/Test reset/);assert.match(ui.text(),/만료 기간이 제공되지 않음/);assert.equal(ui.all().find(n=>n.textContent==='새로고침 재설정').disabled,false);
+ assert.doesNotMatch(ui.text(),/공유 할당량|남은75%|Credits:|신청|업데이트 날짜/);assert.equal(ui.all().some(n=>n.tag==='progress'),false);
  const pending=ui.panel.redeem('card-1');assert.equal(ui.confirmButton().disabled,true);assert.equal(ui.writes.length,0);ui.confirmDialog();await pending;
- assert.equal(ui.writes.length,1);assert.equal(ui.writes[0].confirmed,true);assert.match(ui.text(),/可用数量：2/);
+ assert.equal(ui.writes.length,1);assert.equal(ui.writes[0].confirmed,true);assert.match(ui.text(),/사용 가능:2/);
  ui.language();assert.match(ui.text(),/Refresh resets/);assert.doesNotMatch(ui.text(),/Shared account limits|Subscription|Updated at:/);
 });
 
 test('reset-only view distinguishes an empty inventory from missing details and retains query errors',async()=>{
- const ui=fixture(true);ui.setValue({...ui.value(),resetCredits:{availableCount:0,credits:[]}});await ui.panel.refresh();assert.match(ui.text(),/当前没有可用重置卡/);
- ui.setValue({...ui.value(),resetCredits:null});await ui.panel.refresh();assert.match(ui.text(),/暂未提供重置卡信息/);assert.doesNotMatch(ui.text(),/当前没有可用重置卡/);
- ui.setRead(()=>{throw Error('unavailable');});await ui.panel.refresh();assert.match(ui.text(),/保留上次结果/);assert.equal(ui.panel.value.canReset,false);
+ const ui=fixture(true);ui.setValue({...ui.value(),resetCredits:{availableCount:0,credits:[]}});await ui.panel.refresh();assert.match(ui.text(),/사용량 재설정이 불가능합니다\./);
+ ui.setValue({...ui.value(),resetCredits:null});await ui.panel.refresh();assert.match(ui.text(),/사용량 재설정 정보를 확인할 수 없습니다\./);assert.doesNotMatch(ui.text(),/사용량 재설정이 불가능합니다\./);
+ ui.setRead(()=>{throw Error('unavailable');});await ui.panel.refresh();assert.match(ui.text(),/마지막 결과를 표시합니다\. 데이터가 업데이트되지 않았습니다/);assert.equal(ui.panel.value.canReset,false);
 });
 
 test('reset titles are localized in the list and confirmation while only the welcome message is removed',async()=>{
@@ -58,8 +58,8 @@ test('reset titles are localized in the list and confirmation while only the wel
   const ui=fixture(resetOnly),welcome="Thanks for using Codex! You've been granted one free rate limit reset.";
   const card={...ui.value().resetCredits.credits[0],title:'Full reset (Weekly + 5 hr)',description:welcome};
   ui.setValue({...ui.value(),resetCredits:{availableCount:1,credits:[card]}});await ui.panel.refresh();
-  assert.match(ui.text(),/完全重置（每周＋5 小时）/);assert.doesNotMatch(ui.text(),/Full reset|Thanks for using Codex/);
-  const pending=ui.panel.redeem('card-1');assert.match(ui.all(ui.body).map(n=>n.textContent).join('\n'),/完全重置（每周＋5 小时）/);
+  assert.match(ui.text(),/전체 재설정\(매주 \+ 5시간\)/);assert.doesNotMatch(ui.text(),/Full reset|Thanks for using Codex/);
+  const pending=ui.panel.redeem('card-1');assert.match(ui.all(ui.body).map(n=>n.textContent).join('\n'),/전체 재설정\(매주 \+ 5시간\)/);
   ui.body.children[0].oncancel({preventDefault(){}});await pending;assert.equal(ui.writes.length,0);
   ui.setValue({...ui.value(),resetCredits:{availableCount:1,credits:[{...card,description:welcome+' Only resets Codex usage limits.'}]}});await ui.panel.refresh();
   assert.match(ui.text(),/Only resets Codex usage limits\./);assert.doesNotMatch(ui.text(),/Thanks for using Codex/);
@@ -103,7 +103,7 @@ test('cancelling confirmation sends nothing; repeated click while pending sends 
   ui.advance(1);ui.confirmButton().onclick();await Promise.resolve();assert.equal(ui.writes.length,1);
   await ui.panel.redeem('card-1');assert.equal(ui.writes.length,1);
   finish({outcome:'reset',account:{...ui.value(),resetCredits:{availableCount:2,credits:[]}}});await pending;
-  assert.equal(ui.writes[0].confirmed,true);assert.match(ui.text(),/已使用重置卡/);assert.match(ui.text(),/可用数量：2/);
+  assert.equal(ui.writes[0].confirmed,true);assert.match(ui.text(),/재설정이 사용되었습니다\. 사용량 한도가 새로고침되었습니다\./);assert.match(ui.text(),/사용 가능:2/);
 });
 
 test('uncertain reset retry keeps the backend persisted idempotency key',async()=>{
@@ -111,40 +111,40 @@ test('uncertain reset retry keeps the backend persisted idempotency key',async()
     ui.setValue({...ui.value(),pendingReset:{requestId:body.requestId,accountKey:body.accountKey,creditId:body.creditId}});
     throw Error('connection lost');
   });
-  await ui.redeem('card-1');assert.match(ui.text(),/重试原请求/);
+  await ui.redeem('card-1');assert.match(ui.text(),/동일한 요청을 다시 시도하세요\./);
   ui.setConsume(()=>({outcome:'alreadyRedeemed',account:{...ui.value(),pendingReset:null}}));
   await ui.redeem('card-1',true);
   assert.equal(ui.writes.length,2);assert.equal(ui.writes[0].requestId,ui.writes[1].requestId);
-  assert.match(ui.text(),/此重置已完成/);
+  assert.match(ui.text(),/이 재설정은 이미 완료되었습니다\. 사용량 한도가 새로고침되었습니다\./);
 });
 
 test('permission disabled, no cards and expired cards disable use without changing settings',async()=>{
   const ui=fixture();ui.setValue({...ui.value(),canReset:false});await ui.panel.refresh();
-  assert.equal(ui.all().find(n=>n.textContent==='使用重置卡').disabled,true);
+  assert.equal(ui.all().find(n=>n.textContent==='재설정 사용').disabled,true);
   await ui.redeem('card-1');assert.equal(ui.writes.length,0);
   ui.setValue({...ui.value(),canReset:true,resetCredits:{availableCount:0,credits:[]}});await ui.panel.refresh();
-  assert.equal(ui.all().some(n=>n.textContent==='使用重置卡'),false);
+  assert.equal(ui.all().some(n=>n.textContent==='재설정 사용'),false);
 });
 
 test('missing count and windows show unavailable, never zero; count-only resets are supported',async()=>{
   const ui=fixture();ui.setValue({...ui.value(),limits:[{name:'Codex',windows:[{remainingPercent:null}]}],resetCredits:null});await ui.panel.refresh();
-  assert.match(ui.text(),/暂未提供/);assert.doesNotMatch(ui.text(),/0%|可用数量：0/);
+  assert.match(ui.text(),/사용할 수 없음/);assert.doesNotMatch(ui.text(),/0%|사용 가능:0/);
   ui.setValue({...ui.value(),resetCredits:{availableCount:2,credits:null}});await ui.panel.refresh();
-  assert.ok(ui.all().some(n=>n.textContent==='使用一张重置卡'));await ui.redeem(null);
+  assert.ok(ui.all().some(n=>n.textContent==='한 번의 재설정을 사용하십시오.'));await ui.redeem(null);
   assert.equal(ui.writes[0].creditId,null);
 });
 
 test('account switching during a reset removes the old result and pending card',async()=>{
   const ui=fixture();await ui.panel.refresh();ui.setConsume(()=>({outcome:'reset',account:{...ui.value(),accountKey:'b'.repeat(64),email:'other@example.test'}}));
-  await ui.redeem('card-1');assert.match(ui.text(),/other@example.test/);assert.doesNotMatch(ui.text(),/已使用重置卡/);
+  await ui.redeem('card-1');assert.match(ui.text(),/other@example.test/);assert.doesNotMatch(ui.text(),/재설정이 사용되었습니다\. 사용량 한도가 새로고침되었습니다\./);
   assert.equal(ui.panel.pending,null);
 });
 
 test('refresh keeps the snapshot visible, blocks reset and retains it on query failure',async()=>{
  const ui=fixture();await ui.panel.refresh();let reject;ui.setRead(()=>new Promise((r,j)=>reject=j));const pending=ui.panel.refresh();
- assert.match(ui.text(),/查询中/);assert.match(ui.text(),/剩余 75%/);await ui.redeem('card-1');assert.equal(ui.writes.length,0);
- reject(Error('unavailable'));await pending;assert.match(ui.text(),/剩余 75%/);assert.match(ui.text(),/保留上次结果/);assert.equal(ui.panel.value.canReset,false);
- ui.setRead(async()=>({...ui.value(),limits:[{name:'Codex',windows:[{remainingPercent:60}]}]}));await ui.panel.refresh();assert.match(ui.text(),/剩余 60%/);assert.doesNotMatch(ui.text(),/剩余 75%|保留上次结果/);assert.equal(ui.panel.value.canReset,true);
+ assert.match(ui.text(),/확인 중…/);assert.match(ui.text(),/남은75%/);await ui.redeem('card-1');assert.equal(ui.writes.length,0);
+ reject(Error('unavailable'));await pending;assert.match(ui.text(),/남은75%/);assert.match(ui.text(),/마지막 결과를 표시합니다\. 데이터가 업데이트되지 않았습니다/);assert.equal(ui.panel.value.canReset,false);
+ ui.setRead(async()=>({...ui.value(),limits:[{name:'Codex',windows:[{remainingPercent:60}]}]}));await ui.panel.refresh();assert.match(ui.text(),/남은60%/);assert.doesNotMatch(ui.text(),/남은75%|마지막 결과 유지/);assert.equal(ui.panel.value.canReset,true);
 });
 
 
@@ -161,7 +161,7 @@ test('account change, permission loss and logout cancel an open confirmation',as
 });
 test('expired cards remain visible and cannot be redeemed, including direct invocation',async()=>{
   const ui=fixture();ui.setValue({...ui.value(),resetCredits:{availableCount:0,credits:[{...ui.value().resetCredits.credits[0],expiresAt:1}]}});await ui.panel.refresh();
-  assert.ok(ui.all().find(n=>n.textContent==='已过期')?.disabled);await ui.panel.redeem('card-1');assert.equal(ui.body.children.length,0);assert.equal(ui.writes.length,0);
+  assert.ok(ui.all().find(n=>n.textContent==='만료됨')?.disabled);await ui.panel.redeem('card-1');assert.equal(ui.body.children.length,0);assert.equal(ui.writes.length,0);
 });
 test('an expired uncertain request can only retry its original idempotency key',async()=>{
   const ui=fixture();const pendingReset={requestId:'old-request',accountKey:ui.value().accountKey,creditId:'card-1'};
@@ -174,19 +174,19 @@ test('login subscription dates never claim current expiry and old cached dates s
  const ui=fixture();
  for(const subscription of [null,{periodEndsAt:1790147934,source:'login'},{periodEndsAt:1788250708,source:'login'}]){
   ui.setValue({...ui.value(),subscription});await ui.panel.refresh();
-  assert.match(ui.text(),/订阅有效期暂未确认/);assert.doesNotMatch(ui.text(),/当前订阅周期|已到记录日期|后结束/);
+  assert.match(ui.text(),/구독 종료 날짜가 확인되지 않았습니다\./);assert.doesNotMatch(ui.text(),/현재 구독 기간|기록 날짜 도달|다음 이후에 종료/);
  }
  ui.setValue({...ui.value(),subscription:{periodEndsAt:Date.now()/1000+86400,source:'login'}});await ui.panel.refresh();
- assert.match(ui.text(),/登录记录中的订阅日期（非实时）：/);assert.match(ui.text(),/请以 ChatGPT 订阅页面为准/);
- assert.doesNotMatch(ui.text(),/当前订阅周期|后结束/);
- ui.advance(86401000);ui.panel.render();assert.match(ui.text(),/订阅有效期暂未确认/);
+ assert.match(ui.text(),/로그인 기록의 구독 날짜\(실시간 아님\):/);assert.match(ui.text(),/(?:온라인에서 검색된 날짜입니다\. 갱신 및 청구 상태는 ChatGPT 구독 페이지를 확인하세요\.|로그인 기록이 오래되었을 수 있습니다\. ChatGPT 구독 페이지를 참조하세요\.)/);
+ assert.doesNotMatch(ui.text(),/현재 구독 기간|다음 이후에 종료/);
+ ui.advance(86401000);ui.panel.render();assert.match(ui.text(),/구독 종료 날짜가 확인되지 않았습니다\./);
  ui.language();assert.match(ui.text(),/Subscription end date is unconfirmed/);assert.match(ui.text(),/ChatGPT subscription page/);
 });
 
 
 test('online subscription date is distinct from stale login and failure is not expiry',async()=>{
  const ui=fixture();ui.setValue({...ui.value(),subscription:{periodEndsAt:2000000000,source:'online'}});await ui.panel.refresh();
- assert.match(ui.text(),/查询到的订阅周期截止日期/);assert.doesNotMatch(ui.text(),/登录记录中的订阅日期/);
- ui.setValue({...ui.value(),subscription:{periodEndsAt:null,source:'online',error:'订阅信息暂不可用，请稍后刷新'}});await ui.panel.refresh();
- assert.match(ui.text(),/暂未确认/);assert.doesNotMatch(ui.text(),/已过期/);ui.language();assert.match(ui.text(),/Subscription details are unavailable/);
+ assert.match(ui.text(),/구독 기간 종료일:/);assert.doesNotMatch(ui.text(),/로그인 기록의 구독 날짜/);
+ ui.setValue({...ui.value(),subscription:{periodEndsAt:null,source:'online',error:'구독 세부정보를 확인할 수 없습니다. 나중에 다시 새로고침하세요.'}});await ui.panel.refresh();
+ assert.match(ui.text(),/구독 종료 날짜가 확인되지 않았습니다\./);assert.doesNotMatch(ui.text(),/만료됨/);ui.language();assert.match(ui.text(),/Subscription details are unavailable/);
 });

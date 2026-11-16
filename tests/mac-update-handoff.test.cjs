@@ -37,11 +37,11 @@ test('GUI restores its gateway before acknowledging the legacy updater, without 
 test('stopped gateway stays stopped and an invalidated handoff cannot start a gateway',async t=>{
  const f=fixture(t);f.env.CMB_UPDATE_LAUNCHER_PID='101';f.write('launch-services.json',{pid:202,launcherPid:101,token:f.token});
  const handoff=f.read(202),calls=[];const options={handoff,env:f.env,pid:202,stillManaged:()=>false,worker:async action=>calls.push(action)};
- await assert.rejects(restoreMacUpdate(options),/失效/);assert.deepEqual(calls,[]);
+ await assert.rejects(restoreMacUpdate(options),/업데이트 전달이 만료되었습니다\./);assert.deepEqual(calls,[]);
  const plan=JSON.parse(fs.readFileSync(path.join(f.transaction,'plan.json')));plan.runtime.running=false;f.write('plan.json',plan);
  await restoreMacUpdate({...options,stillManaged:()=>true});assert.deepEqual(calls,[]);
 });
 test('missing launch receipt does not permit a gateway start or acknowledgement',async t=>{
  const f=fixture(t);f.env.CMB_UPDATE_LAUNCHER_PID='101';let calls=0;
- await assert.rejects(restoreMacUpdate({handoff:f.read(202),env:f.env,pid:202,stillManaged:()=>false,worker:async()=>calls++}),/尚未确认/);assert.equal(calls,0);
+ await assert.rejects(restoreMacUpdate({handoff:f.read(202),env:f.env,pid:202,stillManaged:()=>false,worker:async()=>calls++}),/아직 확인되지 않은 업데이트 출시 ID/);assert.equal(calls,0);
 });

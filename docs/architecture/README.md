@@ -1,154 +1,154 @@
-# 开发架构与修改导航
+# 개발 아키텍처와 변경 위치 안내
 
-从本页开始找代码。运行机制与协议细节见根目录 [ARCHITECTURE.md](../../ARCHITECTURE.md)；平台修改边界见 [platforms/README.md](../../bridge/platforms/README.md)。本项目按**功能、客户端、操作系统**分别组织，共享业务只保留一份。
+이 페이지에서 수정할 코드를 찾는다. 실행 방식과 프로토콜은 루트의 [ARCHITECTURE.md](../../ARCHITECTURE.md), 플랫폼별 변경 범위는 [platforms/README.md](../../bridge/platforms/README.md)를 참고한다. 이 프로젝트는 **기능, 클라이언트, 운영체제**별로 구성하며 공통 기능의 규칙은 한 곳에서 관리한다.
 
-## 先判断要改什么
+## 무엇을 바꿀지 먼저 결정하세요
 
-| 需求 | 首先查看 | 需要联动时再看 |
+| 필요 | 먼저 보기 | 함께 변경할 부분을 확인할 때 |
 | --- | --- | --- |
-| Windows 客户端安装路径、进程、启动和退出 | `bridge/platforms/windows/` | `bridge/clients/discovery.py`、`desktop_app.py`、`lifecycle.py` |
-| Codex 页内 APP / CLI / WSL 接入与 Magpie | `bridge/features/endpoints/`、`bridge/clients/manager.py`、`bridge/platforms/windows/wsl.py` | `web/features/clients/client-navigation.js`、[使用说明](../wsl-codex.md)、[验证记录](windows-wsl-validation.md) |
-| macOS 屏保、辅助功能、Claude 原生助手 | `bridge/platforms/macos/claude.py`、`claude-helper.swift` | `bridge/clients/claude/setup.py` |
-| Ubuntu 安装发现、桌面启动和 IPC | `bridge/platforms/linux/`、`platforms/posix/` | [Linux 说明](../linux.md) |
-| 本机 Linux Codex 权限能力、侧边聊天权限确认 | `bridge/features/sessions/linux_permissions.py`、`linux_side_chat.py` | `bridge/clients/codex/catalog.py`、`web/features/chat/permissions.js` |
-| 某个客户端的消息、权限、模型、账号 | `bridge/clients/codex/`、`claude/`、`deepseek/` | `bridge/clients/manager.py`，对应 Web 功能模块 |
-| 登录、配对、可信手机 | `bridge/features/auth/` | `bridge/api/httpd.py`，`mobile/` 的原生持久化 |
-| Codex 账号切换、API、额度、模型列表 | `bridge/features/accounts/` | `bridge/clients/desktop_app.py`，`web/features/accounts/` |
-| 本机 CLI 接入保存、选择与核验 | `bridge/features/accounts/cli_access.py`、`cli_sync.py` | `bridge/clients/claude/cli_session.py`，`web/features/accounts/cli-access.js` |
-| CLI 原生接入与 SSH 发现 | `bridge/clients/codex/app_server.py`、`cli_session.py`、`remote.py` | `features/sessions/store.py`、`app/service.py`；[接入边界](../codex-cli.md) |
-| 会话历史、审批、计划/目标、侧边聊天 | `bridge/features/sessions/` | `bridge/app/service.py`，`web/features/chat/` |
-| 各接入的新建项目、目录浏览与登记 | `bridge/features/sessions/create.py`、`projects.py`、`bridge/clients/manager.py` | `web/shared/project-picker.js`、[新建项目聊天](../project-chats.md) |
-| 新建聊天的模型、思考强度与同账号缓存 | `bridge/features/sessions/creation_models.py`、`bridge/features/accounts/models.py` | `web/shared/creation-model-picker.js`；原生首条输入配置仍归各客户端适配器 |
-| 共用会话菜单、原生改名与项目、Bridge 显示分类 | `web/features/chat/session-menu.js`、`bridge/features/sessions/organization.py`、`display_metadata.py` | `app/service.py`、`features/endpoints/wsl.py`；`sessions/store.py` 读取原生项目归属 |
-| 文件、图片、上传下载、Git | `bridge/features/workspace/` | `web/features/workspace/`、`web/shared/image-viewer.js` |
-| 源码高亮、PDF/HTML 预览与全屏、目录返回 | `web/features/workspace/` | `bridge/api/html_preview.py`、`httpd.py`、原生手机导航；[模块约定](../../web/README.md#文件阅读模块) |
-| 聊天与 Markdown 文件中的 Mermaid 图表、源码和全屏 | `web/shared/mermaid-*.js`、`markdown.js` | `bridge/api/mermaid_render.py`、中继与 iOS 子页面导航；[模块约定](../../web/README.md#mermaid-preview) |
-| Codex 聊天内 visualize 交互图表 | `web/shared/visualize*`、`bridge/features/workspace/visualize.py` | `bridge/api/visualize.py`、`app/service.py`、中继及 Android/iOS 预览导航 |
-| Claude 手动额度与成功查询快照 | `bridge/clients/claude/accounts.py` | `web/features/accounts/client-accounts.js`；[决定与边界](../../.agents/notes/implemented/bug-fix/2026-10-12-keychain-access-and-manual-quota.md) |
-| 终端会话与命令 | `bridge/features/terminals/manager.py` | `bridge/platforms/windows/terminal.py`、`posix/terminal.py` |
-| 通知、后台巡检、事件游标 | `bridge/features/notifications/` | `desktop/features/notifications/`，`mobile/android/`、`mobile/ios/` |
-| 局域网、域名、SSH、Tailscale、中继连接 | `bridge/features/network/` | `desktop/features/connections/`，独立服务 `relay/` |
-| 网关更新或 Codex 更新 | `bridge/features/updates/` | `desktop/features/updates/`、签名与构建脚本 |
-| 共享聊天功能、应用切换 | `web/features/chat/`、`web/features/clients/` | `web/shell/` |
-| 窄屏、横屏、宽屏分屏 | `web/layouts/` | 工作台自身标签/草稿状态仍归 `web/features/workspace/` |
-| 浏览器与手机 App 的差别 | `web/hosts/` | `mobile/shared/web/` 共同注入脚本 |
-| Android 原生菜单、返回、下载、通知 | `mobile/android/` | 可选推送壳 `mobile/android-push/` |
-| iOS 原生菜单、导航、下载、通知 | `mobile/ios/` | Xcode 的 Sources/Resources 与 `WebScripts.swift` |
-| 桌面网关页面与模块排布 | `desktop/shell/`、`desktop/features/` | `desktop/index.html`、`main.cjs`、`preload.cjs` |
+| Windows 클라이언트 설치 경로, 프로세스, 시작·종료 | `bridge/platforms/windows/` | `bridge/clients/discovery.py`、`desktop_app.py`、`lifecycle.py` |
+| Codex 페이지의 APP·CLI·WSL 연결과 Magpie | `bridge/features/endpoints/`、`bridge/clients/manager.py`、`bridge/platforms/windows/wsl.py` | `web/features/clients/client-navigation.js`、[사용 안내](../wsl-codex.md)、[검증 기록](windows-wsl-validation.md) |
+| macOS 화면 보호기, 손쉬운 사용, Claude 네이티브 보조 프로그램 | `bridge/platforms/macos/claude.py`、`claude-helper.swift` | `bridge/clients/claude/setup.py` |
+| Ubuntu 설치 검색, 데스크톱 실행, IPC | `bridge/platforms/linux/`、`platforms/posix/` | [Linux 안내](../linux.md) |
+| 로컬 Linux Codex의 권한 기능과 보조 채팅 권한 확인 | `bridge/features/sessions/linux_permissions.py`、`linux_side_chat.py` | `bridge/clients/codex/catalog.py`、`web/features/chat/permissions.js` |
+| 특정 클라이언트의 메시지, 권한, 모델, 계정 | `bridge/clients/codex/`、`claude/`、`deepseek/` | `bridge/clients/manager.py`, 해당 웹 기능 모듈 |
+| 로그인, 페어링, 신뢰하는 휴대폰 | `bridge/features/auth/` | `bridge/api/httpd.py`, `mobile/`의 네이티브 영구 저장 |
+| Codex 계정 전환, API, 사용 한도, 모델 목록 | `bridge/features/accounts/` | `bridge/clients/desktop_app.py`, `web/features/accounts/` |
+| 로컬 CLI 연결의 저장·선택·확인 | `bridge/features/accounts/cli_access.py`、`cli_sync.py` | `bridge/clients/claude/cli_session.py`, `web/features/accounts/cli-access.js` |
+| CLI 네이티브 연결과 SSH 검색 | `bridge/clients/codex/app_server.py`、`cli_session.py`、`remote.py` | `features/sessions/store.py`、`app/service.py`; [연결 경계](../codex-cli.md) |
+| 대화 기록, 승인, Plan·Goal, 보조 채팅 | `bridge/features/sessions/` | `bridge/app/service.py`, `web/features/chat/` |
+| 연결별 새 프로젝트 생성, 디렉터리 탐색·등록 | `bridge/features/sessions/create.py`、`projects.py`、`bridge/clients/manager.py` | `web/shared/project-picker.js`、[새 프로젝트 채팅](../project-chats.md) |
+| 새 채팅의 모델·추론 강도와 같은 계정의 캐시 | `bridge/features/sessions/creation_models.py`、`bridge/features/accounts/models.py` | `web/shared/creation-model-picker.js`; 네이티브 첫 입력의 설정은 각 클라이언트 어댑터에서 처리 |
+| 공통 대화 메뉴, 네이티브 이름 변경·프로젝트, Bridge 표시 분류 | `web/features/chat/session-menu.js`、`bridge/features/sessions/organization.py`、`display_metadata.py` | `app/service.py`、`features/endpoints/wsl.py`; `sessions/store.py`는 네이티브 프로젝트 소속을 조회 |
+| 파일, 이미지, 업로드·다운로드, Git | `bridge/features/workspace/` | `web/features/workspace/`、`web/shared/image-viewer.js` |
+| 소스 강조 표시, PDF·HTML 미리보기·전체 화면, 디렉터리로 돌아가기 | `web/features/workspace/` | `bridge/api/html_preview.py`、`httpd.py`, 모바일 네이티브 탐색; [모듈 규칙](../../web/README.md#파일-읽기-모듈) |
+| 채팅·Markdown 파일의 Mermaid 다이어그램, 소스, 전체 화면 | `web/shared/mermaid-*.js`、`markdown.js` | `bridge/api/mermaid_render.py`, 중계와 iOS 하위 페이지 탐색; [모듈 규칙](../../web/README.md#mermaid-preview) |
+| Codex 채팅 내 visualize 대화형 차트 | `web/shared/visualize*`、`bridge/features/workspace/visualize.py` | `bridge/api/visualize.py`、`app/service.py`, 중계와 Android·iOS 미리보기 탐색 |
+| Claude 사용 한도의 수동 조회와 성공한 조회의 스냅샷 | `bridge/clients/claude/accounts.py` | `web/features/accounts/client-accounts.js`; [결정과 경계](../../.agents/notes/implemented/bug-fix/2026-10-12-keychain-access-and-manual-quota.md) |
+| 터미널 세션과 명령 | `bridge/features/terminals/manager.py` | `bridge/platforms/windows/terminal.py`、`posix/terminal.py` |
+| 알림, 백그라운드 확인, 이벤트 커서 | `bridge/features/notifications/` | `desktop/features/notifications/`, `mobile/android/`、`mobile/ios/` |
+| LAN, 도메인, SSH, Tailscale, 중계 연결 | `bridge/features/network/` | `desktop/features/connections/`, 독립 서비스 `relay/` |
+| 게이트웨이 또는 Codex 업데이트 | `bridge/features/updates/` | `desktop/features/updates/`, 서명·빌드 스크립트 |
+| 공통 채팅 기능과 앱 전환 | `web/features/chat/`、`web/features/clients/` | `web/shell/` |
+| 좁은 화면, 가로 화면, 넓은 화면의 분할 배치 | `web/layouts/` | 워크벤치 자체의 탭·초안 상태는 `web/features/workspace/`에서 관리 |
+| 브라우저와 모바일 앱의 차이 | `web/hosts/` | `mobile/shared/web/`의 공통 주입 스크립트 |
+| Android 네이티브 메뉴, 뒤로 가기, 다운로드, 알림 | `mobile/android/` | 선택적 푸시 셸 `mobile/android-push/` |
+| iOS 네이티브 메뉴, 탐색, 다운로드, 알림 | `mobile/ios/` | Xcode의 Sources·Resources와 `WebScripts.swift` |
+| 데스크톱 게이트웨이 페이지와 모듈 배치 | `desktop/shell/`、`desktop/features/` | `desktop/index.html`、`main.cjs`、`preload.cjs` |
 
-## 目录与职责
+## 목차 및 책임
 
 ```text
-run.py / desktop.py / stop.py     稳定的命令入口
+run.py / desktop.py / stop.py     유지되는 외부 명령 진입점
 bridge/
-  app/                           启停、主服务与功能组装
-  api/                           HTTP 路由、请求校验、固定静态资源路由
-  features/                      共享业务规则
+  app/                           시작·중지, 주 서비스, 기능 구성
+  api/                           HTTP 라우팅, 요청 검증, 고정 정적 리소스 라우팅
+  features/                      공통 기능의 규칙
     auth/ accounts/ sessions/ workspace/ terminals/
     notifications/ network/ updates/
-  clients/                       客户端协议与数据格式
+  clients/                       클라이언트 프로토콜과 데이터 형식
     codex/ claude/ deepseek/
-    manager.py                   多客户端配置、读请求合并与写操作记录
-    discovery.py                 合并安装、登录、能力与运行状态
-    desktop_app.py / lifecycle.py 归属核验与安全启停协调
-  platforms/                     与操作系统直接交互
+    manager.py                   다중 클라이언트 설정, 읽기 요청 병합, 쓰기 작업 기록
+    discovery.py                 설치·로그인·기능·실행 상태 취합
+    desktop_app.py / lifecycle.py 소유 관계 검증과 안전한 시작·중지 조정
+  platforms/                     운영체제와 직접 상호 작용
     windows/ macos/ linux/ posix/
-  resources.py                   源码/冻结运行时的资源定位
-web/                             Web 与手机共享聊天界面
-  shell/ features/ shared/        共享功能与页面组织
-  hosts/                         browser / iOS / Android 宿主适配
-  layouts/                       紧凑 / 中等 / 宽屏与容器分屏
-desktop/                         桌面网关外壳及功能页面
+  resources.py                   소스·패키징된 런타임의 리소스 위치 확인
+web/                             웹과 모바일이 공유하는 채팅 화면
+  shell/ features/ shared/        공통 기능과 페이지 구성
+  hosts/                         browser / iOS / Android 호스트 환경별 처리
+  layouts/                       좁은·중간·넓은 화면과 컨테이너 분할 배치
+desktop/                         데스크톱 게이트웨이 셸과 기능 페이지
 mobile/
-  ios/ android/                  各平台原生壳、扫码、通知、下载
-  shared/web/                    两端共用、随 App 打包的注入脚本
-  android-push/                  Android 可选推送构建配置
-relay/                           独立中继服务及管理页面
-scripts/                         测试、构建、验证和受控烟测入口
-tests/                           Python 与 Node 回归；browser/ 单列浏览器夹具
+  ios/ android/                  플랫폼별 네이티브 셸, QR 스캔, 알림, 다운로드
+  shared/web/                    두 앱에 함께 포함하는 공통 주입 스크립트
+  android-push/                  Android 선택적 푸시 빌드 설정
+relay/                           독립 중계 서비스와 관리 페이지
+scripts/                         테스트, 빌드, 검증, 통제된 스모크 테스트 진입점
+tests/                           Python·Node 회귀 검사; browser/는 별도 브라우저 픽스처
 ```
 
-`features/` 回答“业务允许做什么”；`clients/` 回答“怎样与某个客户端交换状态和命令”；`platforms/` 回答“这个系统如何发现、启动、退出或通信”。具体平台模块不得反向导入 `clients`、`features` 或 `app`。平台目录中的 `AGENTS.md` 会给在相应系统上工作的 Codex 提供约束。
+`features/`는 허용할 기능과 규칙을, `clients/`는 각 클라이언트와 상태·명령을 주고받는 방식을, `platforms/`는 운영체제에서 검색·실행·종료·통신하는 방식을 담당한다. 플랫폼 모듈에서 `clients`, `features`, `app`을 역으로 가져와서는 안 된다. 플랫폼 디렉터리의 `AGENTS.md`에는 해당 운영체제에서 작업하는 Codex가 따라야 할 제약이 있다.
 
-下面是阅读调用链的示意，省略了模块之间已有的协作依赖：
+아래 그림은 코드를 읽을 때 따라갈 호출 흐름이다. 모듈 사이에 이미 있는 협업 의존성은 생략했다.
 
 ```mermaid
 flowchart TD
-  UI[Web / 手机界面] --> HTTP[api: HTTP 与认证边界]
-  Desktop[桌面网关 IPC] --> App[app: 服务组装与生命周期]
+  UI[웹 / 모바일 화면] --> HTTP[api: HTTP와 인증 경계]
+  Desktop[데스크톱 게이트웨이 IPC] --> App[app: 서비스 구성과 수명 주기]
   HTTP --> App
-  App --> Features[features: 账号 / 会话 / 文件 / 通知等]
+  App --> Features[features: 계정 / 대화 / 파일 / 알림 등]
   App --> Clients[clients: Codex / Claude / DeepSeek]
   Features --> Clients
   Clients --> Platforms[platforms: Windows / macOS / Linux / POSIX]
 ```
 
-## 顺着一个请求阅读
+## 요청에 따라 읽기
 
-**Codex 会话发送：**`web/shell/app.js` 组织请求，`api/httpd.py` 验证登录与 CSRF，`app/service.py` 解析会话和原桌面 owner，`clients/codex/ipc.py` 发送受限协议消息，`clients/codex/transport.py` 选择本机的套接字或 Windows 命名管道。消息/审批规范化在 `features/sessions/model.py`，历史在 `store.py`，时间线在 `timeline.py`。
+**Codex 대화 전송:** `web/shell/app.js`가 요청을 구성하고, `api/httpd.py`가 로그인과 CSRF를 검증한다. `app/service.py`는 대화와 원본 데스크톱 owner를 확인하고, `clients/codex/ipc.py`는 허용된 프로토콜 메시지를 보낸다. `clients/codex/transport.py`는 로컬 소켓이나 Windows 명명된 파이프를 선택한다. 메시지·승인 정규화는 `features/sessions/model.py`, 기록은 `store.py`, 타임라인은 `timeline.py`에서 처리한다.
 
-**Claude/DSH 会话操作：**共享页面模块 `web/features/clients/desktop-sessions.js` 调用 HTTP，`clients/manager.py` 处理客户端启用状态、并发只读合并及写入记录，再调用对应 `adapter.py`。Claude 的 mailbox 与 `connector.js`、DSH 的 `host.mjs` 是实际连接协议边界。某种模型或权限差异应在其客户端适配器内处理。
+**Claude·DSH 대화 작업:** 공통 페이지 모듈 `web/features/clients/desktop-sessions.js`가 HTTP를 호출한다. `clients/manager.py`는 클라이언트 활성화 상태, 동시 읽기 전용 요청 병합, 쓰기 기록을 처리한 뒤 해당 `adapter.py`를 호출한다. Claude의 mailbox와 `connector.js`, DSH의 `host.mjs`가 실제 연결 프로토콜의 경계다. 모델이나 권한의 차이는 해당 클라이언트 어댑터에서 처리한다.
 
-**新增 Agent 的共用边界：**消息展示、任务状态、附件预览和文件定位优先复用 `web/features/chat/`、`web/shared/` 与 `bridge/features/` 中的现有功能。ZCode Mac Test 接入也遵循这一边界，模型、Skill、提醒与账号事务见 [共享能力记录](../../.agents/notes/implemented/feature/2026-10-31-zcode-shared-capabilities.md)。适配器转换原生数据、报告已核验能力并执行原生操作；共享组件依据能力与规范化数据工作，不按 Agent 名称复制流程。已有共享任务状态入口是 `renderChatProgress`，规则见 [共用原生任务状态提示](../../.agents/notes/implemented/feature/2026-10-29-shared-chat-progress.md)。尚未核验的原生能力必须保留限制，不能由共享层推测实现。
+**새 에이전트를 추가할 때의 공통 경계:** 메시지 표시, 작업 상태, 첨부 미리보기, 파일 위치 확인은 `web/features/chat/`, `web/shared/`, `bridge/features/`의 기존 기능을 먼저 재사용한다. ZCode Mac Test 연결도 같은 경계를 따른다. 모델, Skill, 알림, 계정 작업은 [공통 기능 기록](../../.agents/notes/implemented/feature/2026-10-31-zcode-shared-capabilities.md)을 참고한다. 어댑터는 네이티브 데이터를 변환하고 검증된 기능을 보고하며 네이티브 작업을 실행한다. 공통 구성 요소는 기능 정보와 정규화된 데이터에 따라 동작하며 에이전트 이름별로 처리 흐름을 복제하지 않는다. 기존 공통 작업 상태 진입점은 `renderChatProgress`이며 규칙은 [공통 네이티브 작업 상태 표시](../../.agents/notes/implemented/feature/2026-10-29-shared-chat-progress.md)를 따른다. 아직 검증하지 않은 네이티브 기능은 제한된 상태로 남겨야 하며 공통 계층에서 추측해 구현해서는 안 된다.
 
-消息排队、旧版未确认记录恢复和各接入支持范围见 [消息管理](../message-management.md)。
+메시지 대기열, 구버전 미확인 기록의 복구, 연결별 지원 범위는 [메시지 관리](../message-management.md)를 참고한다.
 
-历史首屏与实时控制的拆分、各接入分页能力及本地验证范围见 [历史与控制拆分](history-control-separation.md)。
+기록의 첫 화면과 실시간 제어를 분리하는 방식, 연결별 페이징 기능, 로컬 검증 범위는 [기록과 제어 분리](history-control-separation.md)를 참고한다.
 
-**扫描与启停：**`clients/discovery.py` 调用选中系统的 `discovery.py` 并补充账号、接入和能力信息；`desktop_app.py`/`lifecycle.py` 保留任务及进程归属规则，平台 `desktop.py` 只执行原生查询或启动退出。展示刷新可以共用一次进程清单；关闭、恢复和账号切换必须重新核验。
+**검색과 시작·중지:** `clients/discovery.py`는 선택한 운영체제의 `discovery.py`를 호출하고 계정·연결·기능 정보를 보완한다. `desktop_app.py`와 `lifecycle.py`가 작업 및 프로세스의 소유 관계를 관리하고, 플랫폼의 `desktop.py`는 네이티브 조회·실행·종료만 수행한다. 화면 갱신에서는 프로세스 목록을 한 번 읽어 공유할 수 있다. 종료, 복구, 계정 전환 전에는 다시 검증해야 한다.
 
-**客户端启停交互：**`web/features/clients/client-lifecycle.js` 统一 Web、手机和桌面网关的退出选择；客户端页面负责进度与结果展示。`clients/manager.py` 区分关闭接入、正常退出和明确确认的 Windows 强制退出。强制退出不作为正常退出失败后的自动回退，原生实现仍核验目标身份和当前桌面会话。
+**클라이언트 시작·중지 UI:** `web/features/clients/client-lifecycle.js`가 웹·모바일·데스크톱 게이트웨이의 종료 선택지를 통일하고 클라이언트 페이지는 진행 상황과 결과를 표시한다. `clients/manager.py`는 연결 해제, 정상 종료, 사용자가 명시적으로 확인한 Windows 강제 종료를 구분한다. 정상 종료가 실패했다고 자동으로 강제 종료해서는 안 된다. 네이티브 구현에서도 대상 식별 정보와 현재 데스크톱 세션을 검증한다.
 
-**Windows 原生入口：**`platforms/windows/discovery_ext.py` 读取注册安装信息；`session.py` 核验桌面可交互状态；`claude.py` 管理原生助手回执和 profile 发现，`claude-helper.cs` 操作指定窗口；`codex_quit.py` / `codex-quit-helper.cs` 与 `dsh_quit.py` 实现客户端正常退出；`force_exit.py` 负责显式强制退出的进程核验。连接重试、取消和任务规则仍在客户端层，不能移入原生助手。
+**Windows 네이티브 진입점:** `platforms/windows/discovery_ext.py`는 등록된 설치 정보를 읽고 `session.py`는 데스크톱과 상호 작용할 수 있는 상태인지 확인한다. `claude.py`는 네이티브 보조 프로그램의 응답과 profile 검색을, `claude-helper.cs`는 지정한 창의 조작을 담당한다. `codex_quit.py`·`codex-quit-helper.cs`와 `dsh_quit.py`는 정상 종료를, `force_exit.py`는 명시적 강제 종료의 프로세스 검증을 담당한다. 연결 재시도, 취소, 작업 규칙은 클라이언트 계층에 두며 네이티브 보조 프로그램으로 옮겨서는 안 된다.
 
-**SSH 工作区：**`app/service.py` 通过 `clients/codex/remote.py` 发送实际 Python 源码到所选远端。远端没有安装本项目包；`source_text()` 读取的模块必须仍可独立运行。Windows 网关连接 Linux 主机时，不能根据本机 Windows 选择远端终端实现。
+**SSH 작업 공간:** `app/service.py`는 `clients/codex/remote.py`를 통해 실제 Python 소스를 선택한 원격 호스트에 보낸다. 원격 호스트에는 이 프로젝트 패키지가 설치되어 있지 않으므로 `source_text()`가 읽는 모듈은 독립적으로 실행할 수 있어야 한다. Windows 게이트웨이에서 Linux 호스트에 연결할 때 로컬 운영체제를 기준으로 원격 터미널 구현을 선택해서는 안 된다.
 
-## 在单个系统上针对性开发
+## 단일 시스템에서의 타겟 개발
 
-以 Windows 专项修复为例：先阅读 `bridge/platforms/windows/AGENTS.md`，定位命名管道、进程发现或窗口助手。若接口和返回语义不变，只修改该目录及对应测试。不要为了本机测试通过，把其他系统实现替换成 Windows 分支，也不要在共享账号/任务流程内新增平台绕过。
+Windows 전용 수정을 예로 들면, 먼저 `bridge/platforms/windows/AGENTS.md`를 읽고 명명된 파이프, 프로세스 검색, 창 보조 프로그램 중 변경할 위치를 찾는다. 인터페이스와 반환 의미가 그대로라면 해당 디렉터리와 관련 테스트만 수정한다. 로컬 테스트를 통과시키려고 다른 운영체제 구현을 Windows 분기로 바꾸거나 공통 계정·작업 흐름에 플랫폼 우회를 추가해서는 안 된다.
 
-如果改变了共享接口，应同步共享调用者及另外两个系统的实现/合约测试。操作系统相同不代表分发渠道、安装目录、架构、客户端版本相同：保留 MSIX、AppImage、符号链接等既有发现与核验逻辑。Linux 当前可以发现 Claude，但自动连接仍为不支持；目录存在不等于三平台能力完全一致。
+공통 인터페이스를 바꾸면 공통 호출자와 다른 두 운영체제의 구현·계약 테스트도 함께 갱신한다. 운영체제가 같아도 배포 채널, 설치 디렉터리, 아키텍처, 클라이언트 버전은 다를 수 있다. MSIX, AppImage, 심볼릭 링크 등의 기존 검색·검증 로직을 유지한다. Linux에서는 현재 Claude를 검색할 수 있지만 자동 연결은 지원하지 않는다. 디렉터리가 존재한다는 이유로 세 운영체제의 기능이 모두 같다고 판단해서는 안 된다.
 
-在不同电脑上基于同一个确认过的提交创建短期专题分支，例如 `fix/windows-client-discovery`、`fix/linux-terminal`。每个提交只做一个明确改变，记录测试平台、客户端版本和限制；回合并时逐项审核共享层的修改。不要维护三份长期分叉的公共业务代码。
+여러 컴퓨터에서 작업할 때는 검증한 동일 커밋을 기준으로 `fix/windows-client-discovery`, `fix/linux-terminal` 같은 단기 브랜치를 만든다. 각 커밋은 명확한 변경 하나만 담고 테스트한 운영체제, 클라이언트 버전, 한계를 기록한다. 다시 병합할 때 공통 계층의 변경을 하나씩 검토한다. 공통 기능을 세 개의 장기 브랜치에서 따로 유지하지 않는다.
 
-## 新增或调整功能时
+## 기능을 추가하거나 조정할 때
 
-1. 在上表定位业务目录；先阅读已有请求与状态流，优先复用组件。
-2. 若是客户端协议差异，修改对应客户端目录；若是系统调用差异，修改平台目录；HTTP 入口只负责校验与分派。
-3. 保留写入结果未知、不自动重放、任务保护、认证/CSRF、原会话 provider/cwd/owner 等规则。
-4. 更新对应测试和功能说明。改公开请求格式时，检查桌面、Web、Android/iOS 及中继消费者。
-5. 运行范围匹配的测试，再按 [验证说明](../../tests/README.md) 做必要的共同回归。报告静态检查、模拟测试、真实平台测试和打包测试各自的结果。
+1. 위 표에서 기능 디렉터리를 찾는다. 기존 요청과 상태 흐름을 먼저 읽고 구성 요소를 재사용한다.
+2. 클라이언트 프로토콜의 차이는 해당 클라이언트 디렉터리에서, 운영체제 호출의 차이는 플랫폼 디렉터리에서 처리한다. HTTP 진입점은 검증과 분배만 담당한다.
+3. 결과를 알 수 없는 쓰기의 자동 재전송 금지, 작업 보호, 인증·CSRF, 원본 세션의 provider/cwd/owner 등 기존 규칙을 유지한다.
+4. 관련 테스트와 기능 설명을 갱신한다. 공개 요청 형식을 바꿀 때는 데스크톱, 웹, Android·iOS, 중계 서비스에서 이 형식을 사용하는 부분을 확인한다.
+5. 변경 범위에 맞는 테스트를 실행한 뒤 [검증 안내](../../tests/README.md)에 따라 필요한 공통 회귀 검사를 수행한다. 정적 검사, 모의 테스트, 실제 플랫폼 테스트, 패키징 테스트의 결과를 구분해 보고한다.
 
-## 资源与兼容性
+## 리소스 및 호환성
 
-- 外部入口 `run.py`、`desktop.py`、HTTP URL、配置和数据格式保持不变。内部 Python import 已改为新目录，没有旧模块别名层；项目外自写脚本若直接导入旧内部模块，需要参考 [路径对照](path-map.json) 更新。
-- `web/assets.json` 映射单一文件或按声明顺序组合的 CSS 源文件；`bridge/api/assets.py` 的固定白名单决定可公开访问的 URL。新增映射不会自动开放任意文件。中继使用同一映射。
-- `scripts/gateway-resources.json` 列出必须随网关分发的 SSH 源文件、连接脚本和许可；移动它们时同步清单。CA 证书仍按 TLS 模块的相邻位置分发。
-- 桌面页面直接引用一部分 Web 共享文件，需同时更新 `desktop/index.html` 和 `package.json` 资源清单；不要把磁盘路径改动误用为浏览器公开 URL 改动。
-- 客户端管理页面、顶部切换菜单和底部导航按接入实例 ID 复用，配置内创建的项目与聊天归该实例；详见[共享客户端外壳](../../.agents/notes/implemented/architecture/2026-11-02-shared-client-shell.md)。
-- 独立 Desktop 配置的目录身份、登记与冲突规则归 `features/clients/instances.py`，原生路径和懒加载执行上下文归 `clients/profiles.py`、`clients/instances.py`。HTTP 以 `family + entry` 选择同一账号、附件与工作区上下文；Web 草稿和通知跳转保留完整实例 ID。ZCode 仅保留默认配置；默认入口不受额外登记损坏影响。支持范围与验证边界见[独立客户端实例](../../.agents/notes/implemented/architecture/2026-11-05-independent-client-instances.md)。
-- 本机 CLI 接入由网关管理。默认 Codex CLI 与 Desktop 共用原始 `CODEX_HOME`；独立 Codex 客户端复用同一 Bridge、账号管理与聊天组件，以入口 ID 隔离配置目录、账号和远程导航（详见[独立客户端管理](../../.agents/notes/implemented/feature/2026-11-02-independent-codex-management.md)），切换使用账号存储与原生配置核验；Claude Code API 凭据保存在网关私有目录，选择时更新原始 Claude 配置目录中的认证环境项，保留该目录的会话历史与其他设置。
-- 资源路径回归会在无本地 `bridge` 包的隔离 Python 中执行 SSH 源码定义；这不等于真实 SSH、冻结程序或原生助手已验证。
+- 외부 진입점 `run.py`, `desktop.py`, HTTP URL, 설정·데이터 형식은 유지한다. 내부 Python import는 새 디렉터리로 바뀌었으며 이전 모듈의 별칭 계층은 없다. 프로젝트 밖에서 만든 스크립트가 이전 내부 모듈을 직접 가져오면 [경로 대응표](path-map.json)에 따라 수정한다.
+- `web/assets.json`은 단일 파일 또는 선언 순서대로 합칠 CSS 소스 파일을 매핑한다. `bridge/api/assets.py`의 고정 허용 목록이 공개 URL을 결정한다. 매핑을 추가했다고 임의의 파일이 공개되는 것은 아니다. 중계 서비스도 같은 매핑을 사용한다.
+- `scripts/gateway-resources.json`은 게이트웨이와 함께 배포할 SSH 소스, 연결 스크립트, 라이선스를 나열한다. 이 파일을 옮기면 목록도 갱신한다. CA 인증서는 계속 TLS 모듈 옆에 배포한다.
+- 데스크톱 페이지가 일부 웹 공통 파일을 직접 참조하므로 `desktop/index.html`과 `package.json`의 리소스 목록을 함께 갱신한다. 디스크 경로를 바꾸는 것과 브라우저 공개 URL을 바꾸는 것을 혼동해서는 안 된다.
+- 클라이언트 관리 페이지, 상단 전환 메뉴, 하단 탐색은 연결 인스턴스 ID에 따라 재사용한다. 해당 설정에서 만든 프로젝트와 채팅은 그 인스턴스에 속한다. [공통 클라이언트 셸](../../.agents/notes/implemented/architecture/2026-11-02-shared-client-shell.md)을 참고한다.
+- 독립 Desktop 설정의 디렉터리 식별·등록·충돌 규칙은 `features/clients/instances.py`, 네이티브 경로와 지연 로딩 실행 환경은 `clients/profiles.py`·`clients/instances.py`에서 관리한다. HTTP는 `family + entry`로 같은 계정·첨부·작업 공간 환경을 선택한다. 웹 초안과 알림 이동에서는 전체 인스턴스 ID를 유지한다. ZCode는 기본 설정만 사용하며 추가 등록 정보가 손상되어도 기본 연결에는 영향을 주지 않는다. 지원 범위와 검증 한계는 [독립 클라이언트 인스턴스](../../.agents/notes/implemented/architecture/2026-11-05-independent-client-instances.md)를 참고한다.
+- 로컬 CLI 연결은 게이트웨이에서 관리한다. 기본 Codex CLI와 Desktop은 원본 `CODEX_HOME`을 공유한다. 독립 Codex 클라이언트는 같은 Bridge, 계정 관리, 채팅 구성 요소를 사용하되 연결 ID로 설정 디렉터리·계정·원격 탐색을 분리한다([독립 클라이언트 관리](../../.agents/notes/implemented/feature/2026-11-02-independent-codex-management.md) 참고). 계정 전환 시 계정 저장소와 네이티브 설정을 확인한다. Claude Code API 자격 증명은 게이트웨이의 비공개 디렉터리에 저장하며 선택할 때 원본 Claude 설정 디렉터리의 인증 환경 항목을 갱신한다. 그 디렉터리의 대화 기록과 다른 설정은 유지한다.
+- 리소스 경로 회귀 검사는 로컬 `bridge` 패키지가 없는 격리된 Python에서 SSH 소스 정의를 실행한다. 이 검사만으로 실제 SSH, 패키징된 프로그램, 네이티브 보조 프로그램까지 검증했다고 볼 수는 없다.
 
-## 本轮保留的边界
+## 이번 라운드에서 유지되는 경계
 
-依赖方向由 `scripts/check-boundaries.py` 和 `tests/test_module_boundaries.py` 自动检查。平台禁止反向依赖；功能和客户端层不得新增应用/HTTP 依赖，provider 不得新增相互引用。既有 22 条边保存在 `dependency-exceptions.json`，每条带文件、符号和原因；新增违规或遗留无效例外都会失败。此门禁控制依赖增长，不代表既有耦合已消失。开发流程见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+`scripts/check-boundaries.py`와 `tests/test_module_boundaries.py`가 의존성 방향을 검사한다. 플랫폼의 역방향 의존성을 금지하며 기능·클라이언트 계층에서 앱·HTTP 의존성을 추가하거나 provider 사이에 상호 참조를 추가해서는 안 된다. 기존 22개 의존성은 `dependency-exceptions.json`에 파일·심볼·이유와 함께 기록되어 있다. 새 위반이나 더 이상 필요하지 않은 예외가 있으면 검사가 실패한다. 이 검사는 의존성이 더 늘어나는 것을 막는 장치이며 기존 결합이 모두 해소되었다는 뜻은 아니다. 개발 절차는 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 참고한다.
 
-这次整理已经拆出可独立维护的系统实现，重排了功能与客户端模块。`app/service.py`、`api/httpd.py` 和部分页面组织文件仍较大，保留既有业务入口有助于控制回归。后续应沿真实功能需求逐块抽取，避免单纯按行数切文件。
+이번 구조 정리에서는 운영체제별 구현을 독립적으로 관리할 수 있게 분리하고 기능·클라이언트 모듈의 위치를 재배치했다. `app/service.py`, `api/httpd.py`, 일부 페이지 구성 파일은 여전히 크다. 기존 기능 진입점을 유지해 회귀 위험을 제한했으며 이후에는 실제 기능 요구에 따라 조금씩 분리한다. 줄 수만을 기준으로 파일을 나누지 않는다.
 
-一次性命令执行的 `CommandJob` 仍在终端功能模块内保留系统分支，以保持 SSH 源码自包含；桌面 Electron 主进程内也保留窗口/系统菜单的现有分支。目录划分并不意味着所有 `sys.platform`/`process.platform` 判断已消失。移动端已合并共同注入脚本并分离原生资源加载职责；原生控制器仍保留既有导航和安全回调，避免为了目录分类扩大行为改动。
+일회성 명령의 `CommandJob`은 SSH로 보내는 소스를 독립 실행 가능하게 유지하기 위해 터미널 모듈 안에 운영체제 분기를 남겨 두었다. 데스크톱 Electron 주 프로세스에도 창·시스템 메뉴의 기존 분기가 있다. 디렉터리를 분리했다고 모든 `sys.platform`·`process.platform` 판단이 사라진 것은 아니다. 모바일은 공통 주입 스크립트를 합치고 네이티브 리소스 로딩의 책임을 분리했으며, 네이티브 컨트롤러의 기존 탐색·보안 콜백은 유지해 디렉터리 정리를 이유로 동작 변경을 확대하지 않았다.
 
-初次整理的归档、可比结果与未验证范围见 [目录重组验证记录](refactor-verification.md)；后续 iOS/Android 与宽窄布局区分见 [界面分层验证记录](surface-verification.md)；Windows 分支整合见 [合并验证记录](windows-integration.md)。
+초기 정리의 보관 자료, 비교 결과, 미검증 범위는 [디렉터리 재구성 검증 기록](refactor-verification.md), 이후 iOS·Android와 화면 크기별 레이아웃의 분리는 [UI 계층화 검증 기록](surface-verification.md), Windows 브랜치 병합은 [통합 검증 기록](windows-integration.md)을 참고한다.
 
-后续 Windows/Linux 实测分支的来源、修改边界和本地回归见 [平台验证分支整合记录](platform-validation-integration.md)。
+이후 Windows·Linux 실기기 검증 브랜치의 출처, 수정 범위, 로컬 회귀 결과는 [플랫폼 검증 브랜치 통합 기록](platform-validation-integration.md)을 참고한다.
 
-## 四种访问界面的修改边界
+## 4개 액세스 인터페이스의 수정 경계
 
-“iOS/Android/浏览器”和“紧凑/中等/宽屏”是独立维度，不维护四份聊天业务代码。手机浏览器仍是浏览器宿主；平板和折叠屏中的 App 可以采用宽屏布局。页面尺寸改变时保留现有会话、草稿、标签、阅读位置和用户分屏选择。
+‘iOS·Android·브라우저’와 ‘좁은·중간·넓은 화면’은 서로 독립적인 기준이다. 네 벌의 채팅 기능을 따로 관리하지 않는다. 모바일 브라우저도 브라우저 호스트이며 태블릿·폴더블 기기의 앱은 넓은 화면 배치를 사용할 수 있다. 화면 크기가 바뀌어도 현재 대화, 초안, 탭, 읽던 위치, 사용자의 분할 화면 선택을 유지한다.
 
-- 修改仅 iOS 的行为：从 `mobile/ios/AGENTS.md` 开始；Android 同理。
-- 修改两端共同的原生菜单让位或剪贴板脚本：从 `mobile/shared/AGENTS.md` 开始；源码只存一份，两端构建清单都引用它。
-- 修改窄屏/宽屏排布：从 `web/layouts/README.md` 开始；不能靠宿主或设备型号判断可用空间。
-- 修改浏览器/App 的功能入口差异：从 `web/hosts/README.md` 开始；宿主提示不提供原生权限。
+- iOS 전용 동작은 `mobile/ios/AGENTS.md`부터 확인한다. Android도 해당 디렉터리에서 시작한다.
+- 두 앱이 함께 사용하는 네이티브 메뉴 공간 확보나 클립보드 스크립트는 `mobile/shared/AGENTS.md`부터 확인한다. 소스는 한 곳에 두고 두 앱의 빌드 목록에서 참조한다.
+- 좁은·넓은 화면 배치는 `web/layouts/README.md`부터 확인한다. 호스트나 기기 모델로 사용 가능한 공간을 판단해서는 안 된다.
+- 브라우저·앱의 기능 진입점 차이는 `web/hosts/README.md`부터 확인한다. 호스트를 나타내는 정보가 네이티브 권한을 부여하지는 않는다.
 
-CSS 按有序源清单在内存中组合，保留原公开样式 URL 与级联顺序，不生成打包文件或增加每个片段的 HTTP 请求。缓存按源文件的修改时间和大小失效，编辑源码后仍可刷新验证。共享原生脚本的来源对照见 `mobile/source-map.json`。
+CSS는 순서가 정해진 소스 목록을 메모리에서 합쳐 제공한다. 기존 공개 스타일 URL과 캐스케이드 순서를 유지하며 번들 파일을 만들거나 조각별 HTTP 요청을 추가하지 않는다. 소스 파일의 수정 시간·크기가 바뀌면 캐시를 무효화하므로 소스를 수정하고 새로고침해 검증할 수 있다. 공통 네이티브 스크립트의 출처 대응표는 `mobile/source-map.json`을 참고한다.

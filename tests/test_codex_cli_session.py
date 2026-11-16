@@ -190,7 +190,7 @@ class CliSessionTests(unittest.TestCase):
         token = self.sessions.metadata['thread-a']['connectionToken']
         self.fake.thread['status'] = {'type': 'systemError'}
         self.fake.server_info['userAgent'] = 'codex-mobile-bridge-cli/0.163.0 (fixture)'
-        with self.assertRaisesRegex(ValueError, '版本'):
+        with self.assertRaisesRegex(ValueError, '버전'):
             self.sessions.release_connection('thread-a', token)
         self.assertFalse(any(method == 'thread/unsubscribe' for method, _ in self.fake.sent))
         request = self.fake.request
@@ -208,7 +208,7 @@ class CliSessionTests(unittest.TestCase):
         self.sessions.store.get = Mock(return_value={'origin': 'cli', 'cwd': expected['cwd'],
                                                     'model_provider': expected['modelProvider']})
         before_resume = Mock()
-        with self.assertRaisesRegex(AppServerUnsupported, '仍被原生加载'):
+        with self.assertRaisesRegex(AppServerUnsupported, "대상\\ 세션이\\ 여전히\\ 기본적으로\\ 로드되어\\ 있습니다\\.\\ 먼저\\ 명시적으로\\ 확인하세요\\.\\ CLI\\ 서비스\\ 유지관리\\ 공급자가\\ 마이그레이션되지\\ 않았습니다\\.。"):
             self.sessions.attach('thread-a', explicit=True, target_provider='new-provider',
                                  expected_identity=expected, before_resume=before_resume)
         before_resume.assert_not_called()
@@ -220,7 +220,7 @@ class CliSessionTests(unittest.TestCase):
         expected = {'id': 'thread-a', 'cwd': '/another/project', 'modelProvider': 'original-provider'}
         self.sessions.store.get = Mock(return_value={'origin': 'cli', 'cwd': self.fake.thread['cwd'],
                                                     'model_provider': self.fake.thread['modelProvider']})
-        with self.assertRaisesRegex(AppServerUnsupported, '原会话身份'):
+        with self.assertRaisesRegex(AppServerUnsupported, '원래 세션 ID'):
             self.sessions.attach('thread-a', explicit=True, target_provider='new-provider', expected_identity=expected)
         self.assertFalse(any(method == 'thread/resume' for method, _ in self.fake.sent))
 
@@ -247,7 +247,7 @@ class CliSessionTests(unittest.TestCase):
         response = Mock(returncode=1, stderr='Error: this CLI has no complete local package')
         with patch('bridge.clients.codex.cli_session._managed_cli', return_value=self.home/'codex'), \
                 patch('subprocess.run', return_value=response):
-            with self.assertRaisesRegex(AppServerUnavailable, '安装或修复完整的 Codex CLI'):
+            with self.assertRaisesRegex(AppServerUnavailable, "이\\ Codex\\ CLI\\ 완전한\\ 백그라운드\\ 실행\\ 구성\\ 요소가\\ 부족합니다\\.\\ 전체를\\ 설치하거나\\ 수리하십시오\\.\\ Codex\\ CLI\\ 나중에\\ 다시\\ 시도해\\ 보세요。"):
                 self.sessions._start_daemon()
 
     def test_explicit_attach_resumes_saved_thread_and_preserves_identity(self):
@@ -498,7 +498,7 @@ class CliSessionTests(unittest.TestCase):
         _, unavailable = self.sessions.permission_options('thread-a')
         self.assertFalse(unavailable['options'][0]['available'])
         self.assertIn('CLI', unavailable['options'][0]['reason'])
-        self.assertNotIn('桌面', unavailable['options'][0]['reason'])
+        self.assertNotIn('데스크탑', unavailable['options'][0]['reason'])
 
     def test_native_catalog_and_skill_input_use_joined_daemon(self):
         import hashlib
@@ -873,7 +873,7 @@ class CliSessionTests(unittest.TestCase):
                 'bridge.features.accounts.models.build_opener') as factory:
             result = self.sessions.get_kind('thread-a', 'models')
         self.assertEqual(result['models'], [])
-        self.assertIn('启动环境', result['modelError'])
+        self.assertIn('시작 환경', result['modelError'])
         factory.assert_not_called()
 
     def test_local_env_key_uses_daemon_value_and_exact_native_efforts(self):

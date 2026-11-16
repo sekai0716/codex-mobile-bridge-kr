@@ -94,7 +94,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
             if method == 'setModel': return False
             return await self.call(kind, method, *args, **kwargs)
         self.adapter.desktop.call.side_effect = call
-        with self.assertRaisesRegex(BridgeUnavailable, '未确认模型设置'):
+        with self.assertRaisesRegex(BridgeUnavailable, "데스크톱\\ 앱이\\ 모델\\ 설정을\\ 확인하지\\ 않았습니다\\.\\ 확인하려면\\ 새로고침하세요\\."):
             await self.adapter.dispatch('settings', self.sid(), {'model': 'unconfirmed-model'})
 
     async def test_effort_only_update_does_not_require_resubmitting_model(self):
@@ -123,14 +123,14 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
     async def test_project_references_use_native_mentions_without_upload_bytes(self):
         for kind in ('code', 'cowork'):
             self.calls.clear()
-            body = {'text': '检查文件', 'id': str(uuid.uuid4()), 'resolvedReferences': [
-                {'path': '/host/project/中文 文件.md', 'name': '中文 文件.md', 'kind': 'file'}]}
+            body = {'text': '파일 확인', 'id': str(uuid.uuid4()), 'resolvedReferences': [
+                {'path': '/host/project/중국 문서.md', 'name': '중국 문서.md', 'kind': 'file'}]}
             await self.adapter.dispatch('send', self.sid(kind), body)
             args = next(args for _, method, args in self.calls if method == 'sendMessage')
-            mention = '@"/host/project/中文 文件.md"' if kind == 'code' else '@/host/project/中文 文件.md'
-            self.assertEqual(args[1], '检查文件\n\n' + mention)
+            mention = '@"/host/project/중국 문서.md"' if kind == 'code' else '@/host/project/중국 문서.md'
+            self.assertEqual(args[1], '파일 확인\n\n' + mention)
             self.assertIsNone(args[2]); self.assertIsNone(args[4] if kind == 'code' else args[3])
-            self.assertEqual(body['text'], '检查文件')
+            self.assertEqual(body['text'], '파일 확인')
 
     async def test_invalid_effort_cannot_partially_change_model(self):
         async def call(kind, method, *args, **kwargs):
@@ -138,7 +138,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
                 return {'models': [{'id': 'another'}], 'capabilities': {'models': True}}
             return await self.call(kind, method, *args, **kwargs)
         self.adapter.desktop.call.side_effect = call
-        with self.assertRaisesRegex(ValueError, '思考强度'):
+        with self.assertRaisesRegex(ValueError, '추론 강도'):
             await self.adapter.dispatch('settings', self.sid('cowork'), {'model': 'another', 'effort': ''})
         self.assertFalse(any(method in ('setEffort', 'setModel') for _, method, _ in self.calls))
 
@@ -178,7 +178,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
                 if method == 'setPermissionMode': return accepted
                 return await self.call(kind, method, *args, **kwargs)
             self.adapter.desktop.call.side_effect = call
-            with self.assertRaisesRegex(BridgeUnavailable, '未确认权限设置'):
+            with self.assertRaisesRegex(BridgeUnavailable, "Claude가\\ 권한\\ 설정을\\ 확인하지\\ 않았습니다\\.\\ 데스크톱\\ 앱에서\\ 조직\\ 정책을\\ 확인하세요\\."):
                 await self.adapter.dispatch('access', self.sid(), {'mode': 'plan'})
 
     def test_null_cowork_folders_are_empty(self):
@@ -247,7 +247,7 @@ class DesktopActionContract(unittest.IsolatedAsyncioTestCase):
         self.manager.call('claude', 'access', 'session', body)
         self.manager.call('claude', 'access', 'session', body)
         self.assertEqual(self.adapter.call.call_count, 1)
-        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
+        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
             self.manager.call('claude', 'access', 'session', {**body, 'mode': 'default'})
 
     def test_image_only_send_accepted_but_empty_send_never_dispatched(self):
@@ -262,7 +262,7 @@ class DesktopActionContract(unittest.IsolatedAsyncioTestCase):
         desktop = FileDesktop(Path(self.temp.name), 'test-token')
         path = Path(self.temp.name)/'request.json'
         original = path.read_bytes()
-        request = {'type': 'request', 'args': ['文字' * 32]}
+        request = {'type': 'request', 'args': ['단어' * 32]}
         exact_size = len(desktop.pack(request).encode('utf-8'))
         with patch('bridge.clients.claude.mailbox.MAX_REQUEST', exact_size - 1):
             with self.assertRaisesRegex(ValueError, '10 MiB'): desktop.write(request)

@@ -136,7 +136,7 @@ async function main(){
     const screenshots=[await screenshot('overview')];
     await client.evaluate("document.querySelector('[data-tab=notifications]').click();document.getElementById('ntfy-topic').value='unsaved-topic';document.getElementById('ntfy-topic').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('language').value='en';document.getElementById('language').dispatchEvent(new Event('change'))");
     await until(()=>client.evaluate("document.documentElement.lang==='en'&&!document.getElementById('language').disabled"),'English switch');
-    assert.equal(await client.evaluate("document.getElementById('page-title').textContent"),require('../web/shared/i18n.js').dictionary['消息通知']);
+    assert.equal(await client.evaluate("document.getElementById('page-title').textContent"),require('../web/shared/i18n.js').dictionary['메시지 알림']);
     assert.equal(await client.evaluate("document.getElementById('status').textContent"),'Running');
     assert.equal(await client.evaluate("document.getElementById('ntfy-topic').value"),'unsaved-topic');
     assert.equal(await client.evaluate('dirty'),true);
@@ -149,9 +149,9 @@ async function main(){
       assert.equal(await client.evaluate('document.documentElement.scrollWidth>innerWidth'),false,panel);
       screenshots.push(await screenshot('english-'+panel));
     }
-    await client.evaluate("document.getElementById('language').value='zh';document.getElementById('language').dispatchEvent(new Event('change'))");
-    await until(()=>client.evaluate("document.documentElement.lang==='zh-CN'&&!document.getElementById('language').disabled"),'Chinese switch');
-    assert.equal(await client.evaluate("document.getElementById('save').textContent"),'保存配置');
+    await client.evaluate("document.getElementById('language').value='ko';document.getElementById('language').dispatchEvent(new Event('change'))");
+    await until(()=>client.evaluate("document.documentElement.lang==='ko-KR'&&!document.getElementById('language').disabled"),'Chinese switch');
+    assert.equal(await client.evaluate("document.getElementById('save').textContent"),'구성 저장');
     assert.equal(await client.evaluate("document.getElementById('ntfy-topic').value"),'unsaved-topic');
     await client.call('Emulation.clearDeviceMetricsOverride');
     await client.evaluate("document.querySelector('[data-tab=notifications]').click();document.getElementById('ntfy-topic').value='windows-smoke';document.getElementById('ntfy-topic').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('session-hours').value='0';document.getElementById('session-hours').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('bark-key').value='synthetic-bark-key';document.getElementById('bark-key').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('settings').requestSubmit()");

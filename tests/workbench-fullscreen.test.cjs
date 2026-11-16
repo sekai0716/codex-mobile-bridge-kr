@@ -42,7 +42,7 @@ test('fullscreen preserves the mounted preview and restores background, focus an
   assert.equal(outside.inert, true); assert.equal(sibling.inert, true);
   assert.equal(content.parentElement, body); assert.equal(iframe.parentElement, content);
   assert.equal(content.scrollTop, 73); assert.equal(document.activeElement, trigger);
-  assert.equal(trigger.attributes['aria-label'], '退出全屏');
+  assert.equal(trigger.attributes['aria-label'], '전체 화면 종료');
   assert.equal(body.attributes['aria-modal'], 'true');
   assert.equal(workbench.back(), true);
   assert.equal(workbench.previewFullscreen, null);
@@ -50,7 +50,7 @@ test('fullscreen preserves the mounted preview and restores background, focus an
   assert.equal(outside.inert, false); assert.equal(sibling.inert, false);
   assert.equal(content.parentElement, body); assert.equal(iframe.parentElement, content);
   assert.equal(content.scrollTop, 73); assert.equal(document.activeElement, trigger);
-  assert.equal(trigger.attributes['aria-label'], '全屏预览');
+  assert.equal(trigger.attributes['aria-label'], '전체 화면 미리보기');
   assert.equal(body.attributes['aria-modal'], undefined);
   assert.equal(listeners.has('keydown'), false); assert.equal(listeners.has('focusin'), false);
 

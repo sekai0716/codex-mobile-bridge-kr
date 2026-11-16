@@ -75,7 +75,7 @@ if(typeof document!=='undefined')(()=>{
   }
   function change(values){preserveReading(()=>{settings=ChatAppearance.normalize({...settings,...values});apply();save();});}
   function relabel(){
-    const text=BridgeI18n.t(collapsed?'展开输入区':'收起输入区');
+    const text=BridgeI18n.t(collapsed?"작곡가 표시":"작곡가 숨기기");
     toggle.setAttribute('aria-label',text);toggle.title=text;
     toggle.setAttribute('aria-expanded',String(!collapsed));
   }

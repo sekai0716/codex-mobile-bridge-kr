@@ -161,16 +161,16 @@ class WslEntry(WslFeatures):
         try:
             return wsl.read(self.row['distribution'], prefix + source, self.row['user'], timeout)
         except (OSError, ValueError, TimeoutError) as exc:
-            raise RemoteUnavailable('WSL 入口暂不可用，请检查发行版和原 Codex') from exc
+            raise RemoteUnavailable('WSL 일시적으로 입구를 이용하실 수 없습니다. 출시 버전과 원본을 확인해주세요. Codex') from exc
 
     def _require_open(self):
         if self.closed.is_set():
-            raise IPCError('WSL 入口已关闭')
+            raise IPCError('WSL 입구가 폐쇄되었습니다')
 
     def runtime(self, allow_start=False):
         with self.connection_lock:
             if self.closed.is_set():
-                raise IPCError('WSL 入口已关闭')
+                raise IPCError('WSL 입구가 폐쇄되었습니다')
             if self.server is not None and not self.server.closed:
                 return self.server
             try:
@@ -179,12 +179,12 @@ class WslEntry(WslFeatures):
                 item = next((h for h in info['homes'] if h['home'] == self.row['home']), None)
                 daemon = item.get('daemon') if item else None
                 if info['user'] != self.row['user'] or not daemon:
-                    raise IPCError('WSL 共享服务暂不可用；打开聊天时会尝试启动已安装的 Codex 服务')
+                    raise IPCError('WSL 공유 서비스를 일시적으로 이용할 수 없습니다. 채팅을 열면 설치된 앱을 실행하려고 시도합니다. Codex 제공하다')
                 self.daemon_identity = dict(daemon)
                 stream = wsl.Stream(self.row['distribution'], self.row['user'], self.row['home'], daemon)
                 if self.closed.is_set():
                     stream.close()
-                    raise IPCError('WSL 入口已关闭')
+                    raise IPCError('WSL 입구가 폐쇄되었습니다')
                 generation = uuid.uuid4().hex
                 server = SharedServer(stream, lambda event: self._event(event, generation))
                 self.generation = generation
@@ -199,10 +199,10 @@ class WslEntry(WslFeatures):
                 self.server = server
                 if self.closed.is_set():
                     server.close()
-                    raise IPCError('WSL 入口已关闭')
+                    raise IPCError('WSL 입구가 폐쇄되었습니다')
                 return server.start()
             except (OSError, ValueError, TimeoutError) as exc:
-                raise IPCError('无法连接 WSL Codex 共享服务，请检查版本、发行版状态或其他独立运行的 Codex') from exc
+                raise IPCError('연결할 수 없습니다 WSL Codex 공유 서비스, 버전, 출시 상태 또는 기타 독립 실행형을 확인하세요. Codex') from exc
 
     def _event(self, message, generation):
         if generation != self.generation:
@@ -215,7 +215,7 @@ class WslEntry(WslFeatures):
                 with session.condition:
                     session.connected = False
                     session.state['requests'] = []
-                    session.error = '原 WSL 连接已断开；未确认操作不会自动重发'
+                    session.error = '기존 WSL 연결이 끊어졌습니다. 확인되지 않은 작업은 자동으로 다시 전송되지 않습니다.'
                     session.changed()
             return
         with self.lock:
@@ -230,7 +230,7 @@ class WslEntry(WslFeatures):
                     request = {**copy.deepcopy(message), '_generation': generation}
                     session.state.setdefault('requests', []).append(request)
                 else:
-                    session.error = '此类请求请在原 WSL Codex 中处理'
+                    session.error = '그런 요청은 원본으로 해주세요 WSL Codex 중간 처리'
             elif method == 'serverRequest/resolved':
                 session.state['requests'] = [r for r in session.state.get('requests', [])
                                              if r['id'] != params.get('requestId')]
@@ -260,7 +260,7 @@ class WslEntry(WslFeatures):
                 self.subscriptions.pop(session.id, None)
                 session.connected = False
                 session.state['requests'] = []
-                session.error = 'WSL 会话已卸载，点击重新连接即可恢复'
+                session.error = "WSL 대화가 언로드되었습니다. 재개하려면 다시 연결하세요."
             session.changed()
 
     def _refresh(self, session):
@@ -287,9 +287,9 @@ class WslEntry(WslFeatures):
                          'turns': [{**t, 'turnId': t['id'], 'turnStartedAtMs': (t.get('startedAt') or 0) * 1000} for t in turns],
                          'turnHistory': {'history': {'isComplete': not bool(cursor)}}}
                 connected = not self.released_cli.contains(session.id) and thread.get('status', {}).get('type') in ('idle', 'active') and thread.get('canAcceptDirectInput') is True
-                error = None if connected else '点击重新连接即可在此设备恢复会话并继续聊天'
+                error = None if connected else "이 대화를 재개하고 이 기기에서 계속 채팅하려면 다시 연결하세요."
                 if runtime.closed or generation != self.generation:
-                    raise IPCError('WSL 原连接已变化')
+                    raise IPCError('WSL 원래 연결이 변경되었습니다.')
             except IPCError as exc:
                 state = self.store.history(session.id, turn_limit=session.history_limit)
                 state['title'] = metadata.get('display_title') or state.get('title')
@@ -370,8 +370,8 @@ class WslEntry(WslFeatures):
         for row in rows:
             cwd = row.get('cwd') or ''
             row.update(host=self.host, endpointId=self.host, hostLabel=self.row['label'],
-                       title=row.get('name') or row.get('display_title') or row.get('title') or '未命名聊天',
-                       projectKey=self.host + '|' + cwd, projectName=cwd.rstrip('/').rsplit('/', 1)[-1] or '未归类',
+                       title=row.get('name') or row.get('display_title') or row.get('title') or '이름없는 채팅',
+                       projectKey=self.host + '|' + cwd, projectName=cwd.rstrip('/').rsplit('/', 1)[-1] or '분류되지 않음',
                        recency=row.get('recency_at_ms') or (row.get('recency_at') or 0) * 1000 or row.get('updated_at_ms') or (row.get('updated_at') or 0) * 1000)
             with self.lock:
                 session = self.live.get(row['id'])
@@ -399,7 +399,7 @@ class WslEntry(WslFeatures):
             'canUseGoal': False,
             'canUseSideChat': False,
             'canEditMessages': False,
-            'reason': None if connected else '点击重新连接以恢复 WSL 会话',
+            'reason': None if connected else "WSL 대화를 재개하려면 다시 연결하세요.",
         }
 
     def _account_draft_state(self, provider):
@@ -412,7 +412,7 @@ class WslEntry(WslFeatures):
         source += 'print(json.dumps({"identity":_identity(files),"provider":config.get("model_provider","openai"),"owner":owner}))\n'
         value = self.read(self.row['distribution'], source)
         if not value.get('identity') or value.get('provider') != provider:
-            raise IPCError('WSL 草稿账号身份无法核验，请刷新后重新选择')
+            raise IPCError('WSL 임시 계정의 신원을 확인할 수 없습니다. 새로고침한 후 다시 선택하세요.')
         return {**value, 'accountIdentity': draft_identity('codex', self.host, provider, value['owner']) if value.get('owner') else ''}
 
     def _account_draft_catalog(self, provider):
@@ -422,17 +422,17 @@ class WslEntry(WslFeatures):
             while True:
                 rows = self.store.list(query='', limit=200, offset=offset, archived=archived, source='cli')
                 if not isinstance(rows, list):
-                    raise IPCError('WSL 历史会话目录无法完整核验，账号尚未切换')
+                    raise IPCError('WSL 과거 대화 디렉터리를 완전히 확인할 수 없으며 계정이 아직 전환되지 않았습니다.')
                 for row in rows:
                     sid = row.get('id')
                     if not isinstance(sid, str) or not sid or sid in visited:
-                        raise IPCError('WSL 历史会话目录已变化，账号尚未切换')
+                        raise IPCError('WSL 과거 대화 디렉터리가 변경되었으며 계정이 아직 전환되지 않았습니다.')
                     visited.add(sid)
                     if (row.get('model_provider') or 'openai') != provider:
                         continue
                     sid, cwd = row.get('id'), row.get('cwd')
                     if not isinstance(sid, str) or not sid or not isinstance(cwd, str) or not cwd or sid in sessions:
-                        raise IPCError('WSL 历史会话目录已变化，账号尚未切换')
+                        raise IPCError('WSL 과거 대화 디렉터리가 변경되었으며 계정이 아직 전환되지 않았습니다.')
                     sessions[sid] = {'id': sid, 'cwd': cwd, 'provider': provider}
                 if len(rows) < 200:
                     break
@@ -444,7 +444,7 @@ class WslEntry(WslFeatures):
         state = self._account_draft_state(provider)
         sessions = self._account_draft_catalog(provider)
         if self._account_draft_state(provider) != state:
-            raise IPCError('WSL 草稿账号身份已变化，账号尚未切换')
+            raise IPCError('WSL 초안 계정의 신원이 변경되었으며 아직 계정이 전환되지 않았습니다.')
         return {'version': 1, 'entry': self.host, 'provider': provider, 'identity': state['identity'],
                 'accountIdentity': state['accountIdentity'], 'sessions': list(sessions.values())}
 
@@ -454,17 +454,17 @@ class WslEntry(WslFeatures):
             return {'version': 1, 'entry': self.host, 'sessions': {}}
         value = json.loads(path.read_text(encoding='utf-8'))
         if value.get('version') != 1 or value.get('entry') != self.host or not isinstance(value.get('sessions'), dict):
-            raise IPCError('WSL 草稿续接记录无法核验')
+            raise IPCError('WSL 초안 계속 기록을 확인할 수 없습니다')
         return value
 
     def complete_account_drafts(self, snapshot, appliedIdentity):
         if (snapshot.get('version') != 1 or snapshot.get('entry') != self.host
                 or not isinstance(snapshot.get('sessions'), list)):
-            raise IPCError('WSL 草稿续接归属无法核验')
+            raise IPCError('WSL 초안 지속 소유권을 확인할 수 없습니다.')
         provider = snapshot.get('provider')
         state = self._account_draft_state(provider)
         if state['identity'] != appliedIdentity:
-            raise IPCError('WSL 草稿续接配置身份已变化')
+            raise IPCError('WSL 초안 연속 구성 ID가 변경되었습니다.')
         if not snapshot.get('accountIdentity') or not state['accountIdentity']:
             # A first login has no proven old draft owner. It still permits
             # account setup, without inventing a cross-account authorization.
@@ -479,7 +479,7 @@ class WslEntry(WslFeatures):
             sid = saved['id']
             current = catalog.get(sid)
             if current != saved or saved['provider'] != provider:
-                raise IPCError('原 WSL 草稿会话身份或目录已变化')
+                raise IPCError('기존 WSL 초안 세션 ID 또는 디렉터리가 변경되었습니다.')
             previous = value['sessions'].get(sid) or {}
             same_tuple = previous.get('cwd') == saved['cwd'] and previous.get('provider') == provider
             preceding = (previous.get('appliedIdentity') == snapshot['identity'] and
@@ -495,7 +495,7 @@ class WslEntry(WslFeatures):
             drafts.append({'id': sid, 'previousAccountIdentity': snapshot['accountIdentity'],
                            'accountIdentity': state['accountIdentity']})
         if self._account_draft_state(provider) != state:
-            raise IPCError('WSL 草稿续接配置身份已变化')
+            raise IPCError('WSL 초안 연속 구성 ID가 변경되었습니다.')
         self.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         private_json(self.data_dir/'account-drafts.json', updated)
         with self.lock:
@@ -537,7 +537,7 @@ class WslEntry(WslFeatures):
         result['capabilities'] = {**result['capabilities'], 'compact': result['connected'] and
                                   result['status'] == 'idle' and not result['requests']}
         if not result['connected']:
-            result['readOnlyReason'] = result.get('error') or '点击重新连接以恢复 WSL 会话'
+            result['readOnlyReason'] = result.get('error') or "WSL 대화를 재개하려면 다시 연결하세요."
         return self._view_features(session, result)
 
     def timeline_read(self, identifier, mode='page', **options):
@@ -568,7 +568,7 @@ class WslEntry(WslFeatures):
 
     def activity(self, identifiers):
         if not isinstance(identifiers, list) or len(identifiers) > 500 or any(not isinstance(i, str) for i in identifiers):
-            raise ValueError('会话状态请求无效')
+            raise ValueError("잘못된 채팅 상태 요청")
         rows = []
         for identifier in dict.fromkeys(identifiers):
             if identifier not in self.listed:
@@ -590,7 +590,7 @@ class WslEntry(WslFeatures):
                 thread.get('threadSource') == 'subagent' or
                 any(metadata.get(saved) is not None and thread.get(native) != metadata[saved]
                     for saved, native in (('cwd', 'cwd'), ('model_provider', 'modelProvider')))):
-            raise IPCError('原 WSL 会话身份或接入已变化，操作尚未发送，请重新查看原会话')
+            raise IPCError('기존 WSL 세션 ID 또는 액세스가 변경되었으며 작업이 전송되지 않았습니다. 원래 세션을 다시 확인하세요.')
 
     def _account_route(self):
         from bridge.features.accounts.wsl_account_payload import worker_source
@@ -607,15 +607,15 @@ class WslEntry(WslFeatures):
         if route.get('managed') is False:
             previous = self._managed_routes.get(thread.get('id'))
             if previous is not None and previous[0] == self.generation:
-                raise IPCError('WSL 账号管理状态已变化，请退出原 WSL 服务后重新连接')
+                raise IPCError("WSL 계정 상태가 변경되었습니다. 원래 WSL 서비스를 종료한 후 다시 연결하세요.")
             return None
         if not route.get('valid'):
-            raise IPCError('WSL 账号配置已变化，请在账号页面核验后重新连接')
+            raise IPCError("WSL 계정 구성이 변경되었습니다. 계정에서 확인한 후 다시 연결하세요.")
         config = runtime.request('config/read', {'includeLayers': False, 'cwd': thread.get('cwd')}).get('config') or {}
         provider = config.get('model_provider') or 'openai'
         definition = (config.get('model_providers') or {}).get(provider) or {}
         if ((thread.get('modelProvider') and thread['modelProvider'] != provider) or provider != route['provider']):
-            raise IPCError('此历史会话的提供商与当前接入不同；请先选择原接入')
+            raise IPCError("이 채팅은 다른 제공업체를 사용합니다. 먼저 원래 액세스 프로필을 선택하세요.")
         if (definition.get('base_url') != route['baseUrl']
                 or definition.get('wire_api', 'responses') != 'responses'
                 or definition.get('requires_openai_auth') is not True
@@ -625,7 +625,7 @@ class WslEntry(WslFeatures):
                 or any(config.get(key) for key in ('profile', 'profiles', 'api_key_helper', 'credential_store'))
                 or any(definition.get(key) for key in ('env_key', 'experimental_bearer_token', 'http_headers',
                     'env_http_headers', 'auth', 'aws', 'query_params', 'gateway_oauth'))):
-            raise IPCError('此项目覆盖了已选择的 WSL API 地址或认证，请在原 CLI 修正项目配置后重新连接')
+            raise IPCError("이 프로젝트는 선택한 WSL API 엔드포인트 또는 인증을 재정의합니다. 원래 CLI의 프로젝트 구성을 수정한 후 다시 연결하세요.")
         proof = (self.generation, route['appliedIdentity'], route['accountIdentity'],
                  thread.get('cwd'), provider, thread.get('model'))
         previous = self._managed_routes.get(thread.get('id'))
@@ -633,12 +633,12 @@ class WslEntry(WslFeatures):
         # latest observed model while retaining the original route provenance.
         if (not new and thread.get('status', {}).get('type') != 'notLoaded'
                 and (previous is None or previous[:-1] != proof[:-1])):
-            raise IPCError('此 WSL 会话已由其他连接加载，无法核验原 API 路由；请退出原 WSL 服务后重新连接')
+            raise IPCError("이 WSL 채팅은 다른 연결에 의해 로드되었으며 해당 API 경로를 확인할 수 없습니다. 원래 WSL 서비스를 종료한 후 다시 연결하세요.")
         return proof
 
     def _target(self, identifier, activate=False, managed_control=False):
         if not activate and self.released_cli.contains(identifier):
-            raise IPCError('CLI 连接已释放，请点击继续会话重新连接')
+            raise IPCError('CLI 연결이 해제되었습니다. 다시 연결하려면 ’세션 계속’을 클릭하세요.')
         metadata = self.store.get(identifier)
         self.cli_origins[identifier] = metadata.get('origin')
         runtime = self.runtime(allow_start=activate)
@@ -660,7 +660,7 @@ class WslEntry(WslFeatures):
         if (thread.get('id') != identifier or thread.get('parentThreadId') or
                 thread.get('threadSource') == 'subagent' or
                 thread.get('canAcceptDirectInput') is not True or thread.get('status', {}).get('type') not in ('idle', 'active')):
-            raise IPCError('WSL 会话尚未就绪或由其他执行器独占；操作未发送，请重新连接')
+            raise IPCError('WSL 세션이 준비되지 않았거나 다른 실행자에게 배타적입니다. 작업이 전송되지 않았습니다. 다시 연결해 주세요.')
         if proof is not None and thread.get('status', {}).get('type') != 'notLoaded':
             self._managed_routes[identifier] = (*proof[:-1], thread.get('model'))
         return runtime, thread
@@ -672,7 +672,7 @@ class WslEntry(WslFeatures):
         if thread.get('status', {}).get('type') == 'notLoaded':
             config = runtime.request('config/read', {'includeLayers': False, 'cwd': thread.get('cwd')}).get('config') or {}
             if thread.get('modelProvider') and thread['modelProvider'] != (config.get('model_provider') or 'openai'):
-                raise IPCError('此历史会话的提供商与当前接入不同；已保留原设置，请先在接入管理工具中选择原接入')
+                raise IPCError('이 기록 세션의 제공자는 현재 액세스와 다릅니다. 원래 설정은 유지되었습니다. 먼저 액세스 관리 도구에서 원래 액세스를 선택하세요.')
         # A second connection can send, but only subscribers receive approvals.
         # This reuses the SAME daemon/thread; no runtime, config overrides,
         # auth, cwd, model, permission policy, or new task is supplied.
@@ -680,7 +680,7 @@ class WslEntry(WslFeatures):
         current = result.get('thread') or {}
         if (runtime.closed or generation != self.generation or current.get('id') != identifier or
                 any(thread.get(k) is not None and current.get(k) != thread[k] for k in ('cwd', 'modelProvider', 'model'))):
-            raise IPCError('原 WSL 会话设置或连接已变化，操作尚未发送，请重新查看原会话')
+            raise IPCError('기존 WSL 세션 설정 또는 연결이 변경되었으며 작업이 전송되지 않았습니다. 원래 세션을 다시 확인하세요.')
         session = self.session(identifier, attach=False)
         with session.condition:
             permissions = {k: copy.deepcopy(result[k]) for k in ('approvalPolicy', 'approvalsReviewer', 'activePermissionProfile') if k in result}
@@ -718,7 +718,7 @@ class WslEntry(WslFeatures):
     def _check_scope_new_work(self):
         record = self._cli_recovery_record()
         if record.get('targetGeneration') and record.get('phase') in ('waiting', 'draining'):
-            raise IPCError('此 WSL 配置正在等待释放或退出待核验；新操作未发送，请先取消等待或核验结果。')
+            raise IPCError('이 WSL 구성이 확인을 위해 해제되거나 종료되기를 기다리고 있습니다. 새 작업이 전송되지 않았습니다. 대기를 취소하거나 먼저 결과를 확인하세요.。')
 
     def cli_force_callbacks(self, row):
         sid, key = row.get('sessionId'), row.get('key')
@@ -786,9 +786,9 @@ class WslEntry(WslFeatures):
             return scoped
         from bridge.clients.codex.release import check_release
         if self.server is None or self.server.closed:
-            return {'status':'unknown','notice':'原 WSL 连接无法核验；未启动或重放操作。'}
+            return {'status':'unknown','notice':'기존 WSL 연결을 확인할 수 없습니다. 작업이 시작되거나 재생되지 않았습니다.。'}
         if self.subscription_tokens.get(identifier) not in (None, key):
-            return {'status':'unknown','notice':'原 WSL 连接已变化；未操作新连接。'}
+            return {'status':'unknown','notice':'기존 WSL 연결이 변경되었습니다. 새로운 연결이 작동되지 않음。'}
         return check_release(self.server.request, identifier, unsubscribed=self.released_cli.contains(identifier))
 
     @_entry_write
@@ -800,14 +800,14 @@ class WslEntry(WslFeatures):
             def request(method, params):
                 if (runtime is None or runtime.closed or self.server is not runtime or self.generation != generation
                         or self.subscriptions.get(identifier) != generation or self.subscription_tokens.get(identifier) != token):
-                    raise IPCError('原 WSL CLI 连接已变化；未操作新的连接')
+                    raise IPCError('기존 WSL CLI 연결이 변경되었습니다. 새로운 연결이 작동되지 않음')
                 return runtime.request(method, params)
             queued = [entry for key, entry in self.receipts.items() if key.startswith(identifier + ':send:')
                       and entry.get('result', {}).get('status') in ('queued', 'unknown')]
             if queued:
                 if not stop:
                     return {'status': 'waiting'}
-                raise ValueError('此会话还有待处理的发送记录，请先在发送管理中处理')
+                raise ValueError('이 세션에 대해 아직 대기 중인 전송 기록이 있습니다. 먼저 발송관리에서 처리해 주시기 바랍니다.')
             result = release_thread(request, identifier, stop)
             if result['status'] in ('released', 'detached'):
                 self.released_cli.set(identifier, True)
@@ -871,8 +871,8 @@ class WslEntry(WslFeatures):
 
     @_entry_write
     def register_project(self, path, create=False, host=None, kind='desktop'):
-        if host not in (None, self.host): raise ValueError('请选择当前 WSL 应用的目录')
-        if kind not in ('desktop', 'cli'): raise ValueError('请选择 WSL CLI 项目环境')
+        if host not in (None, self.host): raise ValueError('현재를 선택해주세요 WSL 애플리케이션 디렉토리')
+        if kind not in ('desktop', 'cli'): raise ValueError('선택해주세요 WSL CLI 프로젝트 환경')
         # Explicit action can wake only this already registered distribution.
         self.runtime(allow_start=True)
         source = source_text('features/sessions/create.py')
@@ -884,7 +884,7 @@ class WslEntry(WslFeatures):
 
     @_entry_write
     def project_directories(self, host, path=None, hidden=False, name=None, identity=None):
-        if host != self.host: raise ValueError('请选择当前 WSL 应用')
+        if host != self.host: raise ValueError('현재를 선택해주세요 WSL 애플리케이션')
         source = source_text('features/sessions/create.py')
         source += '\ntry:\n result=project_directory_listing(**' + payload({'value':path,'hidden':hidden,'name':name,'identity':identity}) + ')\nexcept ValueError as error: result={"error":str(error)}\nprint(json.dumps(result))\n'
         result = self.read(self.row['distribution'], source)
@@ -897,13 +897,13 @@ class WslEntry(WslFeatures):
         elif project_key:
             project = next((row for row in self.projects() if row['key'] == project_key), None)
             if not project:
-                raise ValueError('请选择此 WSL 应用的项目')
+                raise ValueError('이것을 선택해 주세요 WSL 적용항목')
             cwd = project['cwd']
         elif path and host == self.host:
             source = source_text('features/sessions/create.py')+'\nprint(json.dumps(project_directory(**'+payload({'value': path})+')))\n'
             cwd = self.read(self.row['distribution'], source)['cwd']
         else:
-            raise ValueError('请先选择新会话的项目目录')
+            raise ValueError('먼저 새 세션의 프로젝트 디렉터리를 선택하세요.')
         runtime = self.runtime(allow_start=True)
         config = runtime.request('config/read', {'includeLayers': False, 'cwd': cwd}).get('config') or {}
         metadata, thread = {'cwd': cwd}, {'modelProvider': config.get('model_provider') or 'openai'}
@@ -917,21 +917,21 @@ class WslEntry(WslFeatures):
         from bridge.features.sessions.creation_models import intent
         model_options = model_options or {}
         if not isinstance(request_id, str):
-            raise ValueError('创建请求标识无效')
+            raise ValueError('잘못된 생성 요청 ID')
         uuid.UUID(request_id)
         if not isinstance(title, str) or len(title.strip()) > 120:
-            raise ValueError('聊天名称不能超过 120 字')
+            raise ValueError("채팅 제목은 120자를 초과할 수 없습니다.")
         if not isinstance(project_key, str) or not project_key.startswith(self.host + '|'):
-            raise ValueError('请选择此 WSL 应用的已有项目或独立聊天')
+            raise ValueError('이것을 선택해 주세요 WSL 앱의 기존 프로젝트 또는 독립형 채팅')
         independent = project_key == self.host + '|independent'
         title = title.strip()
         with self.create_lock:
             receipt = self.creations.get(request_id)
             if receipt:
                 if receipt['project'] != project_key or receipt['title'] != title or intent(receipt.get('modelOptions', {})) != intent(model_options):
-                    raise ValueError('同一创建请求不能用于不同内容')
+                    raise ValueError('동일한 생성 요청을 다른 콘텐츠에 사용할 수 없습니다.')
                 if not receipt.get('id'):
-                    raise IPCError('创建结果待核对，请先刷新聊天列表；不会重复创建')
+                    raise IPCError('생성 결과를 확인해야 합니다. 먼저 채팅 목록을 새로 고치십시오. 반복적으로 생성되지 않습니다.')
                 identifier = receipt['id']
             else:
                 if model_options:
@@ -940,7 +940,7 @@ class WslEntry(WslFeatures):
                 runtime = self.runtime(allow_start=True)
                 project = None if independent else next((p for p in self.projects() if p['key'] == project_key), None)
                 if not independent and project is None:
-                    raise ValueError('请选择此 WSL 应用的已有项目或独立聊天')
+                    raise ValueError('이것을 선택해 주세요 WSL 앱의 기존 프로젝트 또는 독립형 채팅')
                 source = 'import json,uuid\nfrom pathlib import Path\n'
                 if independent:
                     source += source_text('features/sessions/create.py')
@@ -963,23 +963,23 @@ class WslEntry(WslFeatures):
                     identifier = created['id']
                     uuid.UUID(identifier)
                     if created.get('cwd') != cwd or created.get('parentThreadId'):
-                        raise IPCError('新会话身份未确认')
+                        raise IPCError('새 세션 ID가 확인되지 않았습니다.')
                     if proof is not None:
                         if created.get('modelProvider') != proof[4]:
-                            raise IPCError('新会话提供商与已选择的 WSL API 不一致')
+                            raise IPCError("새 채팅 제공자가 선택한 WSL API와 일치하지 않습니다.")
                         self._managed_routes[identifier] = (*proof[:-1], created.get('model'))
                     receipt['id'] = identifier
                     private_json(self.creations_path, self.creations)
                     if model_options and (started.get('model') != model_options['model'] or
                             'effort' in model_options and started.get('reasoningEffort') != model_options['effort']):
-                        raise IPCError('新聊天已创建，但模型或思考强度未确认；请检查原会话')
+                        raise IPCError('새 채팅이 생성되었지만 모델이나 사고력이 확인되지 않았습니다. 원래 대화를 확인해주세요')
                     save_new_thread(runtime.request, created, title)
                     # Force durable empty-thread history before exposing it in lists.
                     runtime.request('thread/read', {'threadId': identifier, 'includeTurns': True})
                 except Exception:
-                    raise IPCError('创建结果待核对，请先刷新聊天列表；不会重复创建') from None
+                    raise IPCError('생성 결과를 확인해야 합니다. 먼저 채팅 목록을 새로 고치십시오. 반복적으로 생성되지 않습니다.') from None
             self.activate(identifier)
-            return {'id': identifier, 'host': self.host, 'opened': True, 'message': '聊天已创建，可以直接发送消息'}
+            return {'id': identifier, 'host': self.host, 'opened': True, 'message': "채팅이 생성되었습니다. 이제 메시지를 보낼 수 있습니다."}
 
     @_entry_write
     def _mutation(self, identifier, key, value, call):
@@ -988,11 +988,11 @@ class WslEntry(WslFeatures):
             old = self.receipts.get(key)
             if old:
                 if old['fingerprint'] != fingerprint:
-                    raise ValueError('相同请求标识不能用于不同操作')
+                    raise ValueError('동일한 요청 ID를 다른 작업에 사용할 수 없습니다.')
                 if old['result'].get('status') != 'queued':
                     return dict(old['result'])
             self.data_dir.mkdir(parents=True, exist_ok=True)
-            unknown = {'status': 'unknown', 'id': key, 'message': '结果待核对，请检查原 WSL 会话；不会重复发送'}
+            unknown = {'status': 'unknown', 'id': key, 'message': '결과를 확인해야 합니다. 원본을 확인하세요. WSL 대화; 반복적으로 전송되지 않습니다'}
             self.receipts[key] = {'fingerprint': fingerprint, 'result': unknown}
             if ':send:' in key:
                 self.receipts[key]['entry'] = {**copy.deepcopy((old or {}).get('entry') or {}), **copy.deepcopy(value)}
@@ -1015,14 +1015,14 @@ class WslEntry(WslFeatures):
                 return None
             fingerprint = hashlib.sha256(json.dumps([identifier, value], sort_keys=True).encode()).hexdigest()
             if old['fingerprint'] != fingerprint:
-                raise ValueError('相同请求标识不能用于不同操作')
+                raise ValueError('동일한 요청 ID를 다른 작업에 사용할 수 없습니다.')
             return dict(old['result'])
 
     @_entry_write
     def send(self, identifier, text, submission_id, mode='send', skills=None, work_mode=None, attachments=None, **options):
         if work_mode == 'goal':
             if options.get('references'):
-                raise ValueError('目标模式暂不支持附件')
+                raise ValueError("목표 모드는 아직 첨부 파일을 지원하지 않습니다.")
             return self.send_goal(identifier, text, submission_id, mode=mode, skills=skills,
                                   attachments=attachments, ui_locale=options.get('ui_locale'))
         return self._send(identifier, text, submission_id, mode, skills, work_mode, attachments, references=options.get('references'))
@@ -1031,18 +1031,18 @@ class WslEntry(WslFeatures):
         uuid.UUID(identifier); uuid.UUID(submission_id)
         skills = skills or []
         if not isinstance(skills, list) or len(skills) > 8 or any(not isinstance(s, str) for s in skills):
-            raise ValueError('最多选择 8 个 Skill')
+            raise ValueError("최대 8개 스킬 선택")
         if work_mode not in (None, 'default', 'plan'):
-            raise ValueError('工作模式无效')
+            raise ValueError('잘못된 작업 모드')
         if mode not in ('send', 'steer', 'queue'):
-            raise ValueError('发送方式无效')
+            raise ValueError('잘못된 전송 방법')
         files = self.uploads.resolve(identifier, attachments or [])
         if references is not None:
             files += self.workspace(identifier, 'references', {'references': references})
         if len(files) > 10:
-            raise ValueError('每条消息最多添加 10 个不同附件')
+            raise ValueError("메시지당 최대 10개의 파일 첨부")
         if not isinstance(text, str) or (not text.strip() and not files) or len(text) > 100000:
-            raise ValueError('请输入 1–100000 字的消息')
+            raise ValueError("1~100000자의 메시지를 입력하세요.")
         with self.session(identifier, attach=False).action_lock:
             value = {'text': text, 'mode': mode, 'attachments': attachments or []}
             if references:
@@ -1061,14 +1061,14 @@ class WslEntry(WslFeatures):
                 self._check_scope_new_work()
             runtime, thread = self._target(identifier, activate=mode != 'queue', managed_control=True)
             if (mode == 'send' or queued) and thread['status']['type'] == 'active':
-                raise ValueError('任务正在运行，请选择补充当前任务，或等待完成')
+                raise ValueError('작업이 실행 중입니다. 현재 작업을 보완하도록 선택하거나 완료될 때까지 기다리십시오.')
             if goal_activation is not None:
                 from bridge.features.sessions.goal import goal_identity
                 current_goal = self._read_goal(identifier, runtime)
                 if not current_goal or current_goal.get('status') != 'active' or goal_identity(current_goal) != goal_activation:
                     if queued:
                         return self.cancel_queued(identifier, submission_id)
-                    raise ValueError('目标已暂停或发生变化，启动消息未发送')
+                    raise ValueError('대상이 일시 중지되었거나 변경되었으며 시작 메시지가 전송되지 않았습니다.')
             selected = self._resolve_skills(identifier, runtime, thread, skills)
             if mode == 'queue' and not queued:
                 result = {'status': 'queued', 'id': submission_id}
@@ -1083,7 +1083,7 @@ class WslEntry(WslFeatures):
                 if file.get('image'):
                     items.append({'type': 'localImage', 'path': file['path']})
                 elif not references:
-                    items[0]['text'] += '\n\n用户提供的文件：' + file['path']
+                    items[0]['text'] += '\n\n사용자 제공 파일：' + file['path']
             items.extend({'type': 'skill', 'name': s['name'], 'path': s['path']} for s in selected)
             collaboration = None
             if work_mode is not None:
@@ -1091,14 +1091,14 @@ class WslEntry(WslFeatures):
                 model = thread.get('model') or state.get('latestModel')
                 effort = thread.get('reasoningEffort') or state.get('latestReasoningEffort')
                 if not model:
-                    raise ValueError('尚未取得模型设置，请重新连接后再切换模式')
+                    raise ValueError("모델 설정을 사용할 수 없습니다. 모드 전환 전에 다시 연결")
                 collaboration = {'mode': work_mode, 'settings': {'model': model, 'reasoning_effort': effort, 'developer_instructions': None}}
             def dispatch():
                 params = {'threadId': identifier, 'input': items}
                 if mode == 'steer':
                     turns = runtime.request('thread/turns/list', {'threadId': identifier, 'limit': 1, 'sortDirection': 'desc'}).get('data', [])
                     if not turns or turns[0].get('status') != 'inProgress':
-                        raise ValueError('当前任务已结束，请重新查看会话')
+                        raise ValueError('현재 작업이 종료되었습니다. 세션을 다시 확인하세요.')
                     params['expectedTurnId'] = turns[0]['id']
                     result = runtime.request('turn/steer', params)
                 else:
@@ -1126,7 +1126,7 @@ class WslEntry(WslFeatures):
         rows, _ = self._skills(runtime, thread, True)
         indexed = {r['id']: r for r in rows}
         if any(key not in indexed for key in identifiers):
-            raise ValueError('Skill 不可用，请刷新列表')
+            raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
         return [indexed[key] for key in sorted(set(identifiers))]
 
     def _submissions(self, identifier):
@@ -1202,7 +1202,7 @@ class WslEntry(WslFeatures):
         with session.action_lock:
             identity = self._management_identity(identifier)
             if not identity or body.get('expectedAccount') != identity:
-                raise ValueError('账号接入已变化，请刷新会话后重试')
+                raise ValueError("계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.")
             body = {k: v for k, v in body.items() if k != 'expectedAccount'}
             prefix = identifier + ':send:'
             rows = [(k[len(prefix):], {**copy.deepcopy(v.get('entry') or {}), **v['result']})
@@ -1240,7 +1240,7 @@ class WslEntry(WslFeatures):
         with self.session(identifier, attach=False).action_lock:
             row = self.receipts.get(identifier + ':send:' + submission_id)
             if row is None or row['result'].get('status') != 'queued':
-                raise ValueError('排队消息已发送或不存在')
+                raise ValueError('대기 중인 메시지가 전송되었거나 존재하지 않습니다.')
             row['result'] = {'status': 'cancelled', 'id': submission_id}
             private_json(self.receipts_path, self.receipts)
             return dict(row['result'])
@@ -1280,11 +1280,11 @@ class WslEntry(WslFeatures):
     @_entry_write
     def permissions(self, identifier, preset, confirmed=False, *, expected_runtime=None):
         if preset not in ('ask', 'auto-review', 'full-access'):
-            raise ValueError('权限设置无效')
+            raise ValueError('잘못된 권한 설정')
         if expected_runtime not in (None, 'cli', 'wsl'):
-            raise ValueError('会话运行时已变化，请重新打开权限面板')
+            raise ValueError("채팅 런타임이 변경되었습니다. 권한 패널을 다시 엽니다.")
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError('请确认完全访问权限')
+            raise ValueError("전체 액세스 확인")
         session = self.session(identifier, attach=False)
         with session.action_lock:
             facts, options = self._permission_options(identifier)
@@ -1307,7 +1307,7 @@ class WslEntry(WslFeatures):
             def prepare():
                 runtime, thread = self._target(identifier)
                 if thread['status']['type'] != 'idle' or session.view()['requests']:
-                    raise ValueError('请等待当前 Codex 任务结束后再压缩上下文')
+                    raise ValueError('현재를 기다려주세요 Codex 작업이 완료된 후 컨텍스트를 압축합니다.')
                 return lambda: runtime.request('thread/compact/start', {'threadId': identifier})
             return self.compact_commands.perform(identifier, request_id, prepare)
 
@@ -1326,9 +1326,9 @@ class WslEntry(WslFeatures):
     def settings(self, identifier, model, effort, *, fast_mode=None):
         if (not isinstance(model, str) or not model or len(model) > 200 or any(c in model for c in '\r\n\0')
                 or effort not in (None, 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')):
-            raise ValueError('模型或推理强度无效')
+            raise ValueError('잘못된 모델 또는 추론 강도')
         if fast_mode is not None and not isinstance(fast_mode, bool):
-            raise ValueError('Fast 模式开关无效')
+            raise ValueError("잘못된 빠른 모드 설정")
         with self.session(identifier, attach=False).action_lock:
             runtime, thread = self._target(identifier)
             settings = {'model': model, 'effort': effort}
@@ -1336,7 +1336,7 @@ class WslEntry(WslFeatures):
                 catalog = self.catalog(identifier, refresh=True, kind='models')
                 known = next((m for m in catalog['models'] if m['id'] == model), None)
                 if not catalog.get('fastMode', {}).get('allowed') or not known or not known.get('fastTier'):
-                    raise ValueError('当前账号、模型或工作区不支持 Fast 模式，请刷新模型设置')
+                    raise ValueError("이 계정, 모델 또는 작업 공간에서는 빠른 모드를 사용할 수 없습니다. 모델 설정을 새로 고칩니다.")
                 settings['serviceTier'] = known['fastTier'] if fast_mode else 'default'
             self._subscribe(identifier, runtime, thread)
             runtime.request('thread/settings/update', {'threadId': identifier, **settings})
@@ -1364,7 +1364,7 @@ class WslEntry(WslFeatures):
         provider = config.get('model_provider') or 'openai'
         if (current.get('modelProvider') or metadata.get('model_provider')) != provider:
             return {'kind': 'models', 'models': [], 'modelSource': 'codex',
-                    'modelError': '此聊天的提供商与当前默认接入不同，请手动填写原提供商支持的模型 ID',
+                    'modelError': '이 채팅 제공업체가 현재 기본 액세스 권한과 다릅니다. 원래 공급자가 지원하는 모델을 수동으로 입력하세요. ID',
                     'fastMode': {'allowed': False}}
         value = self.model_catalog.get(identifier, metadata, current, config, refresh,
             lambda: self._models(runtime, metadata, current, config))
@@ -1389,16 +1389,16 @@ class WslEntry(WslFeatures):
                 'fastMode': fast_mode, 'accessManagement': 'external'}
 
     def access_summary(self):
-        current = {'status': 'error', 'kind': 'external', 'id': None, 'name': 'WSL 外部管理'}
+        current = {'status': 'error', 'kind': 'external', 'id': None, 'name': 'WSL 외부 관리'}
         try:
             config = self.runtime().request('config/read', {'includeLayers': False}).get('config') or {}
-            current.update(status='ready', name='Magpie' if magpie_managed(config=config) else '原 WSL 终端接入')
+            current.update(status='ready', name='Magpie' if magpie_managed(config=config) else '기존 WSL 터미널 접근')
         except (IPCError, RemoteUnavailable):
             pass
         return {'scope': 'wsl', 'scopeLabel': self.row['label'], 'accounts': [], 'current': current,
                 'activeId': None, 'canSwitch': False, 'canManageDesktop': False, 'blockers': [],
                 'switch': {'phase': 'idle'}, 'management': {'mode': 'external', 'external': True,
-                    'reason': 'WSL 接入由原终端或 Magpie 管理，请在原环境中切换'},
+                    'reason': 'WSL 원래 터미널에서 액세스하거나 Magpie 관리는 원래 환경으로 전환해주세요'},
                 'desktopUpdate': {'state': 'unsupported'}, 'reminders': {}}
 
     @_entry_write
@@ -1409,51 +1409,51 @@ class WslEntry(WslFeatures):
             with session.condition:
                 pending = next((r for r in session.state.get('requests', []) if str(r['id']) == str(request_id)), None)
                 if not pending or pending.get('_generation') != self.generation:
-                    raise ValueError('此请求已处理、已过期或属于此前连接，请在原终端检查')
+                    raise ValueError('이 요청은 처리되었거나 만료되었거나 이전 연결에 속해 있습니다. 원래 터미널에서 확인하세요.')
                 pending = copy.deepcopy(pending)
             method, params = pending['method'], pending.get('params') or {}
             if method in ('item/commandExecution/requestApproval', 'item/fileChange/requestApproval'):
                 decision = response.get('decision')
                 if set(response) != {'decision'} or decision not in ('accept', 'decline', 'cancel') or (params.get('availableDecisions') and decision not in params['availableDecisions']):
-                    raise ValueError('此请求不支持所选授权范围')
+                    raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
                 result = {'decision': decision}
             elif method == 'item/permissions/requestApproval':
                 if set(response) != {'decision'} or response['decision'] not in ('accept', 'decline'):
-                    raise ValueError('请选择本次批准或拒绝')
+                    raise ValueError('이번에는 승인 또는 거부를 선택하세요.')
                 result = {'permissions': params.get('permissions', {}) if response['decision'] == 'accept' else {}, 'scope': 'turn'}
             elif method in ('item/tool/requestUserInput', 'tool/requestUserInput'):
                 answers = response.get('answers')
                 keys = {q['id'] for q in params.get('questions', [])}
                 if set(response) != {'answers'} or not isinstance(answers, dict) or not keys or set(answers) != keys or any(not isinstance(v, list) or not v or any(not isinstance(s, str) or not s.strip() or len(s) > 20000 for s in v) for v in answers.values()):
-                    raise ValueError('请完整回答问题')
+                    raise ValueError("모든 질문에 답변해 주세요.")
                 result = {'answers': {k: {'answers': v} for k, v in answers.items()}}
             elif method == 'mcpServer/elicitation/request':
                 action = response.get('action')
                 if action not in ('accept', 'decline', 'cancel'):
-                    raise ValueError('未知确认操作')
+                    raise ValueError('알 수 없는 확인 작업')
                 computer = computer_use_approval(params)
                 if computer:
                     if set(response) - {'action', 'persist'} or ('persist' in response and (action != 'accept' or response['persist'] not in computer['persistModes'])):
-                        raise ValueError('此请求不支持所选授权范围')
+                        raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
                     result = {'action': action, 'content': {} if action == 'accept' else None}
                     if 'persist' in response:
                         result['_meta'] = {'persist': response['persist']}
                 else:
                     from bridge.app.service import validate_form
                     if set(response) - {'action', 'content'}:
-                        raise ValueError('此请求不支持所选授权范围')
+                        raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
                     if action == 'accept':
                         validate_form(response.get('content'), params.get('requestedSchema', {}))
                     result = {'action': action, 'content': response.get('content') if action == 'accept' else None}
             else:
-                raise ValueError('此类请求请在原 WSL 终端处理')
+                raise ValueError('그런 요청은 원본으로 해주세요 WSL 터미널 취급')
             def dispatch():
                 runtime.write({'id': pending['id'], 'result': result})
                 with session.condition:
                     resolved = session.condition.wait_for(lambda: self.generation != pending['_generation'] or
                         not any(r['id'] == pending['id'] for r in session.state.get('requests', [])), timeout=8)
                     if not resolved or self.generation != pending['_generation'] or runtime.closed:
-                        return {'status': 'unknown', 'message': '审批结果待核对；请检查原会话，不会重复发送'}
+                        return {'status': 'unknown', 'message': '승인 결과를 확인해야 합니다. 원본 대화 내용을 확인하시면 다시 발송되지 않습니다.'}
                 return {'status': 'submitted'}
             receipt = self._mutation(identifier, identifier + ':approval:' + self.generation + ':' + str(pending['id']), result, dispatch)
             return receipt
@@ -1461,7 +1461,7 @@ class WslEntry(WslFeatures):
     @_entry_write
     def archive(self, identifier, archived, request_id, disconnect=False):
         if type(disconnect) is not bool or (disconnect and archived is not True):
-            raise ValueError('聊天归档设置无效')
+            raise ValueError('잘못된 채팅 보관 설정')
         def read():
             with self.store.lock:
                 self.store.cache.clear()
@@ -1472,7 +1472,7 @@ class WslEntry(WslFeatures):
             identifiers = [row['id'] for row in self.store.lifecycle_threads(root_id=identifier)]
             if any(key.split(':')[0] in identifiers and row['result'].get('status') in ('queued', 'unknown')
                    for key, row in self.receipts.items()):
-                raise ValueError('聊天有排队或待核对操作，请先在原 WSL 处理')
+                raise ValueError("이 채팅에는 대기 중이거나 확인되지 않은 작업이 있습니다. 먼저 원본 WSL 세션을 확인하세요.")
             runtime = self.runtime(allow_start=True)
             if not disconnect:
                 check_archive_runtime(runtime.request, identifiers)
@@ -1481,13 +1481,13 @@ class WslEntry(WslFeatures):
             for session in sessions:
                 with session.condition:
                     if session.activating or (not disconnect and session.state.get('requests')):
-                        raise ValueError('聊天有运行或等待确认的请求，请先在原 WSL 处理')
+                        raise ValueError("이 채팅에는 활성 또는 대기 중인 요청이 있습니다. 먼저 원본 WSL 세션을 확인하세요.")
             def call():
                 if disconnect:
                     from bridge.features.sessions.create import stop_archive_runtime
                     stop_archive_runtime(runtime.request, identifiers)
                     if set(identifiers) != {row['id'] for row in self.store.lifecycle_threads(root_id=identifier)}:
-                        raise ValueError('子会话范围已变化，尚未发送归档请求')
+                        raise ValueError("하위 세션 범위가 변경되었습니다. 보관 요청이 전송되지 않았습니다.")
                 return runtime.request('thread/archive' if archived else 'thread/unarchive', {'threadId': identifier})
             return call
         return {**self.archive_commands.perform(identifier, archived, request_id, read, prepare), 'host': self.host}
@@ -1500,7 +1500,7 @@ class WslEntry(WslFeatures):
     @_entry_write
     def rename(self, identifier, title):
         if not isinstance(title, str) or not title.strip() or len(title) > 120 or any(ord(c) < 32 for c in title):
-            raise ValueError('聊天名称需为 1–120 个字符，不能包含控制字符')
+            raise ValueError('채팅 이름은 다음과 같아야 합니다. 1–120 문자, 제어 문자를 포함할 수 없습니다.')
         self.store.get(identifier)
         self.runtime().request('thread/name/set', {'threadId': identifier, 'name': title.strip()})
         return {'id': identifier, 'title': title.strip(), 'host': self.host}
@@ -1539,7 +1539,7 @@ class WslEntry(WslFeatures):
         except PermissionError:
             raise
         except OSError as exc:
-            raise RemoteUnavailable('WSL 下载失败，请检查原环境后重试') from exc
+            raise RemoteUnavailable('WSL 다운로드에 실패했습니다. 원래 환경을 확인하고 다시 시도해 주세요.') from exc
 
     @_entry_write
     def upload(self, identifier, upload_id, name, data):
@@ -1557,7 +1557,7 @@ class WslEntry(WslFeatures):
 
     def artifact(self, identifier, artifact_id):
         self.store.get(identifier)
-        raise KeyError('请在项目文件面板访问 WSL 文件')
+        raise KeyError('프로젝트 파일 패널에서 액세스하세요. WSL 파일')
 
     def subagents(self, identifier, agent_id=None):
         self.store.get(identifier)
@@ -1570,7 +1570,7 @@ class WslEntry(WslFeatures):
 
     @staticmethod
     def unsupported(*args, **kwargs):
-        raise ValueError('此功能暂不支持 WSL CLI 入口，请在原终端操作')
+        raise ValueError('이 기능은 아직 지원되지 않습니다 WSL CLI 입장하려면 원래 단말기에서 조작하십시오.')
 
     side_chat = side_attachment = unsupported
     message_action = unsupported

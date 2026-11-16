@@ -8,18 +8,18 @@ class WatchPanel {
     this.value=value;this.root.replaceChildren();
     const t=BridgeI18n.t,node=(tag,text,cls)=>{const el=document.createElement(tag);if(text)el.textContent=text;if(cls)el.className=cls;return el;};
     if(this.error){const error=node('p',t(this.error),'error');error.setAttribute('role','alert');this.root.append(error);}
-    if(!value.watches.length){this.root.append(node('p',t('暂无关注聊天。请在手机打开聊天并开启提醒。'),'hint'));return;}
+    if(!value.watches.length){this.root.append(node('p',t('아직 본 채팅이 없습니다. 휴대폰에서 채팅을 열고 알림을 활성화하세요.'),'hint'));return;}
     const enabled=value.notifications.enabled||value.notifications.barkEnabled||value.notifications.pushplusEnabled||value.notifications.webhookEnabled;
-    this.root.append(node('p',t(!value.runtime.running?'网关未运行，启动后继续监控。':!enabled?'通知通道未开启，保存的监控暂不发送提醒。':'正在监控以下会话的待确认请求。'),'hint'));
+    this.root.append(node('p',t(!value.runtime.running?'게이트웨이가 중지되었습니다. 모니터링이 시작되면 재개됩니다.':!enabled?'알림 채널이 비활성화되었습니다. 저장된 시계에서는 알림이 전송되지 않습니다.':'귀하의 확인이 필요한 요청이 있는지 채팅을 살펴보세요.'),'hint'));
     for(const watch of value.watches){
       const row=node('section',null,'watch-row');row.dataset.id=watch.id;row.dataset.host=watch.host;
-      const info=node('div',null,'watch-info');info.append(node('strong',watch.title||t('名称暂不可用')));
-      info.append(node('small',[watch.host==='local'?t('此电脑'):watch.hostLabel||watch.host,watch.cwd].filter(Boolean).join(' · ')));
+      const info=node('div',null,'watch-info');info.append(node('strong',watch.title||t('채팅 이름을 사용할 수 없습니다.')));
+      info.append(node('small',[watch.host==='local'?t('이 컴퓨터'):watch.hostLabel||watch.host,watch.cwd].filter(Boolean).join(' · ')));
       info.append(node('small',watch.id,'watch-id'));
       const actions=node('div',null,'watch-actions'),label=node('label',null,'check'),input=node('input');input.type='checkbox';input.checked=!!watch.notifyOnCompletion;
       input.onchange=event=>{event.stopPropagation();this.submit(watch,{action:'update',notifyOnCompletion:input.checked});};
-      label.append(input,node('span',t('运行完成后通知')));
-      const remove=node('button',t('删除监控'),'watch-remove');remove.type='button';remove.onclick=()=>this.submit(watch,{action:'remove'});
+      label.append(input,node('span',t('실행이 완료되면 알림')));
+      const remove=node('button',t('시계 제거'),'watch-remove');remove.type='button';remove.onclick=()=>this.submit(watch,{action:'remove'});
       actions.append(label,remove);row.append(info,actions);this.root.append(row);
     }
   }

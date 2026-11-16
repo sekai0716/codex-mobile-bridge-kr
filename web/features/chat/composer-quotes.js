@@ -7,7 +7,7 @@ class ComposerQuotes {
     const doc=input.ownerDocument;this.doc=doc;
     this.root=doc.createElement('div');this.root.className='composer-quotes';this.root.hidden=true;
     this.action=doc.createElement('button');this.action.type='button';this.action.className='composer-quote-selection';this.action.hidden=true;
-    this.action.textContent=translate('引用所选文字');
+    this.action.textContent=translate('선택한 텍스트 인용');
     const context=input.closest('.composer')?.querySelector('.composer-tools .context-usage');
     if(context){
       const tools=context.parentElement;
@@ -51,7 +51,7 @@ class ComposerQuotes {
     const range=selection.getRangeAt(0),body=element(range.startContainer)?.closest('.message-body');
     if(!body||!body.closest('.message.assistant')||!this.messages.contains(body)||!body.contains(range.endContainer)){this.snapshot=null;this.action.hidden=true;this.visibility();return;}
     const text=selection.toString().trim();if(!text)return;
-    this.pressed=null;this.snapshot={text,body,scope:this.identity(),source:String(body.__mermaidIdentity||'')};this.action.textContent=this.translate('引用所选文字');this.action.hidden=false;this.visibility();
+    this.pressed=null;this.snapshot={text,body,scope:this.identity(),source:String(body.__mermaidIdentity||'')};this.action.textContent=this.translate('선택한 텍스트 인용');this.action.hidden=false;this.visibility();
   }
   async quoteMessage(getText,source='',target){
     if(!this.canQuote()||!this.available()||typeof getText!=='function'||!target?.isConnected||!this.messages.contains(target))return;
@@ -59,14 +59,14 @@ class ComposerQuotes {
     try{
       const text=await getText();
       if(this.identity()===scope&&target.isConnected&&this.messages.contains(target)&&typeof text==='string')this.add(text,source);
-    }catch(error){if(this.identity()===scope&&target.isConnected)this.onError(error.message||this.translate('读取完整正文失败，请重试'));}
+    }catch(error){if(this.identity()===scope&&target.isConnected)this.onError(error.message||this.translate('전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요.'));}
   }
-  add(text,source=''){if(!this.canQuote()||!this.available()||!text.trim()||this.quotes.length>=8)return;if(text.length>100000){this.onError(this.translate('消息含引用超过 100000 字符，请缩短后发送'));return;}this.quotes.push({text:text.slice(0,100000),source:String(source).slice(0,500),provider:this.scope().provider});this.onChange();this.render();}
+  add(text,source=''){if(!this.canQuote()||!this.available()||!text.trim()||this.quotes.length>=8)return;if(text.length>100000){this.onError(this.translate('따옴표를 포함한 메시지가 100,000자를 초과합니다. 보내기 전에 짧게 하세요.'));return;}this.quotes.push({text:text.slice(0,100000),source:String(source).slice(0,500),provider:this.scope().provider});this.onChange();this.render();}
   restore(quotes=[]){this.reset();this.quotes=ComposerQuotes.normalize(quotes);this.render();}
   reset(){this.quotes=[];this.snapshot=null;this.pressed=null;this.action.hidden=true;this.render();}
   render(){
     for(const node of [...this.root.children])if(node!==this.action)node.remove();
-    this.quotes.forEach((quote,index)=>{const chip=this.doc.createElement('div');chip.className='composer-quote';const text=this.doc.createElement('details');const summary=this.doc.createElement('summary');summary.textContent=quote.text.slice(0,160);const full=this.doc.createElement('div');full.className='composer-quote-full';full.textContent=quote.text;text.append(summary,full);if(quote.source)text.title=[quote.provider,quote.source].filter(Boolean).join(' · ');const remove=this.doc.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label',this.translate('移除引用'));remove.addEventListener('click',()=>{this.quotes.splice(index,1);this.onChange();this.render();});chip.append(text,remove);this.root.append(chip);});
+    this.quotes.forEach((quote,index)=>{const chip=this.doc.createElement('div');chip.className='composer-quote';const text=this.doc.createElement('details');const summary=this.doc.createElement('summary');summary.textContent=quote.text.slice(0,160);const full=this.doc.createElement('div');full.className='composer-quote-full';full.textContent=quote.text;text.append(summary,full);if(quote.source)text.title=[quote.provider,quote.source].filter(Boolean).join(' · ');const remove=this.doc.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label',this.translate('견적 삭제'));remove.addEventListener('click',()=>{this.quotes.splice(index,1);this.onChange();this.render();});chip.append(text,remove);this.root.append(chip);});
     this.visibility();
   }
   visibility(){this.root.hidden=(!this.root.contains(this.action)||this.action.hidden)&&!this.quotes.length;if(this.selectionRow)this.selectionRow.hidden=!this.selectionRow.contains(this.action)||this.action.hidden;}

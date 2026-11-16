@@ -73,7 +73,7 @@ async function main(){
   const name=assetName(version,process.platform,process.arch),archive=path.join(build,name);
   const sha256=createHash('sha256');for await(const chunk of sync.createReadStream(archive))sha256.update(chunk);
   const size=(await fs.stat(archive)).size,digest=sha256.digest('hex');
-  const work=await fs.mkdtemp(path.join(root,'.tmp/update-smoke-中文 ')),target=path.join(work,mac?'Codex Mobile Bridge.app':'app'),data=path.join(work,'data');
+  const work=await fs.mkdtemp(path.join(root,'.tmp/update-smoke-중국어 ')),target=path.join(work,mac?'Codex Mobile Bridge.app':'app'),data=path.join(work,'data');
   await fs.cp(source,target,{recursive:true,verbatimSymlinks:true});await fs.mkdir(data);
   const {app,runtime}=paths(target),settings=await worker(runtime,data,'snapshot'),gatewayPort=await port();
   Object.assign(settings.preferences,{port:gatewayPort,lan:true,autoStart:false,tunnel:false,connections:[],codexHome:data});

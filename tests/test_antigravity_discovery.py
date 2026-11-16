@@ -206,7 +206,7 @@ class AntigravityDiscoveryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 manager.register_antigravity_application(str(self.home/'fake'))
             manager.config.setdefault('enabled', {})['antigravity'] = True
-            with self.assertRaisesRegex(ValueError, '停用'):
+            with self.assertRaisesRegex(ValueError, "프로그램을\\ 선택하기\\ 전에\\ Antigravity\\ 모바일\\ 액세스를\\ 비활성화하세요\\."):
                 manager.register_antigravity_application(str(cli))
 
     def test_inventory_survives_restart_without_scanning_but_manual_scan_and_missing_path_refresh(self):

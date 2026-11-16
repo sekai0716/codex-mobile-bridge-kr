@@ -66,20 +66,20 @@
             const pre = document.createElement('pre');
             pre.append(code);
             const wrapper=document.createElement('div');wrapper.className='code-block';
-            const button=document.createElement('button');button.className='plain code-copy';button.type='button';button.textContent=typeof BridgeI18n==='undefined'?'复制代码':BridgeI18n.t('复制代码');
+            const button=document.createElement('button');button.className='plain code-copy';button.type='button';button.textContent=typeof BridgeI18n==='undefined'?'코드 복사':BridgeI18n.t('코드 복사');
             const index=codeIndex++;
             button.onclick=()=>window.BridgeClipboard?.copy(async()=>{
               if(!options.fullText)return token.content;
               const complete=await options.fullText();
               const blocks=markdown.parse(complete,{}).filter(t=>t.type==='fence'||t.type==='code_block');
-              if(!blocks[index])throw Error('读取完整正文失败，请重试');
+              if(!blocks[index])throw Error("전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요.");
               return blocks[index].content;
             },button);
             wrapper.append(button,pre);parent.append(wrapper);
           }
         } else if (token.type === 'image') {
           const destination = target(token.attrGet('src') || '');
-          const label = token.content || destination?.file?.name || '图片';
+          const label = token.content || destination?.file?.name || '그림';
           if (destination?.file?.image) {
             const image = document.createElement('img');
             image.className = 'artifact-image';
@@ -114,7 +114,7 @@
             scroll.className = 'markdown-table';
             scroll.tabIndex = 0;
             scroll.setAttribute('role', 'region');
-            scroll.setAttribute('aria-label', '表格，可横向滚动');
+            scroll.setAttribute('aria-label', '테이블, 가로로 스크롤 가능');
             scroll.append(element);
             parent.append(scroll);
           } else parent.append(element);

@@ -21,27 +21,27 @@ function fixture({clipboard,legacy=false,items=true}={}){
 }
 test('ready text reaches Clipboard API within the click, without waiting for a microtask',async()=>{
  const writes=[],ui=fixture({clipboard:{writeText:text=>{writes.push(text);return Promise.resolve();}}});
- const pending=ui.copy(()=> '中文\n🙂');assert.deepEqual(writes,['中文\n🙂']);await pending;assert.equal(ui.button.textContent,'已复制');assert.equal(ui.dialog(),undefined);
+ const pending=ui.copy(()=> '중국어\n🙂');assert.deepEqual(writes,['중국어\n🙂']);await pending;assert.equal(ui.button.textContent,'복사됨');assert.equal(ui.dialog(),undefined);
 });
 test('plain HTTP copies synchronously and restores draft focus and selection',async()=>{
  const ui=fixture({legacy:true}),before=ui.document.body.children.length;
- const pending=ui.copy(()=> 'HTTP 中文\nnext');assert.equal(ui.copied.length,1);await pending;
- assert.equal(ui.copied[0].text,'HTTP 中文\nnext');assert.equal(ui.document.activeElement,ui.draft);assert.equal(ui.draft.value,'keep my draft');assert.deepEqual([ui.draft.selectionStart,ui.draft.selectionEnd,ui.draft.selectionDirection],[2,4,'backward']);assert.equal(ui.document.body.children.length,before);assert.equal(ui.dialog(),undefined);
+ const pending=ui.copy(()=> 'HTTP 중국어\nnext');assert.equal(ui.copied.length,1);await pending;
+ assert.equal(ui.copied[0].text,'HTTP 중국어\nnext');assert.equal(ui.document.activeElement,ui.draft);assert.equal(ui.draft.value,'keep my draft');assert.deepEqual([ui.draft.selectionStart,ui.draft.selectionEnd,ui.draft.selectionDirection],[2,4,'backward']);assert.equal(ui.document.body.children.length,before);assert.equal(ui.dialog(),undefined);
 });
 test('delayed full text reserves ClipboardItem write during the click and reads only once',async()=>{
  let resolve,read=0;const writes=[],ui=fixture({clipboard:{write:items=>{writes.push(items);return items[0].data['text/plain'].then(()=>{});}}});
  const pending=ui.copy(()=>{read++;return new Promise(r=>resolve=r);});assert.equal(writes.length,1);
- resolve('full source\n中文');await pending;assert.equal(await (await writes[0][0].data['text/plain']).text(),'full source\n中文');assert.equal(read,1);assert.equal(ui.button.textContent,'已复制');
+ resolve('full source\n중국어');await pending;assert.equal(await (await writes[0][0].data['text/plain']).text(),'full source\n중국어');assert.equal(read,1);assert.equal(ui.button.textContent,'복사됨');
 });
 test('Clipboard API denial falls back to selection copy within an open dialog',async()=>{
  const ui=fixture({clipboard:{writeText:()=>Promise.reject(Error('NotAllowed'))},legacy:true});
  const modal=ui.document.createElement('dialog');ui.document.body.append(modal);modal.open=true;ui.button.remove();modal.append(ui.button);
- await ui.copy(()=> 'diagram source');assert.equal(ui.copied[0].parent,modal);assert.equal(modal.children.length,1);assert.equal(ui.button.textContent,'已复制');
+ await ui.copy(()=> 'diagram source');assert.equal(ui.copied[0].parent,modal);assert.equal(modal.children.length,1);assert.equal(ui.button.textContent,'복사됨');
 });
 test('only denied automatic copying shows the selectable dialog with a fresh-click retry',async()=>{
  const clipboard={writeText:()=>Promise.reject(Error('denied'))},ui=fixture({clipboard});await ui.copy(()=> 'ready text');
  const dialog=ui.dialog();assert.ok(dialog);const textarea=dialog.children.find(n=>n.tagName==='textarea');assert.equal(textarea.value,'ready text');assert.equal(ui.button.textContent,'Copy');
- const actions=dialog.children.find(n=>n.className==='copy-dialog-actions'),retry=actions.children[0];clipboard.writeText=text=>{assert.equal(text,'ready text');return Promise.resolve();};await retry.onclick();assert.equal(ui.dialog(),undefined);assert.equal(ui.button.textContent,'已复制');
+ const actions=dialog.children.find(n=>n.className==='copy-dialog-actions'),retry=actions.children[0];clipboard.writeText=text=>{assert.equal(text,'ready text');return Promise.resolve();};await retry.onclick();assert.equal(ui.dialog(),undefined);assert.equal(ui.button.textContent,'복사됨');
 });
 test('failed source reads never copy partial data or show success',async()=>{
  const ui=fixture({clipboard:{write:items=>items[0].data['text/plain'].then(()=>{})}});await ui.copy(()=>Promise.reject(Error('source changed')));
@@ -51,7 +51,7 @@ test('HTTP retry uses the fresh click synchronously if the first copy was blocke
  const ui=fixture();await ui.copy(()=> 'loaded text');const dialog=ui.dialog();
  const retry=dialog.children.find(n=>n.className==='copy-dialog-actions').children[0];let copied=false;
  ui.document.execCommand=()=>{copied=true;return true;};
- const pending=retry.onclick();assert.equal(copied,true);await pending;assert.equal(ui.dialog(),undefined);assert.equal(ui.button.textContent,'已复制');
+ const pending=retry.onclick();assert.equal(copied,true);await pending;assert.equal(ui.dialog(),undefined);assert.equal(ui.button.textContent,'복사됨');
 });
 test('older browsers can copy resolved text without ClipboardItem and ignore duplicate clicks',async()=>{
  let resolve,reads=0;const writes=[],ui=fixture({items:false,clipboard:{writeText:text=>{writes.push(text);return Promise.resolve();}}});
@@ -60,11 +60,11 @@ test('older browsers can copy resolved text without ClipboardItem and ignore dup
 
 test('acknowledged browser copying sends one success notification',async()=>{
  const ui=fixture({clipboard:{writeText:()=>Promise.resolve()}}),notices=[];
- await ui.copyWithFeedback(()=> 'ready',message=>notices.push(message));assert.deepEqual(notices,['已复制']);
+ await ui.copyWithFeedback(()=> 'ready',message=>notices.push(message));assert.deepEqual(notices,['복사됨']);
 });
 test('manual browser fallback does not notify until its fresh-click retry succeeds',async()=>{
  const clipboard={writeText:()=>Promise.reject(Error('denied'))},ui=fixture({clipboard}),notices=[];
  await ui.copyWithFeedback(()=> 'ready',message=>notices.push(message));assert.deepEqual(notices,[]);
  clipboard.writeText=()=>Promise.resolve();const retry=ui.dialog().children.find(node=>node.className==='copy-dialog-actions').children[0];
- await retry.onclick();assert.deepEqual(notices,['已复制']);
+ await retry.onclick();assert.deepEqual(notices,['복사됨']);
 });

@@ -1,44 +1,44 @@
-# Agent Note: 原生会话改名与 DSH 项目成员边界
+# Agent Note: 기본 세션 이름 바꾸기 및 DSH 프로젝트 구성원 경계
 
 Status: implemented
 
-后续范围：[原生会话重命名](2026-11-04-native-session-renames.md) 增加已持有 CLI 的官方控制通路、DSH 已加载 Session store 与 ZCode 持久任务服务，并取消改名的别名回退；本文原生非激活、身份和项目边界继续适用。
+후속 범위：[기본 세션 이름 바꾸기](2026-11-04-native-session-renames.md) 증가 보류 CLI 공식 제어 채널、DSH 짐을 실은 Session store 및 ZCode 영구 작업 서비스 및 이름이 변경된 별칭 롤백을 취소합니다. 이 문서의 기본 비활성화, ID 및 프로젝트 경계는 계속 적용됩니다.。
 
-## 问题
+## 문제
 
-共享菜单需要补齐 Claude、DSH 的改名和分类入口，但方法存在并不代表调用没有副作用。DSH 的 `sessionController.rename` 会解析或恢复冷会话；部分第三方 Harness 又改变了项目成员的目录限制。直接通用转发会破坏仅修改显示元数据、不启动会话和保留原工作目录的约束。
+공유 메뉴를 완성해야 합니다 Claude、DSH 이름 바꾸기 및 분류 항목이 있지만 메서드가 존재한다고 해서 호출에 부작용이 없다는 의미는 아닙니다.。DSH 의 `sessionController.rename` 콜드 세션을 구문 분석하거나 복원합니다. 일부 제3자 Harness 프로젝트 구성원에 대한 디렉터리 제한도 변경되었습니다. 직접 범용 전달은 세션을 시작하지 않고 디스플레이 메타데이터만 수정하며 원래 작업 디렉터리를 보존해야 한다는 제약을 깨뜨립니다.。
 
-## 决策
+## 결정
 
-Claude Code Desktop 与 Cowork 仅在连接器同时发现 `getSession` 和 `updateSession` 时提供 `mobileRename`。调用使用 `updateSession(sessionId, {title, titleSource: 'user'})`，先核对目标 ID，再从原生 `getSession` 读回标题、ID、cwd 和 Cowork 文件夹。方法只传标题，不传模型、账号、目录或项目字段。CLI 与 WSL 不借用 Desktop 方法，不为改名恢复 CLI，也不直接改写其 JSONL。
+Claude Code Desktop 및 Cowork 동시에 커넥터에서만 발견됩니다. `getSession` 및 `updateSession` 제공되는 경우 `mobileRename`。전화해서 이용하세요 `updateSession(sessionId, {title, titleSource: 'user'})`，목표를 먼저 확인해보세요 ID，원본에서 `getSession` 제목 다시 읽어보기、ID、cwd 및 Cowork 접는 사람. 이 메서드는 모델, 계정, 디렉터리 또는 프로젝트 필드가 아닌 제목만 전달합니다.。CLI 및 WSL 빌리지 않음 Desktop 이름 변경을 위해 메소드가 복원되지 않았습니다. CLI，직접 다시 작성하지도 않습니다. JSONL。
 
-DSH 只对 `ctx.agents.get(id)` 已存在的原生会话提供原生改名能力，直接调用同一原生 `sessionTitle.rename(agent.session, title)` 服务。服务核对会话仍在原生 live store 中，再写入用户来源的标题事件。Bridge 不调用会隐式恢复的 `sessionController.rename`。冷会话或已卸载会话返回明确的 `notSent`；成功写入必须由 `sessionController.list` 读回确认。菜单中的 Bridge 别名回退由共享元数据层负责，不在此适配器中伪装原生标题。
+DSH 딱 맞아 `ctx.agents.get(id)` 기존 기본 세션은 기본 이름 변경 기능을 제공하고 동일한 기본 세션을 직접 호출합니다. `sessionTitle.rename(agent.session, title)` 제공하다. 서비스 확인 세션은 기본으로 유지됩니다. live store , 사용자 소스에서 제목 이벤트를 작성합니다.。Bridge 호출되지 않으면 암시적으로 복원됩니다. `sessionController.rename`。콜드 또는 언로드된 세션은 명시적 반환을 반환합니다. `notSent`；성공적인 쓰기는 다음에 의해 완료되어야 합니다. `sessionController.list` 확인하려면 다시 읽어보세요. 메뉴에서 Bridge 별칭 폴백은 공유 메타데이터 레이어에서 처리되며 이 어댑터에서는 기본 헤더가 위조되지 않습니다.。
 
-DSH 原生项目操作使用 `workspaceRegistry.list/get` 与工作区的 `attachSession/detachSession`，按 `sessionIds` 读取成员，不根据 cwd 猜测所属项目。可选目标必须经过 `realpath` 确认与原 cwd 相同；提交前再次检查，写后核对成员和 cwd。即使第三方实现放宽约束，Bridge 也不允许借项目操作改变原工作目录。原生分区没有已确认接口，因此不提供原生分区能力。
+DSH 기본 프로젝트 작업 사용 `workspaceRegistry.list/get` 작업공간이 있는 `attachSession/detachSession`，～에 따르면 `sessionIds` 기반이 아닌 멤버 읽기 cwd 프로젝트를 추측해보세요. 선택적 목표를 통과해야 합니다. `realpath` 확인 및 원본 cwd 같은; 제출 전 다시 확인, 작성 후 회원 및 합계 확인 cwd。타사 구현으로 인해 제약이 완화되더라도，Bridge 원래 작업 디렉터리를 변경하기 위해 프로젝트 작업을 차용하는 것도 허용되지 않습니다. 기본 파티셔닝에는 확인된 인터페이스가 없으므로 기본 파티셔닝 기능을 제공하지 않습니다.。
 
-原生修改返回 `status: confirmed` 仅代表读回确认。写入后失败或不匹配保持结果未知，不重放；确定未派发的冷会话、目录不匹配或目标消失返回 `notSent: true`。共享管理器负责跨请求和重启的持久化回执。Claude 文件桥接把 `mobileRename` 列入写操作集合，升级连接器 revision 13；DSH host 升级 revision 9。DSH 保留从本轮基线核验的 revision 8 LF/CRLF 源码摘要，只将原有受控连接识别为待显式升级，不在扫描中改写源码、凭据或配置。新网关不能把仍在运行的旧连接器当作新接口。
+기본 수정 반환 `status: confirmed` 다시 읽기 확인만 나타냅니다. 쓰기 후 실패 또는 불일치는 결과를 알 수 없는 상태로 유지하고 재생되지 않습니다. 전달되지 않은 콜드 세션, 디렉터리 불일치 또는 대상 실종의 반환 결정 `notSent: true`。공유 관리자는 요청 및 재시작 시 영수증을 유지하는 역할을 담당합니다.。Claude 파일 브리지 `mobileRename` 쓰기 작업 세트에 포함, 커넥터 업그레이드 revision 13；DSH host 치받이 revision 9。DSH 이번 라운드의 기준에서 검증된 내용을 유지하세요. revision 8 LF/CRLF 소스 코드 요약은 원래 제어된 연결만 명시적 업그레이드가 보류 중인 것으로 식별하며 스캔 중에 소스 코드, 자격 증명 또는 구성을 다시 작성하지 않습니다. 새 게이트웨이는 아직 실행 중인 기존 커넥터를 새 인터페이스로 처리할 수 없습니다.。
 
-## 原生证据与验证
+## 기본 증거 및 검증
 
-- 本机 Claude 3.6556.2 的 `app.asar` 中，Code 的 `LocalSessions.updateSession` 和 Cowork 的 `LocalAgentModeSessions.updateSession` 都接收 `(sessionId, options)`，底层保存元数据并发送更新事件。Code 自己负责向既有 CLI 标题同步；Bridge 不另行操作 CLI 文件或调用启动接口。
-- 本机官方 DeepSeek Harness 内核包 0.2.1-rc.3 的 `dsh-api-session-controller` 明确由 `rename` 调用 `resolveAgent`；其解析器可恢复会话。`dsh-session-title.rename` 的公开服务实现只接受原生 live session，追加 `session/title` 事件并使用 `source.kind: user`。
-- 本地 DSH Tauri 0.25.0 的内核工作区实现带有 `dsh-tauri-worktree` 补丁，删除了官方 `attachSession` 中的同 cwd 比较。Bridge 的独立目录检查用于守住原约束。项目 API 的语义同时与[官方工作区文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/workspace.md)对应。
-- `claude-session-rename.test.cjs` 在 CDP、签名文件两条合成传输中验证 Code/Cowork 改名、控制字符与长度拒绝、原生 ID 核对、未知结果不重试和不启动会话。
-- `deepseek-session-actions.test.mjs` 验证冷会话不激活、live 标题服务读回、项目加入与移出、第三方宽松实现仍不能跨 cwd、相同成员不重复写入和未知结果不重试。
-- `test_claude_session_rename.py` 验证适配器原生方法选择、网关 ID 转换、缺失能力拒绝和未知结果。相关已有 Claude 连接器/生命周期/owner/适配器及 DSH 桌面/插件/手动绑定回归通过。
+- 로컬 머신 Claude 3.6556.2 의 `app.asar` 가운데，Code 의 `LocalSessions.updateSession` 및 Cowork 의 `LocalAgentModeSessions.updateSession` 모두 수신 `(sessionId, options)`，하단 레이어는 메타데이터를 저장하고 업데이트 이벤트를 보냅니다.。Code 기존에 대한 책임을 지다 CLI 타이틀 싱크；Bridge 추가 작업 없음 CLI 파일 또는 통화 시작 인터페이스。
+- 현지 공무원 DeepSeek Harness 커널 패키지 0.2.1-rc.3 의 `dsh-api-session-controller` 명시적으로 만든 `rename` 부르다 `resolveAgent`；해당 파서가 세션을 재개합니다.。`dsh-session-title.rename` 공공 서비스 구현에서는 네이티브만 허용됩니다. live session，추가 `session/title` 이벤트 및 사용 `source.kind: user`。
+- 현지의 DSH Tauri 0.25.0 커널 작업공간 구현은 다음과 같이 제공됩니다. `dsh-tauri-worktree` 패치, 삭제된 공식 `attachSession` 같은 cwd 비교하다。Bridge 원래 제약 조건을 유지하기 위해 독립적인 디렉터리 검사가 사용됩니다. 프로젝트 API 의미론[공식 작업공간 문서](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/workspace.md)대응하다。
+- `claude-session-rename.test.cjs` 에서 CDP、서명 파일의 두 가지 합성 전송 확인 Code/Cowork 이름 바꾸기, 제어 문자 및 길이 거부, 기본 ID 확인하세요. 알 수 없는 결과가 있으면 재시도하지 말고 세션을 시작하지 마세요.。
+- `deepseek-session-actions.test.mjs` 콜드 세션이 활성화되지 않았는지 확인、live 타이틀 서비스 다시 읽기, 프로젝트 추가 및 제거, 타사의 느슨한 구현은 여전히 ​​교차할 수 없습니다. cwd、동일한 멤버는 반복적으로 작성되지 않으며, 알 수 없는 결과는 재시도되지 않습니다.。
+- `test_claude_session_rename.py` 어댑터 기본 방법 선택, 게이트웨이 확인 ID 변환, 누락된 기능 거부 및 알 수 없는 결과. 이미 관련됨 Claude 커넥터/수명주기/owner/어댑터 및 DSH 데스크탑/플러그인/수동 바인딩 회귀 통과。
 
-这些证据来自已安装源码及隔离合成测试；没有改写真实用户聊天，也没有在本轮专项中安装或升级共享连接器。它们不等同于升级后的三系统和手机实机验收。
+이 증거는 설치된 소스 코드와 격리된 합성 테스트에서 나옵니다. 이 프로젝트 라운드 동안 실제 사용자 채팅이 다시 작성되지 않았으며 공유 커넥터가 설치되거나 업그레이드되지 않았습니다. 업그레이드된 3시스템 및 휴대폰 실제 기계 수용과 동일하지 않습니다.。
 
-## 备选方案
+## 대안
 
-直接复用 DSH 既有 `sessionController.rename` 最简洁，也能覆盖冷会话，但它会隐式恢复会话，因此只复用其底层已加载标题服务。把冷会话直接追加或重写存储日志也能改变历史标题，但绕过原生存储所有权和活跃写入检查，故不采用。
+직접 재사용 DSH 기존의 `sessionController.rename` 가장 간결한 방법은 콜드 세션도 재정의하지만 암시적으로 세션을 재개하므로 로드된 기본 헤더 서비스만 재사용합니다. 콜드 세션의 스토리지 로그를 직접 추가하거나 다시 작성하면 기록 제목이 변경될 수도 있지만 기본 스토리지 소유권 및 활성 쓰기 확인을 우회하므로 사용되지 않습니다.。
 
-完全信任第三方 `attachSession` 可支持更宽松的工作区组织，但不同内核补丁的目录语义不一致；本轮保留同 cwd 边界，并由共享层提供明确的 Bridge 分类，不扩张原生迁移能力。
+제3자를 완전히 신뢰하세요 `attachSession` 보다 느슨한 작업공간 구성을 지원할 수 있지만 다양한 커널 패치의 디렉토리 의미 체계가 일관되지 않습니다. 이번 라운드는 동일하게 유지됩니다 cwd 경계가 뚜렷하고 Bridge 분류, 기본 마이그레이션 기능을 확장하지 않음。
 
-## 历史笔记审计
+## 역사적 기록 감사
 
-按改名、原生 API、会话菜单和分类检索活跃记录。[共享会话菜单](2026-10-28-shared-session-menu.md)部分重叠，本篇补充原生方法核验与冷会话约束，不替代菜单和确认行为；[DSH 通用插件](2026-10-28-dsh-generic-plugin-binding.md)继续持有实例绑定和手动安装契约。本轮修改不改变[停止释放再归档](2026-10-27-confirmed-disconnect-archive.md)及[本地优先置顶](2026-10-26-local-first-session-pins.md)的决定。未发现同义的待实施或已否决改名提案。
+이름 바꾸기를 누르세요. 원본 API、세션 메뉴 및 활성 기록의 카테고리 검색。[세션 메뉴 공유](2026-10-28-shared-session-menu.md)일부 겹치는 부분이 있습니다. 이 문서는 기본 메서드 확인 및 콜드 세션 제약 조건을 보완하며 메뉴 및 확인 동작을 대체하지 않습니다.；[DSH 범용 플러그인](2026-10-28-dsh-generic-plugin-binding.md)인스턴스 바인딩 및 수동 설치 계약을 계속 유지합니다. 이번 수정 라운드에서는 변경 사항이 적용되지 않습니다.[릴리스 중지 후 보관](2026-10-27-confirmed-disconnect-archive.md)그리고[로컬 우선순위가 상단에 고정됨](2026-10-26-local-first-session-pins.md)결정. 구현해야 하거나 거부된 동의어 이름 변경 제안이 없습니다.。
 
-## 影响
+## 영향
 
-原生改名的支持范围按实际能力和会话加载状态显示。Claude CLI、WSL 与 DSH 冷会话不承诺原生改名；DSH 原生项目候选可能只有当前目录对应的一项，也可能没有候选。连接器升级需要走既有身份和在途写入检查，不能仅因代码已更新就视为运行版本已生效。
+지원되는 기본 이름 바꾸기 범위는 실제 기능 및 세션 로딩 상태를 기반으로 표시됩니다.。Claude CLI、WSL 및 DSH 콜드 세션은 기본 이름 변경을 약속하지 않습니다.；DSH 네이티브 프로젝트 후보는 현재 디렉터리에 해당하는 항목이 하나만 있을 수도 있고, 후보가 없을 수도 있습니다. 커넥터 업그레이드에는 기존 ID 및 진행 중인 쓰기 확인이 필요합니다. 코드가 업데이트되었다고 해서 실행 중인 버전이 적용되었다는 의미는 아닙니다.。

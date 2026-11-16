@@ -290,25 +290,25 @@ class SkillStore:
             for identifier in ids:
                 row = by_id.get(identifier)
                 if not row:
-                    raise ValueError('Skill 不可用，请刷新列表')
+                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
                 try:
                     path = Path(row['path']).resolve(strict=True)
                 except (OSError, RuntimeError):
-                    raise ValueError('Skill 不可用，请刷新列表') from None
+                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.') from None
                 # Trust the exact file discovered by native skills/list, including
                 # installed links and plugins outside CODEX_HOME. Do not silently
                 # authorize a changed target during send-time cache refresh.
                 if row['resolved_path'] is None:
-                    raise ValueError('Skill 不可用，请刷新列表')
+                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
                 if str(path) != row['resolved_path']:
-                    raise SkillPathChanged('Skill 链接目标已变化，请刷新列表后重新选择')
+                    raise SkillPathChanged("스킬링크 대상이 변경되었습니다. 목록을 새로 고치고 다시 선택하세요.")
                 try:
                     stat = path.stat()
                     data = path.read_bytes()
                 except OSError:
-                    raise ValueError('Skill 不可用，请刷新列表') from None
+                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.') from None
                 if row['size'] != stat.st_size or row['mtime_ns'] != stat.st_mtime_ns or row['content_hash'] != hashlib.sha256(data).hexdigest():
-                    raise ValueError('Skill 已修改，请刷新列表')
+                    raise ValueError('Skill 수정되었습니다. 목록을 새로고침하세요.')
                 result.append(self._public({**row, 'path': str(path)}))
             return result
         finally:
@@ -587,7 +587,7 @@ class Catalog:
     def _fetch(self, cwd, provider=None, kind='catalog', request_timeout=90, permission_reader=None):
         executable = self.executable
         if not executable:
-            raise CatalogError("找不到桌面 App 的 Codex 运行时")
+            raise CatalogError("데스크톱 Codex 런타임을 찾을 수 없습니다.")
         env = dict(os.environ)
         env['CODEX_HOME'] = str(self.home)
         options = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
@@ -601,7 +601,7 @@ class Catalog:
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                        text=True, encoding='utf-8', **options)
         except OSError as exc:
-            raise CatalogError('无法启动 Codex 运行时，请检查运行配置中的程序路径、项目目录和访问权限') from exc
+            raise CatalogError('시작할 수 없습니다 Codex 실행 시 실행 구성에서 프로그램 경로, 프로젝트 디렉터리, 접근 권한을 확인하세요.') from exc
         messages = queue.Queue()
         def read():
             try:
@@ -626,7 +626,7 @@ class Catalog:
             linux_permission_read = (sys.platform == 'linux' and kind == 'linux-permissions' and
                                      method in ('permissionProfile/list', 'experimentalFeature/list'))
             if method not in self.METHODS and not linux_permission_read:
-                raise ValueError("目录接口只允许读取模型、Skill 与能力配置")
+                raise ValueError("카탈로그 인터페이스에서는 모델 읽기만 허용됩니다.、Skill 및 기능 구성")
             counter += 1
             process.stdin.write(json.dumps({'id': counter, 'method': method, 'params': params}) + '\n')
             process.stdin.flush()
@@ -635,15 +635,15 @@ class Catalog:
                 try:
                     value = messages.get(timeout=max(.01, deadline - time.monotonic()))
                 except queue.Empty as exc:
-                    raise CatalogError("桌面模型/Skill 目录读取超时") from exc
+                    raise CatalogError("데스크탑 모델/Skill 디렉터리 읽기 시간 초과") from exc
                 if value is None:
-                    raise CatalogError("桌面目录查询已断开")
+                    raise CatalogError("데스크톱 디렉터리 쿼리가 손상되었습니다.")
                 if value.get('id') != counter:
                     if time.monotonic() >= deadline:
-                        raise CatalogError("桌面目录读取超时")
+                        raise CatalogError("데스크톱 디렉터리 읽기 시간 초과")
                     continue
                 if 'error' in value:
-                    raise CatalogError(value['error'].get('message', '目录读取失败'))
+                    raise CatalogError(value['error'].get('message', '디렉터리 읽기 실패'))
                 return value['result']
         started = time.monotonic()
         logger.info('catalog fetch start kind=%s executable=%s cwd=%s provider=%s', kind, executable, cwd, provider)
@@ -713,7 +713,7 @@ class Catalog:
         # Preserve the distinction used by upstream model discovery and Fast mode.
         mode = status.get('authMethod')
         if 'authMethod' not in status or mode not in (None, 'apikey', 'chatgpt', 'chatgptAuthTokens'):
-            raise CatalogError('无法确认 SSH 模型目录的认证类型')
+            raise CatalogError('확인할 수 없습니다 SSH 모델 카탈로그의 인증 유형')
         account = None if mode is None else {'type': 'apiKey' if mode == 'apikey' else 'chatgpt'}
         return {'account': account, 'requiresOpenaiAuth': status.get('requiresOpenaiAuth')}
 
@@ -747,19 +747,19 @@ class Catalog:
                       'currentEffort': effective.get('model_reasoning_effort')}
             try:
                 if any(definition.get(k) for k in ('auth', 'gateway_oauth', 'aws')):
-                    raise ValueError('此 API 接入使用额外认证配置，请手动填写模型 ID')
+                    raise ValueError("이 API 연결은 추가 인증 설정을 사용합니다. 모델 ID를 수동으로 입력합니다.")
                 if not base and custom:
-                    raise ValueError('未找到当前 API 地址，请检查接入配置')
+                    raise ValueError("현재 API 주소가 누락되었습니다. 연결 설정을 확인하세요.")
                 headers = {name.lower(): value for name, value in (definition.get('http_headers') or {}).items()}
                 for name, variable in (definition.get('env_http_headers') or {}).items():
                     value = environment.get(variable)
                     if not value:
-                        raise ValueError('未找到当前 API 认证请求头，请检查接入环境变量')
+                        raise ValueError('현재를 찾을 수 없습니다 API 인증 요청 헤더, 접속 환경 변수를 확인해주세요')
                     headers[name.lower()] = value
                 key = (environment.get(definition['env_key'], '') if definition.get('env_key')
                        else definition.get('experimental_bearer_token') or '')
                 if definition.get('env_key') and not key:
-                    raise ValueError('未找到当前 API Key，请检查接入配置')
+                    raise ValueError("현재 API 키를 사용할 수 없습니다. 연결 설정을 확인하세요.")
                 if not key and (definition.get('requires_openai_auth') or (provider == 'openai' and not headers)):
                     try:
                         saved = json.loads((self.home/'auth.json').read_text(encoding='utf-8'))
@@ -767,12 +767,12 @@ class Catalog:
                         saved = {}
                     key = saved.get('OPENAI_API_KEY') or environment.get('OPENAI_API_KEY', '')
                     if not key:
-                        raise ValueError('未找到当前 API Key，请检查接入配置')
+                        raise ValueError("현재 API 키를 사용할 수 없습니다. 연결 설정을 확인하세요.")
                 base = base or 'https://api.openai.com/v1'
                 endpoint = urlsplit(base)
                 if (endpoint.scheme not in ('https', 'http') or not endpoint.hostname or
                         endpoint.username or endpoint.password or endpoint.query or endpoint.fragment):
-                    raise ValueError('未找到当前 API 地址，请检查接入配置')
+                    raise ValueError("현재 API 주소가 누락되었습니다. 연결 설정을 확인하세요.")
                 if key and headers:
                     headers['authorization'] = 'Bearer ' + key
                 options = {}
@@ -915,7 +915,7 @@ class Catalog:
     def get_kind(self, kind, cwd, refresh=False, provider=None, query='', offset=0,
                  limit=SKILL_PAGE_LIMIT, ids=None):
         if kind not in self.kind_locks:
-            raise ValueError('未知目录类型')
+            raise ValueError("알 수 없는 카탈로그 유형")
         cwd = str(Path(cwd).resolve())
         offset = max(0, int(offset))
         limit = min(SKILL_MAX_PAGE_LIMIT, max(1, int(limit)))
@@ -949,14 +949,14 @@ class Catalog:
                     raw = self._fetch(cwd, provider, kind)
                 except CatalogError as exc:
                     if self._model_scope(cwd) != scope:
-                        raise CatalogIdentityChanged('模型接入已变化，请重试') from exc
+                        raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.') from exc
                     if persisted:
                         return {**ModelStore.directory(persisted[1]), 'kind': 'models', 'modelError': str(exc),
                                 'cache': {'state': 'stale', 'updatedAt': persisted[0], 'identity': identity}}
                     return {'models': [], 'kind': 'models', 'modelError': str(exc),
                             'fastMode': {'allowed': False}, 'cache': {'state': 'unavailable', 'identity': identity}}
                 if self._model_scope(cwd) != scope:
-                    raise CatalogIdentityChanged('模型接入已变化，请重试')
+                    raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
                 self._remember_model_provider(scope, raw)
                 identity = self.model_identity(cwd, provider)
                 models = self.normalize_models(raw['models'])
@@ -965,9 +965,9 @@ class Catalog:
                          'modelError': raw.get('modelError'), 'currentModel': raw.get('currentModel'),
                          'currentEffort': raw.get('currentEffort')}
                 if self.model_identity(cwd, provider) != identity:
-                    raise CatalogIdentityChanged('模型接入已变化，请重试')
+                    raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
                 if value.get('modelError') or not models:
-                    value['modelError'] = value.get('modelError') or '模型目录暂不可用，可手动填写模型'
+                    value['modelError'] = value.get('modelError') or '모델 디렉터리를 일시적으로 사용할 수 없습니다. 모델을 수동으로 채울 수 있습니다.'
                     return ({**ModelStore.directory(persisted[1]), 'kind': 'models', 'modelError': value['modelError'],
                              'cache': {'state': 'stale', 'updatedAt': persisted[0], 'identity': identity}} if persisted else
                             {**value, 'cache': {'state': 'unavailable', 'identity': identity}})
@@ -1071,7 +1071,7 @@ class Catalog:
                 self.cache.pop(key, None)
                 raise
             if self._model_scope(cwd) != scope:
-                raise CatalogIdentityChanged('模型接入已变化，请重试')
+                raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
             self._remember_model_provider(scope, raw)
             identity = self.model_identity(cwd, provider)
             key = (cwd, identity)

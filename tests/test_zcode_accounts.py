@@ -15,7 +15,7 @@ class AccountTests(unittest.TestCase):
         self.current={'identity':'a'*64,'name':'A','email':'a@example.invalid'}
         self.store=ZCodeAccounts(self.root/'saved',self.home,lambda:self.current)
         self.write('credentials.json',{'oauth:active_provider':'enc:v1:provider','oauth:test:access_token':'enc:v1:A','unrelated':'private-API','project-key-location:old':'derived'})
-        self.write('setting.json',{'providerFamilyDomain':'a','locale':'zh','recentProjects':['project']})
+        self.write('setting.json',{'providerFamilyDomain':'a','locale':'ko','recentProjects':['project']})
     def write(self,name,value): (self.home/name).write_text(json.dumps(value))
     def test_two_accounts_restore_only_login_and_rollback_without_public_secrets(self):
         a=self.store.import_current()['activeId']
@@ -33,10 +33,10 @@ class AccountTests(unittest.TestCase):
     def test_drift_and_symlink_fail_without_overwriting(self):
         a=self.store.import_current()['activeId'];token=self.store.restore(a)
         self.write('setting.json',{'external':True})
-        with self.assertRaisesRegex(ValueError,'外部修改'):self.store.rollback(token)
+        with self.assertRaisesRegex(ValueError,"ZCode\\ 구성이\\ 외부적으로\\ 수정되었습니다\\.\\ 복구\\ 백업이\\ 유지되었습니다"):self.store.rollback(token)
         self.assertTrue((self.root/'saved'/('rollback-'+token+'.json')).exists())
         (self.home/'credentials.json').unlink();(self.home/'credentials.json').symlink_to(self.home/'setting.json')
-        with self.assertRaisesRegex(ValueError,'符号链接'):self.store.snapshot()
+        with self.assertRaisesRegex(ValueError,'심볼릭 링크'):self.store.snapshot()
     def test_import_requires_stable_native_identity(self):
         self.current={'name':'unknown'}
         with self.assertRaises(ValueError):self.store.import_current()
@@ -92,7 +92,7 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(after['config']['providerConfigRules']['providerRules'][-1]['config']['access']['apiKey'],'fixture-secret')
         self.assertIn(custom,after['config']['modelConfigRules']['providerModelRules'])
         self.assertFalse(any(r['modelId']=='second-model' for r in after['config']['modelConfigRules']['providerModelRules']))
-        with self.assertRaisesRegex(ValueError,'不支持的字段'):self.store.save_api(self.api_draft(authScheme='ignored'))
+        with self.assertRaisesRegex(ValueError,'지원되지 않는 필드'):self.store.save_api(self.api_draft(authScheme='ignored'))
     def test_api_invalid_input_unknown_native_format_and_drift_do_not_overwrite(self):
         for extra in ({'baseUrl':'http://example.invalid'}, {'baseUrl':'https://x.invalid/?secret=x'},
                       {'apiKey':'bad\nkey'}, {'apiFormat':'unknown'}, {'models':[]}, {'models':['bad model']}):
@@ -100,15 +100,15 @@ class AccountTests(unittest.TestCase):
         identifier=self.store.save_api(self.api_draft())['accounts'][0]['id']
         self.write(api_config.FILE,{'schemaVersion':999,'config':{'keep':True}})
         before=(self.home/api_config.FILE).read_bytes()
-        with self.assertRaisesRegex(ValueError,'尚未识别'):self.store.restore(identifier)
+        with self.assertRaisesRegex(ValueError,"ZCode\\ 네이티브\\ API\\ 구성\\ 형식을\\ 인식할\\ 수\\ 없습니다\\.\\ 먼저\\ App\\ 전체\\ 구성\\ 초기화"):self.store.restore(identifier)
         self.assertEqual((self.home/api_config.FILE).read_bytes(),before)
         self.write(api_config.FILE,self.native_api());token=self.store.restore(identifier)
         self.write(api_config.FILE,{'external':True})
-        with self.assertRaisesRegex(ValueError,'外部修改'):self.store.rollback(token)
+        with self.assertRaisesRegex(ValueError,'외부적으로 수정되었습니다'):self.store.rollback(token)
         self.assertEqual(json.loads((self.home/api_config.FILE).read_text()),{'external':True})
     def test_api_save_cannot_overwrite_official_snapshot(self):
         identifier=self.store.import_current()['activeId']
-        with self.assertRaisesRegex(ValueError,'官方登录'):self.store.save_api(self.api_draft(id=identifier))
+        with self.assertRaisesRegex(ValueError,'공식 로그인'):self.store.save_api(self.api_draft(id=identifier))
     def test_notification_provider_and_unread_are_shared(self):
         inbox=MobileEvents(self.root/'events');self.addCleanup(inbox.close)
         row={'host':'desktop:zcode','id':'sess-test'};self.assertEqual(Notifications.desktop_provider(row['host']),'zcode')

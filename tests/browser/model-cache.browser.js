@@ -10,9 +10,9 @@ async function runModelCacheTests(){
   window.fetch=async(url,options)=>{if(!String(url).includes('/catalog?kind=models'))return originalFetch(url,options);reads++;return next?next.promise:response(catalog(accountA,'model-a',1000));};
   try{
     currentId=id;currentHost='local';listIdentity='fixture-gateway';state={connected:true,provider:'chatgpt',model:'model-a',effort:'low',modelCatalogIdentity:accountA};
-    await openModelDialog();check($('model-options').querySelector('input[value="model-a"]'),'First catalog renders model A');const originalTime=$('model-updated').textContent;check(originalTime.includes(BridgeI18n.t('更新于：')),'Successful catalog shows updatedAt');
+    await openModelDialog();check($('model-options').querySelector('input[value="model-a"]'),'First catalog renders model A');const originalTime=$('model-updated').textContent;check(originalTime.includes(BridgeI18n.t('업데이트 날짜：')),'Successful catalog shows updatedAt');
     $('model-dialog').close();next=deferred();const delayed=openModelDialog();
-    check($('model-options').querySelector('input[value="model-a"]'),'Reopen paints cached rows synchronously');check(!$('model-options').textContent.includes('读取模型列表'),'Reopen has no full loading replacement');check($('model-updated').textContent===originalTime,'Reopen preserves successful timestamp');
+    check($('model-options').querySelector('input[value="model-a"]'),'Reopen paints cached rows synchronously');check(!$('model-options').textContent.includes('모델 목록 읽기'),'Reopen has no full loading replacement');check($('model-updated').textContent===originalTime,'Reopen preserves successful timestamp');
     next.resolve(response(catalog(accountA,'model-a',1000)));await delayed;$('model-dialog').close();
     next=deferred();const failed=openModelDialog(true);check($('model-options').querySelector('input[value="model-a"]'),'Refresh retains existing rows while pending');next.reject(Error('Synthetic upstream failure'));await failed;
     check($('model-options').querySelector('input[value="model-a"]'),'Failed refresh retains rows');check($('model-updated').textContent===originalTime,'Failed refresh retains last successful timestamp');

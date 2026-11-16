@@ -9,7 +9,7 @@ async function main(){
     `${process.arch==='x64'?'mac':'mac-'+process.arch}/Codex Mobile Bridge.app/Contents/Resources/gateway/codex-mobile-gateway`:
     'win-unpacked/resources/gateway/codex-mobile-gateway.exe');
   await fs.mkdir(path.join(root,'.tmp'),{recursive:true});
-  const dataDir=await fs.mkdtemp(path.join(root,'.tmp','auth-中文 '));
+  const dataDir=await fs.mkdtemp(path.join(root,'.tmp','auth-중국어 '));
   const probe=net.createServer();await new Promise(resolve=>probe.listen(0,'127.0.0.1',resolve));
   const port=probe.address().port;await new Promise(resolve=>probe.close(resolve));
   const worker=(action,payload)=>runWorker({executable,dataDir},action,payload),base='http://127.0.0.1:'+port;

@@ -107,7 +107,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
 
     def test_idle_owned_executor_released_before_switch_without_losing_thread_history_or_draft(self):
         retained = {name: (self.home / name).read_bytes() for name in ('history.jsonl', 'draft.json')}
-        with self.assertRaisesRegex(ValueError, '仍运行'), account_guard(self.bridge, 'claude', self.row):
+        with self.assertRaisesRegex(ValueError, '아직 실행 중'), account_guard(self.bridge, 'claude', self.row):
             pass  # Reproduces the old idle-owned blocker; inspection stays passive.
         result = self.accounts.change(self.request())
         self.assertEqual(result['activeId'], self.target)
@@ -164,7 +164,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
     def test_timeout_retains_original_files_and_never_forces_exit_or_dispatches_switch(self):
         before = self.store.files()
         self.process.wait.side_effect = subprocess.TimeoutExpired('fixture', 5)
-        with self.assertRaisesRegex(ValueError, '尚未退出'):
+        with self.assertRaisesRegex(ValueError, "WSL\\ Claude\\ Code가\\ 종료되지\\ 않았습니다\\.\\ 계정이\\ 전환되지\\ 않았습니다\\."):
             self.accounts.change(self.request())
         self.assertEqual(self.store.files(), before)
         self.assertEqual([call['action'] for call in self.calls], ['read'])
@@ -207,7 +207,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
         self.owned.active = True
         blocked = self.accounts.read('claude', self.row['id'])
         self.assertFalse(blocked['capabilities'].get('attemptSwitch', False))
-        self.assertIn('此 WSL Claude Code 有任务或待处理请求', blocked['blockers'])
+        self.assertIn("이 WSL Claude Code 환경에는 활성 작업 또는 보류 중인 요청이 있습니다.", blocked['blockers'])
 
     def test_hard_configuration_blocker_does_not_advertise_switch_attempt(self):
         (self.home / 'managed-settings.json').write_text('{}')
@@ -218,7 +218,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
     def test_readonly_release_plan_cannot_close_stdin_even_if_invoked(self):
         with account_guard(self.bridge, 'claude', self.row, read_only=True, release_idle=True) as release:
             self.assertTrue(callable(release))
-            with self.assertRaisesRegex(ValueError, '只读'):
+            with self.assertRaisesRegex(ValueError, '읽기 전용'):
                 release()
         self.process.stdin.close.assert_not_called()
 
@@ -272,7 +272,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
         before = self.store.files()
         self.remote.index[self.sid]['origin'] = 'unverified-origin'
         self.owned.origin = 'unverified-origin'
-        with self.assertRaisesRegex(ValueError, '会话身份已变化'):
+        with self.assertRaisesRegex(ValueError, "원래\\ WSL\\ Claude\\ Code\\ 세션\\ ID가\\ 변경되었습니다\\.\\ 계정이\\ 전환되지\\ 않았습니다\\."):
             self.accounts.change(self.request())
         self.process.stdin.close.assert_not_called()
         self.assertEqual(self.store.files(), before)
@@ -349,7 +349,7 @@ class WslOwnedAccountLifecycleTests(unittest.TestCase):
         replacement = self.transcript.with_suffix('.replacement')
         replacement.write_bytes(self.transcript.read_bytes())
         replacement.replace(self.transcript)
-        with self.assertRaisesRegex(ValueError, '身份已变化'):
+        with self.assertRaisesRegex(ValueError, "기존\\ SSH\\ Claude\\ Code\\ 세션\\ ID가\\ 변경됨"):
             self.remote._get(self.sid)
 
     def test_manager_detail_and_switch_response_use_same_wrapped_draft_scope(self):

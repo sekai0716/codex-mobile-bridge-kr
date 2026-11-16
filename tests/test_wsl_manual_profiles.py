@@ -79,7 +79,7 @@ class ManualWslProfiles(unittest.TestCase):
                     identifier = self.manager.control({**self.request, 'family': family})['entry']
                     registry.configure(identifier, False)
                     before = registry.path.read_bytes()
-                    with self.assertRaisesRegex(ValueError, '已登记'):
+                    with self.assertRaisesRegex(ValueError, "이\\ WSL\\ 구성\\ 디렉터리는\\ 이미\\ 등록되어\\ 있습니다\\.\\ 기존\\ 항목을\\ 사용합니다\\."):
                         self.manager.control({**self.request, 'family': family, 'label': 'Do not replace'})
                     self.assertEqual(registry.path.read_bytes(), before)
                     self.assertFalse(registry.entries[0]['enabled'])
@@ -92,7 +92,7 @@ class ManualWslProfiles(unittest.TestCase):
                 caps = self.manager.control({'action': 'client-profiles', 'operation': 'list'})['capabilities']
                 self.assertFalse(any(row.get('wslSupported') for row in caps))
                 for family in ('codex', 'claude'):
-                    with self.assertRaisesRegex(ValueError, 'WSL 客户端保存请求无效'):
+                    with self.assertRaisesRegex(ValueError, "WSL\\ 클라이언트\\ 등록\\ 요청이\\ 잘못되었습니다\\."):
                         self.manager.control({**self.request, 'family': family})
                 read.assert_not_called(); probe.assert_not_called()
 
@@ -101,7 +101,7 @@ class ManualWslProfiles(unittest.TestCase):
              patch.object(wsl, 'running_distributions', return_value=[]), \
              patch.object(wsl.subprocess, 'run') as process:
             for family in ('codex', 'claude'):
-                with self.subTest(family=family), self.assertRaisesRegex(OSError, '已停止或不可用'):
+                with self.subTest(family=family), self.assertRaisesRegex(OSError, "WSL\\ 배포가\\ 중지되었거나\\ 사용할\\ 수\\ 없습니다\\.\\ 컴퓨터에서\\ 시작한\\ 다음\\ 다시\\ 연결하세요\\."):
                     self.manager.control({**self.request, 'family': family})
             process.assert_not_called()
         self.assertFalse(self.codex.entries); self.assertFalse(self.claude.entries)
@@ -111,7 +111,7 @@ class ManualWslProfiles(unittest.TestCase):
             for home in ('C:\\Users\\alice\\.codex', '\\\\wsl$\\Ubuntu\\home\\alice',
                          '~/.codex', '.codex', '//server/config', '/home/alice/\nconfig'):
                 with self.subTest(family=family, home=home), patch.object(wsl, 'read') as read:
-                    with self.assertRaisesRegex(ValueError, 'Linux 绝对路径'):
+                    with self.assertRaisesRegex(ValueError, "WSL\\ 구성\\ 디렉터리에\\ 대한\\ 절대\\ Linux\\ 경로를\\ 입력합니다\\."):
                         registry.save_wsl('Ubuntu-24.04', 'alice', home, 'Private')
                     read.assert_not_called()
 
@@ -129,7 +129,7 @@ class ManualWslProfiles(unittest.TestCase):
         self.codex.desktop_home = self.root
         info = {'user': 'alice', 'homes': [{'home': self.home, 'windowsHome': str(self.root)}]}
         with self.target('codex', info=info), patch.object(wsl, 'running_distributions', return_value=['Ubuntu-24.04']):
-            with self.assertRaisesRegex(ValueError, '共用同一'):
+            with self.assertRaisesRegex(ValueError, "이\\ WSL\\ 입구와\\ 데스크탑이\\ 동일하게\\ 공유됩니다\\.\\ Codex\\ 디렉터리,\\ 반복적으로\\ 액세스할\\ 수\\ 없음"):
                 self.codex.save_wsl('Ubuntu-24.04', 'alice', self.home, 'Shared')
         self.assertFalse(self.codex.entries); self.assertFalse(self.codex.candidates)
         self.assertFalse(self.codex.path.exists())

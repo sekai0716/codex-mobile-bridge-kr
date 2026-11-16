@@ -26,7 +26,7 @@ class ProjectDirectories(unittest.TestCase):
         self.addCleanup(self.manager.close)
         self.manager.config['enabled'] = {'claude': True, 'deepseek': True}
         self.adapter = self.manager.adapters['claude']
-        self.environment = {'surface': 'cli', 'host': 'local', 'hostLabel': '此电脑',
+        self.environment = {'surface': 'cli', 'host': 'local', 'hostLabel': '이 컴퓨터',
             'name': 'Claude Code', 'origin': 'original-account', 'scope': 'original-account',
             'createRequiresMessage': True}
         self.adapter.project_environments = Mock(side_effect=lambda host_id=None: [dict(self.environment)] if host_id in (None,self.environment['host']) else [])
@@ -81,7 +81,7 @@ class ProjectDirectories(unittest.TestCase):
         project = self.manager.register_project('claude', environment, str(self.root))
         self.environment.update(origin='another-account', scope='another-account')
         self.adapter.call.reset_mock()
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "운영\\ 환경이나\\ 계정이\\ 변경되었습니다\\.\\ 프로젝트를\\ 다시\\ 선택해주세요\\."):
             self.manager.project_directories('claude', environment, str(self.root))
         result = self.manager.call('claude', 'create', body={'id': str(uuid.uuid4()), 'projectKey': project['key']})
         self.assertEqual(result['status'], 'unknown')
@@ -90,13 +90,13 @@ class ProjectDirectories(unittest.TestCase):
         self.manager.directory_projects.rows[project['key']]['directoryIdentity']['inode'] += 1
         self.manager.call('claude', 'create', body={'id': str(uuid.uuid4()), 'projectKey': project['key']})
         self.adapter.call.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '目录选择器'):
+        with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리는\\ 디렉터리\\ 선택기를\\ 통해\\ 등록되어야\\ 합니다\\."):
             self.manager.call('claude', 'create', body={'id': str(uuid.uuid4()), 'directoryProject': project})
 
     def test_disabled_runtime_cannot_browse_or_create_directories(self):
         environment = self.env()
         self.manager.config['enabled']['claude'] = False
-        with self.assertRaisesRegex(ValueError, '已关闭'):
+        with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."):
             self.manager.register_project('claude', environment, str(self.root/'never-created'), True)
         self.assertFalse((self.root/'never-created').exists())
 
@@ -138,7 +138,7 @@ class ProjectDirectories(unittest.TestCase):
         self.assertEqual(project['host'], 'ssh:one')
         hosts.hosts.return_value = {'ssh:one': {'alias': 'different-host'}}
         with patch('bridge.clients.manager.ssh_read') as remote:
-            with self.assertRaisesRegex(ValueError, '已变化'):
+            with self.assertRaisesRegex(ValueError, "SSH\\ 호스트\\ 구성이\\ 변경되었습니다\\."):
                 self.manager.register_project('claude', environment, literal)
             remote.assert_not_called()
 
@@ -226,7 +226,7 @@ class ClaudeActualProfileIdentity(unittest.TestCase):
             result = self.manager.call('claude', 'create', body={
                 'id': str(uuid.uuid4()), 'projectKey': project['key'], 'firstMessage': 'Explicit message'})
             self.assertEqual(result['status'], 'unknown')
-            self.assertIn('已变化', result['message'])
+            self.assertIn("운영 환경이나 계정이 변경되었습니다. 프로젝트를 다시 선택해주세요.", result['message'])
             dispatch.assert_not_called()
         os.environ['ANTHROPIC_BASE_URL'] = 'https://api-two.invalid'
         self.assertNotEqual(self.environment()['key'], changed['key'])
@@ -235,7 +235,7 @@ class ClaudeActualProfileIdentity(unittest.TestCase):
             self.assertNotIn(secret, saved)
             self.assertNotIn(secret, json.dumps(self.manager._public_project(self.environment())))
         with patch('bridge.clients.claude.cli_session.subprocess.Popen') as spawn:
-            with self.assertRaisesRegex(BridgeUnavailable, '已变化'):
+            with self.assertRaisesRegex(BridgeUnavailable, "원래\\ Claude\\ Code\\ 계정\\ 구성이\\ 변경되었거나\\ 사용할\\ 수\\ 없습니다\\."):
                 self.adapter.cli.create(str(self.root), original_profile['origin'], 'Explicit message',
                     project_directory(str(self.root)), original['accountFingerprint'])
             spawn.assert_not_called()

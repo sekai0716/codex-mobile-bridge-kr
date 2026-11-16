@@ -66,7 +66,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         UserDefaults.standard.set(deviceToken.map { String(format: "%02x", $0) }.joined(), forKey: "apnsToken")
         controller.registerNativePush()
     }
-    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) { controller.info(MobileStrings.text("系统推送注册失败，请检查推送签名与网络。")) }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) { controller.info(MobileStrings.text("푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.")) }
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completion: @escaping () -> Void) {
         DispatchQueue.main.async { self.receiveNotification(response, fromScene: false) }
         completion()
@@ -269,7 +269,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         return catalog(address).filter{!disabled.contains(selectionId($0))}
     }
     private func manageComputer(_ address:String){
-        let key=preferenceKey("disabled-channels",address), (sheet,content)=sheet(MobileStrings.text("管理这台电脑"))
+        let key=preferenceKey("disabled-channels",address), (sheet,content)=sheet(MobileStrings.text("이 컴퓨터 관리"))
         var disabled=Set(defaults.stringArray(forKey:key) ?? [])
         for url in catalog(address){
             let id=selectionId(url)
@@ -279,9 +279,9 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
         guard let controller=sheet.topViewController else{return}
         controller.navigationItem.rightBarButtonItem=UIBarButtonItem(systemItem:.cancel,primaryAction:UIAction{[weak sheet] _ in sheet?.dismiss(animated:true)})
-        let remove=button(MobileStrings.text("移除此电脑")){[weak self,weak sheet] in sheet?.dismiss(animated:true){self?.confirmRemove(address)}}
+        let remove=button(MobileStrings.text("이 컴퓨터 제거")){[weak self,weak sheet] in sheet?.dismiss(animated:true){self?.confirmRemove(address)}}
         remove.configuration?.baseForegroundColor = .systemRed
-        let save=button(MobileStrings.text("保存"),primary:true){[weak self,weak sheet] in
+        let save=button(MobileStrings.text("저장"),primary:true){[weak self,weak sheet] in
             self?.cancelSync();self?.defaults.set(Array(disabled),forKey:key);self?.paintAddresses(address);self?.checkComputers();sheet?.dismiss(animated:true)
         }
         for control in [remove,save]{control.configuration?.contentInsets=NSDirectionalEdgeInsets(top:6,leading:14,bottom:6,trailing:14)}
@@ -393,11 +393,11 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             return "ok"
         }
         if let peer=pendingPeer {
-            if cmd=="failed:"+peer.nonce {rollbackPeer();routeNotice(MobileStrings.text("信道暂不可达"));return "ok"}
+            if cmd=="failed:"+peer.nonce {rollbackPeer();routeNotice(MobileStrings.text("채널에 일시적으로 연결할 수 없습니다."));return "ok"}
         }
         return nil
     }
-    private func channelUnavailable(){routeNotice(MobileStrings.text("当前信道不可达，请手动切换连接信道"))}
+    private func channelUnavailable(){routeNotice(MobileStrings.text("현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요."))}
     @discardableResult private func raceChannels(failure:Bool,forced:String?=nil,inspect:Bool=false,allowed:[String]?=nil,notifyFailure:Bool=false)->Bool{
         let address=origin
         guard let view=web, UIApplication.shared.applicationState == .active,let d=channelRecord(address) else{return false}
@@ -416,7 +416,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             guard !inspect,select else{return}
             if url==address,self.pageReady {view.evaluateJavaScript("window.BridgeChannelLink?.check()",completionHandler:nil)}
             if url != address,let requested=view.url ?? self.requestedRoute {self.moveChannel(address,d,to:url,requested:requested,view:view,failure:failure,current:current)}
-        },exhausted:{if notifyFailure{self.channelUnavailable()}else if forced != nil {self.routeNotice(MobileStrings.text("信道暂不可达"))}},finished:{
+        },exhausted:{if notifyFailure{self.channelUnavailable()}else if forced != nil {self.routeNotice(MobileStrings.text("채널에 일시적으로 연결할 수 없습니다."))}},finished:{
             if inspect,self.inspectionGeneration==screen {self.inspectionGeneration=nil;view.evaluateJavaScript("window.dispatchEvent(new Event('bridge-channel-sample'))",completionHandler:nil)}
         })
         return true
@@ -429,7 +429,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         let screen=generation,targets=addresses(address)
         var progress=[String:String]()
         subtitle.isHidden=true
-        let container=UIView(),panel=column(),title=label(MobileStrings.text("正在连接 · ")+computerName(address),size:20,weight:.semibold)
+        let container=UIView(),panel=column(),title=label(MobileStrings.text("연결 중 ·")+computerName(address),size:20,weight:.semibold)
         let rows=column(spacing:8);panel.addArrangedSubview(title);panel.addArrangedSubview(rows)
         entryProgress=container;page.addArrangedSubview(container);container.addSubview(panel);panel.translatesAutoresizingMaskIntoConstraints=false
         NSLayoutConstraint.activate([panel.centerYAnchor.constraint(equalTo:container.centerYAnchor),panel.leadingAnchor.constraint(equalTo:container.leadingAnchor,constant:24),panel.trailingAnchor.constraint(equalTo:container.trailingAnchor,constant:-24)])
@@ -438,7 +438,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             let time=label("",size:14,secondary:true);time.setContentCompressionResistancePriority(.required,for:.horizontal)
             let row=UIStackView(arrangedSubviews:[label(url,size:14),time]);row.spacing=10;row.alignment = .center;rows.addArrangedSubview(row);labels[url]=time
         }
-        func render(){for url in targets{labels[url]?.text=progress[url] ?? MobileStrings.text("连接中…")}}
+        func render(){for url in targets{labels[url]?.text=progress[url] ?? MobileStrings.text("연결 중…")}}
         func current()->Bool{generation==screen && web==nil && connectionError==nil && UIApplication.shared.applicationState == .active}
         let deadline=DispatchWorkItem{[weak self] in
             guard let self,self.generation==screen,self.web==nil,self.connectionError==nil,
@@ -451,7 +451,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             progress[next]=ms.map{"\($0) ms"} ?? "○";render()
             guard select else{return}
             if next==address{self.connect(url,address:address)}else{self.moveChannel(address,d,to:next,requested:url,view:nil,failure:false,current:current)}
-        },exhausted:{if targets.contains(address){self.connect(url,address:address)}else{self.routeNotice(MobileStrings.text("信道暂不可达"))}})
+        },exhausted:{if targets.contains(address){self.connect(url,address:address)}else{self.routeNotice(MobileStrings.text("채널에 일시적으로 연결할 수 없습니다."))}})
     }
     @discardableResult
     private func moveChannel(_ address:String,_ d:[String:Any],to next:String,requested:URL,view:WKWebView?,failure:Bool,current:@escaping ()->Bool)->Task<Void,Never>?{
@@ -495,7 +495,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 (retained != nil && retained?.name != root.name) || before.count>1 ||
                 before.contains(where:{!known.contains($0.value)}) || source.map({!known.contains($0.value)})==true {
                 if view==nil,addresses(address).contains(address) {connect(requested,address:address)}
-                routeNotice(MobileStrings.text("此地址的登录绑定已变化，请重新验证"));return
+                routeNotice(MobileStrings.text("이 주소의 로그인 바인딩이 변경되었습니다. 다시 확인해 주세요."));return
             }
             let shared=URL(string:address)?.host==host && GatewayURL.cookiePath(address)==cookie.path
             let expectedSource=shared ? (cookieMatches(cookie,address:address) ? cookie:nil):source
@@ -537,7 +537,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 defaults.set(saved.filter{$0 != address && $0 != next}+[next],forKey:"origins")
                 release()
                 if view==nil || !pageReady {connect(url,address:next);arrivingVia=next}
-                else{origin=next;defaults.set(next,forKey:"active");routeNotice(MobileStrings.text("已切换连接信道")+" · "+next)}
+                else{origin=next;defaults.set(next,forKey:"active");routeNotice(MobileStrings.text("연결 채널이 전환됨")+" · "+next)}
                 return true
             }
             if view==nil || !pageReady {_ = await commit({true});return}
@@ -679,7 +679,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         subtitle.font = .preferredFont(forTextStyle: .caption1); subtitle.textColor = .secondaryLabel; subtitle.textAlignment = .center; subtitle.numberOfLines = 2; page.addArrangedSubview(subtitle)
         var menuStyle = UIButton.Configuration.plain(); menuStyle.image = UIImage(systemName: "ellipsis")
         menuStyle.baseForegroundColor = .label; menuStyle.baseBackgroundColor = .secondarySystemBackground; menuStyle.cornerStyle = .capsule
-        gatewayMenu.configuration = menuStyle; gatewayMenu.accessibilityLabel = MobileStrings.text("电脑与通知"); gatewayMenu.showsMenuAsPrimaryAction = true
+        gatewayMenu.configuration = menuStyle; gatewayMenu.accessibilityLabel = MobileStrings.text("컴퓨터 및 알림"); gatewayMenu.showsMenuAsPrimaryAction = true
         updateGatewayMenu()
         gatewayMenu.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(gatewayMenu)
         NSLayoutConstraint.activate([gatewayMenu.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8), gatewayMenu.widthAnchor.constraint(equalToConstant: 48), gatewayMenu.heightAnchor.constraint(equalToConstant: 48)])
@@ -763,7 +763,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         let curve = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt ?? 0
         UIView.animate(withDuration: duration, delay: 0, options: [UIView.AnimationOptions(rawValue: curve << 16), .beginFromCurrentState]) { self.view.layoutIfNeeded() }
     }
-    func info(_ text: String) { let a = UIAlertController(title: nil, message: MobileStrings.text(text), preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("好"), style: .default)); present(a, animated: true) }
+    func info(_ text: String) { let a = UIAlertController(title: nil, message: MobileStrings.text(text), preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("확인"), style: .default)); present(a, animated: true) }
     private func label(_ text: String, size: CGFloat = 15, weight: UIFont.Weight = .regular, secondary: Bool = false) -> UILabel {
         let l = UILabel(); l.text = text; l.numberOfLines = 0
         l.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: size, weight: weight)); l.adjustsFontForContentSizeCategory = true
@@ -800,7 +800,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             let ticket = self.generation, address = self.origin
             web.evaluateJavaScript("(()=>{const button=document.getElementById('client-switch-toggle');return document.getElementById('app')?.hidden===false&&button&&!button.hidden?button.getAttribute('aria-expanded')==='false':null;})()") { [weak self, weak web] value, _ in
                 guard let self, let web, self.web === web, self.generation == ticket, let url = web.url, GatewayURL.same(url, documentAddress), let collapsed = value as? Bool else { completion([]); return }
-                let action = UIAction(title: MobileStrings.text(collapsed ? "显示底部 APP 图标" : "隐藏底部 APP 图标"), image: UIImage(systemName: "square.grid.3x1.below.line.grid.1x2")) { [weak self, weak web] _ in
+                let action = UIAction(title: MobileStrings.text(collapsed ? "하단 앱 아이콘 표시" : "하단 앱 아이콘 숨기기"), image: UIImage(systemName: "square.grid.3x1.below.line.grid.1x2")) { [weak self, weak web] _ in
                     guard let self, let web, self.web === web, self.generation == ticket, let url = web.url, GatewayURL.same(url, documentAddress) else { return }
                     web.evaluateJavaScript("document.getElementById('client-switch-toggle')?.click()")
                 }
@@ -831,18 +831,18 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
     }
     private func updateGatewayMenu() {
-        gatewayMenu.accessibilityLabel = MobileStrings.text("电脑与通知")
+        gatewayMenu.accessibilityLabel = MobileStrings.text("컴퓨터 및 알림")
         gatewayMenu.menu = UIMenu(children: [
-            UIAction(title: MobileStrings.text("返回电脑列表"), image: UIImage(systemName: "desktopcomputer")) { [weak self] _ in self?.home() },
-            UIAction(title: MobileStrings.text("账号与接入"), image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in self?.openAccounts() },
-            UIAction(title: MobileStrings.text("在灵动岛显示此聊天"), image: UIImage(systemName: "capsule")) { [weak self] _ in self?.startLiveActivity() },
-            UIAction(title: MobileStrings.text("结束灵动岛显示"), image: UIImage(systemName: "xmark.circle")) { _ in if #available(iOS 16.2, *) { Task { await LiveActivityController.shared.stop() } } },
-            UIAction(title: MobileStrings.text("通知收件箱"), image: UIImage(systemName: "bell")) { [weak self] _ in self?.inbox() },
-            UIAction(title: MobileStrings.text("刷新页面"), image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in self?.refresh() },
-            UIAction(title: MobileStrings.text("外观与显示"), image: UIImage(systemName: "paintpalette")) { [weak self] _ in self?.web?.evaluateJavaScript("document.querySelector('[data-open-appearance]')?.click()") },
+            UIAction(title: MobileStrings.text("컴퓨터 목록으로 돌아가기"), image: UIImage(systemName: "desktopcomputer")) { [weak self] _ in self?.home() },
+            UIAction(title: MobileStrings.text("계정 및 연결"), image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in self?.openAccounts() },
+            UIAction(title: MobileStrings.text("다이나믹 아일랜드에서 이 채팅을 보여주세요"), image: UIImage(systemName: "capsule")) { [weak self] _ in self?.startLiveActivity() },
+            UIAction(title: MobileStrings.text("실시간 현황 종료"), image: UIImage(systemName: "xmark.circle")) { _ in if #available(iOS 16.2, *) { Task { await LiveActivityController.shared.stop() } } },
+            UIAction(title: MobileStrings.text("알림 받은 편지함"), image: UIImage(systemName: "bell")) { [weak self] _ in self?.inbox() },
+            UIAction(title: MobileStrings.text("페이지 새로고침"), image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in self?.refresh() },
+            UIAction(title: MobileStrings.text("화면 설정"), image: UIImage(systemName: "paintpalette")) { [weak self] _ in self?.web?.evaluateJavaScript("document.querySelector('[data-open-appearance]')?.click()") },
             uuMenu(),
             appIconsMenu(),
-            UIAction(title: MobileStrings.text("手机设置"), image: UIImage(systemName: "gearshape")) { [weak self] _ in self?.settings() }
+            UIAction(title: MobileStrings.text("모바일 설정"), image: UIImage(systemName: "gearshape")) { [weak self] _ in self?.settings() }
         ])
     }
     private func navigation(home: Bool) {
@@ -854,8 +854,8 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         logo.widthAnchor.constraint(equalToConstant: 30).isActive = true; logo.heightAnchor.constraint(equalToConstant: 30).isActive = true; logo.layer.cornerRadius = 7; logo.clipsToBounds = true
         let brand = UIStackView(arrangedSubviews: [logo, label("Codex Bridge", size: 18, weight: .semibold)]); brand.axis = .horizontal; brand.spacing = 8; brand.alignment = .center
         navigationItem.leftBarButtonItem = UIBarButtonItem(customView: brand)
-        let settings = UIBarButtonItem(image: UIImage(systemName: "gearshape"), style: .plain, target: self, action: #selector(self.settings)); settings.accessibilityLabel = MobileStrings.text("设置")
-        let inbox = UIBarButtonItem(image: UIImage(systemName: "bell"), style: .plain, target: self, action: #selector(self.inbox)); inbox.accessibilityLabel = MobileStrings.text("通知")
+        let settings = UIBarButtonItem(image: UIImage(systemName: "gearshape"), style: .plain, target: self, action: #selector(self.settings)); settings.accessibilityLabel = MobileStrings.text("설정")
+        let inbox = UIBarButtonItem(image: UIImage(systemName: "bell"), style: .plain, target: self, action: #selector(self.inbox)); inbox.accessibilityLabel = MobileStrings.text("알림")
         navigationItem.rightBarButtonItems = [settings, inbox]
     }
     private func clear() { pendingEntry=nil;routeTraffic.removeAll();uu.scope = ""; uuAvailability = "checking"; hideEntryProgress();pageReady=false;rollbackPeer();for child in Array(peerViews.keys){child.stopLoading();webViewDidClose(child)};cancelChannelJobs();connectionDeadline?.cancel(); connectionDeadline = nil; updateSystemBars(reset: true); connectionError = nil; pendingStorage = nil; nativeMainNavigation = nil; routeDiscovery?.cancel(); routeDiscovery = nil; cancelSync(); finishUpload(nil); if let folder = mediaUploadDirectory { try? FileManager.default.removeItem(at: folder); mediaUploadDirectory = nil }; stopComputerChecks(); computerStates.removeAll();addressLists.removeAll();computerTitles.removeAll();arrivingVia=nil;deferredRoute=nil; computerNotifications.removeAll(); gatewayMenuTop?.isActive = false; gatewayMenuTop = nil; generation += 1; web?.stopLoading(); web?.navigationDelegate = nil; web?.uiDelegate = nil; web = nil; for v in page.arrangedSubviews where v !== subtitle { page.removeArrangedSubview(v); v.removeFromSuperview() } }
@@ -864,14 +864,14 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         let container = UIView(); page.addArrangedSubview(container); let content = scrollContent(in: container)
         let visual = UIImageView(image: UIImage(systemName: "desktopcomputer")); visual.tintColor = .label; visual.contentMode = .scaleAspectFit; visual.heightAnchor.constraint(equalToConstant: 54).isActive = true
         let hero = column(spacing: 14); hero.addArrangedSubview(visual)
-        let heading = label(MobileStrings.text("电脑上的工作，\n带在身边。"), size: 30, weight: .semibold); heading.textAlignment = .center; hero.addArrangedSubview(heading)
-        let hint = label(MobileStrings.text("继续聊天、查看结果，让电脑替你运行。"), secondary: true); hint.textAlignment = .center; hero.addArrangedSubview(hint)
+        let heading = label(MobileStrings.text("컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요."), size: 30, weight: .semibold); heading.textAlignment = .center; hero.addArrangedSubview(heading)
+        let hint = label(MobileStrings.text("컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요."), secondary: true); hint.textAlignment = .center; hero.addArrangedSubview(hint)
         hero.setCustomSpacing(24, after: visual); content.addArrangedSubview(hero)
-        content.addArrangedSubview(card([button(MobileStrings.text("扫码连接电脑"), symbol: "qrcode.viewfinder", primary: true) { [weak self] in self?.scan() }, button(MobileStrings.text("输入网关地址"), symbol: "link") { [weak self] in self?.manualAddress() }, button("DSH Mobile", symbol: "link") { [weak self] in self?.manualDsh() }]))
-        let computersHeading = UIStackView(arrangedSubviews: [label(MobileStrings.text("我的电脑"), size: 19, weight: .semibold), button(MobileStrings.text("刷新状态"), symbol: "arrow.clockwise") { [weak self] in self?.checkComputers(); self?.sync() }])
+        content.addArrangedSubview(card([button(MobileStrings.text("스캔하여 연결"), symbol: "qrcode.viewfinder", primary: true) { [weak self] in self?.scan() }, button(MobileStrings.text("게이트웨이 주소를 입력하세요"), symbol: "link") { [weak self] in self?.manualAddress() }, button("DSH Mobile", symbol: "link") { [weak self] in self?.manualDsh() }]))
+        let computersHeading = UIStackView(arrangedSubviews: [label(MobileStrings.text("내 컴퓨터"), size: 19, weight: .semibold), button(MobileStrings.text("상태 새로고침"), symbol: "arrow.clockwise") { [weak self] in self?.checkComputers(); self?.sync() }])
         computersHeading.axis = .horizontal; computersHeading.alignment = .center; computersHeading.spacing = 8; content.addArrangedSubview(computersHeading)
         if saved.isEmpty && DshMobileStore.ids.isEmpty {
-            content.addArrangedSubview(card([label(MobileStrings.text("还没有连接的电脑"), size: 17, weight: .medium), label(MobileStrings.text("在电脑网关中展开“扫码登录”，然后用上方按钮扫描。"), secondary: true)]))
+            content.addArrangedSubview(card([label(MobileStrings.text("아직 연결된 컴퓨터가 없습니다."), size: 17, weight: .medium), label(MobileStrings.text("컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요."), secondary: true)]))
         } else {
             for address in recentComputers {
                 if address.hasPrefix("dsh:") { content.addArrangedSubview(dshComputer(String(address.dropFirst(4)))); continue }
@@ -884,15 +884,15 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 let list=UIStackView();list.axis = .vertical;list.spacing=4;addressLists[address]=list;paintAddresses(address)
                 let apps = UIStackView(); apps.axis = .horizontal; apps.spacing = 0; apps.setContentHuggingPriority(.required, for: .horizontal); apps.setContentCompressionResistancePriority(.required, for: .horizontal); computerNotifications[address] = apps
                 let heading = UIStackView(arrangedSubviews: [row, apps]); heading.axis = .horizontal; heading.alignment = .center; heading.spacing = 10
-                let rename = button(MobileStrings.text("重命名"), symbol: "pencil") { [weak self] in self?.renameComputer(address) }
-                let remove = button(MobileStrings.text("管理这台电脑"), symbol: "slider.horizontal.3") { [weak self] in self?.manageComputer(address) }
+                let rename = button(MobileStrings.text("이름 바꾸기"), symbol: "pencil") { [weak self] in self?.renameComputer(address) }
+                let remove = button(MobileStrings.text("이 컴퓨터 관리"), symbol: "slider.horizontal.3") { [weak self] in self?.manageComputer(address) }
                 remove.configuration?.contentInsets=NSDirectionalEdgeInsets(top:17,leading:8,bottom:17,trailing:8)
                 let actions = UIStackView(arrangedSubviews: [rename, remove]); actions.axis = .horizontal; actions.distribution = .fillEqually; actions.spacing = 8
                 content.addArrangedSubview(card([heading,list,actions]))
                 updateComputerNotifications(computerSnapshots[address], address: address)
             }
         }
-        let foot = label(MobileStrings.text("外出使用 HTTPS 地址；局域网地址需要连接同一网络。"), size: 13, secondary: true); foot.textAlignment = .center; content.addArrangedSubview(foot)
+        let foot = label(MobileStrings.text("휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다."), size: 13, secondary: true); foot.textAlignment = .center; content.addArrangedSubview(foot)
         checkComputers(); sync()
     }
     private var recentComputers: [String] {
@@ -903,30 +903,30 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     private func dshComputer(_ id: String) -> UIView {
         let url = DshMobileStore.load(id)
-        let open = button(MobileStrings.text("连接"), symbol: "link") { [weak self] in
-            guard let url else { self?.info(MobileStrings.text("连接凭据不可用，请移除后重新添加")); return }; self?.openDsh(url, id: id)
+        let open = button(MobileStrings.text("연결"), symbol: "link") { [weak self] in
+            guard let url else { self?.info(MobileStrings.text("연결 자격 증명을 사용할 수 없습니다. 이 연결을 제거하고 다시 추가하십시오.")); return }; self?.openDsh(url, id: id)
         }
-        let remove = button(MobileStrings.text("移除这台电脑"), symbol: "trash") { [weak self] in
-            let alert = UIAlertController(title: MobileStrings.text("移除这台电脑") + "？", message: nil, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-            alert.addAction(UIAlertAction(title: MobileStrings.text("移除"), style: .destructive) { _ in DshMobileStore.remove(id); self?.defaults.removeObject(forKey: "last-opened:dsh:" + id); self?.home() }); self?.present(alert, animated: true)
+        let remove = button(MobileStrings.text("제거"), symbol: "trash") { [weak self] in
+            let alert = UIAlertController(title: MobileStrings.text("제거") + "？", message: nil, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+            alert.addAction(UIAlertAction(title: MobileStrings.text("제거"), style: .destructive) { _ in DshMobileStore.remove(id); self?.defaults.removeObject(forKey: "last-opened:dsh:" + id); self?.home() }); self?.present(alert, animated: true)
         }
         remove.configuration?.baseForegroundColor = .systemRed
         let actions = UIStackView(arrangedSubviews: [open, remove]); actions.axis = .horizontal; actions.distribution = .fillEqually; actions.spacing = 8
-        return card([label("DSH Mobile", size: 17, weight: .semibold), label(url.map(DshMobileURL.display) ?? MobileStrings.text("连接凭据不可用"), size: 13, secondary: true), actions])
+        return card([label("DSH Mobile", size: 17, weight: .semibold), label(url.map(DshMobileURL.display) ?? MobileStrings.text("연결 자격 증명을 사용할 수 없습니다."), size: 13, secondary: true), actions])
     }
     private func computerName(_ address: String) -> String {
         let id=channelRecord(address)?["deviceId"] as? String ?? address
         return defaults.string(forKey:"name:"+id) ?? defaults.string(forKey:"name:"+address) ?? channelRecord(address)?["name"] as? String ?? URL(string:address)?.host ?? address
     }
     private func renameComputer(_ address: String) {
-        let alert = UIAlertController(title: MobileStrings.text("重命名电脑"), message: address + "\n" + MobileStrings.text("留空恢复默认名称"), preferredStyle: .alert)
+        let alert = UIAlertController(title: MobileStrings.text("컴퓨터 이름 바꾸기"), message: address + "\n" + MobileStrings.text("기본 이름을 복원하려면 비워 두세요."), preferredStyle: .alert)
         alert.addTextField { field in field.text = self.computerName(address) }
-        alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-        alert.addAction(UIAlertAction(title: MobileStrings.text("保存"), style: .default) { [weak self, weak alert] _ in
+        alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+        alert.addAction(UIAlertAction(title: MobileStrings.text("저장"), style: .default) { [weak self, weak alert] _ in
             guard let self else { return }
             let name = (alert?.textFields?.first?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard name.count <= 80 else { self.info(MobileStrings.text("名称最多 80 个字符")); return }
+            guard name.count <= 80 else { self.info(MobileStrings.text("80자 이하로 사용하세요.")); return }
             let id=self.channelRecord(address)?["deviceId"] as? String ?? address;self.defaults.removeObject(forKey:"name:"+address);if name.isEmpty {self.defaults.removeObject(forKey:"name:"+id)} else {self.defaults.set(name,forKey:"name:"+id)}
             self.home()
         })
@@ -944,7 +944,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             let count = max(0, row["unread"] as? Int ?? 0)
             let button = UIButton(type: .custom); button.translatesAutoresizingMaskIntoConstraints = false
             button.alpha = row["connected"] as? Bool == false ? 0.5 : 1
-            button.accessibilityLabel = name + (row["connected"] as? Bool == false ? " · " + MobileStrings.text("尚未连接") : "") + " · " + MobileStrings.text("未读通知") + " " + String(count)
+            button.accessibilityLabel = name + (row["connected"] as? Bool == false ? " · " + MobileStrings.text("연결되지 않음") : "") + " · " + MobileStrings.text("읽지 않은 알림") + " " + String(count)
             button.addAction(UIAction { [weak self] _ in self?.openSaved(address, provider: provider) }, for: .touchUpInside)
             let image = UIImageView(image: UIImage(named: provider)); image.contentMode = .scaleAspectFit; image.translatesAutoresizingMaskIntoConstraints = false; button.addSubview(image)
             NSLayoutConstraint.activate([button.widthAnchor.constraint(equalToConstant: 44), button.heightAnchor.constraint(equalToConstant: 44), image.widthAnchor.constraint(equalToConstant: 24), image.heightAnchor.constraint(equalToConstant: 24), image.centerXAnchor.constraint(equalTo: button.centerXAnchor), image.centerYAnchor.constraint(equalTo: button.centerYAnchor)])
@@ -980,23 +980,23 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         computerTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in self?.checkComputers() }
     }
     private func manualAddress() {
-        let a = UIAlertController(title: MobileStrings.text("连接电脑"), message: MobileStrings.text("粘贴电脑网关提供的访问地址"), preferredStyle: .alert)
+        let a = UIAlertController(title: MobileStrings.text("컴퓨터에 연결"), message: MobileStrings.text("컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요."), preferredStyle: .alert)
         a.addTextField { field in field.text = "https://"; field.keyboardType = .URL; field.autocapitalizationType = .none; field.autocorrectionType = .no; field.placeholder = "https://codex.try2love.com" }
-        a.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel)); a.addAction(UIAlertAction(title: MobileStrings.text("继续"), style: .default) { [weak self, weak a] _ in self?.choose(a?.textFields?.first?.text ?? "") }); present(a, animated: true)
+        a.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel)); a.addAction(UIAlertAction(title: MobileStrings.text("계속"), style: .default) { [weak self, weak a] _ in self?.choose(a?.textFields?.first?.text ?? "") }); present(a, animated: true)
     }
     private func manualDsh() {
-        let alert = UIAlertController(title: "DSH Mobile", message: MobileStrings.text("粘贴 DSH 客户端 Mobile 功能提供的完整链接"), preferredStyle: .alert)
+        let alert = UIAlertController(title: "DSH Mobile", message: MobileStrings.text("DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요."), preferredStyle: .alert)
         alert.addTextField { $0.placeholder = "https://…/?auth=…"; $0.keyboardType = .URL; $0.autocapitalizationType = .none; $0.autocorrectionType = .no }
-        alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-        alert.addAction(UIAlertAction(title: MobileStrings.text("继续"), style: .default) { [weak self, weak alert] _ in self?.chooseDsh(alert?.textFields?.first?.text ?? "") }); present(alert, animated: true)
+        alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+        alert.addAction(UIAlertAction(title: MobileStrings.text("계속"), style: .default) { [weak self, weak alert] _ in self?.chooseDsh(alert?.textFields?.first?.text ?? "") }); present(alert, animated: true)
     }
     private func chooseDsh(_ value: String) {
         do {
             let url = try DshMobileURL.connection(value)
-            let alert = UIAlertController(title: MobileStrings.text("连接 DSH Mobile？"), message: DshMobileURL.display(url) + MobileStrings.text("\n请确认这是你自己的 DSH 客户端。将打开它自带的手机界面。"), preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-            alert.addAction(UIAlertAction(title: MobileStrings.text("连接"), style: .default) { [weak self] _ in
-                do { let id = try DshMobileStore.save(url); self?.openDsh(url, id: id) } catch { self?.info(MobileStrings.text("无法保存 DSH Mobile 连接")) }
+            let alert = UIAlertController(title: MobileStrings.text("DSH Mobile에 연결하시겠습니까?"), message: DshMobileURL.display(url) + MobileStrings.text("\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다."), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+            alert.addAction(UIAlertAction(title: MobileStrings.text("연결"), style: .default) { [weak self] _ in
+                do { let id = try DshMobileStore.save(url); self?.openDsh(url, id: id) } catch { self?.info(MobileStrings.text("DSH Mobile 연결을 저장할 수 없습니다.")) }
             }); present(alert, animated: true)
         } catch { info(error.localizedDescription) }
     }
@@ -1007,16 +1007,16 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     func choose(_ value: String) {
         do { let url = try GatewayURL.connection(value); let address = try GatewayURL.origin(value)
-            let alert = UIAlertController(title: MobileStrings.text("连接到这台电脑？"), message: address + MobileStrings.text("\n请确认这是你自己的网关。"), preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel)); alert.addAction(UIAlertAction(title: MobileStrings.text("连接"), style: .default) { _ in self.connect(url, address: address) })
+            let alert = UIAlertController(title: MobileStrings.text("이 컴퓨터에 연결하시겠습니까?"), message: address + MobileStrings.text("\n 이것이 자신의 게이트웨이인지 확인하세요."), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel)); alert.addAction(UIAlertAction(title: MobileStrings.text("연결"), style: .default) { _ in self.connect(url, address: address) })
             alert.addAction(UIAlertAction(title: "DSH Mobile", style: .default) { [weak self] _ in self?.chooseDsh(value) }); present(alert, animated: true)
         } catch { chooseDsh(value) }
     }
     func openNotification(_ address: String, thread: String?, host: String) {
-        guard saved.contains(address) else { info(MobileStrings.text("请先连接通知对应的电脑。")); return }
+        guard saved.contains(address) else { info(MobileStrings.text("먼저 이 알림을 받으려면 컴퓨터에 연결하세요.")); return }
         if let thread, let target = try? GatewayURL.chat(address, thread: thread, host: host) { connect(target, address: address) } else { openSaved(address) }
     }
-    func openSaved(_ address: String, provider: String? = nil) { let suffix = provider.flatMap { ["codex", "claude", "deepseek", "zcode", "antigravity"].contains($0) ? "?client=" + $0 : nil } ?? ""; guard saved.contains(address), let url = URL(string: address + "/" + suffix) else { info(MobileStrings.text("请先扫码保存通知对应的电脑。")); return }; openComputer(address,url) }
+    func openSaved(_ address: String, provider: String? = nil) { let suffix = provider.flatMap { ["codex", "claude", "deepseek", "zcode", "antigravity"].contains($0) ? "?client=" + $0 : nil } ?? ""; guard saved.contains(address), let url = URL(string: address + "/" + suffix) else { info(MobileStrings.text("먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.")); return }; openComputer(address,url) }
     private func binding(_ address: String, done: @escaping (HTTPCookie?) -> Void) {
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
             done(cookies.first { self.cookieMatches($0, address: address) })
@@ -1044,7 +1044,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                        (auth["cookieName"] as? String ?? "codex_mobile_session") == cookie.name {
                         DeviceBinding.save(address, .init(name: cookie.name, token: cookie.value))
                     } else if auth["authenticated"] as? Bool == false { DeviceBinding.clear(address) }
-                    if auth["authenticated"] as? Bool==true && self.arrivingVia==address {self.arrivingVia=nil;self.routeNotice(MobileStrings.text("已切换连接信道")+" · "+address)}
+                    if auth["authenticated"] as? Bool==true && self.arrivingVia==address {self.arrivingVia=nil;self.routeNotice(MobileStrings.text("연결 채널이 전환됨")+" · "+address)}
                     let platform = (auth["computer"] as? [String:Any])?["platform"] as? String ?? ""
                     self.uu.scope = auth["authenticated"] as? Bool == true && ["Darwin","Windows"].contains(platform)
                         ? UURemote.device(cookie.name) : ""
@@ -1162,7 +1162,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         do { scripts = try WebScripts() }
         catch { info(error.localizedDescription); return }
         if origin != address, #available(iOS 16.2, *) { Task { await LiveActivityController.shared.stop() } }
-        clear(); navigation(home: false); subtitle.isHidden = false; origin = address; documentAddress=address; var all = saved; if !all.contains(address) { all.append(address) }; defaults.set(all, forKey: "origins"); defaults.set(address, forKey: "active"); defaults.set(Date().timeIntervalSince1970, forKey: "last-opened:" + address); subtitle.text = MobileStrings.text("正在连接 · ") + computerName(address)
+        clear(); navigation(home: false); subtitle.isHidden = false; origin = address; documentAddress=address; var all = saved; if !all.contains(address) { all.append(address) }; defaults.set(all, forKey: "origins"); defaults.set(address, forKey: "active"); defaults.set(Date().timeIntervalSince1970, forKey: "last-opened:" + address); subtitle.text = MobileStrings.text("연결 중 ·") + computerName(address)
         let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .default(); configuration.applicationNameForUserAgent = "BridgeMobile/0.1-iOS"
         configuration.preferences.javaScriptCanOpenWindowsAutomatically=true
         configuration.ignoresViewportScaleLimits = false
@@ -1170,7 +1170,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         configuration.userContentController.addUserScript(WKUserScript(source: "window.BridgeMobileCapabilities = Object.freeze({ diagnosticsExport: true });", injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         clipboardToken = UUID().uuidString
         let connectionName = String(decoding: (try? JSONEncoder().encode(computerName(address))) ?? Data("null".utf8), as: UTF8.self)
-        let nativeLanguage = (defaults.string(forKey: "bridge-language") ?? Locale.preferredLanguages.first ?? "zh").hasPrefix("en") ? "en" : "zh"
+        let nativeLanguage = (defaults.string(forKey: "bridge-language") ?? "ko").hasPrefix("en") ? "en" : "ko"
         routeScript=scripts.route
         let appearanceScript = (scripts.route+"\n"+scripts.appearance).replacingOccurrences(of: "__BRIDGE_CLIPBOARD_TOKEN__", with: clipboardToken).replacingOccurrences(of:"__BRIDGE_ROUTE_BOUND__",with:channelRecord(address)==nil ? "no":"yes").replacingOccurrences(of: "'__BRIDGE_CONNECTION_NAME__'", with: connectionName) + "\ndocument.addEventListener('bridge-authenticated', () => window.prompt('codexbridge-session:" + clipboardToken + "', ''));document.addEventListener('bridge-logged-out', () => window.prompt('codexbridge-logout:" + clipboardToken + "', ''));document.addEventListener('bridge-auth-lost', () => window.prompt('codexbridge-auth-lost:" + clipboardToken + "', ''));"
         configuration.userContentController.addUserScript(WKUserScript(source: appearanceScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
@@ -1230,7 +1230,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
         decisionHandler(.cancel)
         if action.navigationType == .linkActivated, ["http", "https"].contains(url.scheme ?? "") {
-            let a = UIAlertController(title: MobileStrings.text("在浏览器打开外部链接？"), message: url.host, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel)); a.addAction(UIAlertAction(title: MobileStrings.text("打开"), style: .default) { _ in UIApplication.shared.open(url) }); present(a, animated: true)
+            let a = UIAlertController(title: MobileStrings.text("브라우저에서 외부 링크를 열까요?"), message: url.host, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel)); a.addAction(UIAlertAction(title: MobileStrings.text("열기"), style: .default) { _ in UIApplication.shared.open(url) }); present(a, animated: true)
         }
     }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -1253,7 +1253,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if nativeMainNavigation?.web === webView { nativeMainNavigation = nil }; guard webView === web, connectionError == nil else { return }
         let failure = error as NSError
         guard failure.domain != NSURLErrorDomain || failure.code != NSURLErrorCancelled else { return }
-        subtitle.isHidden = false; subtitle.text = MobileStrings.text("连接失败，请检查电脑和地址后刷新")
+        subtitle.isHidden = false; subtitle.text = MobileStrings.text("연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.")
         showConnectionError(status: nil)
         recoverConnection()
     }
@@ -1264,19 +1264,19 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         updateSystemBars(reset: true); web?.isHidden = true; subtitle.isHidden = true; gatewayMenu.isHidden = true
         let container = UIView(); page.addArrangedSubview(container); connectionError = container; let content = scrollContent(in: container)
         let visual = UIImageView(image: UIImage(systemName: "wifi.exclamationmark")); visual.tintColor = .secondaryLabel; visual.contentMode = .scaleAspectFit; visual.heightAnchor.constraint(equalToConstant: 48).isActive = true
-        let heading = label(MobileStrings.text("暂时无法连接电脑"), size: 22, weight: .semibold); heading.textAlignment = .center
-        let hint = label(MobileStrings.text("网关暂时无法访问。请检查电脑和网络后重试，或返回电脑列表。"), secondary: true); hint.textAlignment = .center
+        let heading = label(MobileStrings.text("컴퓨터에 연결할 수 없습니다"), size: 22, weight: .semibold); heading.textAlignment = .center
+        let hint = label(MobileStrings.text("게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요."), secondary: true); hint.textAlignment = .center
         let detail = label(computerName(address) + (status.map { " · HTTP \($0)" } ?? ""), size: 13, secondary: true); detail.textAlignment = .center
         let hero = column(spacing: 12); [visual, heading, hint, detail].forEach(hero.addArrangedSubview); hero.setCustomSpacing(20, after: visual)
         content.addArrangedSubview(hero)
-        content.addArrangedSubview(card([button(MobileStrings.text("重试"), symbol: "arrow.clockwise", primary: true) { [weak self] in
+        content.addArrangedSubview(card([button(MobileStrings.text("다시 시도"), symbol: "arrow.clockwise", primary: true) { [weak self] in
             guard let self, ticket == self.generation, self.saved.contains(address) else { return }; self.openComputer(address,route)
-        }, button(MobileStrings.text("管理这台电脑"),symbol:"slider.horizontal.3"){[weak self] in self?.manageComputer(address)
-        }, button(MobileStrings.text("返回电脑列表"), symbol: "desktopcomputer") { [weak self] in self?.home() }]))
+        }, button(MobileStrings.text("이 컴퓨터 관리"),symbol:"slider.horizontal.3"){[weak self] in self?.manageComputer(address)
+        }, button(MobileStrings.text("컴퓨터 목록으로 돌아가기"), symbol: "desktopcomputer") { [weak self] in self?.home() }]))
     }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { if nativeMainNavigation?.web === webView { nativeMainNavigation = nil }; guard webView === web else { return }; recoverConnection() }
-    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) { guard frame.isMainFrame else { completionHandler(); return }; let a = UIAlertController(title: nil, message: message, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("好"), style: .default) { _ in completionHandler() }); present(a, animated: true) }
-    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) { guard frame.isMainFrame else { completionHandler(false); return }; let a = UIAlertController(title: nil, message: message, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel) { _ in completionHandler(false) }); a.addAction(UIAlertAction(title: MobileStrings.text("确认"), style: .default) { _ in completionHandler(true) }); present(a, animated: true) }
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) { guard frame.isMainFrame else { completionHandler(); return }; let a = UIAlertController(title: nil, message: message, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("확인"), style: .default) { _ in completionHandler() }); present(a, animated: true) }
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) { guard frame.isMainFrame else { completionHandler(false); return }; let a = UIAlertController(title: nil, message: message, preferredStyle: .alert); a.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel) { _ in completionHandler(false) }); a.addAction(UIAlertAction(title: MobileStrings.text("확인"), style: .default) { _ in completionHandler(true) }); present(a, animated: true) }
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
         guard webView===web else{completionHandler(nil);return}
         if prompt == "codexbridge-upload-source:" + clipboardToken {
@@ -1369,7 +1369,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
         if prompt == "codexbridge-language:" + clipboardToken {
             guard webView === web, frame.isMainFrame, let source = frame.request.url, GatewayURL.same(source, documentAddress),
-                  let current = webView.url, GatewayURL.same(current, documentAddress), let language = defaultText, ["zh", "en"].contains(language) else { completionHandler(nil); return }
+                  let current = webView.url, GatewayURL.same(current, documentAddress), let language = defaultText, ["ko", "en"].contains(language) else { completionHandler(nil); return }
             defaults.set(language, forKey: "bridge-language");updateGatewayMenu();completionHandler("saved");return
         }
         guard prompt == "codexbridge-copy:" + clipboardToken, webView === web,
@@ -1403,7 +1403,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         url.absoluteString == documentAddress + "/html-preview-shell" || url.absoluteString == documentAddress + "/mermaid-render-shell" || url.absoluteString == documentAddress + "/visualize-shell"
     }
     private func downloadArtifact(_ request: URLRequest) {
-        guard !downloadState.busy else { downloadPanel.expand(); info(MobileStrings.text("已有下载进行中，请稍候")); return }
+        guard !downloadState.busy else { downloadPanel.expand(); info(MobileStrings.text("다운로드가 진행 중입니다. 기다리세요.")); return }
         guard let url = request.url, isArtifact(url) else { return }
         guard let physical=URL(string:origin+url.absoluteString.dropFirst(documentAddress.count)) else{return};downloadPanel.expand(); downloads.start(physical, origin: origin)
     }
@@ -1414,7 +1414,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         // The menu transfers the document to the receiving app; the active task retains its source.
         if !document.presentOpenInMenu(from: downloadPanel.bounds, in: downloadPanel, animated: true),
            !document.presentPreview(animated: true) {
-            openDocument = nil; info(MobileStrings.text("暂无可打开此文件的应用"))
+            openDocument = nil; info(MobileStrings.text("이 파일을 열 수 있는 앱이 없습니다."))
         }
     }
     func documentInteractionControllerViewControllerForPreview(_ controller: UIDocumentInteractionController) -> UIViewController { self }
@@ -1486,7 +1486,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 for url in urls { try? FileManager.default.removeItem(at: url) }; return
             }
             if urls.count == results.count { finishUpload(urls) }
-            else { for url in urls { try? FileManager.default.removeItem(at: url) }; finishUpload(nil); info(MobileStrings.text("无法读取所选文件，请从系统文件选择器重新选择。")) }
+            else { for url in urls { try? FileManager.default.removeItem(at: url) }; finishUpload(nil); info(MobileStrings.text("선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.")) }
         }
     }
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
@@ -1495,7 +1495,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         guard uploadGeneration == generation, let current = web?.url, GatewayURL.same(current, documentAddress) else { finishUpload(nil); return }
         guard !urls.isEmpty, urls.allSatisfy({ $0.isFileURL && FileManager.default.isReadableFile(atPath: $0.path) }) else {
             finishUpload(nil)
-            controller.dismiss(animated: true) { self.info(MobileStrings.text("无法读取所选文件，请从系统文件选择器重新选择。")) }
+            controller.dismiss(animated: true) { self.info(MobileStrings.text("선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.")) }
             return
         }
         finishUpload(urls)
@@ -1508,7 +1508,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         if let result = uu.callback(url) { if !result.isEmpty { routeNotice(MobileStrings.text(result)) }; return }
         guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false), c.scheme == "codexbridge", c.host == "open" else { return }
         let q = c.queryItems ?? []; func get(_ key: String) -> String? { q.first(where: { $0.name == key })?.value }
-        guard let original = get("origin"), let thread = get("thread"), saved.contains(activeChannel(original)), let target = try? GatewayURL.chat(activeChannel(original), thread: thread, host: get("host") ?? "local") else { info(MobileStrings.text("请先扫码保存通知对应的电脑，再打开聊天。")); return }
+        guard let original = get("origin"), let thread = get("thread"), saved.contains(activeChannel(original)), let target = try? GatewayURL.chat(activeChannel(original), thread: thread, host: get("host") ?? "local") else { info(MobileStrings.text("채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.")); return }
         let address = activeChannel(original)
         connect(target, address: address)
     }
@@ -1521,7 +1521,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
             guard valid() else { return }
             guard poll == nil || self.saved.contains(address) else { done(.failure(NSError(domain: "Bridge", code: 401))); return }
             let matching = cookies.filter { cookie in self.cookieMatches(cookie, address: address, discover: route == "/api/auth") }
-            guard !matching.isEmpty else { done(.failure(NSError(domain: "Bridge", code: 401, userInfo: [NSLocalizedDescriptionKey: MobileStrings.text("请先连接并登录电脑网关")]))); return }
+            guard !matching.isEmpty else { done(.failure(NSError(domain: "Bridge", code: 401, userInfo: [NSLocalizedDescriptionKey: MobileStrings.text("먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.")]))); return }
             var request = URLRequest(url: target); request.setValue(GatewayURL.httpOrigin(address), forHTTPHeaderField: "Origin"); request.setValue(HTTPCookie.requestHeaderFields(with: matching)["Cookie"], forHTTPHeaderField: "Cookie"); request.setValue("BridgeMobile/0.1-iOS", forHTTPHeaderField: "User-Agent")
             if let body { request.httpMethod = "POST"; request.httpBody = try? JSONSerialization.data(withJSONObject: body); request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue(csrf, forHTTPHeaderField: "X-CSRF-Token") }
             let task = self.session.dataTask(with: request) { data, response, error in
@@ -1529,7 +1529,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 let result: Result<[String: Any], Error>
                 if let error { result = .failure(error) }
                 else if code == 200, let data, data.count <= 512000, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { result = .success(value) }
-                else { result = .failure(NSError(domain: "Bridge", code: code ?? 0, userInfo: [NSLocalizedDescriptionKey: code == 401 || code == 403 ? MobileStrings.text("登录已失效，请重新连接电脑") : MobileStrings.text("请使用配套电脑 Preview，并检查连接")])) }
+                else { result = .failure(NSError(domain: "Bridge", code: code ?? 0, userInfo: [NSLocalizedDescriptionKey: code == 401 || code == 403 ? MobileStrings.text("로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.") : MobileStrings.text("일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.")])) }
                 DispatchQueue.main.async {
                     guard valid() else { return }
                     if route == "/api/auth", case .success(let auth) = result, auth["authenticated"] as? Bool == true,
@@ -1583,7 +1583,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     private func clearInbox(_ data: [String: Any], address: String, done: @escaping () -> Void) {
         fetch(address: address, route: "/api/auth") { result in
-            guard case .success(let auth) = result, let csrf = auth["csrf"] as? String else { self.info(MobileStrings.text("登录已失效，请重新连接电脑")); return }
+            guard case .success(let auth) = result, let csrf = auth["csrf"] as? String else { self.info(MobileStrings.text("로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.")); return }
             self.fetch(address: address, route: "/api/mobile/events/read", body: ["provider": "all", "streamId": data["streamId"] ?? "", "through": data["cursor"] ?? 0], csrf: csrf) { result in
                 switch result {
                 case .success(let snapshot): self.updateComputerNotifications(snapshot, address: address); done()
@@ -1596,14 +1596,14 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         switch result {
         case .failure(let error): self.info(error.localizedDescription)
         case .success(let data):
-            guard data["enabled"] as? Bool == true else { self.info(MobileStrings.text("请在电脑 Preview 的手机通知中开启“手机 App 通知收件箱”并保存。")); return }
+            guard data["enabled"] as? Bool == true else { self.info(MobileStrings.text("데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.")); return }
             let stream = data["streamId"] as? String ?? ""
             let clearKey = "cleared:" + self.origin + ":" + stream
             let events = (data["events"] as? [[String: Any]] ?? []).filter { ($0["sequence"] as? Int ?? 0) > self.defaults.integer(forKey: clearKey) }
             let address = self.origin
-            let (sheet, content) = self.sheet(MobileStrings.text("通知"))
+            let (sheet, content) = self.sheet(MobileStrings.text("알림"))
             if !events.isEmpty {
-                content.addArrangedSubview(self.button(MobileStrings.text("清空通知"), symbol: "trash") { [weak self, weak sheet] in
+                content.addArrangedSubview(self.button(MobileStrings.text("알림 지우기"), symbol: "trash") { [weak self, weak sheet] in
                     guard let self else { return }
                     self.clearInbox(data, address: address) {
                         let cursor = data["cursor"] as? Int ?? 0
@@ -1616,16 +1616,16 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                     }
                 })
             }
-            content.addArrangedSubview(self.label(MobileStrings.text("最近任务提醒"), size: 24, weight: .semibold))
+            content.addArrangedSubview(self.label(MobileStrings.text("최근 작업 알림"), size: 24, weight: .semibold))
             if events.isEmpty {
-                content.addArrangedSubview(self.card([self.label(MobileStrings.text("暂无通知"), size: 18, weight: .medium), self.label(MobileStrings.text("在聊天中开启“提醒”，任务完成或需要你处理时，会记录在这里。"), secondary: true)]))
+                content.addArrangedSubview(self.card([self.label(MobileStrings.text("아직 알림이 없습니다"), size: 18, weight: .medium), self.label(MobileStrings.text("여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요."), secondary: true)]))
             }
             let date = DateFormatter(); date.dateStyle = .short; date.timeStyle = .short
             for event in events.reversed() {
-                var items: [UIView] = [self.label(event["title"] as? String ?? MobileStrings.text("任务提醒"), size: 17, weight: .semibold)]
+                var items: [UIView] = [self.label(event["title"] as? String ?? MobileStrings.text("작업 알림"), size: 17, weight: .semibold)]
                 if let body = event["body"] as? String, !body.isEmpty { items.append(self.label(body, secondary: true)) }
                 if let timestamp = event["createdAt"] as? Double { items.append(self.label(date.string(from: Date(timeIntervalSince1970: timestamp)), size: 12, secondary: true)) }
-                items.append(self.button(MobileStrings.text("查看聊天"), symbol: "arrow.up.right") { [weak self, weak sheet] in
+                items.append(self.button(MobileStrings.text("채팅 보기"), symbol: "arrow.up.right") { [weak self, weak sheet] in
                     sheet?.dismiss(animated: true) {
                         if let thread = event["threadId"] as? String, let host = event["host"] as? String, let url = try? GatewayURL.chat(address, thread: thread, host: host) { self?.connect(url, address: address) }
                     }
@@ -1663,7 +1663,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                     if ready, self.defaults.bool(forKey: "foregroundAlerts"), self.notificationSourceEnabled(address), UIApplication.shared.applicationState == .active {
                         for event in data["events"] as? [[String: Any]] ?? [] where event["unread"] as? Bool != false && (event["sequence"] as? Int ?? 0) > max(previous, cleared) {
                             let content = UNMutableNotificationContent()
-                            content.title = event["title"] as? String ?? MobileStrings.text("任务提醒")
+                            content.title = event["title"] as? String ?? MobileStrings.text("작업 알림")
                             content.body = event["body"] as? String ?? ""
                             content.sound = .default
                             NotificationSource.apply(content, provider: event["provider"] as? String, host: event["host"] as? String)
@@ -1696,9 +1696,9 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         return card([row])
     }
     private func notificationSources() {
-        let (_, content) = sheet(MobileStrings.text("通知来源"))
-        content.addArrangedSubview(label(MobileStrings.text("仅控制这台手机的任务提醒，不影响聊天和通知收件箱。"), secondary: true))
-        if saved.isEmpty { content.addArrangedSubview(label(MobileStrings.text("尚未保存电脑连接"), secondary: true)) }
+        let (_, content) = sheet(MobileStrings.text("알림 소스"))
+        content.addArrangedSubview(label(MobileStrings.text("이 전화기에 대한 작업 알림을 선택하세요. 채팅 및 알림 받은 편지함은 계속 사용할 수 있습니다."), secondary: true))
+        if saved.isEmpty { content.addArrangedSubview(label(MobileStrings.text("저장된 컴퓨터 연결이 없습니다."), secondary: true)) }
         for address in saved {
             let text = column(spacing: 4)
             text.addArrangedSubview(label(computerName(address), size: 17, weight: .semibold))
@@ -1716,7 +1716,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     private func requestForegroundAlerts(showDeniedMessage: Bool) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { allowed, _ in
-            DispatchQueue.main.async { self.defaults.set(allowed, forKey: "foregroundAlerts"); self.foregroundBaselines.removeAll(); if allowed { self.sync() } else if showDeniedMessage { self.info(MobileStrings.text("请在系统设置中允许通知。")) } }
+            DispatchQueue.main.async { self.defaults.set(allowed, forKey: "foregroundAlerts"); self.foregroundBaselines.removeAll(); if allowed { self.sync() } else if showDeniedMessage { self.info(MobileStrings.text("시스템 설정에서 알림을 허용하세요.")) } }
         }
     }
     private func toggleForegroundAlerts() {
@@ -1738,10 +1738,10 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
     }
     private func startLiveActivity() {
-        guard #available(iOS 16.2, *) else { info(MobileStrings.text("实时活动需要 iOS 16.2 或更新版本。")); return }
+        guard #available(iOS 16.2, *) else { info(MobileStrings.text("라이브 활동에는 iOS 16.2 이상이 필요합니다.")); return }
         currentTask { [weak self] task in
             guard let self else { return }
-            guard let task else { self.info(MobileStrings.text("请先打开要跟踪的聊天，再选择灵动岛显示。")); return }
+            guard let task else { self.info(MobileStrings.text("먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.")); return }
             Task { do { try await LiveActivityController.shared.start(origin: self.origin, thread: task["thread"]!, host: task["host"] ?? "local", phase: task["phase"] ?? "offline") }
                 catch { self.info(error.localizedDescription) } }
         }
@@ -1757,60 +1757,60 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }
     }
     @objc private func settings() {
-        let (sheet, content) = sheet(MobileStrings.text("设置"))
-        content.addArrangedSubview(label(MobileStrings.text("外观与显示"), size: 19, weight: .semibold))
+        let (sheet, content) = sheet(MobileStrings.text("설정"))
+        content.addArrangedSubview(label(MobileStrings.text("화면 설정"), size: 19, weight: .semibold))
         let themes = ["system", "light", "dark"]
-        let choice = UISegmentedControl(items: ["跟随系统", "浅色", "深色"].map(MobileStrings.text))
-        choice.accessibilityLabel = MobileStrings.text("主题")
+        let choice = UISegmentedControl(items: ["시스템 설정 따르기", "밝게", "어둡게"].map(MobileStrings.text))
+        choice.accessibilityLabel = MobileStrings.text("테마")
         choice.selectedSegmentIndex = themes.firstIndex(of: theme) ?? 0
         choice.addAction(UIAction { [weak self, weak choice] _ in
             guard let self, let index = choice?.selectedSegmentIndex, themes.indices.contains(index) else { return }
             self.defaults.set(themes[index], forKey: "settingsTheme"); self.applyTheme()
         }, for: .valueChanged)
-        content.addArrangedSubview(card([label(MobileStrings.text("主题"), size: 17, weight: .semibold), choice]))
-        content.addArrangedSubview(label(MobileStrings.text("通知"), size: 19, weight: .semibold))
+        content.addArrangedSubview(card([label(MobileStrings.text("테마"), size: 17, weight: .semibold), choice]))
+        content.addArrangedSubview(label(MobileStrings.text("알림"), size: 19, weight: .semibold))
         content.addArrangedSubview(card([
-            label(MobileStrings.text("前台任务提醒"), size: 17, weight: .semibold),
-            button(defaults.bool(forKey: "foregroundAlerts") ? MobileStrings.text("关闭任务通知") : MobileStrings.text("开启任务通知"), symbol: "bell") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.toggleForegroundAlerts() } },
-            label(MobileStrings.text("App 打开时提醒已连接电脑的新任务消息。离开 App 或锁屏后不保证通知；可在电脑端配置 Bark 或 ntfy。"), secondary: true),
-            button(MobileStrings.text("通知来源"), symbol: "bell") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.notificationSources() } },
-            button(MobileStrings.text("测试本机通知"), symbol: "bell.badge") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.testNotification() } },
-            label(MobileStrings.text("10 秒后显示，用于检查手机的通知权限。"), size: 13, secondary: true)
+            label(MobileStrings.text("포그라운드 작업 알림"), size: 17, weight: .semibold),
+            button(defaults.bool(forKey: "foregroundAlerts") ? MobileStrings.text("작업 알림 끄기") : MobileStrings.text("작업 알림 켜기"), symbol: "bell") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.toggleForegroundAlerts() } },
+            label(MobileStrings.text("앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요."), secondary: true),
+            button(MobileStrings.text("알림 소스"), symbol: "bell") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.notificationSources() } },
+            button(MobileStrings.text("로컬 알림 테스트"), symbol: "bell.badge") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.testNotification() } },
+            label(MobileStrings.text("알림 권한을 확인하기 위해 10초 후에 나타납니다."), size: 13, secondary: true)
         ]))
         if #available(iOS 16.2, *) {
-            content.addArrangedSubview(label(MobileStrings.text("灵动岛与锁屏"), size: 19, weight: .semibold))
+            content.addArrangedSubview(label(MobileStrings.text("Dynamic Island 및 잠금 화면"), size: 19, weight: .semibold))
             content.addArrangedSubview(card([
-                label(MobileStrings.text("跟踪当前聊天"), size: 17, weight: .semibold),
-                label(MobileStrings.text("从电脑菜单选择聊天跟踪。后台显示可能不是最新状态，打开 App 可继续同步。"), secondary: true),
-                button(MobileStrings.text("预览灵动岛"), symbol: "capsule") { [weak self, weak sheet] in
+                label(MobileStrings.text("현재 채팅 추적"), size: 17, weight: .semibold),
+                label(MobileStrings.text("컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요."), secondary: true),
+                button(MobileStrings.text("실시간 현황 미리보기"), symbol: "capsule") { [weak self, weak sheet] in
                     sheet?.dismiss(animated: true) {
                         Task { do { try await LiveActivityController.shared.start(origin: "", thread: "", host: "local", phase: "running", demo: true) }
                             catch { self?.info(error.localizedDescription) } }
                     }
                 },
-                button(MobileStrings.text("结束灵动岛显示"), symbol: "xmark.circle") { Task { await LiveActivityController.shared.stop() } }
+                button(MobileStrings.text("실시간 현황 종료"), symbol: "xmark.circle") { Task { await LiveActivityController.shared.stop() } }
             ]))
         }
-        content.addArrangedSubview(label(MobileStrings.text("当前电脑"), size: 19, weight: .semibold))
+        content.addArrangedSubview(label(MobileStrings.text("현재 컴퓨터"), size: 19, weight: .semibold))
         if origin.isEmpty {
-            content.addArrangedSubview(card([label(MobileStrings.text("尚未选择电脑"), size: 17), label(MobileStrings.text("返回首页扫码或输入网关地址。"), secondary: true)]))
+            content.addArrangedSubview(card([label(MobileStrings.text("선택한 컴퓨터가 없습니다."), size: 17), label(MobileStrings.text("홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요."), secondary: true)]))
         } else {
             content.addArrangedSubview(card([
                 label(computerName(origin), size: 17, weight: .semibold), label(origin, size: 13, secondary: true),
-                button(MobileStrings.text("移除这台电脑"), symbol: "trash") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.confirmRemove() } }
+                button(MobileStrings.text("제거"), symbol: "trash") { [weak self, weak sheet] in sheet?.dismiss(animated: true) { self?.confirmRemove() } }
             ]))
         }
         let current = Bundle.main.object(forInfoDictionaryKey: "BridgeReleaseVersion") as? String ?? "2.0.0"
         let updateStatus = label("", size: 13, secondary: true)
-        let check = button(MobileStrings.text("检查更新"), symbol: "arrow.down.circle") {}
+        let check = button(MobileStrings.text("업데이트 확인"), symbol: "arrow.down.circle") {}
         check.addAction(UIAction { [weak self, weak sheet, weak check, weak updateStatus] _ in
             guard let self, let sheet, let check, let updateStatus else { return }
             self.checkUpdate(current: current, sheet: sheet, check: check, status: updateStatus)
         }, for: .touchUpInside)
-        content.addArrangedSubview(card([label(MobileStrings.text("应用更新"), size: 19, weight: .semibold), label("Codex Mobile Bridge · " + current, size: 14), label(MobileStrings.text("手动检查更新，不会自动安装"), size: 13, secondary: true), check, updateStatus, label(MobileStrings.text("iOS App 需要使用自己的 Apple 账号重新签名安装，暂不支持 App 内直接覆盖更新。"), size: 13, secondary: true)]))
+        content.addArrangedSubview(card([label(MobileStrings.text("앱 업데이트"), size: 19, weight: .semibold), label("Codex Mobile Bridge · " + current, size: 14), label(MobileStrings.text("수동 업데이트 확인, 자동 설치 없음"), size: 13, secondary: true), check, updateStatus, label(MobileStrings.text("iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다."), size: 13, secondary: true)]))
     }
     private func checkUpdate(current: String, sheet: UIViewController, check: UIButton, status: UILabel) {
-        check.isEnabled = false; status.text = MobileStrings.text("正在检查更新…")
+        check.isEnabled = false; status.text = MobileStrings.text("업데이트 확인 중…")
         var request = URLRequest(url: MobileRelease.api); request.timeoutInterval = 20
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("Codex-Mobile-Bridge/" + current, forHTTPHeaderField: "User-Agent")
@@ -1826,26 +1826,26 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
                 guard let self, let sheet, sheet.presentingViewController != nil, let check, let status else { return }
                 check.isEnabled = true
                 let url = candidate?.page ?? URL(string: MobileRelease.repository + "/releases")!
-                if !failed && candidate == nil { status.text = MobileStrings.text("当前已是此通道最新版本。"); return }
+                if !failed && candidate == nil { status.text = MobileStrings.text("이 채널의 최신 버전을 사용 중입니다."); return }
                 let skipKey = "skip-mobile-update:" + MobileRelease.channel(current)
                 let skipped = candidate?.version == self.defaults.string(forKey: skipKey)
-                status.text = MobileStrings.text(failed ? "检查失败，请检查网络后重试。也可以打开版本页面。" : skipped ? "已跳过此版本，仍可手动更新" : "发现新版本") + (candidate.map { " · " + $0.version } ?? "")
-                let alert = UIAlertController(title: status.text, message: candidate.map { MobileStrings.text("iOS App 需要使用自己的 Apple 账号重新签名安装，暂不支持 App 内直接覆盖更新。") + "\n\n" + $0.notes }, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: MobileStrings.text("稍后"), style: .cancel))
-                if let candidate { alert.addAction(UIAlertAction(title: MobileStrings.text("跳过此版本"), style: .default) { _ in
+                status.text = MobileStrings.text(failed ? "업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다." : skipped ? "이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다" : "업데이트 가능") + (candidate.map { " · " + $0.version } ?? "")
+                let alert = UIAlertController(title: status.text, message: candidate.map { MobileStrings.text("iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.") + "\n\n" + $0.notes }, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: MobileStrings.text("나중에"), style: .cancel))
+                if let candidate { alert.addAction(UIAlertAction(title: MobileStrings.text("이 버전 건너뛰기"), style: .default) { _ in
                     self.defaults.set(candidate.version, forKey: skipKey)
-                    status.text = MobileStrings.text("已跳过此版本，仍可手动更新") + " · " + candidate.version
+                    status.text = MobileStrings.text("이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다") + " · " + candidate.version
                 }) }
-                alert.addAction(UIAlertAction(title: MobileStrings.text(failed ? "版本页面" : "查看新版与安装指引"), style: .default) { _ in UIApplication.shared.open(url) })
+                alert.addAction(UIAlertAction(title: MobileStrings.text(failed ? "릴리스" : "업데이트 및 설치 가이드 보기"), style: .default) { _ in UIApplication.shared.open(url) })
                 sheet.present(alert, animated: true)
             }
         }.resume()
     }
     private var pushSupported: Bool { Bundle.main.object(forInfoDictionaryKey: "BridgePushEnabled") as? Bool == true }
     private func enableNativePush() {
-        guard pushSupported else { info(MobileStrings.text("此预览尚未配置 Apple 推送签名。需要开发者账号和电脑端推送服务后才能启用后台任务提醒。")); return }
+        guard pushSupported else { info(MobileStrings.text("Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.")); return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { allowed, _ in DispatchQueue.main.async {
-            guard allowed else { self.info(MobileStrings.text("请在系统设置中允许通知。")); return }
+            guard allowed else { self.info(MobileStrings.text("시스템 설정에서 알림을 허용하세요.")); return }
             self.defaults.set(true, forKey: "nativePushEnabled"); UIApplication.shared.registerForRemoteNotifications()
         } }
     }
@@ -1868,13 +1868,13 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     private func testNotification() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert,.sound,.badge]) { allowed, _ in
-            guard allowed else { DispatchQueue.main.async { self.info(MobileStrings.text("请在系统设置允许 Codex Bridge 通知。")) }; return }
+            guard allowed else { DispatchQueue.main.async { self.info(MobileStrings.text("시스템 설정에서 Codex Bridge 알림을 허용합니다.")) }; return }
             DispatchQueue.main.async {
-                let content = UNMutableNotificationContent(); content.title = MobileStrings.text("手机通知测试"); content.body = MobileStrings.text("本机通知已开启"); content.sound = .default
+                let content = UNMutableNotificationContent(); content.title = MobileStrings.text("모바일 알림 테스트"); content.body = MobileStrings.text("로컬 알림이 활성화되었습니다."); content.sound = .default
                             NotificationSource.apply(content, provider: "codex", host: "local")
                 if !self.origin.isEmpty { content.userInfo = ["origin": self.origin] }
                 UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "preview-test", content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false))) { error in
-                    DispatchQueue.main.async { self.info(error == nil ? MobileStrings.text("10 秒后显示本地测试通知，可以先锁屏。此测试不代表远程推送已经接通。") : MobileStrings.text("测试通知未能创建，请检查系统通知设置。")) }
+                    DispatchQueue.main.async { self.info(error == nil ? MobileStrings.text("10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.") : MobileStrings.text("테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.")) }
                 }
             }
         }
@@ -1885,9 +1885,9 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
     }
     private func confirmRemove(_ address: String? = nil) {
         let target = address ?? origin
-        let a = UIAlertController(title: MobileStrings.text("移除这台电脑？"), message: target + "\n\n" + MobileStrings.text("清除本机保存的连接和登录状态，电脑上的聊天不受影响。"), preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: MobileStrings.text("取消"), style: .cancel))
-        a.addAction(UIAlertAction(title: MobileStrings.text("移除"), style: .destructive) { _ in
+        let a = UIAlertController(title: MobileStrings.text("이 컴퓨터를 제거하시겠습니까?"), message: target + "\n\n" + MobileStrings.text("저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다."), preferredStyle: .alert)
+        a.addAction(UIAlertAction(title: MobileStrings.text("취소"), style: .cancel))
+        a.addAction(UIAlertAction(title: MobileStrings.text("제거"), style: .destructive) { _ in
             let revision = self.generation
             self.downloads.cancel(origin: target)
             self.revokeConnection(target) {
@@ -1905,7 +1905,7 @@ final class BridgeController: UIViewController, WKNavigationDelegate, WKUIDelega
         }); present(a, animated: true)
     }
     private func scan() {
-        AVCaptureDevice.requestAccess(for: .video) { allowed in DispatchQueue.main.async { guard allowed else { self.info(MobileStrings.text("未获得相机权限，请粘贴网关地址。")); return }; let scanner = Scanner(); scanner.result = { [weak self] value in self?.dismiss(animated: true) { self?.choose(value) } }; self.present(scanner, animated: true) } }
+        AVCaptureDevice.requestAccess(for: .video) { allowed in DispatchQueue.main.async { guard allowed else { self.info(MobileStrings.text("카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.")); return }; let scanner = Scanner(); scanner.result = { [weak self] value in self?.dismiss(animated: true) { self?.choose(value) } }; self.present(scanner, animated: true) } }
     }
 }
 
@@ -1962,12 +1962,12 @@ final class DownloadPanel: UIView {
     func render(_ state: DownloadManager.Snapshot) {
         self.state = state; isHidden = !state.visible; content.isHidden = collapsed
         let percentage = state.total.map { $0 == 0 ? 100 : min(100, Int(Double(state.received) / Double($0) * 100)) }
-        let phases: [DownloadManager.Phase: String] = [.connecting: "正在连接…", .downloading: "正在下载…", .paused: "已暂停", .failed: "下载未完成", .complete: "下载完成，可打开或保存", .saved: "已保存", .idle: "", .cancelled: "已取消"]
+        let phases: [DownloadManager.Phase: String] = [.connecting: "연결 중…", .downloading: "다운로드 중…", .paused: "일시 중지됨", .failed: "다운로드가 완료되지 않았습니다", .complete: "다운로드됨 · 열기 또는 저장", .saved: "저장됨", .idle: "", .cancelled: "취소됨"]
         let phase = MobileStrings.text(phases[state.phase] ?? "")
         title.text = state.name + (collapsed ? " · " + (state.phase == .downloading ? percentage.map { "\($0)%" } ?? phase : phase) : "")
         title.accessibilityLabel = state.name
         collapse.setImage(UIImage(systemName: collapsed ? "chevron.up" : "chevron.down"), for: .normal)
-        collapse.accessibilityLabel = MobileStrings.text(collapsed ? "展开下载" : "收起下载")
+        collapse.accessibilityLabel = MobileStrings.text(collapsed ? "다운로드 펼치기" : "다운로드 축소")
         func bytes(_ value: Int64) -> String { ByteCountFormatter.string(fromByteCount: value, countStyle: .file) }
         detail.text = bytes(state.received) + (state.total.map { " / " + bytes($0) } ?? "") +
             (percentage.map { " · \($0)%" } ?? "") + (state.phase == .downloading ? " · " + bytes(Int64(max(0, state.speed))) + "/s" : "")
@@ -1975,10 +1975,10 @@ final class DownloadPanel: UIView {
         progress.isHidden = state.total == nil
         progress.progress = state.total.map { $0 == 0 ? 1 : Float(Double(state.received) / Double($0)) } ?? 0
         toggle.isHidden = ![.connecting, .downloading, .paused, .failed].contains(state.phase)
-        toggle.configuration?.title = MobileStrings.text([.connecting, .downloading].contains(state.phase) ? "暂停" : state.canResume ? "继续下载" : "重新下载")
-        save.isHidden = state.phase != .complete; save.configuration?.title = MobileStrings.text("保存到文件")
-        open.isHidden = state.phase != .complete; open.configuration?.title = MobileStrings.text("打开")
-        cancel.configuration?.title = MobileStrings.text([.complete, .saved].contains(state.phase) ? "关闭" : "取消下载")
+        toggle.configuration?.title = MobileStrings.text([.connecting, .downloading].contains(state.phase) ? "일시 중지" : state.canResume ? "재개" : "다시 시작")
+        save.isHidden = state.phase != .complete; save.configuration?.title = MobileStrings.text("파일에 저장")
+        open.isHidden = state.phase != .complete; open.configuration?.title = MobileStrings.text("열기")
+        cancel.configuration?.title = MobileStrings.text([.complete, .saved].contains(state.phase) ? "닫기" : "다운로드 취소")
     }
 }
 
@@ -1993,7 +1993,7 @@ final class Scanner: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
         guard let device = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: device), capture.canAddInput(input) else { dismiss(animated: true); return }
         capture.addInput(input); let output = AVCaptureMetadataOutput(); guard capture.canAddOutput(output) else { return }; capture.addOutput(output); output.setMetadataObjectsDelegate(self, queue: .main); output.metadataObjectTypes = [.qr]
         let preview = AVCaptureVideoPreviewLayer(session: capture); preview.videoGravity = .resizeAspectFill; view.layer.addSublayer(preview); layer = preview
-        let close = UIButton(type: .system); close.setTitle(MobileStrings.text("取消扫码"), for: .normal); close.tintColor = .white; close.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(close); close.addAction(UIAction { _ in self.dismiss(animated: true) }, for: .touchUpInside); NSLayoutConstraint.activate([close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 15), close.centerXAnchor.constraint(equalTo: view.centerXAnchor)])
+        let close = UIButton(type: .system); close.setTitle(MobileStrings.text("스캔 취소"), for: .normal); close.tintColor = .white; close.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(close); close.addAction(UIAction { _ in self.dismiss(animated: true) }, for: .touchUpInside); NSLayoutConstraint.activate([close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 15), close.centerXAnchor.constraint(equalTo: view.centerXAnchor)])
         queue.async { self.capture.startRunning() }
     }
     override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); layer?.frame = view.bounds }
@@ -2012,229 +2012,230 @@ enum ComputerNotificationSummary {
 
 enum MobileStrings {
     static let values: [String: String] = [
-        "UU 请求正在处理中": "A UU request is already in progress",
-        "请安装或更新 UU 远程至 4.42.0 及以上版本": "Install or update UU Remote to version 4.42.0 or later",
-        "无法打开 UU 远程": "Could not open UU Remote",
-        "UU 设备已绑定，请再次选择小窗或远控": "Device linked. Select picture-in-picture or remote control again.",
-        "UU 绑定未完成，请在 UU 中确认账号和设备": "Device linking did not finish. Check your account and device in UU Remote.",
-        "UU 小窗已开启": "UU picture-in-picture is open",
-        "UU 设备已失效，请重新绑定": "The UU device is no longer available. Link it again.",
-        "UU 设备离线": "The UU device is offline",
-        "当前设备不支持 UU 小窗，请使用全屏远控": "Picture-in-picture is unavailable. Use full-screen control.",
-        "UU 小窗未能开启，请检查设备或重试": "Could not open picture-in-picture. Check the device and try again.",
-        "此设备无法使用相机": "Camera is unavailable on this device",
-        "粘贴 DSH 客户端 Mobile 功能提供的完整链接": "Paste the full link from your DSH client’s Mobile feature",
-        "连接 DSH Mobile？": "Connect to DSH Mobile?",
-        "\n请确认这是你自己的 DSH 客户端。将打开它自带的手机界面。": "\nConfirm this is your DSH client. Its own mobile interface will open.",
-        "无法保存 DSH Mobile 连接": "Could not save the DSH Mobile connection",
-        "连接凭据不可用，请移除后重新添加": "Connection credentials are unavailable. Remove and add this connection again.",
-        "连接凭据不可用": "Connection credentials unavailable",
-        "Android 8 请使用浏览器打开 DSH Mobile；App 内连接需要 Android 9 或更高版本。": "On Android 8, open DSH Mobile in your browser. In-app access requires Android 9 or later.",
-        "连接失败，请刷新重试": "Connection failed. Refresh to retry",
-        "DSH Mobile 地址无效": "Invalid DSH Mobile URL",
-        "请使用完整的 DSH Mobile HTTPS 链接，或局域网 HTTP 链接。": "Use a full DSH Mobile HTTPS link, or an HTTP link on your local network.",
-        "通知来源": "Notification sources",
-        "连接中…": "Connecting…",
-        "当前信道不可达，请手动切换连接信道": "Current channel is unreachable. Choose another channel.",
-        "移除此电脑": "Remove this computer",
-        "管理这台电脑": "Manage this computer",
-        "仅控制这台手机的任务提醒，不影响聊天和通知收件箱。": "Choose task alerts for this phone. Chats and notification inboxes remain available.",
-        "尚未保存电脑连接": "No saved computer connections",
-        "主题": "Theme",
-        "跟随系统": "System",
-        "浅色": "Light",
-        "深色": "Dark",
-        "正在连接…": "Connecting…",
-        "已暂停": "Paused",
-        "下载未完成": "Download incomplete",
-        "下载完成，可打开或保存": "Downloaded · open or save",
-        "暂无可打开此文件的应用": "No app is available to open this file.",
-        "已保存": "Saved",
-        "已取消": "Cancelled",
-        "展开下载": "Expand download",
-        "收起下载": "Collapse download",
-        "暂停": "Pause",
-        "继续下载": "Resume",
-        "重新下载": "Restart",
-        "保存到文件": "Save to Files",
-        "取消下载": "Cancel download",
-        "关闭": "Close",
-        "当前服务器不支持续传，请重新下载": "This server cannot resume downloads. Restart the download.",
-        "下载响应格式不正确，请重新下载": "Invalid download response. Restart the download.",
-        "文件已变化，请重新下载": "The file changed. Restart the download.",
-        "网关不支持安全续传，请更新网关后重试": "Update the gateway to resume downloads safely.",
-        "文件已变化或服务器不支持续传，请重新下载": "The file changed or the server cannot resume it. Restart the download.",
-        "下载中断，可继续下载": "Download interrupted. You can resume it.",
-        "电脑暂时不可用，可继续下载": "Computer temporarily unavailable. You can resume the download.",
-        "无法读取所选文件，请从系统文件选择器重新选择。": "Cannot read the selected file. Select it again using the system file picker.",
-        "未读通知": "Unread notifications", "刷新状态": "Refresh status", "最近通知": "Recent notifications", "需要你处理": "Action requested", "已运行完毕": "Completed",
-        "重命名": "Rename",
-        "重命名电脑": "Rename computer",
-        "留空恢复默认名称": "Leave blank to restore the default name",
-        "名称最多 80 个字符": "Use no more than 80 characters",
-        "保存": "Save",
+        "UU Remote 요청을 처리 중입니다.": "A UU request is already in progress",
+        "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.": "Install or update UU Remote to version 4.42.0 or later",
+        "UU Remote를 열 수 없습니다.": "Could not open UU Remote",
+        "기기가 연결되었습니다. 작은 화면 또는 원격 제어를 다시 선택하세요.": "Device linked. Select picture-in-picture or remote control again.",
+        "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.": "Device linking did not finish. Check your account and device in UU Remote.",
+        "UU Remote 작은 화면이 열렸습니다.": "UU picture-in-picture is open",
+        "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.": "The UU device is no longer available. Link it again.",
+        "UU Remote 기기가 오프라인 상태입니다.": "The UU device is offline",
+        "작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.": "Picture-in-picture is unavailable. Use full-screen control.",
+        "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.": "Could not open picture-in-picture. Check the device and try again.",
+        "이 기기에서는 카메라를 사용할 수 없습니다": "Camera is unavailable on this device",
+        "DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요.": "Paste the full link from your DSH client’s Mobile feature",
+        "DSH Mobile에 연결하시겠습니까?": "Connect to DSH Mobile?",
+        "\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다.": "\nConfirm this is your DSH client. Its own mobile interface will open.",
+        "DSH Mobile 연결을 저장할 수 없습니다.": "Could not save the DSH Mobile connection",
+        "연결 자격 증명을 사용할 수 없습니다. 이 연결을 제거하고 다시 추가하십시오.": "Connection credentials are unavailable. Remove and add this connection again.",
+        "연결 자격 증명을 사용할 수 없습니다.": "Connection credentials unavailable",
+        "Android 8의 브라우저에서 DSH Mobile을 엽니다. 인앱 액세스에는 Android 9 이상이 필요합니다.": "On Android 8, open DSH Mobile in your browser. In-app access requires Android 9 or later.",
+        "연결에 실패했습니다. 다시 시도하려면 새로고침하세요.": "Connection failed. Refresh to retry",
+        "잘못된 DSH Mobile 주소입니다.": "Invalid DSH Mobile URL",
+        "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요.": "Use a full DSH Mobile HTTPS link, or an HTTP link on your local network.",
+        "알림 소스": "Notification sources",
+        "연결 중…": "Connecting…",
+        "현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요.": "Current channel is unreachable. Choose another channel.",
+        "이 컴퓨터 제거": "Remove this computer",
+        "이 컴퓨터 관리": "Manage this computer",
+        "이 전화기에 대한 작업 알림을 선택하세요. 채팅 및 알림 받은 편지함은 계속 사용할 수 있습니다.": "Choose task alerts for this phone. Chats and notification inboxes remain available.",
+        "저장된 컴퓨터 연결이 없습니다.": "No saved computer connections",
+        "테마": "Theme",
+        "시스템 설정 따르기": "System",
+        "밝게": "Light",
+        "어둡게": "Dark",
 
-"Codex 未完成侧边聊天操作，请检查模型接入和运行时版本":"Codex could not complete the side chat operation. Check the model connection and runtime version.",
-"临时侧边聊天数量已达上限，请关闭不用的聊天；必要时重启网关":"Too many temporary side chats. End unused chats or restart the gateway.",
-"侧边聊天工作目录不一致，已取消创建":"Side chat creation cancelled because the working directory did not match.",
-"侧边聊天已关闭或失效":"Side chat closed or expired",
-"侧边聊天已失效，请关闭后新建":"Side chat expired. End it and create a new one.",
-"侧边聊天执行失败，请检查模型接入后重试":"Side chat failed. Check the model connection and try again.",
-"侧边聊天操作结果未确认，请刷新状态，不要重复发送":"Operation unconfirmed. Refresh the status before sending again.",
-"侧边聊天的模型接入与主聊天不一致，已取消创建":"Side chat creation cancelled because its model connection did not match the parent.",
-"侧边聊天运行时已断开":"Side chat runtime disconnected",
-"同一消息标识不能用于不同内容":"A message ID cannot be reused for different content",
-"无效侧边聊天操作":"Invalid side chat operation",
-"无法确认临时分支，已取消创建":"Could not verify the temporary branch. Creation cancelled.",
-"模型 ID 格式不正确":"Invalid model ID",
-"此 Codex 运行时不支持临时侧边聊天，请更新 Codex":"This runtime does not support temporary side chats. Update Codex.",
-"此侧边聊天已关闭或已失效，请刷新标签":"Side chat closed or expired. Refresh this tab.",
-"此次创建的侧边聊天已关闭，请重新打开标签后新建":"This side chat was ended. Reopen the tab to create another.",
-"此请求已处理或已失效":"This request was handled or expired",
-"此请求暂不支持在侧边聊天处理，请停止本次回复。":"This request is not supported in side chats. Stop this response.",
-"此请求暂不支持，请停止本次回复":"Unsupported request. Stop this response.",
-"此预览暂支持网关电脑上的聊天，SSH 远程工作区尚未接入侧边聊天":"Side chats currently support the gateway computer. SSH remote workspaces are not supported yet.",
-"确认回复格式不正确":"Invalid approval response",
-"确认操作无效":"Invalid approval action",
-"请先等待回复完成或处理确认请求":"Wait for the response or handle the pending request first",
-"请输入 1–20000 字的消息":"Enter a message of 1–20,000 characters",
-"请选择有效的推理强度":"Choose a valid reasoning effort",
-"请选择本次允许、拒绝或取消":"Choose allow once, deny or cancel",
-"请选择本次允许或拒绝":"Choose allow once or deny",
-"这个模型不支持所选推理强度":"This model does not support the selected reasoning effort",
-"公网地址必须使用 HTTPS；HTTP 仅限局域网":"Public addresses require HTTPS. HTTP is only allowed on a local network.",
-"网关地址不应包含路径":"Gateway addresses must not include a path",
-"请使用电脑网关提供的地址或二维码":"Use the address or QR code from your computer’s gateway",
-"请填写完整网关地址，不含账号或参数":"Enter a complete gateway address without credentials or query parameters",
-"请填写完整的 HTTPS 网关地址，或局域网 HTTP 地址，不含路径、账号和参数。":"Enter a complete HTTPS gateway address, or a local HTTP address, without a path, credentials or parameters.",
-        "通知收件箱": "Notification inbox",
-        "手机设置": "Mobile settings",
-"应用更新": "App updates",
-"手动检查更新，不会自动安装": "Manual update checks, no automatic installation",
-"检查更新": "Check for updates",
-"正在检查更新…": "Checking for updates…",
-"没有可用的浏览器，请在电脑上打开 GitHub Release。": "No browser is available. Open GitHub Releases on your computer.",
-"检查失败，请检查网络后重试。也可以打开版本页面。": "Could not check for updates. Check your network and retry, or open the releases page.",
-"版本页面": "Releases",
-"当前已是此通道最新版本。": "You are up to date on this channel.",
-"发现新版本": "Update available",
-"跳过此版本": "Skip this version",
-"已跳过此版本，仍可手动更新": "This version is skipped; you can still update manually",
-"下载后按系统提示覆盖安装，不要先卸载。已保存的电脑与登录状态会保留。": "After downloading, follow the system prompts to update without uninstalling. Saved computers and sign-ins will be retained.",
-"稍后": "Later",
-"更新说明": "Release notes",
-"下载 APK": "Download APK",
-"查看新版与安装指引": "View update and installation guide",
-"iOS App 需要使用自己的 Apple 账号重新签名安装，暂不支持 App 内直接覆盖更新。": "The iOS app requires signing the new build with your own Apple account. Direct in-app installation is not available yet.",
+        "일시 중지됨": "Paused",
+        "다운로드가 완료되지 않았습니다": "Download incomplete",
+        "다운로드됨 · 열기 또는 저장": "Downloaded · open or save",
+        "이 파일을 열 수 있는 앱이 없습니다.": "No app is available to open this file.",
+        "저장됨": "Saved",
+        "취소됨": "Cancelled",
+        "다운로드 펼치기": "Expand download",
+        "다운로드 축소": "Collapse download",
+        "일시 중지": "Pause",
+        "재개": "Resume",
+        "다시 시작": "Restart",
+        "파일에 저장": "Save to Files",
+        "다운로드 취소": "Cancel download",
+        "닫기": "Close",
+        "이 서버는 다운로드를 재개할 수 없습니다. 다운로드를 다시 시작하세요.": "This server cannot resume downloads. Restart the download.",
+        "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.": "Invalid download response. Restart the download.",
+        "파일이 변경되었습니다. 다운로드를 다시 시작하세요.": "The file changed. Restart the download.",
+        "다운로드를 안전하게 재개하려면 게이트웨이를 업데이트하세요.": "Update the gateway to resume downloads safely.",
+        "파일이 변경되었거나 서버가 파일을 재개할 수 없습니다. 다운로드를 다시 시작하세요.": "The file changed or the server cannot resume it. Restart the download.",
+        "다운로드가 중단되었습니다. 재개할 수 있습니다.": "Download interrupted. You can resume it.",
+        "컴퓨터를 일시적으로 사용할 수 없습니다. 다운로드를 재개할 수 있습니다.": "Computer temporarily unavailable. You can resume the download.",
+        "선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.": "Cannot read the selected file. Select it again using the system file picker.",
+        "읽지 않은 알림": "Unread notifications", "상태 새로고침": "Refresh status", "최근 알림": "Recent notifications", "조치가 요청되었습니다": "Action requested", "완료됨": "Completed",
+        "이름 바꾸기": "Rename",
+        "컴퓨터 이름 바꾸기": "Rename computer",
+        "기본 이름을 복원하려면 비워 두세요.": "Leave blank to restore the default name",
+        "80자 이하로 사용하세요.": "Use no more than 80 characters",
+        "저장": "Save",
 
-        "返回电脑列表": "Back to computers",
-        "暂时无法连接电脑": "Can’t reach the computer",
-        "网关暂时无法访问。请检查电脑和网络后重试，或返回电脑列表。": "The gateway is temporarily unreachable. Check your computer and network, then retry or go back to your computers.",
-        "重试": "Try again",
-        "外观与显示": "Appearance",
-        "隐藏底部 APP 图标": "Hide bottom app icons",
-        "显示底部 APP 图标": "Show bottom app icons",
-        "刷新页面": "Reload page",
-        "好": "OK",
-        "电脑上的工作，\n带在身边。": "Your computer’s work,\nalways with you.",
-        "继续聊天、查看结果，让电脑替你运行。": "Continue chats and view results while your computer does the work.",
-        "扫码连接电脑": "Scan to connect",
-        "输入网关地址": "Enter gateway address",
-        "我的电脑": "My computers",
-        "账号与接入": "Accounts & connections",
-        "还没有连接的电脑": "No computers connected yet",
-        "在电脑网关中展开“扫码登录”，然后用上方按钮扫描。": "Open “Scan to sign in” on your computer’s gateway, then scan using the button above.",
-        "连接 ": "Connect ",
-        "外出使用 HTTPS 地址；局域网地址需要连接同一网络。": "Use HTTPS when away. Local addresses require the same network.",
-        "连接电脑": "Connect to computer",
-        "粘贴电脑网关提供的访问地址": "Paste the address shown by your computer’s gateway",
-        "继续": "Continue",
-        "取消": "Cancel",
-        "连接到这台电脑？": "Connect to this computer?",
-        "\n请确认这是你自己的网关。": "\nMake sure this is your own gateway.",
-        "连接": "Connect",
-        "正在连接 · ": "Connecting · ",
-        "电脑与聊天选项": "Computer and chat options",
-        "在浏览器打开外部链接？\n": "Open external link in browser?\n",
-        "打开": "Open",
-        "连接失败，请在更多菜单中刷新": "Connection failed. Reload from the More menu.",
-        "没有可用的文件选择器": "No file picker available",
-        "已有下载进行中，请稍候": "A download is in progress. Please wait.",
-        "此下载不是当前电脑的附件，请在浏览器中打开": "This download is not an attachment from the current computer. Open it in your browser.",
-        "正在下载…": "Downloading…",
-        "没有可用的文件保存器": "No file saver available",
-        "下载失败，请重试": "Download failed. Try again.",
-        "文件已保存": "File saved",
-        "保存失败，请重试": "Could not save. Try again.",
-        "请先扫码保存通知对应的电脑，再打开聊天。": "Scan and save the notification’s computer before opening the chat.",
-        "通知链接无效": "Invalid notification link",
-        "完成": "Done",
-        "请先连接并登录电脑": "Connect and sign in to a computer first",
-        "正在读取通知…": "Loading notifications…",
-        "请在电脑 Preview 的手机通知中开启“手机 App 通知收件箱”并保存。": "Enable and save “Mobile app notification inbox” in the desktop Preview’s notification settings.",
-        "通知": "Notifications",
-        "最近任务提醒": "Recent task notifications",
-        "清空通知": "Clear notifications",
-        "暂无通知": "No notifications yet",
-        "在聊天中开启“提醒”，任务完成或需要你处理时，会记录在这里。": "Enable chat notifications to see completed tasks and requests that need your attention here.",
-        "任务提醒": "Task notification",
-        "查看聊天  ↗": "View chat  ↗",
-        "聊天链接无效": "Invalid chat link",
-        "设置": "Settings",
-        "启用系统后台推送": "Enable system push",
-        "关闭任务通知": "Turn off task notifications",
-        "开启任务通知": "Turn on task notifications",
-        "App 打开时提醒已连接电脑的新任务消息。离开 App 或锁屏后不保证通知；可在电脑端配置 Bark 或 ntfy。": "Receive new task alerts from saved computers while this app is open. Delivery after leaving the app or locking the screen is not guaranteed. Configure Bark or ntfy on your computer for external alerts.",
-        "测试本机通知": "Test local notification",
-        "10 秒后显示，用于检查手机的通知权限。": "Appears in 10 seconds to check notification permissions.",
-        "当前电脑": "Current computer",
-        "尚未选择电脑": "No computer selected",
-        "返回首页扫码或输入网关地址。": "Return home to scan or enter a gateway address.",
-        "移除这台电脑": "Remove",
-        "此预览尚未配置系统推送项目。当前仅同步收件箱；配置 Firebase 或厂商推送后才能启用后台任务提醒。": "System push is not configured. Background task alerts require Firebase or a device vendor’s push service.",
-        "手机通知测试": "Mobile notification test",
-        "本机通知已开启": "Local notifications are enabled",
-        "10 秒后显示本地测试通知，可以先返回桌面。此测试不代表远程推送已经接通。": "A local test notification will appear in 10 seconds. You may leave the app. This does not verify remote push delivery.",
-        "移除这台电脑？": "Remove this computer?",
-        "清除本机保存的连接和登录状态，电脑上的聊天不受影响。": "Remove the saved connection and sign-in on this device. Chats on the computer are unaffected.",
-        "移除": "Remove",
-        "未获得权限，可继续粘贴地址使用。": "Permission denied. You can still paste an address to connect.",
-        "系统推送注册失败，请检查推送签名与网络。": "Push registration failed. Check signing and network access.",
-        "电脑与通知": "Computers and notifications",
-        "在灵动岛显示此聊天": "Show this chat in Dynamic Island",
-        "结束灵动岛显示": "End Live Activity",
-        "请先连接通知对应的电脑。": "Connect to the computer for this notification first.",
-        "请先扫码保存通知对应的电脑。": "Scan and save this notification’s computer first.",
-        "在浏览器打开外部链接？": "Open external link in browser?",
-        "连接失败，请检查电脑和地址后刷新": "Connection failed. Check the computer and address, then reload.",
-        "确认": "确认",
-        "下载失败，请检查登录状态后重试": "Download failed. Check sign-in and try again.",
-        "附件超过 50 MB 下载限制": "Attachment exceeds the 50 MB download limit",
-        "无法保存下载文件，请检查剩余空间": "Could not save the download. Check available storage.",
-        "下载地址发生跳转，已取消。请重新打开电脑附件。": "Download redirect blocked. Reopen the attachment from your computer.",
-        "下载失败，请检查网络后重试": "Download failed. Check your network and try again.",
-        "请先连接并登录电脑网关": "Connect and sign in to your computer’s gateway first",
-        "登录已失效，请重新连接电脑": "Sign-in expired. Reconnect to the computer.",
-        "请使用配套电脑 Preview，并检查连接": "Use the matching desktop Preview and check the connection",
-        "查看聊天": "View chat",
-        "请在系统设置中允许通知。": "Allow notifications in system settings.",
-        "实时活动需要 iOS 16.2 或更新版本。": "Live Activities require iOS 16.2 or later.",
-        "请先打开要跟踪的聊天，再选择灵动岛显示。": "Open a chat first, then choose to show it in Dynamic Island.",
-        "前台任务提醒": "Foreground task notifications",
-        "灵动岛与锁屏": "Dynamic Island and Lock Screen",
-        "跟踪当前聊天": "Track current chat",
-        "从电脑菜单选择聊天跟踪。后台显示可能不是最新状态，打开 App 可继续同步。": "Choose a chat to track from the computer menu. Background status may be out of date; open the app to sync.",
-        "预览灵动岛": "Preview Live Activity",
-        "此预览尚未配置 Apple 推送签名。需要开发者账号和电脑端推送服务后才能启用后台任务提醒。": "Apple push signing is not configured. Background alerts require a developer account and a gateway push service.",
-        "请在系统设置允许 Codex Bridge 通知。": "Allow Codex Bridge notifications in system settings.",
-        "10 秒后显示本地测试通知，可以先锁屏。此测试不代表远程推送已经接通。": "A local test notification will appear in 10 seconds. You may lock the screen. This does not verify remote push delivery.",
-        "测试通知未能创建，请检查系统通知设置。": "Could not schedule the test. Check system notification settings.",
-        "未获得相机权限，请粘贴网关地址。": "Camera access denied. Paste the gateway address instead.",
-        "检查中…": "Checking…", "在线": "Online", "暂不可达": "Unreachable",
-        "取消扫码": "Cancel scan"
+"Codex가 보조 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.":"Codex could not complete the side chat operation. Check the model connection and runtime version.",
+"임시 보조 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.":"Too many temporary side chats. End unused chats or restart the gateway.",
+"작업 디렉터리가 일치하지 않아 보조 채팅 생성이 취소되었습니다.":"Side chat creation cancelled because the working directory did not match.",
+"보조 채팅이 종료되었거나 만료되었습니다.":"Side chat closed or expired",
+"보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.":"Side chat expired. End it and create a new one.",
+"보조 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요.":"Side chat failed. Check the model connection and try again.",
+"작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.":"Operation unconfirmed. Refresh the status before sending again.",
+"모델 연결이 상위 연결과 일치하지 않아 보조 채팅 생성이 취소되었습니다.":"Side chat creation cancelled because its model connection did not match the parent.",
+"보조 채팅 런타임 연결이 끊어졌습니다.":"Side chat runtime disconnected",
+"다른 내용에 같은 메시지 ID를 다시 사용할 수 없습니다.":"A message ID cannot be reused for different content",
+"잘못된 보조 채팅 작업":"Invalid side chat operation",
+"임시 브랜치를 확인할 수 없어 생성을 취소했습니다.":"Could not verify the temporary branch. Creation cancelled.",
+"잘못된 모델 ID":"Invalid model ID",
+"이 런타임은 임시 보조 채팅을 지원하지 않습니다. Codex를 업데이트하세요.":"This runtime does not support temporary side chats. Update Codex.",
+"보조 채팅이 종료되었거나 만료되었습니다. 이 탭을 새로고침하세요.":"Side chat closed or expired. Refresh this tab.",
+"이 보조 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.":"This side chat was ended. Reopen the tab to create another.",
+"이 요청은 처리되었거나 만료되었습니다.":"This request was handled or expired",
+"이 요청은 보조 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오.":"This request is not supported in side chats. Stop this response.",
+"지원되지 않는 요청입니다. 이 응답을 중지하십시오.":"Unsupported request. Stop this response.",
+"보조 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.":"Side chats currently support the gateway computer. SSH remote workspaces are not supported yet.",
+"잘못된 승인 응답":"Invalid approval response",
+"잘못된 승인 작업":"Invalid approval action",
+"응답을 기다리거나 보류 중인 요청을 먼저 처리하세요.":"Wait for the response or handle the pending request first",
+"1~20,000자의 메시지를 입력하세요.":"Enter a message of 1–20,000 characters",
+"유효한 추론 강도를 선택하세요.":"Choose a valid reasoning effort",
+"한 번 허용, 거부 또는 취소를 선택하세요.":"Choose allow once, deny or cancel",
+"한 번 허용 또는 거부를 선택하세요.":"Choose allow once or deny",
+"이 모델은 선택한 추론 강도를 지원하지 않습니다.":"This model does not support the selected reasoning effort",
+"공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.":"Public addresses require HTTPS. HTTP is only allowed on a local network.",
+"게이트웨이 주소에는 경로가 포함되어서는 안 됩니다.":"Gateway addresses must not include a path",
+"컴퓨터의 게이트웨이에 있는 주소 또는 QR 코드를 사용하세요.":"Use the address or QR code from your computer’s gateway",
+"자격 증명이나 쿼리 매개변수 없이 전체 게이트웨이 주소를 입력하세요.":"Enter a complete gateway address without credentials or query parameters",
+"경로, 자격 증명 또는 매개 변수 없이 전체 HTTPS 게이트웨이 주소 또는 로컬 HTTP 주소를 입력하세요.":"Enter a complete HTTPS gateway address, or a local HTTP address, without a path, credentials or parameters.",
+        "알림 받은 편지함": "Notification inbox",
+        "모바일 설정": "Mobile settings",
+"앱 업데이트": "App updates",
+"수동 업데이트 확인, 자동 설치 없음": "Manual update checks, no automatic installation",
+"업데이트 확인": "Check for updates",
+"업데이트 확인 중…": "Checking for updates…",
+"사용할 수 있는 브라우저가 없습니다. 컴퓨터에서 GitHub 릴리스를 엽니다.": "No browser is available. Open GitHub Releases on your computer.",
+"업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다.": "Could not check for updates. Check your network and retry, or open the releases page.",
+"릴리스": "Releases",
+"이 채널의 최신 버전을 사용 중입니다.": "You are up to date on this channel.",
+"업데이트 가능": "Update available",
+"이 버전 건너뛰기": "Skip this version",
+"이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다": "This version is skipped; you can still update manually",
+"다운로드 후 시스템 안내에 따라 기존 앱을 삭제하지 않고 업데이트하세요. 저장된 컴퓨터와 로그인은 유지됩니다.": "After downloading, follow the system prompts to update without uninstalling. Saved computers and sign-ins will be retained.",
+"나중에": "Later",
+"릴리스 노트": "Release notes",
+"APK 다운로드": "Download APK",
+"업데이트 및 설치 가이드 보기": "View update and installation guide",
+"iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.": "The iOS app requires signing the new build with your own Apple account. Direct in-app installation is not available yet.",
+
+        "컴퓨터 목록으로 돌아가기": "Back to computers",
+        "컴퓨터에 연결할 수 없습니다": "Can’t reach the computer",
+        "게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요.": "The gateway is temporarily unreachable. Check your computer and network, then retry or go back to your computers.",
+        "다시 시도": "Try again",
+        "화면 설정": "Appearance",
+        "하단 앱 아이콘 숨기기": "Hide bottom app icons",
+        "하단 앱 아이콘 표시": "Show bottom app icons",
+        "페이지 새로고침": "Reload page",
+        "확인": "OK",
+        "컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요.": "Your computer’s work,\nalways with you.",
+        "컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요.": "Continue chats and view results while your computer does the work.",
+        "스캔하여 연결": "Scan to connect",
+        "게이트웨이 주소를 입력하세요": "Enter gateway address",
+        "내 컴퓨터": "My computers",
+        "계정 및 연결": "Accounts & connections",
+        "아직 연결된 컴퓨터가 없습니다.": "No computers connected yet",
+        "컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요.": "Open “Scan to sign in” on your computer’s gateway, then scan using the button above.",
+        "연결 ": "Connect ",
+        "휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다.": "Use HTTPS when away. Local addresses require the same network.",
+        "컴퓨터에 연결": "Connect to computer",
+        "컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요.": "Paste the address shown by your computer’s gateway",
+        "계속": "Continue",
+        "취소": "Cancel",
+        "이 컴퓨터에 연결하시겠습니까?": "Connect to this computer?",
+        "\n 이것이 자신의 게이트웨이인지 확인하세요.": "\nMake sure this is your own gateway.",
+        "연결": "Connect",
+        "연결 중 ·": "Connecting · ",
+        "컴퓨터 및 채팅 옵션": "Computer and chat options",
+        "브라우저에서 외부 링크를 열까요? \n": "Open external link in browser?\n",
+        "열기": "Open",
+        "연결에 실패했습니다. 더보기 메뉴에서 새로고침하세요.": "Connection failed. Reload from the More menu.",
+        "사용 가능한 파일 선택기가 없습니다.": "No file picker available",
+        "다운로드가 진행 중입니다. 기다리세요.": "A download is in progress. Please wait.",
+        "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다. 브라우저에서 열어보세요.": "This download is not an attachment from the current computer. Open it in your browser.",
+        "다운로드 중…": "Downloading…",
+        "파일을 저장할 앱이 없습니다.": "No file saver available",
+        "다운로드에 실패했습니다. 다시 시도해 보세요.": "Download failed. Try again.",
+        "파일이 저장되었습니다": "File saved",
+        "저장할 수 없습니다. 다시 시도해 보세요.": "Could not save. Try again.",
+        "채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.": "Scan and save the notification’s computer before opening the chat.",
+        "잘못된 알림 링크": "Invalid notification link",
+        "완료": "Done",
+        "먼저 컴퓨터에 연결하고 로그인하세요.": "Connect and sign in to a computer first",
+        "알림 로드 중…": "Loading notifications…",
+        "데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.": "Enable and save “Mobile app notification inbox” in the desktop Preview’s notification settings.",
+        "알림": "Notifications",
+        "최근 작업 알림": "Recent task notifications",
+        "알림 지우기": "Clear notifications",
+        "아직 알림이 없습니다": "No notifications yet",
+        "여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요.": "Enable chat notifications to see completed tasks and requests that need your attention here.",
+        "작업 알림": "Task notification",
+        "채팅 보기 ↗": "View chat  ↗",
+        "잘못된 채팅 링크": "Invalid chat link",
+        "설정": "Settings",
+        "시스템 푸시 활성화": "Enable system push",
+        "작업 알림 끄기": "Turn off task notifications",
+        "작업 알림 켜기": "Turn on task notifications",
+        "앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요.": "Receive new task alerts from saved computers while this app is open. Delivery after leaving the app or locking the screen is not guaranteed. Configure Bark or ntfy on your computer for external alerts.",
+        "로컬 알림 테스트": "Test local notification",
+        "알림 권한을 확인하기 위해 10초 후에 나타납니다.": "Appears in 10 seconds to check notification permissions.",
+        "현재 컴퓨터": "Current computer",
+        "선택한 컴퓨터가 없습니다.": "No computer selected",
+        "홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요.": "Return home to scan or enter a gateway address.",
+        "제거": "Remove",
+        "시스템 푸시가 구성되지 않았습니다. 백그라운드 작업 알림에는 Firebase 또는 기기 공급업체의 푸시 서비스가 필요합니다.": "System push is not configured. Background task alerts require Firebase or a device vendor’s push service.",
+        "모바일 알림 테스트": "Mobile notification test",
+        "로컬 알림이 활성화되었습니다.": "Local notifications are enabled",
+        "10초 후에 로컬 테스트 알림이 나타납니다. 앱을 종료해도 됩니다. 원격 푸시 전달을 확인하지는 않습니다.": "A local test notification will appear in 10 seconds. You may leave the app. This does not verify remote push delivery.",
+        "이 컴퓨터를 제거하시겠습니까?": "Remove this computer?",
+        "저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다.": "Remove the saved connection and sign-in on this device. Chats on the computer are unaffected.",
+
+        "허가가 거부되었습니다. 연결하려면 주소를 붙여넣을 수 있습니다.": "Permission denied. You can still paste an address to connect.",
+        "푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.": "Push registration failed. Check signing and network access.",
+        "컴퓨터 및 알림": "Computers and notifications",
+        "다이나믹 아일랜드에서 이 채팅을 보여주세요": "Show this chat in Dynamic Island",
+        "실시간 현황 종료": "End Live Activity",
+        "먼저 이 알림을 받으려면 컴퓨터에 연결하세요.": "Connect to the computer for this notification first.",
+        "먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.": "Scan and save this notification’s computer first.",
+        "브라우저에서 외부 링크를 열까요?": "Open external link in browser?",
+        "연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.": "Connection failed. Check the computer and address, then reload.",
+
+        "다운로드에 실패했습니다. 로그인을 확인하고 다시 시도하세요.": "Download failed. Check sign-in and try again.",
+        "첨부파일이 MB 다운로드 제한 50개를 초과했습니다.": "Attachment exceeds the 50 MB download limit",
+        "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.": "Could not save the download. Check available storage.",
+        "다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.": "Download redirect blocked. Reopen the attachment from your computer.",
+        "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.": "Download failed. Check your network and try again.",
+        "먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.": "Connect and sign in to your computer’s gateway first",
+        "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.": "Sign-in expired. Reconnect to the computer.",
+        "일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.": "Use the matching desktop Preview and check the connection",
+        "채팅 보기": "View chat",
+        "시스템 설정에서 알림을 허용하세요.": "Allow notifications in system settings.",
+        "라이브 활동에는 iOS 16.2 이상이 필요합니다.": "Live Activities require iOS 16.2 or later.",
+        "먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.": "Open a chat first, then choose to show it in Dynamic Island.",
+        "포그라운드 작업 알림": "Foreground task notifications",
+        "Dynamic Island 및 잠금 화면": "Dynamic Island and Lock Screen",
+        "현재 채팅 추적": "Track current chat",
+        "컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요.": "Choose a chat to track from the computer menu. Background status may be out of date; open the app to sync.",
+        "실시간 현황 미리보기": "Preview Live Activity",
+        "Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.": "Apple push signing is not configured. Background alerts require a developer account and a gateway push service.",
+        "시스템 설정에서 Codex Bridge 알림을 허용합니다.": "Allow Codex Bridge notifications in system settings.",
+        "10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.": "A local test notification will appear in 10 seconds. You may lock the screen. This does not verify remote push delivery.",
+        "테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.": "Could not schedule the test. Check system notification settings.",
+        "카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.": "Camera access denied. Paste the gateway address instead.",
+        "확인 중…": "Checking…", "온라인": "Online", "연결할 수 없음": "Unreachable",
+        "스캔 취소": "Cancel scan",
+        "컴퓨터 게이트웨이에서 제공한 전체 HTTPS 주소 또는 LAN HTTP 주소를 입력하세요. 사용자 정보나 쿼리 매개변수는 사용할 수 없습니다.": "Enter the full HTTPS or local HTTP URL from your computer gateway. Credentials and query parameters are not allowed."
     ]
     static func text(_ value: String) -> String {
-        let language = UserDefaults.standard.string(forKey: "bridge-language") ?? Locale.preferredLanguages.first ?? "zh"
+        let language = UserDefaults.standard.string(forKey: "bridge-language") ?? "ko"
         return language.hasPrefix("en") ? values[value] ?? value : value
     }
 }

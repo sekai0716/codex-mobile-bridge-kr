@@ -48,7 +48,7 @@ class SharedServer:
             header = bytearray()
             while not header.endswith(b'\r\n\r\n'):
                 if len(header) >= 16384:
-                    raise IPCError('WSL 控制通道握手过大')
+                    raise IPCError('WSL 제어 채널 핸드셰이크가 너무 큼')
                 header.extend(self.exact(1))
             lines = bytes(header).decode('ascii').split('\r\n')
             fields = {k.lower(): v.strip() for line in lines[1:] if ':' in line for k, v in [line.split(':', 1)]}
@@ -56,7 +56,7 @@ class SharedServer:
             if (lines[0] != 'HTTP/1.1 101 Switching Protocols' or fields.get('sec-websocket-accept') != expected
                     or fields.get('upgrade', '').lower() != 'websocket'
                     or 'upgrade' not in fields.get('connection', '').lower()):
-                raise IPCError('WSL 控制通道身份握手失败')
+                raise IPCError('WSL 제어 채널 ID 핸드셰이크 실패')
             self.reader = threading.Thread(target=self._read, daemon=True)
             self.reader.start()
             self.server_info = self._request('initialize', {'clientInfo': {'name': 'codex_mobile_bridge_wsl', 'version': '0.2'},
@@ -74,13 +74,13 @@ class SharedServer:
         while len(data) < size:
             block = self.stream.recv(size - len(data))
             if not block:
-                raise EOFError('WSL 控制通道已断开')
+                raise EOFError('WSL 제어 채널의 연결이 끊어졌습니다.')
             data.extend(block)
         return bytes(data)
 
     def frame(self, data, opcode=1):
         if len(data) > self.LIMIT:
-            raise IPCError('WSL 控制消息过大')
+            raise IPCError('WSL 제어 메시지가 너무 큼')
         size = len(data)
         head = bytes([0x80 | opcode, 0x80 | size]) if size < 126 else (
             bytes([0x80 | opcode, 0x80 | 126]) + struct.pack('!H', size) if size < 65536
@@ -88,24 +88,24 @@ class SharedServer:
         mask = os.urandom(4)
         with self.write_lock:
             if self.closed:
-                raise IPCError('WSL 控制通道已断开')
+                raise IPCError('WSL 제어 채널의 연결이 끊어졌습니다.')
             try:
                 self.stream.sendall(head + mask + bytes(v ^ mask[i % 4] for i, v in enumerate(data)))
             except OSError as exc:
-                raise IPCError('WSL 写入结果未确认，请检查原会话，不要重复提交') from exc
+                raise IPCError('WSL 작성 결과는 확인되지 않습니다. 원래 세션을 확인하고 다시 제출하지 마십시오.') from exc
 
     def write(self, value):
         self.frame(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
 
     def request(self, method, params, timeout=20):
         if method not in self.METHODS:
-            raise ValueError('不支持的 WSL 会话操作')
+            raise ValueError('지원되지 않음 WSL 세션 작업')
         return self._request(method, params, timeout)
 
     def _request(self, method, params, timeout):
         with self.lock:
             if self.closed:
-                raise IPCError('WSL 控制通道已断开')
+                raise IPCError('WSL 제어 채널의 연결이 끊어졌습니다.')
             self.counter += 1
             identifier = self.counter
             future = self.pending[identifier] = Future()
@@ -116,12 +116,12 @@ class SharedServer:
                 if method in ('thread/archive', 'thread/unarchive'):
                     from bridge.features.sessions.create import ArchiveRejected
                     raise ArchiveRejected(response['error'])
-                error = IPCError('WSL Codex 拒绝此操作，请检查原会话状态和版本')
+                error = IPCError('WSL Codex 이 작업을 거부하십시오. 원래 세션 상태와 버전을 확인하십시오.')
                 error.rpc_error = response['error']
                 raise error
             return response.get('result') or {}
         except TimeoutError as exc:
-            raise IPCError('WSL 操作超时，写入结果未确认；请检查原会话') from exc
+            raise IPCError('WSL 작업 시간이 초과되어 쓰기 결과가 확인되지 않았습니다. 원래 세션을 확인하세요') from exc
         finally:
             with self.lock:
                 self.pending.pop(identifier, None)
@@ -178,7 +178,7 @@ class SharedServer:
             with self.lock:
                 for future in self.pending.values():
                     if not future.done():
-                        future.set_exception(IPCError('WSL 控制通道已断开，操作结果待核对'))
+                        future.set_exception(IPCError('WSL 제어 채널의 연결이 끊어졌으며 작업 결과를 확인해야 합니다.'))
             self.event({'method': 'bridge/disconnected'})
             self.close()
 

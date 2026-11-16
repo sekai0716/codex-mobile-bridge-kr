@@ -1,5 +1,5 @@
 // Isolated production-page fixture only. Synthetic WSL reads; never switches an account or sends a chat.
-window.runWslDialogWidthChecks=async function({kind='accounts',provider='codex',language='zh',assert=true}={}){
+window.runWslDialogWidthChecks=async function({kind='accounts',provider='codex',language='ko',assert=true}={}){
   window.__wslLayoutCleanup?.();
   BridgeI18n.setLanguage(language);BridgeI18n.apply();
   const distribution='Nvidia_SDKM_Ubuntu_22.04_JetPack_6.2.1',longName='SavedAccountWithoutSpaces'.repeat(5);
@@ -8,10 +8,10 @@ window.runWslDialogWidthChecks=async function({kind='accounts',provider='codex',
     dialog=document.createElement('dialog');dialog.className='picker ds-picker';
     const head=document.createElement('div');head.className='picker-head';
     const heading=document.createElement('div');heading.className='accounts-dialog-heading';
-    const title=document.createElement('h2');title.textContent=BridgeI18n.t('账号与接入');heading.append(title);
+    const title=document.createElement('h2');title.textContent=BridgeI18n.t('계정 및 액세스');heading.append(title);
     const close=document.createElement('button');close.className='icon-button';close.textContent='×';close.onclick=()=>dialog.close();head.append(heading,close);
     const controls=document.createElement('div');controls.className='accounts-runtime-controls';
-    const label=document.createElement('label');label.append(BridgeI18n.t('运行环境'));
+    const label=document.createElement('label');label.append(BridgeI18n.t('운영 환경'));
     const select=document.createElement('select');select.append(new Option('WSL '+provider+' · '+distribution,'wsl'));label.append(select);controls.append(label);
     const root=document.createElement('div');dialog.append(head,controls,root);document.body.append(dialog);
     panel=new WslAccountsPanel({root,provider,read:async entry=>({entry,provider,available:true,activeVerified:false,identity:'synthetic',target:{distribution,user:'fixture',configDir:'/home/fixture/.codex'},accounts:[{id:'fake',name:longName,kind:'api',baseUrl:'https://example.invalid/'+longName,model:'synthetic-model'}],capabilities:{save:true,import:true,models:true,switch:true}}),request:async()=>{throw Error('Writes prohibited in layout fixture');}});

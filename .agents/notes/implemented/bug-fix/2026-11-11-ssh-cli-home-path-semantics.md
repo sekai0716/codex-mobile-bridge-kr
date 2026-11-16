@@ -1,31 +1,31 @@
-# Agent Note: SSH CLI 配置目录使用目标端路径语义
+# Agent Note: SSH CLI 구성 디렉터리는 대상 측 경로 의미 체계를 사용합니다.
 
 Status: implemented
 
-## 问题
+## 문제
 
-Windows 网关把 Linux SSH 握手返回的 `/home/.../.codex` 交给本机 `Path.is_absolute()`，因而在创建、恢复、归档及创建配置查询之前错误拒绝合法的远端配置目录。旧夹具使用网关自己的临时目录，未覆盖跨系统路径。
+Windows 게이트웨이 핸들 Linux SSH 악수로 돌아왔다 `/home/.../.codex` 이 기계에 맡겨주세요 `Path.is_absolute()`，따라서 구성 쿼리를 생성, 복원, 보관 및 생성하기 전에 유효한 원격 구성 디렉터리가 잘못 거부됩니다. 이전 설비는 게이트웨이의 자체 임시 디렉토리를 사용했으며 시스템 간 경로를 재정의하지 않았습니다.。
 
-## 决策
+## 결정
 
-Codex CLI 的运行时目录统一经 `_runtime_home` 核验。本机保留本机 `Path`，SSH 使用 `PurePosixPath`，且后续握手必须匹配第一次核验的远端 home。模型目录助手把任意 `PurePath` 显式序列化为原始目标路径，不通过本机解析或映射。
+Codex CLI 런타임 디렉토리는 다음을 통해 통합됩니다. `_runtime_home` 확인하다. 로컬 로컬 유지 `Path`，SSH 사용 `PurePosixPath`，그리고 후속 핸드셰이크는 첫 번째 확인의 원격 끝과 일치해야 합니다. home。모델 카탈로그 도우미는 모든 것을 변환합니다. `PurePath` 네이티브를 통해 구문 분석되거나 매핑되지 않고 원래 대상 경로로 명시적으로 직렬화됩니다.。
 
-此修复保留 SSH 登录 shell 的 `CODEX_HOME` 选择、原主机、原 provider、原 cwd 和已安装运行时。只读路径核验不启动或恢复线程。
+이 수정 사항은 남아 있습니다. SSH 로그인 shell 의 `CODEX_HOME` 선택, 원본 호스트, 원본 provider、기존 cwd 그리고 설치된 런타임. 읽기 전용 경로 확인이 스레드를 시작하거나 재개하지 않습니다.。
 
-## 备选方案
+## 대안
 
-只删除 `is_absolute()` 可以绕过误拒绝，但会接受相对路径且遗漏目录换代；依据网关系统分支也无法描述 SSH 目标。因此保留绝对路径与 home 身份比较，只更换路径解释器。
+삭제만 `is_absolute()` 잘못된 거부를 우회할 수 있지만 상대 경로를 허용하고 디렉터리 교체를 놓치게 됩니다. 게이트웨이 시스템 분기를 기준으로 설명할 수 없습니다. SSH 목표. 따라서 절대 경로를 유지하십시오. home 신원 비교, 경로 해석기만 교체。
 
-## 验证
+## 검증
 
-`tests/test_cli_remote_home.py` 在 CLI 模块的本机路径类型替换为 `PureWindowsPath` 时覆盖 Linux home 的 resume、create、archive 和 creation_context；相对路径、Windows 路径与 home 变化均在写入前拒绝。模型助手同时覆盖 `PurePosixPath` JSON 传输。
+`tests/test_cli_remote_home.py` 에서 CLI 모듈의 기본 경로 유형이 다음으로 대체됩니다. `PureWindowsPath` 시간 범위 Linux home 의 resume、create、archive 및 creation_context；상대 경로、Windows 경로 home 변경사항은 작성되기 전에 거부됩니다. 모델 어시스턴트는 두 가지 모두를 다룹니다. `PurePosixPath` JSON 전염。
 
-真实 Windows 通过已保存的 88Server SSH 别名，以已核验源码的产品 proxy 通路连接现存原生服务，initialize 返回 `/home/sp/.codex`；同一 Windows 进程中的旧 `Path.is_absolute()` 返回 false，新 `_runtime_home()` 接受并固定该 POSIX home。独立 socket peer 元数据对应目标用户的 0.160 二进制，握手版本也为 0.160。该检查未启动/退出 daemon、读取或接续固定会话、发送模型请求。原始证据为 `.tmp/feedback-20261111-10/root-windows-ssh-handshake.json` 和 `root-ssh-peer.json`；它证明实际跨系统握手与错误路径判断，不代替完整会话恢复或该版本排空验收。
+현실 Windows 저장을 통해 88Server SSH Alias는 소스코드가 검증된 제품에 대한 것입니다. proxy 기존 네이티브 서비스를 연결하는 경로，initialize 뒤로 `/home/sp/.codex`；같은 Windows 오래된 진행 중 `Path.is_absolute()` 뒤로 false，새로운 `_runtime_home()` 동의하고 고정하세요. POSIX home。독립적인 socket peer 메타데이터는 대상 사용자의 0.160 바이너리, 핸드셰이크 버전도 있습니다. 0.160。점검이 시작되지 않았습니다/종료 daemon、고정 세션을 읽거나 계속하고 모델 요청을 보냅니다. 원본 증거는 `.tmp/feedback-20261111-10/root-windows-ssh-handshake.json` 및 `root-ssh-peer.json`；이는 실제 시스템 간 핸드셰이크 및 오류 경로 결정을 보여 주며 전체 세션 복구 또는 이 릴리스 드레인 수용을 대체하지 않습니다.。
 
-## 影响
+## 영향
 
-跨系统接入不会因网关路径语义误判而失败；远端 home 保持独立，不借用本机账号。已有 SSH 模型助手与会话协议保持不变。
+게이트웨이 경로 의미 체계의 잘못된 판단으로 인해 시스템 간 액세스가 실패하지 않습니다. 원격 home 독립성을 유지하고 현지 계좌를 빌리지 마십시오. 이미 SSH 모델 도우미 및 세션 프로토콜은 변경되지 않습니다.。
 
-## 固定远端样本接续
+## 원격 샘플 연결 수정
 
-在 Windows 使用原保存 SSH 别名和已核对源码摘要的产品 CliSessions 适配器，用户指定 88Server 原 CLI 会话经 thread/resume 于 1969 ms 连通。真实目标为 Ubuntu 上的原生 0.160.0，原 ID、openai provider 与工作目录均保持不变；没有发送模型消息、替换账号或退出共享服务。仅关闭本次字节代理。此结果补齐适配器实际接续，Windows 新版安装包界面仍需最终验收，不能据此扩大 0.160 的正常排空支持范围。证据为本机 `.tmp/feedback-20261111-10/root-windows-ssh-heldout.json`。
+에서 Windows 원본 저장 사용 SSH 확인된 소스 코드 조각이 포함된 별칭 및 제품 CliSessions 어댑터, 사용자 지정 88Server 기존 CLI 대화경 thread/resume ～에 1969 ms 연결되었습니다. 진짜 목표는 Ubuntu 기본 켜짐 0.160.0，기존 ID、openai provider 작업 디렉토리는 변경되지 않고 그대로 유지됩니다. 모델 메시지가 전송되지 않거나, 계정이 교체되거나, 공유 서비스가 종료됩니다. 이 바이트 프록시만 닫으세요. 이 결과로 어댑터의 실제 연결이 완료됩니다.，Windows 새 버전의 설치 패키지 인터페이스는 여전히 최종 승인이 필요하므로 이에 따라 확장할 수 없습니다. 0.160 정상적인 비우기 지원 범위. 증거는 기본입니다 `.tmp/feedback-20261111-10/root-windows-ssh-heldout.json`。

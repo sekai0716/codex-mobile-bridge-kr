@@ -19,7 +19,7 @@ class CompletionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.cwd = Path(self.temp.name)
-        (self.cwd / '普通 文件.txt').write_text('')
+        (self.cwd / "\u666e\u901a \u6587\u4ef6.txt").write_text('')
         (self.cwd / 'folder').mkdir()
         (self.cwd / 'folder' / 'inner file').write_text('')
         (self.cwd / 'a$(touch injected)').write_text('')
@@ -31,10 +31,10 @@ class CompletionTests(unittest.TestCase):
         return complete_path(self.session, text, len(text.encode('utf-16-le')) // 2 if cursor is None else cursor)
 
     def test_paths_are_escaped_and_completion_never_executes(self):
-        value = self.complete('ls 普')
+        value = self.complete("ls \u666e")
         self.assertEqual(value['cwd'], str(self.cwd))
         self.assertEqual(value['replaceStart'], 3)
-        self.assertEqual(value['candidates'][0]['insertText'], "'普通 文件.txt'")
+        self.assertEqual(value['candidates'][0]['insertText'], "'\u666e\u901a \u6587\u4ef6.txt'")
         value = self.complete('ls a')
         self.assertEqual(value['candidates'][0]['insertText'], "'a$(touch injected)'")
         self.assertFalse((self.cwd / 'injected').exists())
@@ -46,7 +46,7 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(self.complete('ls "folder/in')['candidates'][0]['insertText'], expected)
 
     def test_quotes_utf16_and_unsafe_syntax(self):
-        value = self.complete('😀 ls "普', cursor=8)
+        value = self.complete("😀 ls \"\u666e", cursor=8)
         self.assertEqual(value['replaceStart'], 6)
         self.assertEqual(value['replaceEnd'], 8)
         for text in ('ls $(whoami)', 'ls `whoami`', 'ls *.txt', 'ls a; pwd', 'ls a | cat', 'ls a\nother'):
@@ -55,8 +55,8 @@ class CompletionTests(unittest.TestCase):
 
     def test_windows_drive_and_basic_quote(self):
         self.session.shell = 'C:\\Windows\\System32\\cmd.exe'
-        value = self.complete('dir "普通')
-        self.assertEqual(value['candidates'][0]['insertText'], '"普通 文件.txt"')
+        value = self.complete("dir \"\u666e\u901a")
+        self.assertEqual(value['candidates'][0]['insertText'], "\"\u666e\u901a \u6587\u4ef6.txt\"")
         for text in ('dir %TEMP%', 'dir a & whoami', 'dir ^x'):
             with self.subTest(text=text), self.assertRaises(ValueError): self.complete(text)
 

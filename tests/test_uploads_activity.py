@@ -45,7 +45,7 @@ class UploadActivityTests(unittest.TestCase):
             self.bridge.desktop_image_preview(THREAD, identifier)
         self.assertEqual(self.calls(), [])
 
-    def upload(self, name='报告.txt', data=b'fixture attachment'):
+    def upload(self, name='보고서.txt', data=b'fixture attachment'):
         return self.bridge.upload(THREAD, str(uuid.uuid4()), name, data)
 
     def calls(self, method='thread-follower-start-turn'):
@@ -53,7 +53,7 @@ class UploadActivityTests(unittest.TestCase):
 
     def test_project_references_use_native_context_without_upload_and_bind_retries(self):
         project = self.root / 'project'; project.mkdir()
-        file = project / '中文 file.txt'; file.write_text('fixture')
+        file = project / '중국어 file.txt'; file.write_text('fixture')
         directory = project / 'folder'; directory.mkdir()
         refs = [{'path': p.name, 'absolutePath': str(p)} for p in [file, directory]]
         original = self.bridge.store.get
@@ -69,7 +69,7 @@ class UploadActivityTests(unittest.TestCase):
             self.assertEqual(context['localTurnMetadata'], {'fileAttachmentCount': 2})
             prompt = self.calls()[0]['params']['turnStart']['request']['input'][0]['text']
             self.assertIn(str(file), prompt)
-            self.assertNotIn('[中文 file.txt]', prompt)
+            self.assertNotIn('[중국어 file.txt]', prompt)
             with self.assertRaises(ValueError):
                 self.bridge.send(THREAD, 'read references', identifier, references=refs[:1])
             self.assertFalse(self.bridge.uploads.root.exists())
@@ -86,10 +86,10 @@ class UploadActivityTests(unittest.TestCase):
         self.assertEqual(turn['request']['input'][1]['type'], 'localImage')
         self.assertEqual(Path(turn['request']['input'][1]['path']).read_bytes(), PNG)
         self.assertIn('# Files mentioned by the user:', turn['request']['input'][0]['text'])
-        self.assertIn('## 报告.txt: ', turn['request']['input'][0]['text'])
+        self.assertIn('## 보고서.txt: ', turn['request']['input'][0]['text'])
         self.assertIn('## My request:', turn['request']['input'][0]['text'])
         self.assertEqual(turn['context']['fileAttachments'], [
-            {'path': self.bridge.uploads.get(THREAD, file['id'])['path'], 'label': '报告.txt'},
+            {'path': self.bridge.uploads.get(THREAD, file['id'])['path'], 'label': '보고서.txt'},
             {'path': self.bridge.uploads.get(THREAD, image['id'])['path'], 'label': 'photo.png'},
         ])
         self.assertTrue(turn['context']['inheritThreadSettings'])
@@ -105,17 +105,17 @@ class UploadActivityTests(unittest.TestCase):
         session = self.bridge.session(THREAD)
         identifier = str(uuid.uuid4())
         self.bridge.send(THREAD, 'later', identifier, 'queue', attachments=[file['id']])
-        self.assertEqual(self.bridge.view(THREAD)['submissions'][0]['attachments'], ['报告.txt'])
+        self.assertEqual(self.bridge.view(THREAD)['submissions'][0]['attachments'], ['보고서.txt'])
         self.bridge.send(THREAD, 'steer', str(uuid.uuid4()), 'steer', attachments=[file['id']])
         steer_text=self.calls('thread-follower-steer-turn')[0]['params']['input'][0]['text']
         self.assertTrue(steer_text.endswith('steer'))
-        self.assertIn('## 报告.txt: ', steer_text)
-        self.assertIn('报告.txt', json.dumps(self.calls('thread-follower-steer-turn')[0]['params']['restoreMessage']['context'], ensure_ascii=False))
-        self.assertEqual(self.calls('thread-follower-steer-turn')[0]['params']['attachments'][0]['label'], '报告.txt')
+        self.assertIn('## 보고서.txt: ', steer_text)
+        self.assertIn('보고서.txt', json.dumps(self.calls('thread-follower-steer-turn')[0]['params']['restoreMessage']['context'], ensure_ascii=False))
+        self.assertEqual(self.calls('thread-follower-steer-turn')[0]['params']['attachments'][0]['label'], '보고서.txt')
         session.state['threadRuntimeStatus']['type'] = 'idle'
         key = THREAD+':'+identifier
         self.bridge._send_queued(session, key, self.bridge.submissions[key])
-        self.assertEqual(self.calls()[0]['params']['turnStart']['context']['fileAttachments'][0]['label'], '报告.txt')
+        self.assertEqual(self.calls()[0]['params']['turnStart']['context']['fileAttachments'][0]['label'], '보고서.txt')
         with self.assertRaises(ValueError):
             self.bridge.send(THREAD, 'Exact objective', str(uuid.uuid4()), work_mode='goal', attachments=[file['id']])
         self.assertEqual(len(self.calls('thread-follower-start-turn')), 1)
@@ -268,7 +268,7 @@ class UploadActivityTests(unittest.TestCase):
             session.changed()
         rows = self.bridge.timeline_read(THREAD)['rows']
         self.assertEqual(rows[0]['kind'], 'imageView')
-        self.assertEqual(rows[0]['title'], '图片预览')
+        self.assertEqual(rows[0]['title'], '사진 미리보기')
         self.assertEqual(rows[0]['text'], '')
         self.assertFalse(rows[0]['truncated'])
         self.assertNotIn('path', rows[0]['attachments'][0])

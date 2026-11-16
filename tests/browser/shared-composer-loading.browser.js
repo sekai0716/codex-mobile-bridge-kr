@@ -12,16 +12,16 @@ async function runSharedComposerLoadingChecks({keepOpen=false}={}){
   try{
     view.container.hidden=false;
     for(const provider of ['claude','deepseek','zcode','antigravity']){
-      view.provider=provider;view.clientStates=[{id:provider,enabled:true,connected:true,historyAvailable:true}];view.rows=[{id:'synthetic',title:'聊天',model:'GLM-5.3-Flash'}];view.prepareChat('synthetic');await frame();
+      view.provider=provider;view.clientStates=[{id:provider,enabled:true,connected:true,historyAvailable:true}];view.rows=[{id:'synthetic',title:'채팅',model:'GLM-5.3-Flash'}];view.prepareChat('synthetic');await frame();
       const original=controls();check(original.every(visible),provider+' loading keeps every shared slot');check(view.modelButton.disabled&&view.skillsButton.disabled&&view.permissionsButton.disabled&&view.attachButton.disabled&&view.workMode.disabled&&view.send.disabled,provider+' unknown capabilities remain disabled');check(view.skillsButton.dataset.capabilityState==='unknown',provider+' unknown is explicit');fit(provider+' loading');
-      view.input.value='保留离线草稿';view.attachments.rows.push({id:'saved',status:'ready',name:'saved.png'});view.attachments.render();
-      const detail=capabilities=>({session:{id:'synthetic',title:'聊天',status:'idle',connectionState:'ready',model:'GLM-5.3-Flash'},capabilities,messages:[]});
+      view.input.value='초안을 오프라인으로 유지';view.attachments.rows.push({id:'saved',status:'ready',name:'saved.png'});view.attachments.render();
+      const detail=capabilities=>({session:{id:'synthetic',title:'채팅',status:'idle',connectionState:'ready',model:'GLM-5.3-Flash'},capabilities,messages:[]});
       view.applyDetail(detail({send:true,models:false,skills:false,permissions:false,attachments:false,projectReferences:false,plan:false,goal:false}));await frame();
       check(controls().every((control,index)=>control===original[index]&&visible(control)),provider+' unsupported retains the same controls');check(view.skillsButton.disabled&&view.skillsButton.dataset.capabilityState==='unsupported',provider+' unsupported differs from unknown');fit(provider+' unsupported');
       view.attachButton.hidden=true;await frame();fit(provider+' hidden attachment regression');view.attachButton.hidden=false;
       view.applyDetail(detail({send:true,models:true,skills:true,permissions:true,attachments:true,plan:true,goal:true}));await frame();
       check([view.modelButton,view.skillsButton,view.permissionsButton,view.attachButton,view.workMode].every(control=>!control.disabled),provider+' verified capabilities enable existing controls');
-      check(view.input.value==='保留离线草稿'&&view.attachments.rows[0].id==='saved',provider+' reconnect keeps draft and attachment');
+      check(view.input.value==='초안을 오프라인으로 유지'&&view.attachments.rows[0].id==='saved',provider+' reconnect keeps draft and attachment');
       view.staleDetail();await frame();check(controls().every(visible)&&view.send.disabled&&view.attachButton.disabled,provider+' disconnect keeps disabled complete layout');fit(provider+' disconnected');
       view.attachments.rows.splice(0);
     }

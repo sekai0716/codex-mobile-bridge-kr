@@ -17,7 +17,7 @@ app.on('browser-window-created',(_,win)=>{
     const save=async()=>{await evaluate("$('settings').requestSubmit()");await until('!saving&&!dirty');};
     try{
       await until('Boolean(snapshot)&&Boolean(credentialLoad)');await evaluate('credentialLoad');
-      for(const language of ['zh','en']){
+      for(const language of ['ko','en']){
         await evaluate("$('language').value='"+language+"';$('language').onchange()");
         await evaluate("tab('network')");
         for(const mode of ['quick','cloudflare','server','nas']){
@@ -26,14 +26,14 @@ app.on('browser-window-created',(_,win)=>{
           await evaluate("document.querySelector('.connection-card:last-child .setup-guide').click()");
           assert.equal(openedGuides.at(-1),'https://try2love.github.io/codex-mobile-bridge/setup.html?lang='+language+'#'+mode);
         }
-        assert.equal(await evaluate("[...document.querySelectorAll('.connection-card .setup-guide')].every(a=>a.textContent==='"+(language==='en'?'Online guide':'在线指引')+"')"),true);
+        assert.equal(await evaluate("[...document.querySelectorAll('.connection-card .setup-guide')].every(a=>a.textContent==='"+(language==='en'?'Online guide':'온라인 안내')+"')"),true);
         await evaluate("document.querySelector('[data-setup-guide=lan]').click()");
         assert.equal(openedGuides.at(-1),'https://try2love.github.io/codex-mobile-bridge/setup.html?lang='+language+'#lan');
         await evaluate("tab('network');document.querySelector('.connection-card').scrollIntoView({block:'start',behavior:'instant'});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
         fs.writeFileSync(path.join(data,'connection-guides-'+language+'.png'),(await win.webContents.capturePage()).toPNG());
         await evaluate("connectionDraft=[];connectionSecretDraft.clear();renderConnections();updateDirty()");
       }
-      await evaluate("$('language').value='zh';$('language').onchange()");
+      await evaluate("$('language').value='ko';$('language').onchange()");
       await evaluate("tab('network');connectionDraft=['quick','cloudflare','server','nas'].map((accessMode,i)=>({id:'fold-'+i,accessMode,enabled:false,sshAuth:'key',sshRemotePort:18787}));connectionExpanded.clear();renderConnections();updateDirty()");
       assert.equal(await evaluate("document.querySelectorAll('details.connection-card:not([open])').length"),4);
       assert.equal(await evaluate("document.querySelectorAll('details.connection-basic:not([open])').length"),2);
@@ -63,7 +63,7 @@ app.on('browser-window-created',(_,win)=>{
       await until("!saving&&!$('toast').hidden");
       assert.equal(await evaluate('document.activeElement.id'),await evaluate("'connection-'+connectionDraft[1].id+'-publicUrl'"));
       assert.equal(await evaluate("document.activeElement.closest('details.connection-card').open"),true);
-      assert.match(await evaluate("$('toast-message').textContent"),/完整 HTTPS/);
+      assert.match(await evaluate("$('toast-message').textContent"),/전체 HTTPS/);
       assert.equal(await evaluate("getComputedStyle($('toast')).position"),'fixed');
       assert.equal(await evaluate("$('toast-progress').getAnimations()[0].effect.getTiming().duration"),5000);
       fs.writeFileSync(path.join(data,'validation-focus.png'),(await win.webContents.capturePage()).toPNG());
@@ -76,12 +76,12 @@ app.on('browser-window-created',(_,win)=>{
       await evaluate("document.querySelector('[data-connection-secret=tunnelToken]').nextElementSibling.click()");
       assert.equal(await evaluate("document.querySelector('[data-connection-secret=tunnelToken]').type"),'text');
       await evaluate("renderConnections();tab('overview');$('start').click()");await until('snapshot.runtime.running');
-      assert.ok(!/SSH 密码/.test(await evaluate("$('toast-message').textContent")));
+      assert.ok(!/SSH 비밀번호/.test(await evaluate("$('toast-message').textContent")));
       await evaluate("$('stop').click()");await until('!snapshot.runtime.running');
       // Renderer reload must reload session-only credentials via the real main-process IPC.
       await evaluate('setTimeout(()=>location.reload(),0)');await until('Boolean(snapshot)');await until("document.querySelector('[data-connection-secret=tunnelToken]')?.value==='fixture-token'");
       await evaluate("tab('network');$('connection-kind').value='server';addConnection();Object.assign(connectionDraft[1],{enabled:false,sshAuth:'key'});renderConnections();updateDirty()");
-      await evaluate("[...document.querySelectorAll('button')].find(node=>node.textContent==='选择私钥文件').click()");
+      await evaluate("[...document.querySelectorAll('button')].find(node=>node.textContent==='개인 키 파일 선택').click()");
       await until('true');assert.ok(picker.properties.includes('showHiddenFiles'));assert.equal(path.basename(picker.defaultPath),'.ssh');
       await save();
       assert.equal(await evaluate("document.querySelector('[data-connection-action=inspect]').disabled"),false);
@@ -95,7 +95,7 @@ app.on('browser-window-created',(_,win)=>{
       assert.equal(await evaluate("$('ntfy-token').value"),'');
       await evaluate("tab('network');document.querySelector('[data-connection-action=clearCredentials]').click()");
       await until("!busyActions.size&&document.querySelector('[data-connection-secret=tunnelToken]').value===''");
-      await evaluate("feedback('SSH 认证和服务器预检通过。请确认域名 DNS 指向该服务器，且公网 80/443 可达。')");
+      await evaluate("feedback('SSH 인증 및 서버 프리플라이트가 통과되었습니다. 도메인 이름을 확인해 주세요 DNS 서버 및 공용 네트워크를 가리킵니다. 80/443 도달 가능。')");
       fs.writeFileSync(path.join(data,'ssh-result-toast.png'),(await win.webContents.capturePage()).toPNG());
       await new Promise(r=>setTimeout(r,5300));assert.equal(await evaluate("$('toast').hidden"),true);
       console.log(JSON.stringify({ok:true,data,checks:['each connection has a direct bilingual tutorial link','exact invalid connection focused','fixed dismissible 5s toast','saved secrets masked and revealable','Cloudflare-only start without SSH password','renderer reload retains secrets','notification secrets retained and cleared','hidden SSH folder picker','toast expiry']}));

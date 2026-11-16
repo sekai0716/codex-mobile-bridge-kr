@@ -63,7 +63,7 @@ def commands(pids):
 def _bundle(executable):
     bundle = next((p for p in executable.parents if p.suffix == '.app'), None)
     if bundle is None:
-        raise ValueError('macOS 桌面程序必须位于应用程序包中')
+        raise ValueError('macOS 데스크톱 프로그램은 애플리케이션 패키지에 있어야 합니다.')
     return bundle
 
 
@@ -71,7 +71,7 @@ def verify_relaunch(executable, previous, current, environment):
     """Verify one same-user signed App generation without activating it."""
     from bridge.platforms.macos.force_exit import Native
     from bridge.platforms.macos.codex_daemon_env import read_process_environment
-    changed = '独立客户端重启后的原生身份无法确认'
+    changed = '다시 시작한 후 독립 클라이언트의 기본 ID를 확인할 수 없습니다.'
     native = Native()
     try:
         native.identity(previous['pid'])
@@ -95,12 +95,12 @@ def verify_relaunch(executable, previous, current, environment):
     except (OSError, ValueError):
         raise ValueError(changed) from None
     if values != environment:
-        raise ValueError('独立客户端重启后的配置环境不一致')
+        raise ValueError('독립 클라이언트를 다시 시작한 후 구성 환경이 일치하지 않습니다.')
     try:
         subprocess.run(['/usr/bin/codesign', '--verify', '--strict', '-R=anchor apple generic', str(_bundle(executable))],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
     except (OSError, subprocess.SubprocessError):
-        raise ValueError('无法核验独立客户端的应用签名') from None
+        raise ValueError('독립형 클라이언트에 대한 애플리케이션 서명을 확인할 수 없습니다.') from None
     if native.identity(current['pid']) != before:
         raise ValueError(changed)
 
@@ -129,18 +129,18 @@ def quit_application(executable, *, pids=None):
     if not pids:
         return 'exited'
     if len(pids) != 1 or type(pids[0]) is not int or pids[0] <= 0:
-        raise ValueError('客户端进程已变化，请重新检查后再关闭（quit: changed）')
+        raise ValueError("클라이언트 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하세요(quit: changed).")
     try:
         result = subprocess.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', _QUIT_SCRIPT,
                                  str(pids[0]), str(executable)],
                                 capture_output=True, text=True, timeout=10)
     except subprocess.TimeoutExpired:
-        raise ValueError('macOS 退出请求结果未知，请检查客户端状态；尚未强制结束进程（quit: timeout）') from None
+        raise ValueError("macOS 종료 결과를 알 수 없습니다. 클라이언트 상태를 확인하세요. 프로세스를 강제로 중지하지 않았습니다(quit: timeout).") from None
     except OSError:
-        raise ValueError('无法发送 macOS 退出请求，请检查系统运行环境（quit: unavailable）') from None
+        raise ValueError("macOS 종료 요청을 보낼 수 없습니다. 시스템 환경을 확인하세요(quit: unavailable).") from None
     if result.returncode:
         # Do not return the native script, arguments or private stderr over HTTP.
-        raise ValueError('macOS 退出请求失败，请检查客户端状态（quit: native-error; code: '+str(result.returncode)+'）')
+        raise ValueError('macOS 종료 요청이 실패했습니다. 클라이언트 상태를 확인하세요.（quit: native-error; code: '+str(result.returncode)+'）')
     try:
         receipt = json.loads(result.stdout)
         state = receipt.get('state') if isinstance(receipt, dict) else None
@@ -149,10 +149,10 @@ def quit_application(executable, *, pids=None):
     if state in ('submitted', 'exited'):
         return state
     if state == 'changed':
-        raise ValueError('客户端进程已变化，请重新检查后再关闭（quit: changed）')
+        raise ValueError("클라이언트 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하세요(quit: changed).")
     if state == 'rejected':
-        raise ValueError('客户端未接受退出请求，请检查客户端提示；尚未强制结束进程（quit: rejected）')
-    raise ValueError('无法核验 macOS 退出请求结果，请检查客户端状态（quit: invalid-response）')
+        raise ValueError("클라이언트가 종료 요청을 거부했습니다. 안내를 확인하세요. 프로세스를 강제로 중지하지 않았습니다(quit: rejected).")
+    raise ValueError("macOS 종료 결과를 확인할 수 없습니다. 클라이언트 상태를 확인하세요(quit: invalid-response).")
 
 
 def start(executable, home, environment, *, arguments=(), new_instance=False, environment_unset=()):

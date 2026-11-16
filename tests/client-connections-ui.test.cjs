@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function fixture({accounts=false}={}){
   function node(tag){const value={tag,textContent:'',value:'',hidden:false,disabled:false,children:[],dataset:{},attributes:{},className:'',append(...children){for(const child of children){child.parent=this;this.children.push(child);}},insertBefore(child,before){if(child===before)return child;child.remove();const index=before?this.children.indexOf(before):-1;this.children.splice(index<0?this.children.length:index,0,child);child.parent=this;return child;},replaceChildren(...children){this.children=[];this.append(...children);},after(...children){const at=this.parent.children.indexOf(this)+1;for(const child of children)child.parent=this.parent;this.parent.children.splice(at,0,...children);},setAttribute(k,v){this.attributes[k]=v;},matches(selector){if(selector.startsWith('.'))return this.className.split(' ').includes(selector.slice(1));const attribute=selector.match(/^\[([^=\]]+)(?:="([^"]+)")?\]$/);if(attribute){const actual=this.attributes[attribute[1]]??this.dataset[attribute[1].replace(/^data-/,'').replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())];return attribute[2]===undefined?actual!==undefined:actual===attribute[2];}return this.tag===selector;},querySelectorAll(selector){return this.children.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);},querySelector(selector){return this.querySelectorAll(selector)[0]||null;},closest(){return null;}};const events={};Object.assign(value,{addEventListener(type,fn){events[type]=fn;},showModal(){this.open=true;},close(){this.open=false;events.close?.();},remove(){if(this.parent)this.parent.children=this.parent.children.filter(child=>child!==this);},focus(){}});value.classList={toggle(){},add(...names){value.className+=' '+names.join(' ');},contains:name=>value.className.split(' ').includes(name)};return value;}
   const nodes=Object.fromEntries(['client-overview','client-scan-status','refresh-clients','clients-page'].map(id=>[id,node('div')]));
-  const input=node('input'),workspace=node('pre'),claudeHome=node('pre'),claudeData=node('div'),statuses={deepseek:node('p'),claude:node('p')},choose=node('button'),scan=node('button');scan.dataset.desktopAction='scan';claudeData.hidden=true;for(const status of Object.values(statuses))status.dataset.i18n='正在检查接入…';
+  const input=node('input'),workspace=node('pre'),claudeHome=node('pre'),claudeData=node('div'),statuses={deepseek:node('p'),claude:node('p')},choose=node('button'),scan=node('button');scan.dataset.desktopAction='scan';claudeData.hidden=true;for(const status of Object.values(statuses))status.dataset.i18n='연결 확인 중…';
   const articles={};if(accounts)for(const provider of ['deepseek','claude']){const article=node('article'),automatic=node('div');automatic.className='client-auto-setup';article.append(automatic);if(provider==='deepseek'){const details=node('details'),label=node('label');label.append(input);details.append(label);article.append(details);}articles[provider]=article;}
   const root={hidden:false,querySelector(selector){const provider=selector.includes('deepseek')?'deepseek':'claude';if(selector.includes('.client-auto-setup'))return articles[provider]?.querySelector('.client-auto-setup')||null;if(selector.startsWith('[data-client-config='))return articles[provider]||null;if(selector==='input')return accounts?articles.deepseek.querySelector('input'):input;if(selector==='[data-deepseek-home]')return input;if(selector==='[data-desktop-choose]')return choose;if(selector==='[data-claude-workspace]')return workspace;if(selector==='[data-claude-home]')return claudeHome;if(selector==='[data-claude-data]')return claudeData;return statuses[provider];},querySelectorAll(selector){if(selector==='[data-desktop-status]')return Object.values(statuses);if(selector.includes('data-desktop-action'))return [scan];return Object.values(articles).flatMap(article=>article.querySelectorAll(selector));}};
   const calls=[],errors=[],prompts=[],choices=[],initializations=[];let closeChoice=true,finishChoice,initializeChoice=true,finishInitialize,chosen='',confirmed=true,handler=async body=>body.action==='status'?{backends:{},deepseekHome:'/fixture'}:body.action==='accounts'?{accounts:[]}:{clients:[]};
@@ -21,27 +21,27 @@ function fixture({accounts=false}={}){
 test('Antigravity management edits only the selected source session without claiming accounts support',async()=>{
   const ui=fixture(),client={id:'antigravity',name:'Antigravity',enabled:true,installed:true,capabilities:{accounts:false,management:true}};ui.panel.clients=[client];
   const sources=['app','cli','ide'].map(id=>({id,name:id.toUpperCase(),historyAvailable:true,connected:id==='cli',sessions:[{id:id+'-session',title:id,model:'',permissionMode:'desktop'}]}));
-  ui.setHandler(async body=>body.operation==='catalog'?{models:[{id:'cli-model',name:'CLI Model'}],cache:{identity:'cli-account'},capabilities:{models:true}}:{enabled:true,surfaces:sources,plugin:{active:true},permissionOptions:[{value:'desktop',label:'电脑端处理'},{value:'mobile-ask',label:'手机端审批'}]});
+  ui.setHandler(async body=>body.operation==='catalog'?{models:[{id:'cli-model',name:'CLI Model'}],cache:{identity:'cli-account'},capabilities:{models:true}}:{enabled:true,surfaces:sources,plugin:{active:true},permissionOptions:[{value:'desktop',label:'PC 처리'},{value:'mobile-ask',label:'모바일 앱 승인'}]});
   await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]');assert.ok(root);
   const [source,session,model,effort,permission]=root.querySelectorAll('select'),buttons=root.querySelectorAll('button');
   assert.equal(source.value,'app');assert.equal(session.value,'app-session');assert.equal(model.disabled,true);assert.equal(permission.disabled,false);
-  source.value='cli';await source.onchange();assert.equal(session.value,'cli-session');await buttons.find(b=>b.textContent==='刷新模型').onclick();
+  source.value='cli';await source.onchange();assert.equal(session.value,'cli-session');await buttons.find(b=>b.textContent==='모델 새로 고침').onclick();
   assert.equal(ui.calls.at(-1).surface,'cli');assert.equal(ui.calls.at(-1).sessionId,'cli-session');model.value='cli-model';model.onchange();
-  assert.equal(buttons.find(b=>b.textContent==='应用模型').disabled,false);
-  source.value='ide';source.onchange();assert.equal(model.value,'');assert.equal(buttons.find(b=>b.textContent==='应用模型').disabled,true);
+  assert.equal(buttons.find(b=>b.textContent==='애플리케이션 모델').disabled,false);
+  source.value='ide';source.onchange();assert.equal(model.value,'');assert.equal(buttons.find(b=>b.textContent==='애플리케이션 모델').disabled,true);
   assert.equal(ui.calls.some(body=>body.action==='accounts'),false);
 });
 
 test('Antigravity management failures block stale configuration until an explicit reload',async()=>{
   const ui=fixture(),client={id:'antigravity',name:'Antigravity',capabilities:{management:true}};ui.panel.clients=[client];
-  ui.setHandler(async()=>{throw Error('配置读取失败');});await ui.panel.manageClient(client);await new Promise(setImmediate);
-  const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]');assert.equal(root.querySelector('[role="alert"]').textContent,'配置读取失败');
-  assert.equal(root.querySelectorAll('button').find(b=>b.textContent==='应用模型').disabled,true);
-  assert.equal(root.querySelectorAll('button').find(b=>b.textContent==='应用审批方式').disabled,true);
+  ui.setHandler(async()=>{throw Error('구성 읽기 실패');});await ui.panel.manageClient(client);await new Promise(setImmediate);
+  const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]');assert.equal(root.querySelector('[role="alert"]').textContent,'구성 읽기 실패');
+  assert.equal(root.querySelectorAll('button').find(b=>b.textContent==='애플리케이션 모델').disabled,true);
+  assert.equal(root.querySelectorAll('button').find(b=>b.textContent==='신청 승인 방법').disabled,true);
 });
 
 test('first Claude setup guides both permissions without launching, trusting or copying the connector',async()=>{
-  const ui=fixture(),workspace='/Users/fixture/本地文稿/想法/claude';
+  const ui=fixture(),workspace='/Users/fixture/로컬 텍스트/아이디어/claude';
   ui.panel.clients=[{id:'claude',installed:true,enabled:true,connected:false}];ui.panel.connectionValue={claudeWorkspace:workspace};
   let granted=false;
   ui.setHandler(async body=>body.action==='claude-prerequisites'?{supported:true,platform:'darwin',workspace,gatewayRunning:false,accessibility:{setupState:(granted||=body.requestPermission===true)?'ready':'needs-permission'}}:{copied:true});
@@ -49,7 +49,7 @@ test('first Claude setup guides both permissions without launching, trusting or 
   assert.equal(dialog.open,true);assert.equal(dialog.children[5].textContent,workspace);assert.equal(buttons[3].disabled,true);
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls)),[{action:'claude-prerequisites'}]);
   await ui.panel.showClaudeSetup(true);assert.equal(ui.document.body.children.length,1);
-  await buttons[0].onclick();assert.equal(ui.calls.at(-1).requestPermission,true);assert.match(dialog.children[2].textContent,/已授权/);assert.equal(buttons[3].disabled,true,'public gateway must still be started explicitly');
+  await buttons[0].onclick();assert.equal(ui.calls.at(-1).requestPermission,true);assert.match(dialog.children[2].textContent,/접근성: 부여됨/);assert.equal(buttons[3].disabled,true,'public gateway must still be started explicitly');
   await buttons[1].onclick();assert.equal(ui.calls.at(-1).action,'copy-claude-workspace');
   buttons[4].onclick();assert.equal(ui.document.body.children.length,0);assert.equal(ui.panel.choosingClient,null);
   await ui.panel.showClaudeSetup(true);assert.equal(ui.document.body.children.length,0);
@@ -84,10 +84,10 @@ test('DSH directory refresh targets its field after real account forms are inser
 });
 
 test('desktop progress overrides stale process and configuration snapshots and allows an explicit retry',async()=>{
- const ui=fixture(),client={id:'deepseek',name:'DSH',enabled:true,installed:true,selectable:true,configured:true,running:false,connected:false,connectionState:'connecting',reason:'Harness 已启动，正在等待桌面连接'};ui.panel.clients=[client];ui.panel.renderClients();
- assert.match(ui.text(),/正在连接，请稍候/);assert.doesNotMatch(ui.text(),/应用未运行/);assert.equal(ui.all().find(node=>node.attributes.role==='status').attributes['aria-busy'],'true');
+ const ui=fixture(),client={id:'deepseek',name:'DSH',enabled:true,installed:true,selectable:true,configured:true,running:false,connected:false,connectionState:'connecting',reason:'Harness가 시작되었습니다. 데스크톱 연결을 기다리는 중입니다.'};ui.panel.clients=[client];ui.panel.renderClients();
+ assert.match(ui.text(),/연결 중입니다\. 잠시 기다려 주세요…/);assert.doesNotMatch(ui.text(),/앱이 실행되지 않음/);assert.equal(ui.all().find(node=>node.attributes.role==='status').attributes['aria-busy'],'true');
  ui.english();assert.doesNotMatch(ui.text(),/[\u4e00-\u9fff]/);assert.match(ui.text(),/Connecting, please wait/);
- Object.assign(client,{connectionState:'timeout',retryable:true,reason:'Harness 连接超时，请检查桌面应用后重试接入'});ui.panel.renderClients();assert.match(ui.text(),/Connection timed out/);
+ Object.assign(client,{connectionState:'timeout',retryable:true,reason:'Harness 연결 시간이 초과되었습니다. 데스크톱 앱을 확인한 후 다시 시도하세요.'});ui.panel.renderClients();assert.match(ui.text(),/Connection timed out/);
  ui.setHandler(async()=>({clients:[{...client,connectionState:'connecting',retryable:false}]}));await ui.all().find(node=>node.textContent==='Retry connection').onclick();assert.equal(ui.calls[0].action,'toggle-client');assert.equal(ui.calls[0].enabled,true);assert.equal(ui.calls[0].provider,'deepseek');
 });
 
@@ -99,7 +99,7 @@ test('desktop fast polling is limited to visible startup states and deduplicates
 
 test('DSH directory picker and plugin actions never use the account name field',async()=>{
   const ui=fixture({accounts:true}),name=ui.panel.ensureAccountPanel('deepseek').nameInput;name.value='Saved access';
-  const selected='F:\\Harness 数据\\profile';ui.setChosen(selected);await ui.choose.onclick();
+  const selected='F:\\Harness 데이터\\profile';ui.setChosen(selected);await ui.choose.onclick();
   assert.equal(ui.input.value,selected);assert.equal(name.value,'Saved access');
   for(const action of ['install-deepseek','remove-deepseek']){ui.input.value=' '+selected+' ';await ui.panel.action(action);assert.equal(ui.calls.find(call=>call.action===action).home,selected);assert.equal(name.value,'Saved access');}
 });
@@ -110,12 +110,12 @@ test('scan discovers clients without connecting apps and ignores duplicate scans
   finish({clients:[]});await pending;assert.equal(ui.nodes['refresh-clients'].disabled,false);assert.deepEqual(ui.calls.map(c=>c.action),['scan','status']);
 });
 test('Claude unknown-state quit is a separate explicitly confirmed desktop action',async()=>{
-  const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,enabled:true,running:true,canConfirmQuit:true,reason:'连接已断开'};
+  const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,enabled:true,running:true,canConfirmQuit:true,reason:'연결이 끊어졌습니다'};
   ui.panel.clients=[client];ui.panel.renderClients();
   ui.setHandler(async body=>body.action==='claude-quit-preview'?{token:'fixture-preview',canQuit:true,requiresUnknownConfirmation:true}:body.action==='status'?{backends:{}}:{clients:[client]});
-  ui.confirm(false);await ui.all().find(n=>n.textContent==='退出 Claude…').onclick();
-  assert.ok(ui.prompts[0].includes('可能中断'));assert.match(ui.prompts[0],/重新启动 Claude Desktop 后，初始化连接需要电脑处于解锁状态/);assert.equal(ui.calls.some(c=>c.action==='claude-quit-confirm'),false);assert.equal(client.enabled,true);
-  ui.confirm(true);await ui.all().find(n=>n.textContent==='退出 Claude…').onclick();
+  ui.confirm(false);await ui.all().find(n=>n.textContent==='Claude 종료…').onclick();
+  assert.ok(ui.prompts[0].includes('작업이 중단될 수 있습니다'));assert.match(ui.prompts[0],/Claude Desktop을 다시 시작한 후 연결을 초기화하려면 컴퓨터 잠금을 해제해야 합니다\. 정말 그만두시겠어요\?/);assert.equal(ui.calls.some(c=>c.action==='claude-quit-confirm'),false);assert.equal(client.enabled,true);
+  ui.confirm(true);await ui.all().find(n=>n.textContent==='Claude 종료…').onclick();
   const value=ui.calls.find(c=>c.action==='claude-quit-confirm');assert.equal(value.token,'fixture-preview');assert.equal(value.confirmed,true);assert.equal(value.acknowledgeUnknown,true);
   assert.equal(ui.calls.some(c=>['toggle-client','restart-claude','connect-claude'].includes(c.action)),false);
 });
@@ -130,57 +130,57 @@ test('the separate desktop Claude quit confirmation includes the unlock warning 
 test('Claude known busy tasks never receive the unknown-state quit confirmation',async()=>{
   const ui=fixture();ui.panel.clients=[{id:'claude',name:'Claude',installed:true,connected:false,enabled:true,running:true,canConfirmQuit:true}];ui.panel.renderClients();
   ui.setHandler(async body=>body.action==='claude-quit-preview'?{token:'fixture-preview',canQuit:false,busy:true}:body.action==='status'?{backends:{}}:{clients:ui.panel.clients});
-  await ui.all().find(n=>n.textContent==='退出 Claude…').onclick();assert.equal(ui.prompts.length,0);assert.equal(ui.calls.some(c=>c.action==='claude-quit-confirm'),false);assert.ok(ui.errors.some(x=>x.includes('任务运行')));
+  await ui.all().find(n=>n.textContent==='Claude 종료…').onclick();assert.equal(ui.prompts.length,0);assert.equal(ui.calls.some(c=>c.action==='claude-quit-confirm'),false);assert.ok(ui.errors.some(x=>x.includes('작업이 실행 중')));
 });
 test('Claude desktop blockers retain their own labels and allow cancelling pending connection',async()=>{
-  for(const [setupStatus,label] of [['needs-screen-saver','等待退出屏保'],['needs-unlock','等待解锁'],['needs-desktop','等待桌面恢复']])for(const running of [true,false]){
+  for(const [setupStatus,label] of [['needs-screen-saver','화면 보호기가 끝날 때까지 기다리는 중'],['needs-unlock','잠금 해제를 기다리는 중'],['needs-desktop','데스크탑을 기다리고 있어요']])for(const running of [true,false]){
     const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,enabled:true,running,setupStatus,reason:'waiting reason'};ui.panel.clients=[client];ui.panel.renderClients();
-    assert.match(ui.text(),new RegExp(label));ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='取消连接').onclick();assert.equal(ui.calls[0].action,'cancel-claude');
+    assert.match(ui.text(),new RegExp(label));ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='연결 취소').onclick();assert.equal(ui.calls[0].action,'cancel-claude');
   }
 });
 test('installed but unsupported Claude is never shown as connected or switchable; original icons remain',()=>{
-  const ui=fixture();ui.english();ui.panel.clients=[{id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'unsupported',reason:'此版本 Claude Desktop 限制自动接入，暂时无法连接'}];ui.panel.renderClients();
+  const ui=fixture();ui.english();ui.panel.clients=[{id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'unsupported',reason:'이 Claude 데스크톱 버전은 자동 액세스를 제한하므로 아직 연결할 수 없습니다.'}];ui.panel.renderClients();
   assert.match(ui.text(),/Automatic access unavailable/);assert.doesNotMatch(ui.text(),/[\u4e00-\u9fff]/);assert.match(ui.text(),/restricts automatic access/);assert.ok(ui.all().find(n=>n.tag==='input').disabled);assert.equal(ui.all().find(n=>n.tag==='img').src,'../web/client-icons/claude.png');
 });
 test('an offline read failure preserves established configuration instead of inventing unconfigured rows',async()=>{
-  const ui=fixture(),clients=[{id:'codex',name:'Codex',configured:true,connected:false,enabled:true,reason:'接入配置已就绪'}];ui.panel.clients=clients;ui.panel.renderClients();ui.setHandler(async()=>{throw Error('read unavailable');});await ui.panel.refreshClients();
+  const ui=fixture(),clients=[{id:'codex',name:'Codex',configured:true,connected:false,enabled:true,reason:'연결 준비됨'}];ui.panel.clients=clients;ui.panel.renderClients();ui.setHandler(async()=>{throw Error('read unavailable');});await ui.panel.refreshClients();
   assert.equal(ui.panel.clients,clients);assert.match(ui.text(),/Codex/);assert.match(ui.nodes['client-scan-status'].textContent,/read unavailable/);
 });
 test('failed automatic scan reports failure, then can recover through the same rescan control',async()=>{
   const ui=fixture();ui.setHandler(async body=>{if(body.action==='scan')throw Error('setup failed');return body.action==='status'?{backends:{}}:{clients:[]};});await ui.panel.scan(true);
   assert.deepEqual(ui.errors,['setup failed']);assert.equal(ui.nodes['refresh-clients'].disabled,false);assert.match(ui.nodes['client-scan-status'].textContent,/setup failed/);
-  ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[]});await ui.nodes['refresh-clients'].onclick();assert.equal(ui.panel.scanError,false);assert.match(ui.nodes['client-scan-status'].textContent,/扫描完成/);
+  ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[]});await ui.nodes['refresh-clients'].onclick();assert.equal(ui.panel.scanError,false);assert.match(ui.nodes['client-scan-status'].textContent,/스캔이 완료되었습니다\. 연결 상태는 아래와 같습니다\./);
 });
 
 test('DSH restart button requires explicit confirmation and never starts the public gateway',async()=>{
-  const ui=fixture(),clients=[{id:'deepseek',name:'DSH',installed:true,configured:false,connected:false,enabled:false,setupStatus:'restart-required',reason:'请结束当前任务后重启 Harness 完成接入'}];
-  ui.panel.clients=clients;ui.panel.renderClients();ui.confirm(false);await ui.all().find(n=>n.textContent==='重启并接入').onclick();assert.equal(ui.calls.length,0);assert.equal(ui.prompts.length,1);
-  ui.confirm(true);ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients});await ui.all().find(n=>n.textContent==='重启并接入').onclick();assert.equal(ui.calls[0].action,'restart-deepseek');assert.equal(ui.calls.some(c=>c.action==='start'),false);assert.ok(ui.errors.includes('正在等待 Harness 连接'));
+  const ui=fixture(),clients=[{id:'deepseek',name:'DSH',installed:true,configured:false,connected:false,enabled:false,setupStatus:'restart-required',reason:'현재 작업을 완료하고 Harness를 다시 시작하여 연결하세요.'}];
+  ui.panel.clients=clients;ui.panel.renderClients();ui.confirm(false);await ui.all().find(n=>n.textContent==='다시 시작 및 연결').onclick();assert.equal(ui.calls.length,0);assert.equal(ui.prompts.length,1);
+  ui.confirm(true);ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients});await ui.all().find(n=>n.textContent==='다시 시작 및 연결').onclick();assert.equal(ui.calls[0].action,'restart-deepseek');assert.equal(ui.calls.some(c=>c.action==='start'),false);assert.ok(ui.errors.includes('Harness가 연결되기를 기다리는 중'));
 });
 test('DSH first-open action triggers a follow-up scan and uses no manual directory',async()=>{
-  const ui=fixture(),clients=[{id:'deepseek',name:'DSH',installed:true,configured:false,connected:false,enabled:false,setupStatus:'needs-first-launch',reason:'请先打开 Harness 完成首次设置，再重新扫描'}];
-  ui.panel.clients=clients;ui.panel.renderClients();ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients});await ui.all().find(n=>n.textContent==='打开并接入').onclick();
+  const ui=fixture(),clients=[{id:'deepseek',name:'DSH',installed:true,configured:false,connected:false,enabled:false,setupStatus:'needs-first-launch',reason:'Harness를 열고 초기 설정을 마친 후 다시 스캔하세요.'}];
+  ui.panel.clients=clients;ui.panel.renderClients();ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients});await ui.all().find(n=>n.textContent==='열기 및 연결').onclick();
   assert.equal(ui.calls[0].action,'connect-deepseek');assert.equal(ui.calls[0].home,undefined);assert.equal(ui.calls.some(c=>c.action==='scan'&&c.setup===false),true);
 });
 
 test('Claude setup exposes native permission and developer confirmation without enabling an unverified connection',async()=>{
-  const ui=fixture();ui.english();const client={id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'needs-permission',reason:'请在系统设置中允许 Claude 连接组件使用辅助功能，授权后会继续连接'};
+  const ui=fixture();ui.english();const client={id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'needs-permission',reason:'Claude 커넥터가 시스템 설정에서 접근성을 사용하도록 허용합니다. 권한이 부여된 후에 연결이 계속됩니다.'};
   ui.panel.clients=[client];ui.panel.renderClients();
   assert.match(ui.text(),/Permission required/);assert.doesNotMatch(ui.text(),/[\u4e00-\u9fff]/);assert.equal(ui.all().find(n=>n.tag==='input').disabled,true);
   ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='Authorize & connect').onclick();assert.equal(ui.calls[0].action,'connect-claude');
-  client.setupStatus='needs-developer-mode';client.reason='请确认 Claude 的开发者模式提示，完成后会继续连接';ui.panel.renderClients();
+  client.setupStatus='needs-developer-mode';client.reason='계속 연결하려면 Claude의 개발자 모드 프롬프트를 확인하세요.';ui.panel.renderClients();
   assert.match(ui.text(),/Developer mode confirmation required/);assert.doesNotMatch(ui.text(),/[\u4e00-\u9fff]/);
   await ui.all().find(n=>n.textContent==='Retry initialization').onclick();assert.ok(ui.calls.some(c=>c.action==='connect-claude'));
   client.setupStatus='connecting';ui.panel.renderClients();await ui.all().find(n=>n.textContent==='Cancel connection').onclick();assert.ok(ui.calls.some(c=>c.action==='cancel-claude'));
 });
 
 test('Claude connection recovery waits for an explicit initialization click and explains foreground use',async()=>{
-  const ui=fixture();const client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,running:false,enabled:true,setupStatus:'needs-initialization',reason:'Claude 未恢复已有连接；请点击“初始化连接”。初始化会使用电脑前台，请保持桌面可交互。'};
+  const ui=fixture();const client={id:'claude',name:'Claude',installed:true,configured:true,connected:false,running:false,enabled:true,setupStatus:'needs-initialization',reason:'Claude가 기존 연결을 복원할 수 없습니다. 연결 초기화를 선택합니다. 초기화에서는 전경 창을 사용합니다. 컴퓨터 바탕화면을 대화형으로 유지하세요.'};
   ui.panel.clients=[client];ui.panel.renderClients();ui.panel.renderScan();
-  assert.match(ui.text(),/需要初始化连接/);assert.match(ui.text(),/初始化会使用电脑前台/);assert.doesNotMatch(ui.text(),/连接失败/);
+  assert.match(ui.text(),/연결 초기화 필요/);assert.match(ui.text(),/Claude가 기존 연결을 복원할 수 없습니다\. 연결 초기화를 선택합니다\. 초기화에서는 전경 창을 사용합니다\. 컴퓨터 바탕화면을 대화형으로 유지하세요\./);assert.doesNotMatch(ui.text(),/연결 실패/);
   ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.poll();
   assert.equal(ui.calls.some(call=>call.action==='connect-claude'),false);
-  await ui.all().find(node=>node.tag==='button'&&node.textContent==='初始化连接').onclick();assert.ok(ui.calls.some(call=>call.action==='connect-claude'));assert.deepEqual(ui.initializations,['claude']);
+  await ui.all().find(node=>node.tag==='button'&&node.textContent==='연결 초기화').onclick();assert.ok(ui.calls.some(call=>call.action==='connect-claude'));assert.deepEqual(ui.initializations,['claude']);
   ui.english();assert.match(ui.text(),/Connection initialization required/);assert.match(ui.text(),/Initialization uses the foreground window/);assert.doesNotMatch(ui.text(),/[\u4e00-\u9fff]/);
 });
 
@@ -190,7 +190,7 @@ test('desktop ZCode access switch stays separate from private-pipe initializatio
  await ui.panel.toggleClient('zcode',true);
  const writes=()=>ui.calls.filter(call=>call.action==='toggle-client');
  assert.equal(writes().length,1);assert.equal(writes()[0].initializeDesktop,undefined);assert.deepEqual(ui.initializations,[]);
- ui.setInitializeChoice(false);await ui.all().find(node=>node.tag==='button'&&node.textContent==='初始化连接').onclick();
+ ui.setInitializeChoice(false);await ui.all().find(node=>node.tag==='button'&&node.textContent==='연결 초기화').onclick();
  assert.equal(writes().length,1);assert.deepEqual(ui.initializations,['zcode']);
  ui.panel.operationFailures=new Map([['zcode',{action:'initialize',uncertain:false}]]);ui.setInitializeChoice(true);
  await ui.panel.retryOperation('zcode');assert.equal(writes().at(-1).initializeDesktop,true);assert.equal(writes().at(-1).provider,'zcode');
@@ -201,7 +201,7 @@ test('failed ZCode enable keeps initialization reachable and retry requests cons
   const ui=fixture(),client={id:'zcode',name:'ZCode',configured:true,installed:true,enabled:true,canInitializeDesktop:true,pipeSupported:true,connectionMode:'private-pipe',setupStatus:'needs-initialization'};
   ui.panel.clients=[client];ui.panel.operationFailures=new Map([['zcode',{action:'enable',uncertain,message:'Initialize local connection first',connectionMode:'private-pipe'}]]);
   ui.setHandler(async()=>({clients:[client]}));ui.panel.renderClients();
-  const initialize=ui.all().find(node=>node.tag==='button'&&node.textContent==='初始化连接');
+  const initialize=ui.all().find(node=>node.tag==='button'&&node.textContent==='연결 초기화');
   assert.equal(!!initialize,!uncertain);
   if(uncertain){await ui.panel.retryOperation('zcode');assert.equal(ui.initializations.length,0);assert.equal(ui.calls.length,0);continue;}
   ui.setInitializeChoice(false);await ui.panel.retryOperation('zcode');assert.deepEqual(ui.initializations,['zcode']);assert.equal(ui.calls.length,0);
@@ -240,70 +240,70 @@ test('desktop pending initialization choice blocks duplicate actions and stale s
 });
 
 test('Claude restart requires confirmation and connected clients no longer offer setup actions',async()=>{
-  const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'restart-required',reason:'未找到 Claude Console，请在结束当前任务后重启 Claude 再连接'};
-  ui.panel.clients=[client];ui.panel.renderClients();ui.confirm(false);await ui.all().find(n=>n.textContent==='重启并接入').onclick();assert.equal(ui.calls.length,0);
-  ui.confirm(true);ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='重启并接入').onclick();assert.equal(ui.calls[0].action,'restart-claude');
-  Object.assign(client,{configured:true,connected:true,enabled:true,setupStatus:'connected',reason:'桌面连接可用'});ui.panel.renderClients();assert.equal(ui.all().find(n=>n.tag==='input').disabled,false);assert.ok(!ui.all().some(n=>n.tag==='button'&&/连接|接入/.test(n.textContent)));
+  const ui=fixture(),client={id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'restart-required',reason:'Claude 콘솔을 찾을 수 없습니다. 현재 작업을 완료한 다음 Claude를 다시 시작하고 다시 연결하세요.'};
+  ui.panel.clients=[client];ui.panel.renderClients();ui.confirm(false);await ui.all().find(n=>n.textContent==='다시 시작 및 연결').onclick();assert.equal(ui.calls.length,0);
+  ui.confirm(true);ui.setHandler(async body=>body.action==='status'?{backends:{}}:{clients:[client]});await ui.all().find(n=>n.textContent==='다시 시작 및 연결').onclick();assert.equal(ui.calls[0].action,'restart-claude');
+  Object.assign(client,{configured:true,connected:true,enabled:true,setupStatus:'connected',reason:'데스크톱 연결 가능'});ui.panel.renderClients();assert.equal(ui.all().find(n=>n.tag==='input').disabled,false);assert.ok(!ui.all().some(n=>n.tag==='button'&&/연결|연결/.test(n.textContent)));
 });
 
 const clientState=reason=>({id:'claude',name:'Claude',installed:true,configured:false,connected:false,enabled:false,setupStatus:'failed',reason});
 test('periodic client refresh keeps list and open detail status on the same snapshot',async()=>{
-  const ui=fixture();ui.panel.clients=[clientState('正在等待 Claude 连接')];ui.panel.renderClients();await ui.panel.refresh();
-  ui.setHandler(async()=>({clients:[clientState('未收到 Claude 连接确认，请检查登录和目录信任后重试')]}));await ui.poll();
-  assert.match(ui.text(),/未收到 Claude 连接确认/);assert.equal(ui.statuses.claude.textContent,'未收到 Claude 连接确认，请检查登录和目录信任后重试');
+  const ui=fixture();ui.panel.clients=[clientState('대기 중 Claude 연결')];ui.panel.renderClients();await ui.panel.refresh();
+  ui.setHandler(async()=>({clients:[clientState('Claude에서 연결 확인이 없습니다. 로그인 및 디렉터리 신뢰를 확인한 후 다시 시도하세요.')]}));await ui.poll();
+  assert.match(ui.text(),/Claude에서 연결 확인이 없습니다\. 로그인 및 디렉터리 신뢰를 확인한 후 다시 시도하세요\./);assert.equal(ui.statuses.claude.textContent,'Claude에서 연결 확인이 없습니다. 로그인 및 디렉터리 신뢰를 확인한 후 다시 시도하세요.');
 });
 test('concurrent status and client reads converge regardless of completion order',async()=>{
   for(const statusFirst of [true,false]){
-    const ui=fixture();ui.panel.clients=[clientState('旧连接状态')];ui.panel.renderClients();let status,clients;
+    const ui=fixture();ui.panel.clients=[clientState('이전 연결 상태')];ui.panel.renderClients();let status,clients;
     ui.setHandler(body=>new Promise(resolve=>{if(body.action==='status')status=resolve;else clients=resolve;}));
     const readingStatus=ui.panel.refresh(),readingClients=ui.panel.refreshClients();
-    if(statusFirst){status({backends:{claude:{connected:false}},claudeWorkspace:'/bridge/claude'});await readingStatus;clients({clients:[clientState('新的连接结果')]});await readingClients;}
-    else{clients({clients:[clientState('新的连接结果')]});await readingClients;status({backends:{claude:{connected:false}},claudeWorkspace:'/bridge/claude'});await readingStatus;}
-    assert.match(ui.text(),/新的连接结果/);assert.equal(ui.statuses.claude.textContent,'新的连接结果');
+    if(statusFirst){status({backends:{claude:{connected:false}},claudeWorkspace:'/bridge/claude'});await readingStatus;clients({clients:[clientState('새로운 연결 결과')]});await readingClients;}
+    else{clients({clients:[clientState('새로운 연결 결과')]});await readingClients;status({backends:{claude:{connected:false}},claudeWorkspace:'/bridge/claude'});await readingStatus;}
+    assert.match(ui.text(),/새로운 연결 결과/);assert.equal(ui.statuses.claude.textContent,'새로운 연결 결과');
   }
 });
 test('late pre-scan client read cannot replace the scan result',async()=>{
-  const ui=fixture(),current=clientState('扫描后的连接结果');let finishOld,clientReads=0;
+  const ui=fixture(),current=clientState('스캔된 연결 결과');let finishOld,clientReads=0;
   ui.setHandler(body=>body.action==='clients'?++clientReads===1?new Promise(resolve=>finishOld=resolve):Promise.resolve({clients:[current]}):Promise.resolve(body.action==='status'?{backends:{}}:{clients:[current]}));
-  const reading=ui.panel.refreshClients(),scanning=ui.panel.scan();await Promise.resolve();finishOld({clients:[clientState('扫描前的旧结果')]});await Promise.all([reading,scanning]);
-  assert.match(ui.text(),/扫描后的连接结果/);assert.doesNotMatch(ui.text(),/扫描前的旧结果/);assert.equal(ui.statuses.claude.textContent,current.reason);
+  const reading=ui.panel.refreshClients(),scanning=ui.panel.scan();await Promise.resolve();finishOld({clients:[clientState('스캔 전 이전 결과')]});await Promise.all([reading,scanning]);
+  assert.match(ui.text(),/스캔된 연결 결과/);assert.doesNotMatch(ui.text(),/스캔 전 이전 결과/);assert.equal(ui.statuses.claude.textContent,current.reason);
 });
 test('changing language preserves the latest detail state through the global translation pass',()=>{
-  const ui=fixture();ui.panel.clients=[clientState('未收到 Claude 连接确认，请检查登录和目录信任后重试')];ui.panel.renderClients();ui.english();ui.apply();
+  const ui=fixture();ui.panel.clients=[clientState('Claude에서 연결 확인이 없습니다. 로그인 및 디렉터리 신뢰를 확인한 후 다시 시도하세요.')];ui.panel.renderClients();ui.english();ui.apply();
   assert.match(ui.statuses.claude.textContent,/No connection confirmation/);assert.doesNotMatch(ui.statuses.claude.textContent,/Checking|[\u4e00-\u9fff]/);
 });
 test('Claude diagnostics distinguish gateway communication and detected client data directories',async()=>{
   const ui=fixture();ui.setHandler(async()=>({backends:{claude:{connected:false,dataHome:'/actual/Claude'}},claudeWorkspace:'/bridge/desktop-sessions/claude'}));await ui.panel.refresh();
   assert.equal(ui.workspace.textContent,'/bridge/desktop-sessions/claude');assert.equal(ui.claudeHome.textContent,'/actual/Claude');assert.equal(ui.claudeData.hidden,false);
   ui.setHandler(async()=>({backends:{claude:{connected:false}},claudeWorkspace:'/bridge/desktop-sessions/claude'}));await ui.panel.refresh();assert.equal(ui.claudeData.hidden,true);assert.equal(ui.claudeHome.textContent,'');
-  const html=fs.readFileSync(path.join(__dirname,'../desktop/index.html'),'utf8');assert.match(html,/data-i18n="网关通信目录"/);assert.match(html,/data-i18n="Claude 数据目录"/);
+  const html=fs.readFileSync(path.join(__dirname,'../desktop/index.html'),'utf8');assert.match(html,/data-i18n="게이트웨이 통신 디렉토리"/);assert.match(html,/data-i18n="Claude 데이터 디렉토리"/);
 });
 test('older status response cannot restore a stale diagnostic directory',async()=>{
   const ui=fixture(),pending=[];ui.setHandler(()=>new Promise(resolve=>pending.push(resolve)));const old=ui.panel.refresh(),latest=ui.panel.refresh();
   pending[1]({backends:{},claudeWorkspace:'/new/claude'});await latest;pending[0]({backends:{},claudeWorkspace:'/old/claude'});await old;assert.equal(ui.workspace.textContent,'/new/claude');
 });
 test('process quit starts after a choice, excludes duplicates and rolls back a refused quit',async()=>{
-  const ui=fixture(),client={id:'claude',name:'Claude',configured:true,enabled:true,connected:true,reason:'桌面连接可用'};let reject;
+  const ui=fixture(),client={id:'claude',name:'Claude',configured:true,enabled:true,connected:true,reason:'데스크톱 연결 가능'};let reject;
   ui.panel.clients=[client];ui.setHandler(body=>body.action==='toggle-client'?new Promise((_,failed)=>reject=failed):Promise.resolve({clients:[client]}));
   const pending=ui.panel.toggleClient('claude',false);await Promise.resolve();
-  assert.equal(ui.panel.clients[0].enabled,false);assert.match(ui.text(),/正在退出应用/);assert.ok(ui.all().find(n=>n.tag==='input').disabled);
+  assert.equal(ui.panel.clients[0].enabled,false);assert.match(ui.text(),/앱을 종료하는 중…/);assert.ok(ui.all().find(n=>n.tag==='input').disabled);
   await ui.panel.toggleClient('claude',true);await ui.panel.scan();assert.equal(ui.calls.length,1);
-  reject(Error('有任务运行或等待确认'));await pending;
-  assert.equal(ui.panel.clients[0].enabled,true);assert.equal(ui.panel.busy,false);assert.equal(ui.all().find(n=>n.tag==='input').disabled,false);assert.deepEqual(ui.errors,['有任务运行或等待确认']);
+  reject(Error('실행 중이거나 확인을 기다리는 작업이 있습니다.'));await pending;
+  assert.equal(ui.panel.clients[0].enabled,true);assert.equal(ui.panel.busy,false);assert.equal(ui.all().find(n=>n.tag==='input').disabled,false);assert.deepEqual(ui.errors,['실행 중이거나 확인을 기다리는 작업이 있습니다.']);
 });
 
 test('desktop uncertain quit remains blocked after a failed read, then permits a confirmed retry',async()=>{
  const ui=fixture(),client={id:'claude',name:'Claude',enabled:true,configured:true,installed:true,connected:true,running:true};ui.panel.clients=[client];ui.panel.lifecycleTimeout=5;let finish,readable=false;
  ui.setHandler(body=>body.action==='toggle-client'?new Promise(resolve=>finish=resolve):readable?Promise.resolve({clients:[client]}):Promise.reject(Error('status offline')));
- await ui.panel.toggleClient('claude',false);assert.equal(ui.panel.busy,false);assert.equal(ui.panel.hasUncertain(),true);assert.equal(ui.panel.clients[0].connected,true);assert.match(ui.text(),/尚未确认/);assert.ok(ui.all().some(node=>node.textContent==='刷新状态'));const count=ui.calls.length;
+ await ui.panel.toggleClient('claude',false);assert.equal(ui.panel.busy,false);assert.equal(ui.panel.hasUncertain(),true);assert.equal(ui.panel.clients[0].connected,true);assert.match(ui.text(),/작업 결과가 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로고침하세요\./);assert.ok(ui.all().some(node=>node.textContent==='새로고침 상태'));const count=ui.calls.length;
  await ui.panel.retryOperation('claude');await ui.panel.pollClients();assert.equal(ui.calls.length,count);await ui.panel.refreshClients(true);assert.equal(ui.panel.hasUncertain(),true);
  readable=true;await ui.panel.refreshClients(true);assert.equal(ui.panel.hasUncertain(),false);finish({clients:[{...client,enabled:false,connected:false,running:false}]});await Promise.resolve();await Promise.resolve();assert.equal(ui.panel.clients[0].connected,true);
- ui.setChoice(null);await ui.all().find(node=>node.textContent==='重试退出').onclick();assert.equal(ui.choices.length,2);assert.equal(ui.calls.filter(call=>call.action==='toggle-client').length,1);
+ ui.setChoice(null);await ui.all().find(node=>node.textContent==='종료 다시 시도').onclick();assert.equal(ui.choices.length,2);assert.equal(ui.calls.filter(call=>call.action==='toggle-client').length,1);
 });
 
 test('desktop lock status provides an explicit initialization retry while keeping existing connections usable',()=>{
- const ui=fixture();ui.panel.windowsSession={state:'locked',interactive:false};ui.panel.clients=[{id:'claude',name:'Claude',enabled:true,installed:true,configured:true,connected:false,initializationMode:'background',setupStatus:'needs-unlock',connectionState:'needs-initialization'}];ui.panel.renderClients();ui.panel.renderScan();assert.match(ui.text(),/电脑已锁定/);assert.match(ui.nodes['client-scan-status'].textContent,/后台服务继续运行/);assert.ok(ui.all().some(node=>node.textContent==='重试初始化'));
- ui.panel.clients[0].connected=true;ui.panel.renderClients();assert.equal(ui.all().find(node=>node.attributes.role==='status').textContent,'已连接');ui.panel.windowsSession={state:'unlocked',interactive:true};ui.panel.renderClients();assert.equal(ui.calls.length,0);
+ const ui=fixture();ui.panel.windowsSession={state:'locked',interactive:false};ui.panel.clients=[{id:'claude',name:'Claude',enabled:true,installed:true,configured:true,connected:false,initializationMode:'background',setupStatus:'needs-unlock',connectionState:'needs-initialization'}];ui.panel.renderClients();ui.panel.renderScan();assert.match(ui.text(),/컴퓨터가 잠겼습니다\./);assert.match(ui.nodes['client-scan-status'].textContent,/컴퓨터가 잠겨 있습니다\. 백그라운드 서비스는 계속 실행됩니다\. 데스크톱 상호 작용이 필요한 작업을 다시 시도하기 전에 잠금을 해제하세요\./);assert.ok(ui.all().some(node=>node.textContent==='초기화 재시도'));
+ ui.panel.clients[0].connected=true;ui.panel.renderClients();assert.equal(ui.all().find(node=>node.attributes.role==='status').textContent,'연결됨');ui.panel.windowsSession={state:'unlocked',interactive:true};ui.panel.renderClients();assert.equal(ui.calls.length,0);
 });
 
 test('desktop restart, cancel and plugin timeouts require reconciliation and retry the original action',async()=>{
@@ -333,9 +333,9 @@ test('DSH recovery preview timeout never submits a mutation or marks its outcome
 });
 
 test('DSH recovery uses a preview token and explicit acknowledgment for unknown background tasks',async()=>{
- const ui=fixture();ui.english();const clients=[{id:'deepseek',name:'DSH',enabled:true,configured:true,connected:false,running:true,mainRunning:false,backgroundRunning:true,reason:'客户端已配置，可开启桌面应用'}];ui.panel.clients=clients;
+ const ui=fixture();ui.english();const clients=[{id:'deepseek',name:'DSH',enabled:true,configured:true,connected:false,running:true,mainRunning:false,backgroundRunning:true,reason:'앱이 구성되었으며 열 준비가 되었습니다.'}];ui.panel.clients=clients;
  ui.setHandler(async body=>body.action==='deepseek-recovery-preview'?{token:'review-token',canRecover:true,busy:false,requiresUnknownConfirmation:true,guiCount:0,backgroundCount:2}:body.action==='status'?{backends:{}}:{clients});
- await ui.panel.recoverDeepseek(true);const actions=ui.calls.filter(row=>row.action.startsWith('deepseek-recovery'));assert.equal(actions.length,2);assert.equal(actions[0].restart,true);assert.equal(actions[1].token,'review-token');assert.equal(actions[1].acknowledgeUnknown,true);assert.equal(actions[1].confirmed,true);assert.equal(actions[1].pid,undefined);assert.match(ui.prompts[0],/could not be verified/);assert.doesNotMatch(ui.prompts[0],/[\u4e00-\u9fff]/);assert.ok(!ui.errors.includes('DSH 已重新接入'));
+ await ui.panel.recoverDeepseek(true);const actions=ui.calls.filter(row=>row.action.startsWith('deepseek-recovery'));assert.equal(actions.length,2);assert.equal(actions[0].restart,true);assert.equal(actions[1].token,'review-token');assert.equal(actions[1].acknowledgeUnknown,true);assert.equal(actions[1].confirmed,true);assert.equal(actions[1].pid,undefined);assert.match(ui.prompts[0],/could not be verified/);assert.doesNotMatch(ui.prompts[0],/[\u4e00-\u9fff]/);assert.ok(!ui.errors.includes('DSH가 다시 연결됨'));
 });
 test('busy DSH tasks prevent recovery and cancelling the preview never quits a client',async()=>{
  for(const busy of [true,false]){
@@ -344,7 +344,7 @@ test('busy DSH tasks prevent recovery and cancelling the preview never quits a c
  }
 });
 test('background-only Harness exposes recovery instead of the legacy restart path',()=>{
- const ui=fixture();ui.panel.clients=[{id:'deepseek',name:'DSH',installed:true,configured:true,enabled:true,connected:true,running:true,mainRunning:false,backgroundRunning:true,setupStatus:'restart-required',reason:'接入配置已就绪'}];ui.panel.renderClients();assert.match(ui.text(),/后台运行，桌面未打开/);assert.ok(ui.all().some(row=>row.tag==='button'&&row.textContent==='恢复并重新接入'));assert.ok(!ui.all().some(row=>row.tag==='button'&&row.textContent==='重启并接入'));
+ const ui=fixture();ui.panel.clients=[{id:'deepseek',name:'DSH',installed:true,configured:true,enabled:true,connected:true,running:true,mainRunning:false,backgroundRunning:true,setupStatus:'restart-required',reason:'연결 준비됨'}];ui.panel.renderClients();assert.match(ui.text(),/백그라운드에서 실행 중입니다\. 데스크톱이 닫혔습니다\./);assert.ok(ui.all().some(row=>row.tag==='button'&&row.textContent==='복구 및 다시 연결'));assert.ok(!ui.all().some(row=>row.tag==='button'&&row.textContent==='다시 시작 및 연결'));
 });
 
 
@@ -356,7 +356,7 @@ test('desktop close choices pass explicit quit intent and distinguish pending st
   ui.setHandler(body=>body.action==='toggle-client'?new Promise(resolve=>finish=resolve):Promise.resolve({clients:[result]}));
   const pending=ui.panel.toggleClient('claude',false);assert.equal(ui.panel.clients[0].enabled,true);await Promise.resolve();
   assert.equal(ui.calls[0].quitDesktop,quitDesktop);assert.equal(Object.hasOwn(ui.calls[0],'forceDesktop'),forceDesktop);if(forceDesktop)assert.equal(ui.calls[0].forceDesktop,true);
-  assert.match(ui.text(),forceDesktop?/正在后台强制结束/:quitDesktop?/正在退出应用/:/正在停用接入/);
+  assert.match(ui.text(),forceDesktop?/백그라운드에서 강제 종료 중…/:quitDesktop?/앱을 종료하는 중…/:/액세스를 비활성화하는 중…/);
   finish({clients:[result]});await pending;assert.equal(ui.panel.clients[0].running,!quitDesktop);assert.equal(ui.panel.clients[0].enabled,false);
  }
 });
@@ -401,9 +401,9 @@ test('desktop stopped-gateway switches save preferences without a quit choice',a
 test('desktop offers force only inside close choices and retains a disabled running app exit',async()=>{
  for(const id of ['codex','claude','deepseek']){
   const ui=fixture(),client={id,name:id,enabled:true,configured:true,installed:true,running:true,connected:true,canForceQuit:true};ui.panel.clients=[client];ui.panel.gatewayRunning=true;ui.panel.renderClients();
-  assert.equal(ui.all().some(node=>node.textContent==='强制关闭 App'),false);assert.equal(ui.all().some(node=>node.textContent==='关闭电脑 App…'),false);
+  assert.equal(ui.all().some(node=>node.textContent==='앱 강제 종료'),false);assert.equal(ui.all().some(node=>node.textContent==='데스크톱 앱 닫기…'),false);
   Object.assign(client,{enabled:false,configured:false,selectable:false,connected:false});ui.panel.renderClients();
-  const close=ui.all().find(node=>node.textContent==='关闭电脑 App…');assert.ok(close);assert.equal(!!close.disabled,false);assert.equal(!!ui.all().find(node=>node.tag==='input').disabled,true);
+  const close=ui.all().find(node=>node.textContent==='데스크톱 앱 닫기…');assert.ok(close);assert.equal(!!close.disabled,false);assert.equal(!!ui.all().find(node=>node.tag==='input').disabled,true);
   ui.setChoice(null);await close.onclick();assert.deepEqual(ui.choices,[id]);assert.equal(ui.calls.length,0);
   ui.english();assert.ok(ui.all().some(node=>node.textContent==='Close desktop app…'));assert.equal(ui.all().some(node=>node.textContent==='Force quit App'),false);
   ui.setChoice('force');ui.setHandler(async()=>({clients:[{...client,running:false}]}));await close.onclick();const body=ui.calls.find(call=>call.action==='toggle-client');
@@ -423,7 +423,7 @@ test('desktop client management keeps native and WSL rows without redundant prov
  const ui=fixture();ui.panel.clients=[codexEntries()];ui.panel.renderClients();
  const rows=ui.all().filter(node=>node.tag==='tr'),group=rows.find(row=>row.children[0]?.attributes.scope==='rowgroup');assert.equal(group,undefined);assert.ok(ui.all().some(node=>node.tag==='strong'&&node.textContent==='Codex'));assert.ok(ui.all().some(node=>node.tag==='strong'&&node.textContent==='WSL Codex · Ubuntu'));
  const entries=rows.filter(row=>row.dataset.clientParent==='codex');assert.deepEqual(entries.map(row=>row.dataset.clientId),['codex','wsl:'+'c'.repeat(32)]);
- assert.equal(ui.all().filter(node=>node.tag==='input'&&node.className==='client-toggle').length,2);assert.equal(ui.all().some(node=>node.textContent==='关闭电脑 App…'),false);
+ assert.equal(ui.all().filter(node=>node.tag==='input'&&node.className==='client-toggle').length,2);assert.equal(ui.all().some(node=>node.textContent==='데스크톱 앱 닫기…'),false);
 });
 test('desktop native Codex disable preserves WSL-only availability while the write is pending',async()=>{
  const ui=fixture();ui.panel.clients=[codexEntries()];ui.panel.refreshClients=async()=>{};let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));
@@ -448,9 +448,9 @@ test('desktop WSL Manage buttons mount the real account panel for the exact prov
  for(const [provider,kind,prefix] of [['codex','wsl-cli','wsl:'],['claude','wsl-claude-cli','wsl-claude:']]){
   const ui=fixture(),entry=prefix+'a'.repeat(32),client={id:entry,kind,name:'Fixture WSL',configured:true,enabled:true,installed:true,canQuitDesktop:false};ui.panel.clients=[client];
   ui.setHandler(async value=>{assert.equal(value.action,'wslAccounts');assert.equal(value.provider,provider);assert.equal(value.entry,entry);return{provider,entry,identity:'fixture',available:true,target:{distribution:'Fixture',user:'tester',configDir:'/home/tester/.config'},accounts:[],blockers:['External CLI remains running'],capabilities:{save:true,import:true,capture:false,switch:false}};});
-  ui.panel.renderClients();assert.ok(ui.text().includes('在网关中管理 WSL 账号与 API'));const button=ui.all().find(node=>node.tag==='button'&&node.textContent==='管理');const panel=await button.onclick();await new Promise(resolve=>setImmediate(resolve));
+  ui.panel.renderClients();assert.ok(ui.text().includes('이 게이트웨이에서 WSL 계정 및 API를 관리하세요.'));const button=ui.all().find(node=>node.tag==='button'&&node.textContent==='관리');const panel=await button.onclick();await new Promise(resolve=>setImmediate(resolve));
   const page=ui.pages.get(entry),account=ui.panel.managementPages.get(entry).panel;
-  assert.ok(page);assert.equal(ui.selected.at(-1),entry);assert.equal(ui.document.body.children.length,0);assert.equal(page.children[0].children[0].textContent,'Fixture WSL');const labels=page.querySelectorAll('button').map(node=>node.textContent);assert.ok(labels.includes('保存 API 接入'));assert.ok(labels.includes('从本机导入 API 接入'));assert.equal(labels.includes('确认切换'),false);assert.equal(account.entry,entry);
+  assert.ok(page);assert.equal(ui.selected.at(-1),entry);assert.equal(ui.document.body.children.length,0);assert.equal(page.children[0].children[0].textContent,'Fixture WSL');const labels=page.querySelectorAll('button').map(node=>node.textContent);assert.ok(labels.includes('API 액세스 저장'));assert.ok(labels.includes('이 컴퓨터에서 API 액세스 가져오기'));assert.equal(labels.includes('스위치 확인'),false);assert.equal(account.entry,entry);
   await button.onclick();assert.equal(ui.pages.size,1,'reuse the management page');
  }
 });
@@ -460,14 +460,14 @@ test('desktop list starts only the selected enabled WSL through the existing acc
   const ui=fixture(),client={id:prefix+'b'.repeat(32),kind,name:'WSL fixture',enabled:true,configured:true,installed:true,distributionRunning:false,connected:false};
   ui.panel.clients=[client];ui.panel.gatewayRunning=true;let finish,refreshes=0;t.after(()=>finish?.({}));
   ui.setHandler(()=>new Promise(resolve=>finish=resolve));ui.panel.refreshClients=async()=>{refreshes++;};ui.panel.renderClients();
-  const button=ui.all().find(n=>n.tag==='button'&&n.textContent==='启动并连接 WSL');assert.ok(button);
+  const button=ui.all().find(n=>n.tag==='button'&&n.textContent==='WSL 시작 및 연결');assert.ok(button);
   const pending=button.onclick();await ui.panel.connectWsl(client.id);
   assert.equal(ui.calls.length,1);assert.deepEqual(JSON.parse(JSON.stringify(ui.calls[0])),{action:'wslAccounts',provider,entry:client.id,operation:'connect'});
-  assert.equal(ui.all().find(n=>n.tag==='button'&&n.textContent==='正在连接，请稍候…').disabled,true);
+  assert.equal(ui.all().find(n=>n.tag==='button'&&n.textContent==='연결 중입니다. 잠시 기다려 주세요…').disabled,true);
   finish({provider,entry:client.id,available:true});await pending;
   assert.equal(refreshes,1);assert.equal(client.connected,false,'starting WSL does not prove a CLI connection');assert.equal(client.enabled,true);
   for(const change of [{enabled:false},{distributionRunning:true},{connected:true}]){
-   ui.panel.clients=[{...client,...change}];ui.panel.renderClients();assert.equal(ui.all().some(n=>n.tag==='button'&&n.textContent==='启动并连接 WSL'),false);
+   ui.panel.clients=[{...client,...change}];ui.panel.renderClients();assert.equal(ui.all().some(n=>n.tag==='button'&&n.textContent==='WSL 시작 및 연결'),false);
   }
   ui.panel.clients=[client];ui.panel.gatewayRunning=false;await ui.panel.connectWsl(client.id);assert.equal(ui.calls.length,1);
  }
@@ -481,9 +481,9 @@ test('Codex overview shows unsaved native login quota and refreshes that exact l
  ui.panel.clients=[{id:'codex',name:'Codex',enabled:true,configured:true}];ui.panel.renderClients();
  const login={id:'native-login',kind:'chatgpt',name:'fixture@example.invalid',details:{usage:{status:'ready',resetCredits:{availableCount:2},limits:[{name:'5h',windows:[{remainingPercent:75}]}]}}};
  const value={activeId:null,accounts:[],loginAccount:login,current:{name:login.name}};
- ui.panel.renderAccount(value);assert.match(ui.text(),/75%/);assert.match(ui.text(),/重置卡 · 2/);assert.equal(ui.all().find(node=>node.tag==='progress').value,75);
- const calls=[];ui.panel.api.accounts=async request=>{calls.push(request);return value;};await ui.all().find(node=>node.textContent==='查看剩余额度').onclick();assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{action:'details',id:'native-login',section:'usage',refresh:true}]);
- ui.panel.renderAccount({accounts:[{...login,id:'another'}],activeId:null,current:{name:'Unknown'}});assert.doesNotMatch(ui.text(),/75%|重置卡/);
+ ui.panel.renderAccount(value);assert.match(ui.text(),/75%/);assert.match(ui.text(),/사용량 재설정 · 2/);assert.equal(ui.all().find(node=>node.tag==='progress').value,75);
+ const calls=[];ui.panel.api.accounts=async request=>{calls.push(request);return value;};await ui.all().find(node=>node.textContent==='남은 할당량 보기').onclick();assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{action:'details',id:'native-login',section:'usage',refresh:true}]);
+ ui.panel.renderAccount({accounts:[{...login,id:'another'}],activeId:null,current:{name:'Unknown'}});assert.doesNotMatch(ui.text(),/75%|사용량 재설정/);
 });
 
 test('absent unconfigured clients do not occupy the list, but offline configured bindings remain',async()=>{
@@ -491,20 +491,20 @@ test('absent unconfigured clients do not occupy the list, but offline configured
  ui.panel.clients=[{id:'codex',name:'Codex',installed:true},{id:'claude',name:'Claude',installed:false,configured:false,enabled:false},{id:'deepseek',name:'DSH',bindingMode:'manual',connected:false}];
  ui.panel.renderClients();assert.match(ui.text(),/Codex/);assert.doesNotMatch(ui.text(),/Claude/);assert.match(ui.text(),/DSH/);
  ui.panel.clients=[{id:'claude',name:'Claude',configured:true,installed:false}];ui.panel.renderClients();assert.match(ui.text(),/Claude/);
- ui.panel.clients=[];ui.panel.renderClients();assert.match(ui.text(),/尚未发现客户端/);
- ui.setHandler(async()=>({capabilities:[{family:'codex',kind:'codex-local',supported:true},{family:'claude',kind:'desktop-profile',supported:true},{family:'deepseek',kind:'desktop-profile',supported:true},{family:'zcode',supported:false,reason:'仅使用默认接入'}]}));
+ ui.panel.clients=[];ui.panel.renderClients();assert.match(ui.text(),/클라이언트를 찾을 수 없습니다\. 클라이언트를 추가하거나 다시 검사하세요\./);
+ ui.setHandler(async()=>({capabilities:[{family:'codex',kind:'codex-local',supported:true},{family:'claude',kind:'desktop-profile',supported:true},{family:'deepseek',kind:'desktop-profile',supported:true},{family:'zcode',supported:false,reason:'기본 연결만'}]}));
  await ui.panel.addClient();const dialog=ui.document.body.children[0],buttons=dialog.children[1].children;
- assert.equal(dialog.open,true);assert.deepEqual(buttons.map(button=>button.textContent),['Codex','Claude','DSH','ZCode · 仅使用默认接入','Antigravity','取消']);assert.equal(buttons[3].disabled,true);assert.equal(buttons[4].disabled,true);buttons[3].onclick();assert.equal(dialog.open,true);await buttons[2].onclick();assert.notEqual(ui.document.body.children[0],dialog);assert.match(ui.document.body.children[0].querySelector('h2').textContent,/DSH/);assert.equal(ui.selected.length,0,'adding never opens the default account page');
+ assert.equal(dialog.open,true);assert.deepEqual(buttons.map(button=>button.textContent),['Codex','Claude','DSH','ZCode · 기본 연결만','Antigravity','취소']);assert.equal(buttons[3].disabled,true);assert.equal(buttons[4].disabled,true);buttons[3].onclick();assert.equal(dialog.open,true);await buttons[2].onclick();assert.notEqual(ui.document.body.children[0],dialog);assert.match(ui.document.body.children[0].querySelector('h2').textContent,/DSH/);assert.equal(ui.selected.length,0,'adding never opens the default account page');
 });
 
 test('ZCode uses its own logo and shared next-level management page',async()=>{
   const ui=fixture(),client={id:'zcode',name:'ZCode',installed:true,configured:true,connected:true,enabled:true,
-    canQuitDesktop:false,description:'连接 ZCode 原生聊天',accountNotice:'在 ZCode 中管理模型与账号',configurationNotice:'仅接入原生测试聊天'};
+    canQuitDesktop:false,description:'연결 ZCode 네이티브 채팅',accountNotice:'에서 ZCode 중간 관리 모델 및 계정',configurationNotice:'기본 테스트 채팅에만 액세스'};
   ui.panel.clients=[client];ui.panel.renderClients();
   assert.ok(ui.all().some(node=>node.tag==='img'&&node.src==='../web/client-icons/zcode.png'));
-  assert.match(ui.text(),/连接 ZCode 原生聊天/);assert.match(ui.text(),/在 ZCode 中管理模型与账号/);
-  assert.doesNotMatch(ui.text(),/在 Harness 中管理/);
-  await ui.all().find(node=>node.tag==='button'&&node.textContent==='管理').onclick();
+  assert.match(ui.text(),/연결 ZCode 네이티브 채팅/);assert.match(ui.text(),/에서 ZCode 중간 관리 모델 및 계정/);
+  assert.doesNotMatch(ui.text(),/Harness의 계정 \/ API 관리/);
+  await ui.all().find(node=>node.tag==='button'&&node.textContent==='관리').onclick();
   assert.equal(ui.selected.at(-1),'zcode');assert.ok(ui.pages.get('zcode'));assert.equal(ui.document.body.children.length,0);assert.deepEqual(ui.calls.map(value=>value.action),['zcode-official-state']);
 });
 
@@ -517,22 +517,22 @@ test('ZCode management removes the compatibility port even from legacy descripto
  }
 });
 
-const connectionModes=[{id:'private-pipe',label:'本机连接',description:'由网关启动原 App。',configured:true,available:true},{id:'official-remote',label:'官方远控',description:'使用原 App 的同一官方账号。',configured:true,available:true}];
+const connectionModes=[{id:'private-pipe',label:'로컬 연결',description:'게이트웨이로 시작됨 App。',configured:true,available:true},{id:'official-remote',label:'공식 원격 연결',description:'원본을 사용하세요 App 같은 공식 계정。',configured:true,available:true}];
 test('ZCode management shares its mode picker and refreshes official state only on opening or explicit actions',async()=>{
  const ui=fixture(),client={id:'zcode',name:'ZCode',installed:true,configured:true,connectionMode:'private-pipe',connectionModes};ui.panel.clients=[client];
  const state={configured:true,connected:false,selected:false,accountName:'Fixture account',provider:'z.ai',link:'https://zcode.z.ai/pair?fixture=one'};
  ui.setHandler(async request=>request.action==='clients'?{clients:[client]}:{...state});await ui.panel.manageClient(client);
  const page=ui.pages.get('zcode'),section=page.querySelector('[data-zcode-official]'),text=()=>section.querySelectorAll('p').map(node=>node.textContent).join('\n'),modes=page.querySelector('[data-client-connection-modes]');
  const guide=section.querySelector('[data-zcode-official-guide]');assert.equal(guide.open,false);assert.equal(guide.querySelectorAll('li').length,7);guide.open=true;
- assert.equal(section.className,'accounts-panel');assert.equal(modes.querySelector('[data-connection-mode="private-pipe"]').attributes['aria-pressed'],'true');assert.match(text(),/同.*官方账号/);assert.match(text(),/官方中继/);assert.match(text(),/Fixture account/);
+ assert.equal(section.className,'accounts-panel');assert.equal(modes.querySelector('[data-connection-mode="private-pipe"]').attributes['aria-pressed'],'true');assert.match(text(),/이 컴퓨터에서 ZCode와 동일한 공식 계정을 사용하고 원래 앱에서 웹 원격 제어를 활성화하십시오\. 채팅 데이터는 ZCode의 공식 릴레이를 통해 전달됩니다\./);assert.match(text(),/이 컴퓨터에서 ZCode와 동일한 공식 계정을 사용하고 원래 앱에서 웹 원격 제어를 활성화하십시오\. 채팅 데이터는 ZCode의 공식 릴레이를 통해 전달됩니다\./);assert.match(text(),/Fixture account/);
  assert.equal(page.querySelector('[data-zcode-compatibility]'),null);assert.deepEqual(ui.calls.map(value=>value.action),['zcode-official-state']);
  await ui.poll();assert.equal(ui.calls.filter(value=>value.action==='zcode-official-state').length,1);
  await ui.panel.manageClient(client);assert.equal(ui.pages.size,1);assert.equal(ui.calls.filter(value=>value.action==='zcode-official-state').length,2);
  const input=section.querySelector('input');input.value='https://zcode.z.ai/pair?fixture=edited';input.oninput();
  client.connectionMode='official-remote';ui.panel.renderClients();assert.equal(modes.querySelector('[data-connection-mode="official-remote"]').attributes['aria-pressed'],'true');
- await section.querySelectorAll('button').find(button=>button.textContent==='刷新状态').onclick();
+ await section.querySelectorAll('button').find(button=>button.textContent==='새로고침 상태').onclick();
  assert.equal(guide.open,true,'A status refresh preserves the user-opened instructions');
- assert.equal(input.value,'https://zcode.z.ai/pair?fixture=edited');assert.match(text(),/已修改，尚未保存/);assert.equal(section.querySelector('[data-official-action="connect"]').disabled,true);
+ assert.equal(input.value,'https://zcode.z.ai/pair?fixture=edited');assert.match(text(),/연결 설정에 저장되지 않은 변경사항이 있습니다\./);assert.equal(section.querySelector('[data-official-action="connect"]').disabled,true);
 });
 
 test('official settings save independently and connect through the shared client mode action',async()=>{
@@ -548,7 +548,7 @@ test('official settings save independently and connect through the shared client
  await button('login').onclick();assert.equal(button('connect').disabled,false);await button('connect').onclick();assert.equal(button('disconnect').disabled,false);
  assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.filter(value=>['zcode-official-save','zcode-official-login','toggle-client'].includes(value.action)))),[{action:'zcode-official-save',link:input.value},{action:'zcode-official-login',link:input.value},{action:'toggle-client',provider:'zcode',enabled:true,connectionMode:'official-remote'}]);
  await button('disconnect').onclick();assert.equal(state.selected,true);assert.equal(state.configured,true);
- const count=ui.calls.length;ui.confirm(false);await button('forget').onclick();assert.equal(ui.calls.length,count);assert.match(ui.prompts.at(-1),/原 App.*账号和任务会保留/);
+ const count=ui.calls.length;ui.confirm(false);await button('forget').onclick();assert.equal(ui.calls.length,count);assert.match(ui.prompts.at(-1),/게이트웨이의 저장된 공식 로그인을 제거하고 공식 원격 연결을 끊으시겠습니까\? 저장된 링크, 원래 ZCode 앱의 계정 및 작업은 유지됩니다\./);
  ui.confirm(true);await button('forget').onclick();assert.equal(state.configured,false);assert.equal(input.value,state.link);assert.ok(state.link);
 });
 
@@ -569,14 +569,14 @@ test('shared independent profile form scans, picks and manually saves the select
   if(family==='codex')await ui.panel.codexProfile();else await ui.panel.clientProfile(family);
   const dialog=ui.document.body.children[0],form=dialog.querySelector('form'),inputs=form.querySelectorAll('input'),button=text=>form.querySelectorAll('button').find(b=>b.textContent===text);
   assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].operation,'list');assert.equal(form.querySelector('.error').textContent,'');
-  assert.ok(button('保存配置'));assert.equal(form.querySelectorAll('label')[1].textContent,label+' 配置目录');
-  await button('扫描配置').onclick();assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.at(-1))),{action:'client-profiles',operation:'scan',family,kind});assert.equal(button('/wrong'),undefined);
+  assert.ok(button('설정 저장'));assert.equal(form.querySelectorAll('label')[1].textContent,label+' 구성 디렉터리');
+  await button('구성 검색').onclick();assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.at(-1))),{action:'client-profiles',operation:'scan',family,kind});assert.equal(button('/wrong'),undefined);
   button(profile.home).onclick();assert.equal(inputs[1].value,profile.home);
-  ui.setChosen('/fixture/chosen');await button('选择文件夹').onclick();assert.equal(inputs[1].value,'/fixture/chosen');
+  ui.setChosen('/fixture/chosen');await button('폴더 선택').onclick();assert.equal(inputs[1].value,'/fixture/chosen');
   inputs[1].value='/fixture/manual';inputs[0].value='Manual profile';await form.onsubmit({preventDefault(){}});
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(c=>c.operation==='save'))),{action:'client-profiles',operation:'save',family,kind,home:'/fixture/manual',label:'Manual profile'});
   assert.ok(!ui.calls.some(c=>['initialize','resume','start','toggle-client'].includes(c.action)));
-  assert.equal(dialog.open,false);assert.ok(ui.errors.includes(label+' 客户端已保存'));assert.equal(ui.selected.at(-1),profile.id);
+  assert.equal(dialog.open,false);assert.ok(ui.errors.includes(label+' 클라이언트가 저장되었습니다.'));assert.equal(ui.selected.at(-1),profile.id);
  }
 });
 
@@ -596,8 +596,8 @@ test('independent client removal confirms scope and does not quit or erase nativ
   const ui=fixture(),id=family+':'+'b'.repeat(32),client={id,family,kind:family==='codex'?'codex-local':'desktop-profile',name:'Independent',enabled:true,configured:true};ui.panel.clients=[client];
   ui.setHandler(async body=>body.action==='clients'?{clients:[]}:{removed:id});
   await ui.panel.manageClient(client);const control=ui.panel.removalControls.get(id);assert.ok(control);const remove=control.querySelector('button');
-  await remove.onclick();assert.equal(ui.calls.length,0);assert.match(ui.errors.at(-1),/先停用/);
-  client.enabled=false;ui.confirm(false);await remove.onclick();assert.equal(ui.calls.length,0);assert.match(ui.prompts.at(-1),/原应用、账号、聊天和配置文件都会保留/);
+  await remove.onclick();assert.equal(ui.calls.length,0);assert.match(ui.errors.at(-1),/구성을 제거하기 전에 이 클라이언트에 대한 모바일 액세스를 비활성화하십시오\./);
+  client.enabled=false;ui.confirm(false);await remove.onclick();assert.equal(ui.calls.length,0);assert.match(ui.prompts.at(-1),/이 클라이언트 구성을 삭제하시겠습니까\? 해당 애플리케이션, 계정, 채팅 및 구성 파일은 보존됩니다\./);
   ui.confirm(true);await remove.onclick();assert.deepEqual(JSON.parse(JSON.stringify(ui.calls[0])),{action:'client-profiles',operation:'remove',family,entry:id,confirmed:true});
   assert.equal(ui.panel.removalControls.has(id),false);assert.equal(ui.selected.at(-1),null);assert.ok(!ui.calls.some(row=>['stop','quit','initialize'].includes(row.action)));
  }
@@ -648,7 +648,7 @@ test('Antigravity App IDE and CLI paths use the shared default-application form'
   await ui.panel.addClient();await ui.document.body.children[0].querySelectorAll('button').find(button=>button.textContent==='Antigravity').onclick();
   const dialog=ui.document.body.children[0],form=dialog.querySelector('form');
   assert.equal(form.querySelectorAll('input').length,1);
-  assert.match(form.querySelector('.hint').textContent,/Antigravity App.*IDE.*agy/);
+  assert.match(form.querySelector('.hint').textContent,english?/Antigravity App.*IDE.*agy/:/Antigravity 앱.*IDE.*agy/);
   if(english)assert.doesNotMatch(form.querySelector('.hint').textContent,/[\u4e00-\u9fff]/);
   form.querySelector('input').value='/user/.gemini/bin/agy';await form.onsubmit({preventDefault(){}});
   assert.deepEqual(JSON.parse(JSON.stringify(ui.calls.find(body=>body.operation==='save'))),{action:'client-profiles',operation:'save',family:'antigravity',kind:'default-application',application:'/user/.gemini/bin/agy'});
@@ -664,11 +664,11 @@ test('missing ZCode can be added through the shared client form without creating
   ui.setHandler(async body=>body.action==='client-profiles'?body.operation==='save'?{entry:'zcode',instance:client}:{capabilities:[capability]}:body.action==='clients'?{clients:[client]}:{});
   ui.panel.api.choose=async kind=>{chosen.push(kind);return 'F:\\Portable Apps\\ZCode\\ZCode.exe';};
   await ui.panel.addClient();let dialog=ui.document.body.children[0];
-  assert.equal(dialog.querySelector('h2').textContent,english?'Add client':'添加客户端');
+  assert.equal(dialog.querySelector('h2').textContent,english?'Add client':'클라이언트 추가');
   const zcode=dialog.querySelectorAll('button').find(button=>button.textContent==='ZCode');assert.equal(zcode.disabled,false);await zcode.onclick();
   dialog=ui.document.body.children[0];const form=dialog.querySelector('form'),inputs=form.querySelectorAll('input');
   assert.equal(inputs.length,1,'Default ZCode has an installation path, not a second home or account');
-  await form.querySelectorAll('button').find(button=>button.textContent===(english?'Choose application':'选择应用程序')).onclick();
+  await form.querySelectorAll('button').find(button=>button.textContent===(english?'Choose application':'애플리케이션 선택')).onclick();
   assert.deepEqual(chosen,['file']);assert.match(inputs[0].value,/Portable Apps/);
   inputs[0].value='/custom/ZCode.AppImage';await form.onsubmit({preventDefault(){}});
   const saved=JSON.parse(JSON.stringify(ui.calls.find(call=>call.operation==='save')));
@@ -679,9 +679,9 @@ test('missing ZCode can be added through the shared client form without creating
 });
 
 test('already present ZCode is not offered as a duplicate client',async()=>{
- const ui=fixture();ui.setHandler(async()=>({capabilities:[{family:'zcode',kind:'default-application',supported:false,reason:'ZCode 客户端已存在，请使用已有管理入口'}]}));
+ const ui=fixture();ui.setHandler(async()=>({capabilities:[{family:'zcode',kind:'default-application',supported:false,reason:'ZCode는 이미 사용 가능합니다. 기존 관리 페이지를 사용하세요.'}]}));
  await ui.panel.addClient();const button=ui.document.body.children[0].querySelectorAll('button').find(node=>node.textContent.startsWith('ZCode'));
- assert.equal(button.textContent,'ZCode · 已添加');assert.equal(button.disabled,true);button.onclick();assert.equal(ui.calls.length,1);
+ assert.equal(button.textContent,'ZCode · 이미 추가됨');assert.equal(button.disabled,true);button.onclick();assert.equal(ui.calls.length,1);
 });
 
 test('official login can explicitly retry unavailable storage without status polling probing it',async()=>{
@@ -727,16 +727,16 @@ test('Antigravity management keeps exact manual model after catalog refresh fail
  const ui=fixture(),client={id:'antigravity',name:'Antigravity',enabled:true,capabilities:{management:true}};ui.panel.clients=[client];let fail=false;
  const state={enabled:true,surfaces:[{id:'app',name:'APP',connected:true,historyAvailable:true,sessions:[{id:'chat',model:'original'}]}],permissionOptions:[]};
  ui.setHandler(async body=>{if(body.operation==='settings')return {status:'accepted'};if(body.operation!=='catalog')return state;if(fail)throw Error('temporary directory failure');return {models:[{id:'original'}],cache:{identity:'verified-account',updatedAt:100},capabilities:{models:true,effort:false,manualModels:true}};});
- await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),model=root.querySelector('[aria-label="模型"]'),manual=root.querySelector('[aria-label="手动输入模型"]');
- model.value='__manual__';model.onchange();manual.value='MODEL_EXPLICIT_525';manual.oninput();fail=true;await root.querySelectorAll('button').find(b=>b.textContent==='刷新模型').onclick();
- await root.querySelectorAll('button').find(b=>b.textContent==='重新加载').onclick();assert.equal(manual.value,'MODEL_EXPLICIT_525');assert.equal(manual.disabled,false);assert.equal(root.querySelector('.project-picker-models').querySelector('.error').textContent,'');
- await root.querySelectorAll('button').find(b=>b.textContent==='应用模型').onclick();const write=ui.calls.find(body=>body.operation==='settings');assert.equal(write.model,'MODEL_EXPLICIT_525');assert.equal(write.manualModel,true);assert.equal(write.modelCatalogIdentity,'verified-account');
+ await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),model=root.querySelector('[aria-label="모델"]'),manual=root.querySelector('[aria-label="수동으로 모델 입력"]');
+ model.value='__manual__';model.onchange();manual.value='MODEL_EXPLICIT_525';manual.oninput();fail=true;await root.querySelectorAll('button').find(b=>b.textContent==='모델 새로 고침').onclick();
+ await root.querySelectorAll('button').find(b=>b.textContent==='다시 불러오기').onclick();assert.equal(manual.value,'MODEL_EXPLICIT_525');assert.equal(manual.disabled,false);assert.equal(root.querySelector('.project-picker-models').querySelector('.error').textContent,'');
+ await root.querySelectorAll('button').find(b=>b.textContent==='애플리케이션 모델').onclick();const write=ui.calls.find(body=>body.operation==='settings');assert.equal(write.model,'MODEL_EXPLICIT_525');assert.equal(write.manualModel,true);assert.equal(write.modelCatalogIdentity,'verified-account');
 });
 
 test('Antigravity cached source keeps manual entry when its next directory read fails',async()=>{
  const ui=fixture(),client={id:'antigravity',name:'Antigravity',enabled:true,capabilities:{management:true}};ui.panel.clients=[client];let fail=false;
  const state={enabled:true,surfaces:['app','ide'].map(id=>({id,name:id,connected:true,historyAvailable:true,sessions:[{id:id+'-chat',model:'original'}]})),permissionOptions:[]};
  ui.setHandler(async body=>{if(body.operation!=='catalog')return state;if(fail)throw Error('offline');return {models:[{id:'original'}],cache:{identity:body.surface,updatedAt:100},capabilities:{models:true,manualModels:true,effort:false}};});
- await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),source=root.querySelector('[aria-label="会话来源"]'),model=root.querySelector('[aria-label="模型"]');
- source.value='ide';await source.onchange();fail=true;source.value='app';await source.onchange();assert.ok(model.children.some(row=>row.value==='__manual__'));model.value='__manual__';model.onchange();const manual=root.querySelector('[aria-label="手动输入模型"]');assert.equal(manual.disabled,false);assert.equal(manual.hidden,false);assert.equal(root.querySelector('[aria-label="思考强度"]').parent.hidden,true);
+ await ui.panel.manageClient(client);await new Promise(setImmediate);const root=ui.pages.get('antigravity').querySelector('[data-antigravity-management]'),source=root.querySelector('[aria-label="세션 소스"]'),model=root.querySelector('[aria-label="모델"]');
+ source.value='ide';await source.onchange();fail=true;source.value='app';await source.onchange();assert.ok(model.children.some(row=>row.value==='__manual__'));model.value='__manual__';model.onchange();const manual=root.querySelector('[aria-label="수동으로 모델 입력"]');assert.equal(manual.disabled,false);assert.equal(manual.hidden,false);assert.equal(root.querySelector('[aria-label="추론 강도"]').parent.hidden,true);
 });

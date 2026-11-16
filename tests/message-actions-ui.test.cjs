@@ -13,14 +13,14 @@ test('copy loads all detail pages and rejects version/offset changes',async()=>{
  ui.stub.read=async(action,args)=>{calls.push(args);return {key:'row',version:'v',offset:args.offset,text:args.offset?'tail':'complete',next:args.offset?null:8};};
  assert.equal(await ui.read(),'completetail');assert.deepEqual(calls.map(c=>c.offset),[0,8]);
  ui.stub.read=async()=>({key:'row',version:'new',offset:0,text:'changed',next:null});
- await assert.rejects(ui.read(),/已变化/);
+ await assert.rejects(ui.read(),/메시지가 변경되었습니다\. 다시 열어보세요\./);
  ui.stub.read=async()=>({key:'row',version:'v',offset:10,text:'missing',next:null});
- await assert.rejects(ui.read(),/已变化/);
+ await assert.rejects(ui.read(),/메시지가 변경되었습니다\. 다시 열어보세요\./);
 });
 test('copy of short text needs no fetch and switching chat cancels full-text result',async()=>{
  const ui=timeline();ui.row.truncated=false;ui.stub.read=()=>assert.fail('no request expected');assert.equal(ui.read(),'preview');
  ui.row.truncated=true;ui.stub.read=async()=>{ui.stub.abort.signal.aborted=true;return {key:'row',version:'v',offset:0,text:'old',next:null};};
- await assert.rejects(ui.read(),/已变化/);
+ await assert.rejects(ui.read(),/메시지가 변경되었습니다\. 다시 열어보세요\./);
 });
 function fixture(){
  const nodes=new Map(),saved=new Map(),requests=[],opened=[],notices=[];

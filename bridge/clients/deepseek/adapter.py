@@ -19,7 +19,7 @@ BRIDGE_REVISION = 11
 # Revisions 3–10 share the complete native-agent lifecycle schema; presentation
 # and fork capability additions do not invalidate an older idle snapshot.
 LIFECYCLE_REVISIONS = (3, 4, 5, 6, 7, 8, 9, 10, BRIDGE_REVISION)
-UPDATE_REASON = 'Harness 接入需要更新，请结束任务后点击“重启并接入”'
+UPDATE_REASON = "Harness 연결을 업데이트해야 합니다. 활성 작업을 완료한 다음 다시 시작 및 연결을 선택합니다."
 
 
 def _write_patch(patch, text):
@@ -43,8 +43,8 @@ class DeepSeek:
 
     def connection_error(self):
         if not (self.home/'profiles/desktop/cordis.patch.yml').is_file():
-            return '未找到 Harness 桌面档案。使用 Web 或第三方客户端时，请在“第三方客户端：手动安装与绑定”中扫描并绑定其接入插件；官方桌面版请先启动一次并确认数据目录。'
-        return 'DeepSeek 桌面未连接，请安装接入插件并重新打开 Harness'
+            return '찾을 수 없음 Harness 데스크탑 파일. 사용 Web 또는 제3자 클라이언트로 문의해 주세요.“타사 클라이언트: 수동 설치 및 바인딩”액세스 플러그인을 스캔하고 바인딩합니다. 먼저 공식 데스크톱 버전을 시작하고 데이터 디렉터리를 확인하세요.。'
+        return 'DeepSeek 데스크톱이 연결되지 않았습니다. 액세스 플러그인을 설치하고 다시 열어주세요. Harness'
 
     def repair_missing_connector(self, expected, check_stopped):
         from bridge.clients.deepseek.orphan import repair
@@ -82,7 +82,7 @@ class DeepSeek:
         block = insertion(text)
         verified = verified_directory(block[0], self.home) if block and len(PLUGIN_ID.findall(text)) == 1 else None
         if not verified or (directory is not None and Path(directory).resolve() != verified[0]):
-            raise ValueError('已有 Harness 接入无法验证，尚未修改配置')
+            raise ValueError("기존 Harness 연결을 확인할 수 없습니다. 해당 구성은 변경되지 않았습니다.")
         self.directory, self.legacy_protocol = verified
         self.reused = True
         self.receipts_path = self.directory.parent/'requests.sqlite'
@@ -119,7 +119,7 @@ class DeepSeek:
         """
         patch = self.home/'profiles/desktop/cordis.patch.yml'
         if not patch.is_file():
-            raise ValueError('未找到 Harness 桌面配置，请先启动一次 DeepSeek Harness，或选择正确的数据目录')
+            raise ValueError('찾을 수 없음 Harness 데스크톱 구성을 먼저 시작하세요. DeepSeek Harness，또는 올바른 데이터 디렉토리를 선택하십시오')
         text = patch.read_text('utf-8')
         line = self._line()
         block = insertion(text)
@@ -132,7 +132,7 @@ class DeepSeek:
                          (verified[0]/'mobile-host.mjs').read_bytes() != source.read_bytes()):
             return self.use_existing()
         if (MARKER in text or PLUGIN_ID.search(text)) and not verified:
-            raise ValueError('已有 Harness 接入无法验证，尚未修改配置')
+            raise ValueError("기존 Harness 연결을 확인할 수 없습니다. 해당 구성은 변경되지 않았습니다.")
         source = Path(__file__).with_name('host.mjs')
         target = self.directory/'mobile-host.mjs'
         content = source.read_bytes()
@@ -145,7 +145,7 @@ class DeepSeek:
         else:
             saved = json.loads(config.read_text('utf-8'))
             if not isinstance(saved.get('token'), str) or not saved['token'] or saved.get('endpoint') != str(self.directory/'endpoint.json'):
-                raise ValueError('Harness 接入配置无效，请先移除接入后重新扫描')
+                raise ValueError('Harness 액세스 구성이 잘못되었습니다. 먼저 액세스를 제거한 후 다시 검색하세요.')
         if source_changed:
             temp = target.with_suffix('.tmp')
             temp.write_bytes(content)
@@ -166,7 +166,7 @@ class DeepSeek:
 
     def uninstall(self):
         if self.reused:
-            raise ValueError('当前使用已有 Harness 接入，未移除原接入配置')
+            raise ValueError("기존 Harness 연결을 사용합니다. 원래 구성은 제거되지 않았습니다.")
         record = self.directory/'installation.json'
         if not record.exists():
             return {'installed': False}
@@ -175,7 +175,7 @@ class DeepSeek:
         text = patch.read_text('utf-8')
         block = insertion(text)
         if not block or block[0] != json.loads(saved['line'][2:]) or len(PLUGIN_ID.findall(text)) != 1:
-            raise ValueError('插件配置已被修改，请在 Harness 中检查后移除')
+            raise ValueError('플러그인 구성이 수정되었습니다. Harness 확인 후 삭제')
         remaining = text[:block[1]]+text[block[2]:]
         backup = self.directory/'cordis.patch.before-mobile.yml'
         if backup.is_file():
@@ -199,7 +199,7 @@ class DeepSeek:
 
     def call(self, action, sid=None, body=None):
         if action == 'create' and body and 'model' in body and self.call('status').get('createModels') is not True:
-            raise ResumePreflightBlocked('Harness 接入需要更新后才能预设新会话模型；尚未创建会话')
+            raise ResumePreflightBlocked('Harness 새 세션 모델을 미리 설정하려면 먼저 액세스를 업데이트해야 합니다. 세션이 아직 생성되지 않았습니다')
         if action == 'send' and body and body.get('resolvedReferences'):
             body = {**body, 'text': file_mentions(body.get('text', ''), body['resolvedReferences'])}
             body.pop('resolvedReferences')
@@ -212,23 +212,23 @@ class DeepSeek:
             endpoint = json.loads((self.directory/'endpoint.json').read_text())
             port = endpoint['port']
             if not isinstance(port, int) or not 1 <= port <= 65535:
-                raise ValueError('Harness 端口无效')
+                raise ValueError('Harness 잘못된 포트')
             request = urllib.request.Request(f'http://127.0.0.1:{port}/mobile', data=json.dumps({'action': action, 'sid': sid, 'body': body or {}}).encode(), headers={'Authorization': 'Bearer '+config['token'], 'Content-Type': 'application/json'})
             with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(request, timeout=30) as response:
                 raw = response.read(32*1024*1024+1)
             if len(raw) > 32*1024*1024:
-                raise BridgeUnavailable('会话内容过大，请在桌面查看')
+                raise BridgeUnavailable('세션 내용이 너무 큽니다. 데스크톱에서 확인하세요.')
             value = json.loads(raw)
         except urllib.error.HTTPError as exc:
             try:
-                message = json.loads(exc.read(4096)).get('error', 'Harness 拒绝了操作')
+                message = json.loads(exc.read(4096)).get('error', 'Harness 작업이 거부되었습니다.')
             except ValueError:
-                message = 'Harness 拒绝了操作'
+                message = 'Harness 작업이 거부되었습니다.'
             raise BridgeUnavailable(message) from exc
         except (OSError, KeyError) as exc:
             raise BridgeUnavailable(self.connection_error()) from exc
         if action == 'archive' and value.get('archiveNotSent') is True:
-            raise ArchiveNotSent(value.get('message') or '原生客户端拒绝归档，操作未发送')
+            raise ArchiveNotSent(value.get('message') or "네이티브 클라이언트가 보관을 거부했습니다. 보관 작업이 전송되지 않았습니다.")
         if action == 'detail':
             records = value.pop('records', [])
             value['messages'] = messages(records)
@@ -262,8 +262,8 @@ class DeepSeek:
         state = self.call('status')
         if not state.get('connected') or not state.get('projectDirectories'):
             return []
-        return [{'surface': 'desktop', 'host': 'local', 'hostLabel': '此电脑',
-                 'name': 'DSH Desktop · 此电脑', 'scope': str(self.home),
+        return [{'surface': 'desktop', 'host': 'local', 'hostLabel': '이 컴퓨터',
+                 'name': 'DSH Desktop · 이 컴퓨터', 'scope': str(self.home),
                  'createRequiresMessage': False}]
 
 
@@ -315,7 +315,7 @@ def messages(records):
                 metadata['timestamp'] = event['time']
             source_kind = (message.get('source') or {}).get('kind')
             if kind == 'user/message' and isinstance(source_kind, str) and source_kind and source_kind != 'user':
-                metadata.update(role='activity', kind='context', title='上下文')
+                metadata.update(role='activity', kind='context', title='문맥')
             if kind == 'assistant/message':
                 selection = data.get('modelSelection') or {}
                 source = message.get('source') or {}
@@ -332,7 +332,7 @@ def messages(records):
             for i, block in enumerate(content):
                 if block.get('type') == 'image':
                     result.append({'id': str(event.get('seq'))+':'+str(i), 'role': kind.split('/')[0], 'text':'',
-                        'attachments':[{'type':'image','name':(block.get('attachment') or {}).get('name') or '图片',
+                        'attachments':[{'type':'image','name':(block.get('attachment') or {}).get('name') or '그림',
                                         '_nativeImage':{'seq':event.get('seq'),'part':i}}], **metadata})
                     continue
                 text = block.get('text') or block.get('thinking') or ''

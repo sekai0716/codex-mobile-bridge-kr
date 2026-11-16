@@ -19,9 +19,9 @@ async function runSideAgentsTests(){
  check(document.querySelectorAll('.wb-agent-card').length===2,'Subagent panel includes child and grandchild');
  check(parseInt(document.querySelectorAll('.wb-agent-card')[1].style.paddingLeft)>parseInt(document.querySelectorAll('.wb-agent-card')[0].style.paddingLeft),'Task tree indents descendants');
  document.querySelector('.wb-agent-card').click();await wait(()=>document.querySelector('.wb-agent-message'));
- check(document.querySelector('.wb-agent-detail').textContent.includes('已完成'),'Saved child completion is displayed');
+ check(document.querySelector('.wb-agent-detail').textContent.includes('완전한'),'Saved child completion is displayed');
  check(location.hash===hash,'Inspecting child does not navigate or activate it');
  const agentPanel=session.files.find(t=>t.id==='agents').agents;
- agentPanel.window.element.querySelector('[aria-label="关闭详情"]').click();
+ agentPanel.window.element.querySelector('[aria-label="세부정보 닫기"]').click();
  return checks;
 }

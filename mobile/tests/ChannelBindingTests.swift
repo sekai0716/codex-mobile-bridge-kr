@@ -186,9 +186,9 @@ private func check(_ result:Bool,_ message:String)throws{if !result{throw Failur
         }
         for opening in [true,false] {
             let foreign=Fixture(source,same,foreign:true);await foreign.cookies.seed(source,Fixture.root);await foreign.begin(same,opening:opening)
-            try check(foreign.cookies.writes==0 && foreign.notices.contains("此地址的登录绑定已变化，请重新验证"),"different gateway rejected")
+            try check(foreign.cookies.writes==0 && foreign.notices.contains("이 주소의 로그인 바인딩이 변경되었습니다. 다시 확인해 주세요."),"different gateway rejected")
             let unknown=Fixture(source,other);await unknown.cookies.seed(source,Fixture.root);await unknown.cookies.seed(other,String(repeating:"u",count:64));await unknown.begin(other,opening:opening)
-            try check(unknown.cookies.writes==0 && unknown.notices.contains("此地址的登录绑定已变化，请重新验证"),"unknown cookie rejected")
+            try check(unknown.cookies.writes==0 && unknown.notices.contains("이 주소의 로그인 바인딩이 변경되었습니다. 다시 확인해 주세요."),"unknown cookie rejected")
         }
         passed.append("different-gateway-and-unknown-cookie:both-entries")
         let rootAwait=Fixture(source,other);await rootAwait.cookies.seed(source,Fixture.root)

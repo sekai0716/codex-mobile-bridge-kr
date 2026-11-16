@@ -218,7 +218,7 @@ class AntigravityStoreTest(unittest.TestCase):
                     'type': 'USER_INPUT',
                     'status': 'DONE',
                     'created_at': '2026-11-08T01:00:01Z',
-                    'content': '請幫我檢查架構',
+                    'content': '스키마를 확인하도록 도와주세요',
                     'media': [{'mime_type': 'image/png', 'uri': str(img_path)}],
                 },
                 {
@@ -249,8 +249,8 @@ class AntigravityStoreTest(unittest.TestCase):
                 compact_steps[0],
                 {
                     **compact_steps[1],
-                    'thinking': '完整思考內容：先檢查目錄結構與 IPC 邊界',
-                    'content': '完整回答內容：架構檢查完畢，可以接入 Antigravity。',
+                    'thinking': '완전한 사고 내용: 먼저 디렉토리 구조를 확인하고 IPC 국경',
+                    'content': '답변내용 완료 : 아키텍처 점검이 완료되어 접속하실 수 있습니다. Antigravity。',
                 },
                 compact_steps[2],
             ]
@@ -273,8 +273,8 @@ class AntigravityStoreTest(unittest.TestCase):
             messages = page['messages']
             roles = [m['role'] for m in messages]
             self.assertEqual(roles, ['user', 'reasoning', 'activity', 'assistant'])
-            self.assertEqual(messages[1]['text'], '完整思考內容：先檢查目錄結構與 IPC 邊界')
-            self.assertEqual(messages[3]['text'], '完整回答內容：架構檢查完畢，可以接入 Antigravity。')
+            self.assertEqual(messages[1]['text'], '완전한 사고 내용: 먼저 디렉토리 구조를 확인하고 IPC 국경')
+            self.assertEqual(messages[3]['text'], '답변내용 완료 : 아키텍처 점검이 완료되어 접속하실 수 있습니다. Antigravity。')
             self.assertEqual(messages[2]['title'], 'Ran Git status check')
             self.assertIn('git status', messages[2]['text'])
             self.assertIn('On branch main', messages[2]['text'])
@@ -322,7 +322,7 @@ class AntigravitySafetyTests(unittest.TestCase):
         return Antigravity(self.directory, home=self.home)
 
     def test_file_uris_preserve_drive_unc_spaces_and_literal_percent(self):
-        for path in (PureWindowsPath('C:/My Project/中文'), PureWindowsPath('//server/share/My Project')):
+        for path in (PureWindowsPath('C:/My Project/중국어'), PureWindowsPath('//server/share/My Project')):
             self.assertEqual(local_file_path(path.as_uri(), windows=True), str(path))
         self.assertEqual(local_file_path('file:///tmp/a%2520b', windows=False), '/tmp/a%20b')
         self.assertEqual(local_file_path('file://elsewhere/tmp/data', windows=False), '')
@@ -377,8 +377,8 @@ class AntigravitySafetyTests(unittest.TestCase):
             value = adapter.accounts()
         self.assertEqual(len(value['accounts']), 1)
         self.assertEqual(value['accounts'][0]['surface'], 'cli')
-        self.assertIn('账号状态暂不可用', value['message'])
-        self.assertIn('尚未登录', value['message'])
+        self.assertIn('계정 상태를 일시적으로 사용할 수 없습니다.', value['message'])
+        self.assertIn('아직 로그인하지 않았습니다.', value['message'])
 
     def test_shared_accounts_manager_does_not_fall_through_to_deepseek_store(self):
         settings = self.directory/'desktop-sessions/settings.json'
@@ -393,7 +393,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             self.assertEqual(value['provider'], 'antigravity')
             self.assertFalse(value['canSwitch'])
             for operation in ('import-current', 'save-api'):
-                with self.assertRaisesRegex(ValueError, '原客户端'):
+                with self.assertRaisesRegex(ValueError, '원래 클라이언트'):
                     manager.client_accounts('antigravity', {'operation': operation})
 
     def test_account_model_directory_groups_sources_without_history(self):
@@ -408,7 +408,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             value = adapter.call('account', body={'surface': 'cli'})
             self.assertEqual(value['models'][0]['name'], 'cli')
             read.assert_called_once_with('cli', False)
-            with self.assertRaisesRegex(ValueError, '来源无效'):
+            with self.assertRaisesRegex(ValueError, '잘못된 소스'):
                 adapter.call('account', body={'surface': 'other'})
 
     def test_account_model_source_failure_keeps_previous_shared_cache(self):
@@ -426,7 +426,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             good = manager._account_models('antigravity', refresh=True)
             read.side_effect = lambda surface, refresh: (_ for _ in ()).throw(BridgeUnavailable('offline')) if surface == 'app' else {'models': [{'id': 'new'}]}
             partial = adapter.call('account')
-            self.assertIn('原客户端模型暂不可用', partial['modelError'])
+            self.assertIn('원래 클라이언트 모델을 일시적으로 사용할 수 없습니다.', partial['modelError'])
             self.assertEqual(partial['groups'][1]['models'][0]['id'], 'new')
             stale = manager._account_models('antigravity', refresh=True)
             self.assertEqual(stale['groups'], good['groups'])
@@ -462,7 +462,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             self.assertFalse(row['capabilities']['skills'])
             self.assertFalse(row['capabilities']['plan'])
             self.assertFalse(row['capabilities']['send'])
-            self.assertEqual(row['permissionLabel'], '电脑端处理')
+            self.assertEqual(row['permissionLabel'], 'PC 처리')
             self.assertTrue(row['readOnly'])
 
     def test_management_keeps_source_model_and_permission_writes_scoped(self):
@@ -489,7 +489,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             catalog = manager.control(request)
             self.assertEqual(catalog['models'][0]['id'], 'cli')
             with mock.patch.object(manager, 'call', wraps=manager.call) as call:
-                with self.assertRaisesRegex(ValueError, '来源不匹配'):
+                with self.assertRaisesRegex(ValueError, "채팅\\ 내용이\\ 출처와\\ 일치하지\\ 않습니다\\.\\ 다시\\ 선택해\\ 주세요\\."):
                     manager.control({**request, 'surface': 'app'})
                 call.assert_not_called()
             result = manager.control({**request, 'operation': 'settings', 'id': str(uuid.uuid4()),
@@ -498,7 +498,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             self.assertEqual(adapter._settings, {sid: {'model': 'cli'}})
             result = manager.control({**request, 'operation': 'access', 'id': str(uuid.uuid4()), 'mode': 'mobile-ask'})
             self.assertNotEqual(result['status'], 'accepted')
-            self.assertIn('启用 Antigravity', result['message'])
+            self.assertIn("컴퓨터 게이트웨이에서 활성화하십시오. Antigravity 연결", result['message'])
 
     def test_unknown_idle_and_unreadable_native_database_never_send(self):
         adapter = self.adapter()
@@ -770,7 +770,7 @@ class AntigravitySafetyTests(unittest.TestCase):
         with mock.patch.object(adapter.cli, 'user_status', side_effect=lambda surface: {'email': 'account-a'} if surface == 'app' else {}) as read:
             self.assertTrue(adapter.account_scope('app'))
             read.assert_called_once_with('app')
-            with self.assertRaisesRegex(BridgeUnavailable, '登录'):
+            with self.assertRaisesRegex(BridgeUnavailable, '로그인'):
                 adapter.account_scope('ide')
 
     def test_long_multibyte_hook_path_uses_token_authenticated_tcp(self):
@@ -779,7 +779,7 @@ class AntigravitySafetyTests(unittest.TestCase):
         import socket
         base = self.directory.parent
         count = max(1, (100 - len(os.fsencode(base/'hook.sock')) + 2) // 3)
-        state = base/('中'*count)
+        state = base/("중간"*count)
         self.assertLess(len(str(state/'hook.sock')), 100)
         self.assertGreaterEqual(len(os.fsencode(state/'hook.sock')), 100)
         server = HookIPCServer(state, session_resolver=lambda payload: 'scoped')
@@ -867,7 +867,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             self.assertEqual(req['id'], req_id)
             self.assertTrue(req['needsInput'])
             self.assertTrue(req['canCancel'])
-            self.assertEqual(req['cancelLabel'], '取消')
+            self.assertEqual(req['cancelLabel'], '취소')
             self.assertTrue(req['exclusiveWriteIn'])
             self.assertTrue(all(q['canSkip'] for q in req['input']['questions']))
 
@@ -912,7 +912,7 @@ class AntigravitySafetyTests(unittest.TestCase):
                 adapter.cli._waiting_cache.clear()
                 adapter.cli._trajectories_cache.clear()
             state['trajectories'] = {}
-            with self.assertRaisesRegex(ValueError, '已过期'):
+            with self.assertRaisesRegex(ValueError, "상호\\ 작용\\ 요청이\\ 만료되었거나\\ 데스크톱에서\\ 처리되었습니다\\."):
                 adapter.call('respond', sid, {
                     'requestId': req_id,
                     'decision': 'accept',
@@ -1006,7 +1006,7 @@ class AntigravitySafetyTests(unittest.TestCase):
             detail = adapter.call('detail', parent_sid)
             reqs = {r['id']: r for r in detail['requests']}
             sub_req = reqs[f'agy-wait:app:{sub_cid}:traj-sub:5']
-            self.assertTrue(sub_req['tool'].startswith('子智能体 · '))
+            self.assertTrue(sub_req['tool'].startswith('하위 에이전트 · '))
 
             adapter.call('respond', parent_sid, {'requestId': sub_req['id'], 'decision': 'accept', 'answers': {'0': {'answers': ['Yes']}}})
             self.assertEqual(rpc_calls[-1][2]['cascadeId'], sub_cid)
@@ -1060,18 +1060,18 @@ class AntigravitySafetyTests(unittest.TestCase):
             self.assertEqual([m['id'] for m in catalog['models']], ['m-good', 'm-low', 'm-empty'])
             self.assertNotIn('usage', catalog)
             by_id = {m['id']: m for m in catalog['models']}
-            self.assertEqual(by_id['m-good']['quotaTag'], '剩余 100%')
+            self.assertEqual(by_id['m-good']['quotaTag'], '남은 100%')
             self.assertEqual(by_id['m-good']['quotaStatus'], 'good')
             self.assertNotIn('resetNote', by_id['m-good'])
-            self.assertEqual(by_id['m-low']['quotaTag'], '剩余 15.0%')
+            self.assertEqual(by_id['m-low']['quotaTag'], '남은 15.0%')
             self.assertEqual(by_id['m-low']['quotaStatus'], 'warning')
             self.assertEqual(by_id['m-low']['resetNote'], adapter.cli._format_reset_note('2026-11-14T12:30:00Z'))
-            self.assertEqual(by_id['m-empty']['quotaTag'], '已用尽')
+            self.assertEqual(by_id['m-empty']['quotaTag'], '탈진한')
             self.assertEqual(by_id['m-empty']['quotaStatus'], 'exhausted')
             summary = catalog['usageSummary']
             self.assertEqual(summary['tier'], 'Google AI Pro')
             self.assertEqual(len(summary['items']), 3)
-            self.assertEqual(summary['credits'], '可用 Prompt 点数: 120 · Flow 点数: 45')
+            self.assertEqual(summary['credits'], '사용 가능 Prompt 전철기: 120 · Flow 전철기: 45')
             account = adapter.call('account', body={'surface': 'app'})
             self.assertEqual(account['usageSummary'], summary)
             for blocked in ('m-dis-flag', 'm-unavail', 'm-legacy-disabled'):
@@ -1103,7 +1103,7 @@ class AntigravitySafetyTests(unittest.TestCase):
         adapter = self.adapter()
         self.assertEqual(
             format_tool_call({'name': 'write_to_file', 'args': {'TargetFile': '/tmp/a.py', 'CodeContent': 'print(1)'}}),
-            '写入文件：/tmp/a.py\nprint(1)',
+            '파일 쓰기：/tmp/a.py\nprint(1)',
         )
         session_dir = self.root / 'brain' / CID
         session_dir.mkdir(parents=True, exist_ok=True)

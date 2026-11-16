@@ -56,7 +56,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/__state':
             return self.output(state)
         if path == '/api/auth':
-            return self.output({'authenticated': True, 'csrf': 'synthetic', 'draftIdentity': 'synthetic', 'listCacheIdentity': ('b' if case == 'identity' else 'a') * 64, 'computer': {'name': 'Startup fixture'}, 'uiLanguage': 'zh'})
+            return self.output({'authenticated': True, 'csrf': 'synthetic', 'draftIdentity': 'synthetic', 'listCacheIdentity': ('b' if case == 'identity' else 'a') * 64, 'computer': {'name': 'Startup fixture'}, 'uiLanguage': 'ko'})
         if path == '/api/clients':
             if case == 'cached':
                 time.sleep(5)

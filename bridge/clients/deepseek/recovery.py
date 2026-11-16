@@ -18,9 +18,9 @@ from bridge.clients.deepseek.adapter import DeepSeek, LIFECYCLE_REVISIONS
 from bridge.clients.errors import BridgeUnavailable
 from bridge.features.accounts.models import NoRedirect
 
-CHANGED = 'Harness 进程已变化，请重新检查后再确认恢复'
-BUSY = '有任务运行或等待确认，请先结束任务再关闭或重启客户端'
-CONNECTOR_UNKNOWN = 'Harness 接入配置无法验证，任务状态未知，尚未提交退出；请在电脑端正常退出，或另行预览并确认强制关闭'
+CHANGED = "Harness 프로세스가 변경되었습니다. 복구를 확인하기 전에 다시 확인하세요."
+BUSY = "작업이 실행 중이거나 확인 대기 중입니다. 앱을 닫거나 다시 시작하기 전에 완료하세요."
+CONNECTOR_UNKNOWN = 'Harness 액세스 구성을 확인할 수 없고 작업 상태를 알 수 없으며 종료가 아직 제출되지 않았습니다. 컴퓨터를 정상적으로 종료하거나 강제 종료를 미리 보고 확인하세요.'
 
 
 def _identities(pids):
@@ -239,7 +239,7 @@ def _quit(descriptor, expected, *, adapter=None):
     main = current['state']['mainPids']
     if main and sys.platform == 'darwin':
         bundle = next((p for p in app.executable.parents if p.suffix == '.app'), None)
-        if bundle is None: raise ValueError('DeepSeek Harness 桌面程序必须位于应用程序包中')
+        if bundle is None: raise ValueError("DeepSeek Harness 실행 파일은 앱 번들 내에 있어야 합니다.")
         subprocess.run(['osascript', '-e', 'on run argv\n tell application (item 1 of argv) to quit\nend run', str(bundle)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
     else:
@@ -252,7 +252,7 @@ def _quit(descriptor, expected, *, adapter=None):
         _remaining_processes(current, expected, gui_allowed=True)
         if not current['state']['mainPids']: break
         if time.monotonic() >= deadline:
-            raise ValueError('Harness 尚未退出，请在客户端处理退出提示后重试；未终止后台任务')
+            raise ValueError("Harness가 종료되지 않았습니다. 클라이언트에서 종료 프롬프트를 처리한 후 다시 시도하세요. 백그라운드 작업이 종료되지 않았습니다.")
         time.sleep(.2)
     for pid in current['state']['runtimePids']:
         check = _quitting_snapshot(descriptor, expected)
@@ -266,7 +266,7 @@ def _quit(descriptor, expected, *, adapter=None):
     deadline = time.monotonic()+15
     while inspect_client(descriptor)['running']:
         if time.monotonic() >= deadline:
-            raise ValueError('Harness 后台尚未退出，请在电脑端检查；未强制结束进程')
+            raise ValueError("Harness 백그라운드 프로세스가 종료되지 않았습니다. 컴퓨터에서 확인하세요. 강제 종료된 프로세스가 없습니다.")
         time.sleep(.2)
 
 
@@ -275,7 +275,7 @@ class DeepSeekRecovery:
         self.pending = None
 
     def preview(self, descriptor, adapter, restart=True):
-        if type(restart) is not bool: raise ValueError('Harness 恢复选项无效')
+        if type(restart) is not bool: raise ValueError("Harness 복구 옵션이 잘못되었습니다.")
         snapshot = _snapshot(descriptor)
         evidence, connector_ready = _recovery_evidence(adapter, snapshot)
         state = snapshot['state']
@@ -305,27 +305,27 @@ class DeepSeekRecovery:
         pending = self.pending
         if (not pending or not isinstance(value.get('token'), str) or
                 not secrets.compare_digest(value['token'], pending['token']) or time.monotonic() >= pending['expires']):
-            raise ValueError('Harness 恢复确认已过期，请重新检查')
-        if value.get('confirmed') is not True: raise ValueError('请确认完整退出 Harness')
+            raise ValueError("Harness 복구 확인이 만료되었습니다. 다시 확인하세요.")
+        if value.get('confirmed') is not True: raise ValueError("Harness를 완전히 종료할지 확인하세요.")
         snapshot = _same_processes(descriptor, pending['snapshot'])
         if pending.get('repair'):
             if value.get('confirmConfigurationRepair') is not True:
-                raise ValueError('请明确确认备份并替换失效的 Harness 接入配置')
+                raise ValueError('백업을 명시적으로 확인하고 실패한 백업을 교체하십시오. Harness 액세스 구성')
             def check_stopped():
                 current = _same_processes(descriptor, pending['snapshot'])
                 if current['state']['pids'] or current['state']['running']:
-                    raise ValueError('Harness 已运行，尚未替换接入配置，请退出后重新预览')
+                    raise ValueError('Harness 이미 실행 중이며 액세스 구성이 대체되지 않았습니다. 종료하고 다시 미리보기해 보세요.')
             check_stopped()
             self.pending = None
             adapter.repair_missing_connector(pending['repair'], check_stopped)
             return pending['restart']
         evidence, connector_ready = _recovery_evidence(adapter, snapshot)
         if evidence['busy']: raise ValueError(BUSY)
-        if not pending['allowed']: raise ValueError('检测到其他或无法识别的 Harness 实例，请先在电脑端退出这些实例')
+        if not pending['allowed']: raise ValueError("기타 또는 인식할 수 없는 Harness 인스턴스가 감지되었습니다. 먼저 컴퓨터에서 종료하세요.")
         if not pending['connectorReady'] or not connector_ready:
             raise ValueError(CONNECTOR_UNKNOWN)
         if evidence['unknown'] and (not pending['unknown'] or value.get('acknowledgeUnknown') is not True):
-            raise ValueError('无法核验 Harness 任务状态，请重新检查并明确确认可能中断任务')
+            raise ValueError("Harness 작업 상태를 확인할 수 없습니다. 다시 확인하고 작업이 중단될 수 있는지 명시적으로 확인하세요.")
         self.pending = None
         _quit(descriptor, snapshot, adapter=adapter)
         return pending['restart']

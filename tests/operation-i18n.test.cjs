@@ -3,37 +3,37 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const i18n=require('../web/shared/i18n.js'),desktop=require('../desktop/shared/i18n.js');
 test('English operation failures and dynamic channel feedback are translated',()=>{
  i18n.setLanguage('en');
- for(const source of ['请先保存连接配置。','账号不存在，请刷新列表','账号身份已变化','找不到桌面 App 的 Codex 运行时','保存的账号需要重新登录','PushPlus 测试失败，请检查服务地址、认证和网络','部分通道发送失败：ntfy, pushplus；请在手机确认其他通道是否收到。']){
+ for(const source of ['먼저 연결 설정을 저장하세요.','계정이 더 이상 존재하지 않습니다. 목록을 새로 고칩니다.','계정 ID가 변경되었습니다.','데스크톱 앱의 Codex 런타임을 찾을 수 없습니다.','저장된 계정에 다시 로그인하세요.','PushPlus 테스트가 실패했습니다. 서비스 주소, 인증, 네트워크를 확인하세요.','일부 채널에서 전송하지 못했습니다.：ntfy, pushplus；다른 채널에서 수신 여부를 휴대폰에서 확인해주세요.。']){
   assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/);assert.doesNotMatch(i18n.t("Error invoking remote method 'bridge:accounts': Error: "+source),/[\u4e00-\u9fff]/);assert.doesNotMatch(desktop.translate("Error invoking remote method 'bridge:accounts': Error: "+source,'en'),/[\u4e00-\u9fff]/);
  }
- assert.equal(i18n.t('用户的中文聊天标题'),'用户的中文聊天标题');
- i18n.setLanguage('zh');assert.equal(i18n.t('账号身份已变化'),'账号身份已变化');
+ assert.equal(i18n.t('사용자의 중국어 채팅 제목'),'사용자의 중국어 채팅 제목');
+ i18n.setLanguage('ko');assert.equal(i18n.t('계정 ID가 변경되었습니다.'),'계정 ID가 변경되었습니다.');
 });
 test('macOS quit receipts translate without dropping diagnostic codes',()=>{
- const messages=['客户端进程已变化，请重新检查后再关闭（quit: changed）','macOS 退出请求结果未知，请检查客户端状态；尚未强制结束进程（quit: timeout）','无法发送 macOS 退出请求，请检查系统运行环境（quit: unavailable）','macOS 退出请求失败，请检查客户端状态（quit: native-error; code: -1）','客户端未接受退出请求，请检查客户端提示；尚未强制结束进程（quit: rejected）','无法核验 macOS 退出请求结果，请检查客户端状态（quit: invalid-response）'];
- i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/);assert.match(i18n.t(source),/quit: /);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('zh');
+ const messages=['클라이언트 프로세스가 변경되었습니다. 종료하기 전에 다시 한번 확인해 보세요(quit: changed).','macOS 종료 결과를 알 수 없습니다. 클라이언트 상태를 확인하세요. 프로세스가 강제로 중지되지 않았습니다(quit: timeout).','macOS 종료 요청을 보낼 수 없습니다. 시스템 환경을 확인하세요(quit: unavailable).','macOS 종료 요청이 실패했습니다. 클라이언트 상태를 확인하세요.（quit: native-error; code: -1）','클라이언트가 종료 요청을 거부했습니다. 프롬프트를 확인하세요. 프로세스가 강제로 중지되지 않았습니다(quit: rejected).','macOS 종료 결과를 확인할 수 없습니다. 클라이언트 상태를 확인하세요(quit: invalid-response).'];
+ i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/);assert.match(i18n.t(source),/quit: /);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('ko');
 });
 
 test('background force quit choices, risks and progress translate for desktop and mobile',()=>{
- const messages=['正常退出电脑 App','后台强制结束','结束应用进程，可能丢失未保存内容或中断任务。锁屏时也可使用。','正在后台强制结束…','重试后台强制结束','后台强制结束请求无效','此系统不支持 Windows 客户端强制结束','桌面应用配置不可用，请重新扫描','客户端进程已变化或无法核对，已停止强制结束；请重新扫描后重试','所选应用与网关或其启动进程重叠，不能强制结束','未能结束全部客户端进程，请检查权限或在电脑端处理后重试','等待客户端强制结束超时，请重新扫描并检查电脑端状态'];
- i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('zh');
+ const messages=['정상적으로 데스크톱 앱 종료','백그라운드에서 강제 종료','앱 프로세스를 종료합니다. 저장하지 않은 콘텐츠는 손실될 수 있으며 작업이 중단될 수 있습니다. 이는 컴퓨터가 잠겨 있는 동안에도 작동합니다.','백그라운드에서 강제 종료 중…','백그라운드 강제 종료 재시도','백그라운드 강제 종료 요청이 잘못되었습니다.','이 시스템은 Windows 앱 강제 종료를 지원하지 않습니다.','데스크톱 앱 구성을 사용할 수 없습니다. 다시 스캔하세요.','앱 프로세스가 변경되었거나 확인할 수 없어 강제 종료가 중지되었습니다. 다시 시도하기 전에 다시 스캔하세요.','선택한 앱이 게이트웨이 또는 해당 앱을 실행한 프로세스와 겹치므로 강제 종료할 수 없습니다.','모든 앱 프로세스를 종료할 수 있는 것은 아닙니다. 다시 시도하기 전에 컴퓨터에서 권한을 확인하거나 문제를 해결하세요.','앱이 강제 종료되기를 기다리는 중 시간이 초과되었습니다. 다시 스캔하고 컴퓨터에서 앱을 확인하세요.'];
+ i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('ko');
 });
 
 test('macOS background connection recovery and explicit foreground initialization are translated accurately',()=>{
- const messages=['安装和登录请在电脑端完成。关闭接入可保留或退出电脑 App。macOS Claude 默认后台启动并尝试恢复已有连接；“初始化连接”经确认后使用电脑前台。Windows 优先尝试后台初始化。','选择需要接入的应用。macOS Claude 默认后台启动并尝试恢复已有连接；“初始化连接”经确认后使用电脑前台。Windows 优先尝试后台初始化。','Claude 未恢复已有连接；请点击“初始化连接”。初始化会使用电脑前台，请保持桌面可交互。','已选择，启动网关后在后台打开 Claude 并尝试恢复已有连接；需要初始化时会提示。'];
+ const messages=['컴퓨터에 설치하고 로그인합니다. 접근을 비활성화할 때 데스크톱 앱을 유지할지, 종료할지 선택하세요. macOS에서 Claude는 백그라운드에서 시작되어 기존 연결을 복원하려고 시도합니다. 초기화 연결은 확인 후에만 포그라운드를 사용합니다. Windows는 먼저 백그라운드 초기화를 시도합니다.','연결할 앱을 선택하세요. macOS에서 Claude는 백그라운드에서 시작되어 기존 연결을 복원하려고 시도합니다. 초기화 연결은 확인 후에만 포그라운드를 사용합니다. Windows는 먼저 백그라운드 초기화를 시도합니다.','Claude가 기존 연결을 복원할 수 없습니다. 연결 초기화를 선택합니다. 초기화에서는 전경 창을 사용합니다. 컴퓨터 바탕화면을 대화형으로 유지하세요.','선택된. 게이트웨이가 시작되면 Claude가 백그라운드에서 열리고 기존 연결 복원을 시도합니다. 초기화가 필요한지 묻는 메시지가 표시됩니다.'];
  i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));assert.match(i18n.t(source),/restore an existing connection/);}
- assert.match(i18n.t(messages[0]),/foreground only after confirmation/);assert.match(i18n.t(messages[0]),/Windows attempts background initialization first/);i18n.setLanguage('zh');
+ assert.match(i18n.t(messages[0]),/foreground only after confirmation/);assert.match(i18n.t(messages[0]),/Windows attempts background initialization first/);i18n.setLanguage('ko');
 });
 
 
 test('close choices and exit failures translate without implying that disabling ends tasks',()=>{
- const messages=["当前 Claude Desktop 不支持后台退出；请在电脑上从 Claude 菜单或系统托盘选择“退出”，也可以选择“仅停用手机接入”","Harness 接入需要更新才能正常退出；请先在电脑端退出 Harness，再重新连接","Harness 尚未退出，请在电脑端处理退出提示后重试；尚未强制结束进程","无法确认客户端所有任务均已结束；可选择“仅停用手机接入”保留电脑 App，或在电脑端退出后重试","客户端尚未连接，无法确认任务状态；可选择“仅停用手机接入”，或在电脑端退出 App 后重试","正在停用接入…"];
+ const messages=["이 Claude 데스크톱 버전은 백그라운드 종료를 지원하지 않습니다. Claude 메뉴 또는 컴퓨터의 시스템 트레이에서 종료를 선택하거나 ”전화 액세스만 비활성화”를 선택하십시오.","정상적으로 종료하기 전에 Harness 연결을 업데이트하세요. 컴퓨터에서 Harness를 종료한 후 다시 연결하세요.","Harness가 종료되지 않았습니다. 컴퓨터에서 프롬프트 종료를 처리하고 다시 시도하세요. 강제 종료된 프로세스가 없습니다.","모든 앱 작업이 종료되었는지 확인할 수 없습니다. 데스크톱 앱을 계속 실행하려면 ’전화 액세스만 비활성화’를 선택하거나, 컴퓨터에서 앱을 종료하고 다시 시도하세요.","클라이언트가 연결되어 있지 않아 작업 상태를 확인할 수 없습니다. ’전화 액세스만 비활성화’를 선택하거나 컴퓨터에서 앱을 종료하고 다시 시도하세요.","액세스를 비활성화하는 중…"];
  i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));}
- assert.match(i18n.t('保留电脑 App 和现有任务。'),/tasks running/);i18n.setLanguage('zh');
+ assert.match(i18n.t('데스크톱 앱과 현재 작업을 계속 실행하세요.'),/tasks running/);i18n.setLanguage('ko');
 });
 
 
 test('native app quit prompts and results translate in both desktop and mobile',()=>{
- const messages=["通过 Claude 原生菜单退出，菜单可能短暂出现；如有任务或保存确认，请在电脑端处理。","安装和登录请在电脑端完成。关闭接入时可选择保留或退出电脑 App。Claude 退出会短暂打开原生菜单。Claude 首次连接需在电脑端手动初始化。","此退出操作仅用于 Claude 桌面端","Claude 进程已变化，请重新检查后再退出","请在电脑端处理 Claude 的任务或保存提示后重试","Claude 尚未退出，请在电脑端处理任务或保存提示后重试","已取消 Claude 退出","找不到 Claude 的原生退出菜单，请在电脑端检查菜单后重试","Claude 退出菜单不唯一，请在电脑端检查后重试","Claude 主进程已改变，退出请求已停止","焦点已离开 Claude，退出请求已停止，请重试","Claude 有待处理的原生对话框，请在电脑端确认或取消","Claude 已正常退出","Claude 正在等待电脑端退出确认，请自行确认或取消","已请求 Claude 正常退出，正在等待保存和退出完成","缺少 Claude 原生退出组件，请重新构建或安装网关 App","无法启动 Claude 原生退出组件，请检查网关安装","Claude 原生退出请求超时，请在电脑端检查退出状态","Claude 原生退出组件未返回有效状态，请在电脑端检查退出状态","此退出操作仅用于 Harness 桌面端","当前 Harness 未提供可验证的后台退出通道，请更新桌面端后重试","Harness 运行实例的数据目录无法核对，请重新扫描后重试","Harness 正常退出请求尚未完成，请稍后重试","Harness 拒绝了正常退出请求，请在电脑端检查后重试"];
- i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('zh');
+ const messages=["Claude의 네이티브 메뉴를 통해 종료합니다. 메뉴가 잠시 나타날 수 있습니다. 작업을 처리하거나 확인 내용을 컴퓨터에 저장하세요.","컴퓨터에 설치하고 로그인합니다. 액세스를 비활성화할 때 데스크톱 앱을 계속 실행할지 아니면 종료할지 선택하세요. Claude를 종료하면 네이티브 메뉴가 잠시 열립니다. 처음 연결하기 전에 컴퓨터에서 Claude를 초기화하세요.","이 종료 작업은 Claude 데스크톱에서만 사용할 수 있습니다.","Claude 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하세요.","Claude 작업을 처리하거나 컴퓨터에 프롬프트를 저장한 후 다시 시도하세요.","Claude가 종료되지 않았습니다. 작업을 처리하거나 컴퓨터에 프롬프트를 저장한 후 다시 시도하세요.","Claude 종료 요청이 취소되었습니다.","Claude의 네이티브 종료 메뉴를 찾을 수 없습니다. 컴퓨터에서 메뉴를 확인하고 다시 시도하세요.","둘 이상의 Claude 종료 메뉴가 발견되었습니다. 컴퓨터를 확인하고 다시 시도하세요.","Claude 기본 프로세스가 변경되었습니다. 종료 요청이 중지되었습니다.","초점이 Claude에서 멀어졌습니다. 종료 요청이 중지되었습니다. 다시 시도해 보세요.","Claude에는 보류 중인 네이티브 대화 상자가 있습니다. 컴퓨터에서 확인하거나 취소하세요.","Claude가 정상적으로 종료됩니다.","Claude가 컴퓨터에서 종료 확인을 기다리고 있습니다. 직접 확인하거나 취소하세요.","정상적인 Claude 종료가 요청되었습니다. 저장 및 종료가 완료되기를 기다리는 중입니다.","Claude 네이티브 종료 구성요소가 누락되었습니다. 게이트웨이 앱을 다시 빌드하거나 다시 설치하세요.","Claude 네이티브 종료 구성요소를 시작할 수 없습니다. 게이트웨이 설치를 확인하세요.","Claude 네이티브 종료 요청 시간이 초과되었습니다. 컴퓨터에서 종료 상태를 확인하세요.","Claude 네이티브 종료 구성 요소가 유효한 상태를 반환하지 않았습니다. 컴퓨터에서 종료 상태를 확인하세요.","이 종료 작업은 Harness 데스크톱에서만 사용할 수 있습니다.","이 Harness 버전에는 검증 가능한 백그라운드 종료 방법이 없습니다. 데스크톱 앱을 업데이트하고 다시 시도하세요.","실행 중인 Harness 인스턴스의 데이터 디렉터리를 확인할 수 없습니다. 다시 스캔하고 다시 시도하세요.","일반적인 Harness 종료 요청이 완료되지 않았습니다. 잠시 후 다시 시도하세요.","Harness가 일반 종료 요청을 거부했습니다. 컴퓨터를 확인하고 다시 시도하세요."];
+ i18n.setLanguage('en');for(const source of messages){assert.doesNotMatch(i18n.t(source),/[\u4e00-\u9fff]/,source);assert.equal(desktop.translate(source,'en'),i18n.t(source));}i18n.setLanguage('ko');
 });

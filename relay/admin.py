@@ -65,7 +65,7 @@ class Admin:
         value = await self.relay.body(request)
         identifier = value.get('deviceId')
         if not isinstance(identifier, str) or not self.relay.registry.active(identifier):
-            raise ValueError('设备不存在或已撤销')
+            raise ValueError('장치가 존재하지 않거나 취소되었습니다.')
         self.relay.registry.revoke(identifier)
         self.relay.fail(identifier)
         ws = self.relay.devices.get(identifier)

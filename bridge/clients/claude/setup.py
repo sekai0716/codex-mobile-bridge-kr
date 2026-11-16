@@ -51,7 +51,7 @@ def inspect_installation(executable):
     """Return capability evidence without launching Claude or reading accounts."""
     if not executable:
         return {'installed': False, 'automaticConnection': 'unavailable',
-                'setupState': 'not-installed', 'reason': '未检测到 Claude Desktop'}
+                'setupState': 'not-installed', 'reason': "Claude 데스크탑을 찾을 수 없습니다"}
     path = Path(executable).expanduser()
     bundle = next((p for p in (path, *path.parents) if p.suffix == '.app'), None)
     version = ''
@@ -60,7 +60,7 @@ def inspect_installation(executable):
         path, archive, version = macos_claude.installation_paths(path, bundle)
     if not path.is_file():
         return {'installed': False, 'automaticConnection': 'unavailable',
-                'setupState': 'not-installed', 'reason': '未检测到 Claude Desktop'}
+                'setupState': 'not-installed', 'reason': "Claude 데스크탑을 찾을 수 없습니다"}
     try:
         for name, content in _archive_members(archive):
             if name == 'package.json' and not version:
@@ -71,8 +71,8 @@ def inspect_installation(executable):
     return {'installed': True, 'executable': str(path.resolve()), 'version': version,
             'automaticConnection': 'native-console' if sys.platform in ('darwin', 'win32') else 'unavailable',
             'setupState': 'ready-to-connect' if sys.platform in ('darwin', 'win32') else 'unsupported',
-            'reason': ('已发现 Claude Desktop，可以自动连接' if sys.platform in ('darwin', 'win32')
-                       else '此系统暂未提供 Claude 自动连接组件')}
+            'reason': ("Claude 데스크톱을 찾았으며 연결할 준비가 되었습니다." if sys.platform in ('darwin', 'win32')
+                       else "이 플랫폼에서는 아직 자동 Claude 연결을 사용할 수 없습니다.")}
 
 
 def helper_path():
@@ -142,7 +142,7 @@ def console_source(source, config, *, multiline=False):
         if not line or line.startswith('//'):
             continue
         if '`' in line:
-            raise ValueError('连接脚本格式不支持，请重新构建应用')
+            raise ValueError("지원되지 않는 커넥터 스크립트 형식입니다. 앱을 다시 빌드합니다.")
         lines.append(line)
     marker = '/* codex bridge connector */'
     encoded_config = json.dumps(config, ensure_ascii=True)
@@ -158,7 +158,7 @@ def console_source(source, config, *, multiline=False):
                         len((marker if not groups else '') + ' '.join(pending[:cut])) <= 3500):
                     break
             else:
-                raise ValueError('连接脚本单行过长，请重新构建应用')
+                raise ValueError('연결 스크립트의 한 줄이 너무 깁니다. 애플리케이션을 다시 빌드하세요.')
             groups.append((marker if not groups else '') + ' '.join(pending[:cut]))
             pending = pending[cut:]
     groups.append((marker if not groups else '') + ' '.join(pending))
@@ -167,10 +167,10 @@ def console_source(source, config, *, multiline=False):
 
 def _native_action_macos(action, *, pid=None, executable=None, script=None, cancel_path=None, cancelled=None, recovered=None):
     if cancelled and cancelled.is_set():
-        return {'setupState': 'cancelled', 'reason': '已取消 Claude 连接'}
+        return {'setupState': 'cancelled', 'reason': "Claude 연결이 취소되었습니다."}
     helper = helper_path()
     if not helper.is_file():
-        return {'setupState': 'failed', 'reason': '缺少 Claude 自动连接组件，请重新构建或安装网关 App'}
+        return {'setupState': 'failed', 'reason': "Claude 커넥터 구성요소가 누락되었습니다. 게이트웨이 앱을 다시 빌드하거나 다시 설치하세요."}
     command = _native().helper_command(helper, action, pid, executable, script, cancel_path)
     if command is None:
         return {'setupState': 'ready'}
@@ -192,9 +192,9 @@ def _native_action_macos(action, *, pid=None, executable=None, script=None, canc
                 except subprocess.TimeoutExpired:
                     process.kill(); process.communicate()
                 if connected and not (cancelled and cancelled.is_set()):
-                    return {'setupState': 'connected', 'reason': '桌面连接可用'}
+                    return {'setupState': 'connected', 'reason': '데스크톱 연결 가능'}
                 return {'setupState': 'cancelled' if cancelled and cancelled.is_set() else 'failed',
-                        'reason': '已取消 Claude 连接' if cancelled and cancelled.is_set() else 'Claude 自动连接超时，请重试'}
+                        'reason': "Claude 연결이 취소되었습니다." if cancelled and cancelled.is_set() else "Claude 연결 시간이 초과되었습니다. 다시 시도해 보세요."}
     return _native().helper_result(action, stdout, process.returncode)
 
 
@@ -202,7 +202,7 @@ def _native_action_macos(action, *, pid=None, executable=None, script=None, canc
 def native_action(action, *, pid=None, executable=None, script=None, cancel_path=None, cancelled=None, recovered=None):
     if action not in ('check', 'request-permission', 'connect', 'connect-background', 'close-devtools',
                       'close-background-devtools', 'enable-devtools', 'inspect-error', 'quit', 'wait-desktop'):
-        raise ValueError('不支持的 Claude 本机操作')
+        raise ValueError('지원되지 않음 Claude 현지 운영')
     if sys.platform == 'win32':
         return windows_claude.native_action(action, helper=helper_path(), pid=pid, executable=executable,
                                             script=script, cancel_path=cancel_path, cancelled=cancelled)
@@ -281,27 +281,27 @@ def background_console_supported(executable):
 def background_running_app(executable, data_home, cancelled=None, launch_gate=None, *, initialize_console=False, explicit_home=False):
     """Start a verified Windows Claude in its native hidden mode at most once."""
     if sys.platform != 'win32':
-        raise ValueError('此系统尚未验证 Claude 后台启动入口')
+        raise ValueError("Claude의 백그라운드 실행 항목이 이 시스템에서 확인되지 않았습니다.")
     def check():
         if cancelled is not None and cancelled.is_set():
-            raise ValueError('已取消 Claude 后台启动')
+            raise ValueError("Claude 백그라운드 실행이 취소되었습니다.")
     check()
     app = DesktopApp(executable, data_home)
     pids = _main_pids(app)
     check()
     if len(pids) > 1:
-        raise ValueError('无法确认唯一的 Claude 主进程，请在电脑端检查')
+        raise ValueError("고유한 Claude 기본 프로세스를 확인할 수 없습니다. 컴퓨터에서 확인해보세요.")
     if pids:
         return {'pid': pids[0], 'launched': False}
     if not background_start_supported(app.executable):
-        raise ValueError('此 Claude 版本尚未验证后台启动，请在电脑端打开应用后重试')
+        raise ValueError("이 Claude 버전에 대한 백그라운드 실행이 확인되지 않았습니다. 컴퓨터에서 앱을 연 다음 다시 시도하세요.")
     packaged = any(folder.name.casefold() == 'windowsapps' or (folder/'AppxManifest.xml').is_file()
                    for folder in app.executable.parents)
     if packaged:
         from bridge.platforms.windows.discovery_ext import application_execution_alias
         launcher = application_execution_alias(app.executable)
         if launcher is None:
-            raise ValueError('无法确认所选 Claude 的后台启动别名，请在电脑端打开应用后重试')
+            raise ValueError("선택한 Claude 앱의 백그라운드 실행 별칭을 확인할 수 없습니다. 컴퓨터에서 열어서 다시 시도하세요.")
     else:
         launcher = app.executable
     # No explorer fallback: it would activate the window and drop --startup.
@@ -314,7 +314,7 @@ def background_running_app(executable, data_home, cancelled=None, launch_gate=No
         pids = _main_pids(app)
         check()
         if len(pids) > 1:
-            raise ValueError('无法确认唯一的 Claude 主进程，请在电脑端检查')
+            raise ValueError("고유한 Claude 기본 프로세스를 확인할 수 없습니다. 컴퓨터에서 확인해보세요.")
         if pids:
             return {'pid': pids[0], 'launched': False}
         if console_supported:
@@ -336,9 +336,9 @@ def background_running_app(executable, data_home, cancelled=None, launch_gate=No
         if len(pids) == 1:
             return {'pid': pids[0], 'launched': True}
         if len(pids) > 1:
-            raise ValueError('Claude 启动后出现多个主进程，请在电脑端检查')
+            raise ValueError("출시 후 여러 Claude 기본 프로세스가 나타났습니다. 컴퓨터에서 확인하세요.")
         if process.poll() not in (None, 0) or time.monotonic() >= deadline:
-            raise ValueError('Claude 后台启动未完成，请检查桌面应用后重试')
+            raise ValueError("Claude가 백그라운드에서 시작을 완료할 수 없습니다. 데스크톱 앱을 확인한 후 다시 시도하세요.")
         if cancelled is None:
             time.sleep(.25)
         elif cancelled.wait(.25):
@@ -347,34 +347,34 @@ def background_running_app(executable, data_home, cancelled=None, launch_gate=No
 
 def running_app(executable, data_home, restart=False, cancelled=None, allow_launch=True):
     if cancelled and cancelled.is_set():
-        raise ValueError('已取消 Claude 连接')
+        raise ValueError("Claude 연결이 취소되었습니다.")
     if sys.platform == 'win32':
         windows_session.require_interactive()
     app = DesktopApp(executable, data_home)
     pids = _main_pids(app)
     if cancelled and cancelled.is_set():
-        raise ValueError('已取消 Claude 连接')
+        raise ValueError("Claude 연결이 취소되었습니다.")
     if not allow_launch and (not pids or restart):
-        raise ValueError('请先在电脑端打开 Claude，再重新连接')
+        raise ValueError("다시 연결하기 전에 컴퓨터에서 Claude를 엽니다.")
     if pids and restart:
         if sys.platform == 'win32':
             windows_session.require_interactive()
         if len(pids) != 1:
-            raise ValueError('无法确认唯一的 Claude 主进程，请检查桌面窗口')
+            raise ValueError("단일 Claude 기본 프로세스를 식별할 수 없습니다. 바탕화면 창을 확인해보세요.")
         if sys.platform == 'win32':
             windows_claude.close_main_window(pids[0])
             deadline = time.monotonic() + 25
             while _main_pids(app):
-                if cancelled and cancelled.is_set(): raise ValueError('已取消 Claude 连接')
+                if cancelled and cancelled.is_set(): raise ValueError("Claude 연결이 취소되었습니다.")
                 if time.monotonic() >= deadline:
-                    raise ValueError('Claude 尚未退出，请在电脑上关闭后重试；尚未强制结束进程')
+                    raise ValueError("Claude가 종료되지 않았습니다. 컴퓨터에서 닫고 다시 시도하세요. 강제 종료가 아니었습니다.")
                 time.sleep(.25)
         else:
             app.stop()
         pids = []
     if not pids:
         if cancelled and cancelled.is_set():
-            raise ValueError('已取消 Claude 连接')
+            raise ValueError("Claude 연결이 취소되었습니다.")
         if sys.platform == 'win32':
             windows_session.require_interactive()
         if sys.platform == 'darwin':
@@ -386,8 +386,8 @@ def running_app(executable, data_home, restart=False, cancelled=None, allow_laun
         deadline = time.monotonic() + 15
         while not pids and time.monotonic() < deadline:
             if cancelled and cancelled.is_set():
-                raise ValueError('已取消 Claude 连接')
+                raise ValueError("Claude 연결이 취소되었습니다.")
             time.sleep(.25); pids = _main_pids(app)
     if len(pids) != 1:
-        raise ValueError('无法确认唯一的 Claude 主进程，请检查桌面窗口')
+        raise ValueError("단일 Claude 기본 프로세스를 식별할 수 없습니다. 바탕화면 창을 확인해보세요.")
     return pids[0]

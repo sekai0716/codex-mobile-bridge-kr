@@ -8,7 +8,7 @@ class TerminalPanel {
     this.key='pty:'+session.key;
     try{this.id=sessionStorage.getItem(this.key);}catch{}
     this.hadId=!!this.id;this.id ||= uuid();this.save();
-    this.tab.name=BridgeI18n.t('终端 · 连接中');this.workbench.paint();
+    this.tab.name=BridgeI18n.t('터미널 · 연결');this.workbench.paint();
     this.load();
   }
   save(){try{sessionStorage.setItem(this.key,this.id);}catch{}}
@@ -37,25 +37,25 @@ class TerminalPanel {
       const result=await this.workbench.request(this.url(),{action:'open',id:this.id,cols:this.term.cols,rows:this.term.rows});
       if(this.disposed){if(!this.hadId)this.workbench.request(this.url(),{action:'close',id:this.id}).catch(()=>{});return;}
       this.apply(result);this.startDuplex();this.schedule();this.focusOnSelect();
-    }catch(e){if(!this.disposed){if(!this.status)this.render({});this.status.textContent=BridgeI18n.t(e.message);this.reopen.hidden=false;this.tab.name=BridgeI18n.t('终端 · 未连接');this.workbench.paint();}}
+    }catch(e){if(!this.disposed){if(!this.status)this.render({});this.status.textContent=BridgeI18n.t(e.message);this.reopen.hidden=false;this.tab.name=BridgeI18n.t('터미널 · 연결이 끊김');this.workbench.paint();}}
   }
   render(info){
     const n=(...a)=>this.workbench.node(...a),b=(...a)=>this.workbench.button(...a);
     this.tab.body.replaceChildren();this.tab.body.classList.add('wb-pty');
     const head=n('div','wb-terminal-head wb-terminal-font-head');
-    this.reopen=b(BridgeI18n.t('重新打开'),()=>this.restart());this.reopen.hidden=true;
+    this.reopen=b(BridgeI18n.t('다시 열다'),()=>this.restart());this.reopen.hidden=true;
     const font=TerminalFont.control(this.workbench);this.fontControl=font;
     this.modeButton=b('',()=>this.toggleInputMode());this.updateInputMode();
-    head.append(this.modeButton,font.label,b(BridgeI18n.t('清屏'),()=>this.clearScreen()));
-    this.shellHint=n('small','wb-terminal-shell-hint',BridgeI18n.t('跨盘切换示例：cd /d D:\\（进入 D 盘根目录）。'));this.shellHint.hidden=!/(^|[\\/])cmd(?:\.exe)?$/i.test(info.shell||'');
-    this.screen=n('div','wb-terminal-screen');this.screen.setAttribute("data-i18n-aria-label",'交互终端');this.screen.setAttribute('aria-label',BridgeI18n.t('交互终端'));
+    head.append(this.modeButton,font.label,b(BridgeI18n.t('분명한'),()=>this.clearScreen()));
+    this.shellHint=n('small','wb-terminal-shell-hint',BridgeI18n.t('예: cd /d D:＼는 D 드라이브의 루트로 전환됩니다.'));this.shellHint.hidden=!/(^|[\\/])cmd(?:\.exe)?$/i.test(info.shell||'');
+    this.screen=n('div','wb-terminal-screen');this.screen.setAttribute("data-i18n-aria-label",'대화형 터미널');this.screen.setAttribute('aria-label',BridgeI18n.t('대화형 터미널'));
     this.status=n('p','wb-status');this.status.setAttribute('role','status');
-    this.location=n('small','wb-terminal-shell-location',info.shell||BridgeI18n.t('连接终端…'));this.location.title=info.shell||'';
+    this.location=n('small','wb-terminal-shell-location',info.shell||BridgeI18n.t('터미널 연결 중…'));this.location.title=info.shell||'';
     const footer=n('div','wb-terminal-footer');footer.append(this.status,this.location,this.reopen);
     const keys=n('div','wb-terminal-keys');
     for(const [label,value] of [['Ctrl+C','\x03'],['Tab','\t'],['Enter','\r'],['Esc','\x1b'],['↑','\x1b[A'],['↓','\x1b[B'],['←','\x1b[D'],['→','\x1b[C']])keys.append(b(label,()=>this.shortcut(label,value)));
-    this.form=n('form','wb-terminal-input');this.input=n('textarea');this.input.rows=2;this.input.setAttribute("data-i18n-placeholder",'输入命令或回复，换行键可换行');this.input.placeholder=BridgeI18n.t('输入命令或回复，换行键可换行');this.input.setAttribute("data-i18n-aria-label",'终端输入');this.input.setAttribute('aria-label',BridgeI18n.t('终端输入'));this.input.setAttribute('autocapitalize','off');this.input.setAttribute('autocorrect','off');this.input.spellcheck=false;
-    this.send=n('button','',BridgeI18n.t('发送到终端'));this.send.type='submit';this.send.disabled=true;
+    this.form=n('form','wb-terminal-input');this.input=n('textarea');this.input.rows=2;this.input.setAttribute("data-i18n-placeholder",'명령이나 답장을 입력하세요. Return은 새 줄을 삽입합니다.');this.input.placeholder=BridgeI18n.t('명령이나 답장을 입력하세요. Return은 새 줄을 삽입합니다.');this.input.setAttribute("data-i18n-aria-label",'단자 입력');this.input.setAttribute('aria-label',BridgeI18n.t('단자 입력'));this.input.setAttribute('autocapitalize','off');this.input.setAttribute('autocorrect','off');this.input.spellcheck=false;
+    this.send=n('button','',BridgeI18n.t('터미널로 보내기'));this.send.type='submit';this.send.disabled=true;
     this.form.append(this.input,this.send);this.form.onsubmit=e=>{e.preventDefault();this.submit();};
     this.input.addEventListener('compositionstart',()=>{this.composing=true;this.clearCompletion();});
     this.input.addEventListener('compositionend',()=>{this.composing=false;this.clearCompletion();});
@@ -65,7 +65,7 @@ class TerminalPanel {
     this.input.addEventListener('keydown',e=>this.handleInputKeydown(e));
     this.completions=n('div','wb-terminal-completions');this.completions.hidden=true;
     // Enter in the mobile composer ALWAYS inserts a newline. Submit is explicit.
-    this.retry=b(BridgeI18n.t('重试未确认输入'),()=>{this.inputError=false;this.retry.hidden=true;this.flush();});this.retry.hidden=true;
+    this.retry=b(BridgeI18n.t('확인되지 않은 입력을 다시 시도하세요.'),()=>{this.inputError=false;this.retry.hidden=true;this.flush();});this.retry.hidden=true;
     this.tab.body.append(head,this.shellHint,this.screen,keys,this.form,this.completions,footer,this.retry);
     this.term=new Terminal({fontSize:TerminalFont.size(),fontFamily:'Menlo, Consolas, monospace',cursorBlink:false,scrollback:2000,
       theme:{background:'#11151b',foreground:'#e2e8f0',cursor:'#ffffff',cursorAccent:'#11151b'},cursorStyle:'block',cursorInactiveStyle:'block',allowProposedApi:false,
@@ -124,8 +124,8 @@ class TerminalPanel {
     if(e.touches.length!==1||Array.from(e.changedTouches).some(touch=>touch.identifier===this.touchPoint?.id))this.touchPoint=null;
   }
   updateInputMode(){
-    if(this.modeButton){this.modeButton.textContent=BridgeI18n.t(this.inputMode==='draft'?'编写后发送模式':'终端直接输入模式');this.modeButton.title=BridgeI18n.t(this.inputMode==='draft'?'切换为终端直接输入模式':'切换为编写后发送模式');}
-    if(this.input){this.input.placeholder=BridgeI18n.t(this.mobile()?'输入命令或回复，换行键可换行':'编写后发送模式：Enter 发送，Shift+Enter 换行；密码请用终端直接输入模式');}
+    if(this.modeButton){this.modeButton.textContent=BridgeI18n.t(this.inputMode==='draft'?'작성 후 보내기':'직접 입력 모드');this.modeButton.title=BridgeI18n.t(this.inputMode==='draft'?'직접 터미널 입력으로 전환':'작성 및 보내기로 전환');}
+    if(this.input){this.input.placeholder=BridgeI18n.t(this.mobile()?'명령이나 답장을 입력하세요. Return은 새 줄을 삽입합니다.':'작성 및 보내기: 보내기를 입력합니다. Shift+Enter를 누르면 줄이 추가됩니다. 비밀번호는 직접 터미널 입력을 사용하세요.');}
     this.tab.body.classList.toggle('wb-terminal-draft',this.inputMode==='draft');
     this.tab.body.classList.toggle('wb-terminal-direct',this.inputMode==='direct');
     if(this.term?.textarea){this.term.textarea.readOnly=this.inputMode==='draft';this.term.textarea.tabIndex=this.inputMode==='draft'?-1:0;if(this.inputMode==='draft'&&document.activeElement===this.term.textarea)this.term.blur();}
@@ -201,7 +201,7 @@ class TerminalPanel {
     this.clearCompletion();const version=this.completionVersion,id=this.id,text=this.input.value,selectionStart=this.input.selectionStart,selectionEnd=this.input.selectionEnd;
     if(selectionStart!==selectionEnd)return;
     const pending=this.completing=this.completionSnapshot={version,id,text,start:selectionStart,end:selectionEnd};
-    this.completions.append(this.workbench.node('span','',BridgeI18n.t('正在补全…')));this.completions.hidden=false;
+    this.completions.append(this.workbench.node('span','',BridgeI18n.t('일치하는 경로를 찾는 중…')));this.completions.hidden=false;
     try{
       const result=await this.workbench.request(this.url(),{action:'complete',id,text,selectionStart});
       if(this.disposed||id!==this.id||version!==this.completionVersion||text!==this.input.value||selectionStart!==this.input.selectionStart||selectionEnd!==this.input.selectionEnd||this.inputMode!=='draft'||!this.workbench.isVisible(this.session,this.tab))return;
@@ -212,11 +212,11 @@ class TerminalPanel {
         this.input.setRangeText(candidate.insertText,result.replaceStart,result.replaceEnd,'end');this.clearCompletion();this.input.focus();
       };
       if(candidates.length===1&&!result.truncated){apply(candidates[0]);return;}
-      if(!candidates.length){this.completions.append(this.workbench.node('span','',BridgeI18n.t('没有匹配的路径')));this.completions.hidden=false;return;}
+      if(!candidates.length){this.completions.append(this.workbench.node('span','',BridgeI18n.t('일치하는 경로가 없습니다.')));this.completions.hidden=false;return;}
       if(!result.truncated&&result.commonPrefixInsertText){apply({insertText:result.commonPrefixInsertText});return;}
-      this.completions.append(this.workbench.node('span','',BridgeI18n.t('选择路径补全')));
+      this.completions.append(this.workbench.node('span','',BridgeI18n.t('경로 완성 선택')));
       for(const candidate of candidates){const button=this.workbench.button(candidate.label,()=>apply(candidate));button.type='button';this.completions.append(button);}
-      if(result.truncated)this.completions.append(this.workbench.node('small','',BridgeI18n.t('仅显示部分匹配项')));
+      if(result.truncated)this.completions.append(this.workbench.node('small','',BridgeI18n.t('일부 일치 항목 표시 중')));
       this.completions.hidden=false;
     }catch(e){if(!this.disposed&&id===this.id&&version===this.completionVersion&&text===this.input.value&&selectionStart===this.input.selectionStart&&selectionEnd===this.input.selectionEnd&&this.inputMode==='draft'&&this.workbench.isVisible(this.session,this.tab)){this.completions.replaceChildren();this.completions.append(this.workbench.node('span','',BridgeI18n.t(e.message)));this.completions.hidden=false;}}
     finally{if(this.completing===pending)this.completing=null;}
@@ -226,7 +226,7 @@ class TerminalPanel {
     const text=this.input.value;
     // xterm may wrap bracketed paste in two six-byte markers before onData.
     if(this.inputBytes(text.replace(/\r?\n/g,'\r'))+13+this.operations.reduce((size,entry)=>size+this.inputBytes(entry.data),0)>262144){
-      this.status.textContent=BridgeI18n.t('终端输入过长或队列已满；草稿仍在，请稍后重试');return;
+      this.status.textContent=BridgeI18n.t('터미널 입력이 너무 길거나 대기열이 가득 찼습니다. 귀하의 초안은 아직 여기에 있습니다. 나중에 다시 시도해 보세요.');return;
     }
     // xterm honours bracketed-paste mode set by the active shell/application.
     if(text){this.term.options.disableStdin=false;this.submitting=true;try{this.term.paste(text);}finally{this.submitting=false;this.layout();}}
@@ -235,7 +235,7 @@ class TerminalPanel {
   enqueue(data){
     if(!this.running||this.disposed)return;
     if(this.inputBytes(data)+this.operations.reduce((size,entry)=>size+this.inputBytes(entry.data),0)>262144){
-      this.queueFull=true;this.status.textContent=BridgeI18n.t('终端输入队列已满；这部分输入未发送');return;
+      this.queueFull=true;this.status.textContent=BridgeI18n.t('터미널 입력 대기열이 가득 찼습니다. 이 입력은 전송되지 않았습니다.');return;
     }
     // Keep each Unicode character intact while staying below the server input cap.
     let chunk='';for(const char of data){if(chunk.length+char.length>3000){this.queueChunk(chunk);chunk='';}chunk+=char;}
@@ -282,7 +282,7 @@ class TerminalPanel {
         this.operations.shift();
         this.clearQueueNotice();
       }
-    }catch(e){if(!this.disposed&&!this.restarting&&this.id===id){this.inputError=true;this.status.textContent=BridgeI18n.t(e.message)+BridgeI18n.t(this.operations[0]?.sent?' · 输入结果未确认；重试不会重复输入。':' · 终端尺寸未同步；输入尚未发送。');this.retry.hidden=false;this.send.disabled=true;this.term.options.disableStdin=true;}}
+    }catch(e){if(!this.disposed&&!this.restarting&&this.id===id){this.inputError=true;this.status.textContent=BridgeI18n.t(e.message)+BridgeI18n.t(this.operations[0]?.sent?'· 입력이 확인되지 않았습니다. 다시 시도하면 복제되지 않습니다.':'· 터미널 크기가 업데이트되지 않았습니다. 입력이 전송되지 않았습니다.');this.retry.hidden=false;this.send.disabled=true;this.term.options.disableStdin=true;}}
     finally{this.flushing=false;if(!this.disposed&&!this.inputError){this.send.disabled=!this.running;this.layout();this.flushDuplex();if(this.hadDuplex&&!this.duplex&&!this.duplexUnsupported&&!this.reconnectTimer)this.startDuplex();}}
   }
   startDuplex(){
@@ -320,7 +320,7 @@ class TerminalPanel {
           this.clearQueueNotice();
         }
       }else if(message.type==='error'){
-        this.status.textContent=BridgeI18n.t(message.message||'终端连接失败');socket.close();
+        this.status.textContent=BridgeI18n.t(message.message||'터미널 연결 실패');socket.close();
       }
     };
     socket.onclose=()=>{
@@ -337,7 +337,7 @@ class TerminalPanel {
         this.reconnectTimer=setTimeout(()=>{this.reconnectTimer=null;this.startDuplex();},1000*this.duplexReconnects);
       }
       if(uncertain){
-        this.inputError=true;this.status.textContent=BridgeI18n.t('终端连接中断 · 输入结果未确认；重试不会重复输入。');
+        this.inputError=true;this.status.textContent=BridgeI18n.t('터미널 연결이 끊겼습니다. · 입력이 확인되지 않았습니다. 다시 시도하면 복제되지 않습니다.');
         this.retry.hidden=false;this.send.disabled=true;this.term.options.disableStdin=true;
       }else this.flush();
       this.schedule(true);
@@ -371,16 +371,16 @@ class TerminalPanel {
   clearQueueNotice(){
     if(this.queueFull&&this.operations.reduce((size,entry)=>size+this.inputBytes(entry.data),0)<131072){
       this.queueFull=false;
-      if(!this.inputError)this.status.textContent=BridgeI18n.t('连续会话 · 关闭标签将结束终端');
+      if(!this.inputError)this.status.textContent=BridgeI18n.t('영구 세션 · 이 탭을 닫으면 터미널이 종료됩니다.');
     }
   }
   apply(result,rendered){
     if(result.reset)this.term.reset();
     if(result.output)this.term.write(result.output,rendered);else rendered?.();
     this.cursor=result.cursor;this.running=result.running;
-    const label=BridgeI18n.t(result.running?'终端 · 已连接':'终端 · 已退出');if(this.tab.name!==label){this.tab.name=label;this.workbench.paint();}
-    this.location.textContent=result.shell||BridgeI18n.t('终端');this.location.title=result.shell||'';
-    if(!this.inputError&&!this.queueFull)this.status.textContent=result.running?BridgeI18n.t('连续会话 · 关闭标签将结束终端'):result.message||BridgeI18n.t('终端已退出');
+    const label=BridgeI18n.t(result.running?'터미널 · 연결됨':'터미널 · 종료');if(this.tab.name!==label){this.tab.name=label;this.workbench.paint();}
+    this.location.textContent=result.shell||BridgeI18n.t('단말기');this.location.title=result.shell||'';
+    if(!this.inputError&&!this.queueFull)this.status.textContent=result.running?BridgeI18n.t('영구 세션 · 이 탭을 닫으면 터미널이 종료됩니다.'):result.message||BridgeI18n.t('터미널 종료');
     this.send.disabled=!this.running||this.inputError;this.reopen.hidden=this.running;this.layout();
   }
   schedule(error=false,idle=false){clearTimeout(this.timer);if(!this.disposed&&this.running&&!document.hidden&&!this.restarting&&!this.duplexReady&&!this.duplexConnecting)this.timer=setTimeout(()=>this.poll(),error?750:(!this.workbench.isVisible(this.session,this.tab)?500:idle?35:0));}

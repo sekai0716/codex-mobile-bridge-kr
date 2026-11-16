@@ -17,9 +17,9 @@ const BridgePdfPreview = (() => {
     return node;
   };
   const errorMessage = error => {
-    if (error?.name === 'PasswordException') return '此 PDF 已加密，请下载后使用其他应用打开。';
-    if (error?.name === 'InvalidPDFException' || error?.name === 'FormatError') return 'PDF 文件已损坏或格式无效，请下载后检查。';
-    return 'PDF 预览失败，请下载后使用其他应用打开。';
+    if (error?.name === 'PasswordException') return '이 PDF는 암호화되어 있습니다. 다운로드하고 다른 앱에서 열어보세요.';
+    if (error?.name === 'InvalidPDFException' || error?.name === 'FormatError') return '이 PDF가 손상되었거나 유효하지 않습니다. 파일을 검사하려면 다운로드하세요.';
+    return 'PDF 미리보기가 실패했습니다. 다운로드하고 다른 앱에서 열어보세요.';
   };
   const create = ({url, info, loadLibrary = library}) => {
     const element = document.createElement('div'); element.className = 'wb-pdf';
@@ -69,10 +69,10 @@ const BridgePdfPreview = (() => {
       const number = Math.max(1, Math.min(documentProxy.numPages, current + delta));
       stage.scrollTop = topOf(number - 1); current = number; refresh(); schedule();
     };
-    const previous = button('上一页', () => go(-1));
-    const next = button('下一页', () => go(1));
-    const smaller = button('缩小', () => changeZoom(Math.max(MIN_ZOOM, +(zoom - .25).toFixed(2))));
-    const larger = button('放大', () => changeZoom(Math.min(MAX_ZOOM, +(zoom + .25).toFixed(2))));
+    const previous = button('이전 페이지', () => go(-1));
+    const next = button('다음 페이지', () => go(1));
+    const smaller = button('축소', () => changeZoom(Math.max(MIN_ZOOM, +(zoom - .25).toFixed(2))));
+    const larger = button('확대', () => changeZoom(Math.min(MAX_ZOOM, +(zoom + .25).toFixed(2))));
     toolbar.append(previous, pageLabel, next, smaller, zoomLabel, larger);
     stage.tabIndex = 0; stage.append(pages); element.append(toolbar, status, stage); refresh();
 
@@ -391,10 +391,10 @@ const BridgePdfPreview = (() => {
       started = true;
       if (!allowed(info)) {
         status.classList.add('error');
-        status.textContent = BridgeI18n.t('PDF 超过在线预览或当前下载限额，请下载后打开。');
+        status.textContent = BridgeI18n.t('이 PDF는 미리보기 또는 현재 다운로드 제한을 초과합니다. 다운로드하여 열어보세요.');
         return;
       }
-      status.textContent = BridgeI18n.t('正在打开 PDF…');
+      status.textContent = BridgeI18n.t('PDF 여는 중…');
       try {
         const pdfjs = await loadLibrary(); if (disposed) return;
         pdfjs.GlobalWorkerOptions.workerSrc = base() + '/vendor/pdfjs/pdf.worker.min.mjs?v=5.6.205';

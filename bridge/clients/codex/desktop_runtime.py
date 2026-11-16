@@ -35,7 +35,7 @@ def private_directory(root):
     root.mkdir(mode=0o700, exist_ok=True)
     info = root.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise ValueError('共享接入目录权限无法确认')
+        raise ValueError('공유 액세스 디렉터리 권한을 확인할 수 없습니다.')
     return root
 
 
@@ -100,7 +100,7 @@ def exclusive_lock(home, name, *, timeout=0):
                     return
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise DesktopRuntimeBusy('共享接入仍在使用或退出中，请稍后重试')
+                raise DesktopRuntimeBusy('공유 액세스가 아직 사용 중이거나 종료되었습니다. 나중에 다시 시도해 주세요.')
             time.sleep(min(.25, remaining))
     import fcntl
     root = private_directory(directory(home))
@@ -108,7 +108,7 @@ def exclusive_lock(home, name, *, timeout=0):
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-            raise ValueError('共享接入锁身份无法确认')
+            raise ValueError('공유 액세스 잠금 ID를 확인할 수 없습니다.')
         deadline = time.monotonic() + timeout
         while True:
             try:
@@ -117,7 +117,7 @@ def exclusive_lock(home, name, *, timeout=0):
             except BlockingIOError as exc:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise DesktopRuntimeBusy('共享接入仍在使用或退出中，请稍后重试') from exc
+                    raise DesktopRuntimeBusy('공유 액세스가 아직 사용 중이거나 종료되었습니다. 나중에 다시 시도해 주세요.') from exc
                 time.sleep(min(.25, remaining))
         yield
     finally:
@@ -135,7 +135,7 @@ def _read(path):
     info = path.lstat()
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or
             info.st_mode & 0o077 or info.st_size > 65536):
-        raise ValueError('共享接入文件身份无法确认')
+        raise ValueError('공유 액세스 파일의 신원을 확인할 수 없습니다.')
     return json.loads(path.read_text(encoding='utf-8'))
 
 
@@ -163,7 +163,7 @@ def settings(home):
         return None
     value = _read(path)
     if value.get('version') != VERSION or value.get('home') != str(Path(home).resolve()):
-        raise ValueError('共享接入配置不匹配，请重新初始化')
+        raise ValueError('공유 액세스 구성이 일치하지 않습니다. 다시 초기화하세요.')
     return value
 
 
@@ -175,7 +175,7 @@ def preparation(home):
     value = _read(path)
     if (value.get('version') != VERSION or value.get('home') != str(Path(home).resolve())
             or value.get('state') not in ('pending', 'complete') or not isinstance(value.get('requestId'), str)):
-        raise ValueError('原生连接准备记录无法核验，请在账号管理中检查')
+        raise ValueError('기본 연결 준비 기록을 확인할 수 없습니다. 계정 관리에서 확인하세요.')
     return value
 
 
@@ -188,7 +188,7 @@ def record_preparation(home, request_id, *, complete=False):
 def configure(home, application, cli):
     """Called only after the lifecycle owner has verified idle and normal exit."""
     if sys.platform not in ('darwin', 'win32'):
-        raise ValueError('此系统尚未验证 Codex 共享接入')
+        raise ValueError('이 시스템은 아직 검증되지 않았습니다. Codex 공유 액세스')
     # GUI exit precedes the adapter's cooperative proxy/native shutdown.
     with exclusive_lock(home, 'runtime', timeout=35):
         _configure(home, application, cli)
@@ -230,14 +230,14 @@ def launcher_settings(application):
     if sys.platform != 'win32':
         return {}
     if not getattr(sys, 'frozen', False):
-        raise ValueError('请使用已编译的网关 App 初始化 Windows 原生连接')
+        raise ValueError('컴파일된 게이트웨이를 사용하세요 App 초기화 Windows 기본 연결')
     from bridge.platforms.windows.discovery_ext import application_user_model_id, application_execution_alias
     identity = application_user_model_id(application)
     packaged = any((parent / 'AppxManifest.xml').is_file() for parent in Path(application).parents)
     if packaged and not identity:
-        raise ValueError('无法核验 Codex 安装包身份；尚未改变原生连接设置')
+        raise ValueError('확인할 수 없습니다 Codex 패키지 ID 기본 연결 설정이 변경되지 않았습니다.')
     if packaged and application_execution_alias(application) is None:
-        raise ValueError('无法核验 Codex 应用启动别名；尚未改变原生连接设置')
+        raise ValueError('확인할 수 없습니다 Codex 앱 실행 별칭 기본 연결 설정이 아직 변경되지 않았습니다')
     return {'launcher': str(Path(sys.executable).resolve()), 'sandboxFamily': identity.split('!')[0]}
 
 
@@ -251,9 +251,9 @@ def validate_runtime(cli):
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     text=True, timeout=10, check=True, **options)
             if required not in result.stdout:
-                raise ValueError('此 Codex 版本不支持共享接入，请先更新原 App')
+                raise ValueError('이 Codex 해당 버전은 공유 액세스를 지원하지 않습니다. 먼저 원본 버전을 업데이트하세요. App')
     except (OSError, subprocess.SubprocessError) as exc:
-        raise ValueError('无法核验 Codex 共享接入能力；原 App 保持不变') from exc
+        raise ValueError('확인할 수 없습니다 Codex 공유 액세스 기능 원래의 App 변함없이 남아있다') from exc
 
 
 def launch_environment(home, application):
@@ -261,17 +261,17 @@ def launch_environment(home, application):
     if value is None:
         return {}
     if value['application'] != os.path.normcase(str(Path(application).resolve())):
-        raise ValueError('Codex 程序已变化，请重新初始化共享接入')
+        raise ValueError('Codex 프로그램이 변경되었습니다. 공유 액세스를 다시 초기화하세요.')
     if sys.platform == 'win32':
         launcher = Path(value['launcher'])
         if not launcher.is_file() or launcher.resolve() != Path(sys.executable).resolve():
-            raise ValueError('网关程序已变化，请重新初始化 Codex 原生连接')
+            raise ValueError('게이트웨이 프로그램이 변경되었습니다. 다시 초기화해 주세요. Codex 기본 연결')
         return {'CODEX_CLI_PATH': str(launcher), 'CMB_CODEX_DESKTOP_CONFIGURATION': str(directory(home) / 'settings.json'),
                 'CODEX_APP_SERVER_WS_URL': '', 'CODEX_APP_SERVER_FORCE_CLI': '0'}
     launcher = directory(home) / 'codex-cli'
     info = launcher.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise ValueError('共享接入启动器身份无法确认')
+        raise ValueError('공유 액세스 개시자의 신원을 확인할 수 없습니다.')
     return {'CODEX_CLI_PATH': str(launcher), 'CODEX_APP_SERVER_WS_URL': '',
             'CODEX_APP_SERVER_FORCE_CLI': '0'}
 
@@ -284,7 +284,7 @@ def process_identity(pid):
     from bridge.platforms.macos.force_exit import Native
     value = Native().identity(pid)
     if value['uid'] != os.getuid() or value['ruid'] != os.getuid() or value['zombie']:
-        raise ValueError('共享运行时进程身份无法确认')
+        raise ValueError('공유 런타임 프로세스 ID를 확인할 수 없습니다.')
     return {key: (list(item) if isinstance(item, tuple) else item) for key, item in value.items()}
 
 
@@ -309,7 +309,7 @@ def require_inactive(record):
     """A failed launch is not permission to create an untracked second writer."""
     identity = record.get('runtime')
     if not identity:
-        raise ValueError('原共享运行时启动结果待核对，请在电脑端检查；不会重复启动')
+        raise ValueError('원래 공유 런타임 시작 결과를 확인해야 합니다. 컴퓨터에서 확인하시기 바랍니다. 반복적으로 시작되지 않습니다.')
     if record.get('ready') is True or sys.platform == 'win32':
         alive = runtime_alive(identity)
     else:
@@ -324,7 +324,7 @@ def require_inactive(record):
                      all(current[key] == identity[key]
                          for key in ('pid', 'started', 'uid', 'ruid')))
     if alive:
-        raise ValueError('原共享运行时尚未退出，请稍后重新检查')
+        raise ValueError('원래 공유 런타임이 종료되지 않았습니다. 나중에 다시 확인하세요.')
 
 
 def connect(home, cli):
@@ -368,7 +368,7 @@ def connect(home, cli):
             client.close()
             raise
     except (OSError, KeyError, TypeError, ValueError, AppServerUnavailable) as exc:
-        raise AppServerUnavailable('Codex 原生共享连接尚未就绪，可在账号管理中查看自动准备状态；不会另起运行时重试写入') from exc
+        raise AppServerUnavailable('Codex 기본 공유 연결이 아직 준비되지 않았습니다. 계정 관리에서 자동 준비 상태를 확인할 수 있습니다. 다시 실행할 때 쓰기가 다시 시도되지 않습니다.') from exc
 
 
 def server_arguments(arguments, socket_path):

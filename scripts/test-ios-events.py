@@ -49,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         after = int(query.get('after', ['0'])[0])
         events = [{'id': f'event-{i}', 'sequence': i, 'threadId': 'thread', 'host': 'local',
                    'kind': 'attention' if i == 201 else 'request' if i % 2 == 0 else 'completion',
-                   'title': 'Codex 需要你处理' if i == 201 else '任务提醒', 'body': '消息内容' * 30}
+                   'title': 'Codex 당신이 처리해야' if i == 201 else '작업 알림', 'body': '메시지 내용' * 30}
                   for i in range(max(1, state['cursor'] - 199), state['cursor'] + 1) if i > after]
         summary = [{'provider': 'claude', 'kind': 'request' if state['cursor'] % 2 == 0 else 'completion', 'sequence': state['cursor']}]
         body = json.dumps({'clients': [{'id': 'claude', 'enabled': True, 'unread': state.get('unread', state['cursor'])}], 'summary': summary, 'streamId': state['stream'], 'cursor': state['cursor'], 'events': events, 'enabled': True}, ensure_ascii=False).encode()

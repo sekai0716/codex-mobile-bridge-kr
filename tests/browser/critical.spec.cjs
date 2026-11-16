@@ -27,8 +27,8 @@ test('login status follows language changes without resetting attempts or creden
   await page.locator('#password').fill('synthetic-unsent-password');
   await page.locator('#phone-language').selectOption('en');
   await expect(page.locator('#login-attempts')).toHaveText('Attempts remaining: 3/5; 5 consecutive failures will block this IP.');
-  await page.locator('#phone-language').selectOption('zh');
-  await expect(page.locator('#login-attempts')).toHaveText('剩余尝试次数：3/5；连续输错 5 次将封禁此 IP。');
+  await page.locator('#phone-language').selectOption('ko');
+  await expect(page.locator('#login-attempts')).toHaveText('남은 시도 횟수:3/5; 5회 연속 실패하면 이 IP가 차단됩니다.');
   // Native/shared language changes also use the public language event.
   await page.evaluate(() => BridgeI18n.setLanguage('en'));
   await expect(page.locator('#login-attempts')).toHaveText('Attempts remaining: 3/5; 5 consecutive failures will block this IP.');
@@ -36,8 +36,8 @@ test('login status follows language changes without resetting attempts or creden
   await expect(page.locator('#login-button')).toBeEnabled();
   await page.evaluate(() => renderLoginStatus({attemptsRemaining: 0, attemptLimit: 5, blocked: true}));
   await expect(page.locator('#login-attempts')).toHaveText( 'This IP is blocked. Unblock it under Login devices in the desktop gateway app.');
-  await page.locator('#phone-language').selectOption('zh');
-  await expect(page.locator('#login-attempts')).toHaveText('此 IP 已被封禁，请在电脑网关 App 的“登录设备”中解除。');
+  await page.locator('#phone-language').selectOption('ko');
+  await expect(page.locator('#login-attempts')).toHaveText('이 IP는 차단되었습니다. 데스크톱 게이트웨이 앱의 로그인 장치에서 차단을 해제하세요.');
   await expect(page.locator('#login-button')).toBeDisabled();
 });
 
@@ -46,7 +46,7 @@ test('shared composer preserves complete loading and unsupported slots', async (
   await page.evaluate(readFileSync(path.join(__dirname,'shared-composer-loading.browser.js'),'utf8'));
   for(const width of [320,350,390,1280]){
     await page.setViewportSize({width,height:844});
-    for(const language of ['zh','en']){
+    for(const language of ['ko','en']){
       await page.evaluate(language=>BridgeI18n.setLanguage(language),language);
       const result=await page.evaluate(()=>runSharedComposerLoadingChecks());
       expect(result.requests).toBe(0);expect(result.checks).toBeGreaterThan(80);
@@ -60,7 +60,7 @@ test('Codex main composer columns and mixed capability states remain distinct', 
   await page.evaluate(readFileSync(path.join(__dirname,'shared-composer-loading.browser.js'),'utf8'));
   for(const width of [320,390]){
     await page.setViewportSize({width,height:844});
-    for(const language of ['zh','en']){
+    for(const language of ['ko','en']){
       await page.evaluate(language=>BridgeI18n.setLanguage(language),language);
       const result=await page.evaluate(()=>runComposerReviewRegressionChecks());
       expect(result.requests).toBe(0);expect(result.checks).toBe(18);
@@ -74,7 +74,7 @@ test('CLI network panel keeps waiting, explicit force and saved-state recovery v
   await page.evaluate(readFileSync(path.join(__dirname,'cli-network.browser.js'),'utf8'));
   for(const width of [390,1280]){
     await page.setViewportSize({width,height:844});
-    for(const language of ['zh','en']){
+    for(const language of ['ko','en']){
       await page.evaluate(language=>BridgeI18n.setLanguage(language),language);
       const result=await page.evaluate(()=>runCliNetworkPanelChecks());
       expect(result.forceRequests).toBe(1);expect(result.modelRequests).toBe(0);expect(result.checks).toBeGreaterThan(30);
@@ -88,7 +88,7 @@ test('CLI release panel separates Agent host and home while retaining operation 
   await page.evaluate(readFileSync(path.join(__dirname,'cli-release.browser.js'),'utf8'));
   for(const width of [320,390,1280]){
     await page.setViewportSize({width,height:844});
-    for(const language of ['zh','en']){
+    for(const language of ['ko','en']){
       await page.evaluate(language=>BridgeI18n.setLanguage(language),language);
       const result=await page.evaluate(()=>runCliReleaseChecks());
       expect(result.modelRequests).toBe(0);expect(result.passed).toBeGreaterThan(35);
@@ -103,18 +103,18 @@ test('image preview has one header row and a bottom save icon', async ({page}, t
     await ready(page);
     await page.evaluate(()=>BridgeFeatures.load('chat'));
     await page.evaluate(readFileSync(path.join(__dirname,'image-save.browser.js'),'utf8'));
-    for (const language of ['zh','en']) {
+    for (const language of ['ko','en']) {
       await page.evaluate(language=>BridgeI18n.setLanguage(language),language);
       expect((await page.evaluate(()=>runImageSaveChecks())).passed).toBe(47);
     }
   }
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>{
-    BridgeI18n.setLanguage('zh');
+    BridgeI18n.setLanguage('ko');
     BridgeImageViewer.configureComposer({scope:()=> 'fixture',canReuse:()=>true,add:()=>true});
     const button=document.createElement('button');document.body.append(button);
     button.dataset.imagePreview='/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/uploads/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/preview';
-    button.dataset.imageName='Screenshot_2026-11-01_很长的原始图片文件名.png';button.click();
+    button.dataset.imageName='Screenshot_2026-11-01_매우 긴 원본 이미지 파일 이름.png';button.click();
   });
   await testInfo.attach('image-toolbar',{body:await page.screenshot(),contentType:'image/png'});
 });
@@ -151,7 +151,7 @@ test('code syntax labels, safe highlighting, exact copy and shared lazy loading'
     const plain=document.createElement('div');host.append(plain);renderMarkdown(plain,'```\nabc\n```\n\n```unknown\n<script>literal</script>\n```');
     return [...plain.querySelectorAll('.code-language')].map(node=>node.textContent);
   });
-  expect(before).toEqual(['纯文本','纯文本']);expect(requests).toHaveLength(0);
+  expect(before).toEqual(['일반 텍스트','일반 텍스트']);expect(requests).toHaveLength(0);
   const result=await page.evaluate(async()=>{
     const host=document.getElementById('syntax-test'),node=document.createElement('div');host.append(node);
     const source='from copy import deepcopy\na = "abc"\nprint(deepcopy(a))\n';
@@ -343,7 +343,7 @@ for (const provider of ['claude', 'deepseek']) {
   test(provider + ' project dialog and directory isolation', async ({page}) => {
     await ready(page);
     await page.addScriptTag({url: '/__browser/project-creation.browser.js'});
-    const result = await page.evaluate(provider => runProjectCreationBrowserChecks({provider, language: 'zh'}), provider);
+    const result = await page.evaluate(provider => runProjectCreationBrowserChecks({provider, language: 'ko'}), provider);
     expect(result.passed).toBeGreaterThan(0);
   });
 }
@@ -369,7 +369,7 @@ for(const provider of ['Codex','Claude','DSH']){
   await ready(page,'session-menu');
   await expect(page.locator('#login')).toBeHidden();
   await page.locator('#client-switch').getByRole('button',{name:provider,exact:true}).click();
-  const row=page.locator('.session:visible').filter({hasText:provider+' · 页面交互验证'}).first();
+  const row=page.locator('.session:visible').filter({hasText:provider+' · 페이지 대화형 검증'}).first();
   await expect(row).toBeVisible();
   const listIdentity=await row.getAttribute('data-id');
   const openMenu=async()=>{
@@ -387,34 +387,34 @@ for(const provider of ['Codex','Claude','DSH']){
    await expect(box).toBeVisible();
    await expect(page.locator('#app')).not.toHaveClass(/chat-open/);
    await expect(row).toHaveAttribute('data-id',listIdentity);
-   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
-   await expect(box.getByRole('button',{name:'聊天通知设置',exact:true})).toBeVisible();
-   await expect(box.getByRole('button',{name:'项目',exact:true})).toHaveCount(1);
-   await expect(box.getByRole('button',{name:'分区',exact:true})).toHaveCount(1);
+   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
+   await expect(box.getByRole('button',{name:'채팅 알림 설정',exact:true})).toBeVisible();
+   await expect(box.getByRole('button',{name:'프로젝트 목록',exact:true})).toHaveCount(1);
+   await expect(box.getByRole('button',{name:'부분',exact:true})).toHaveCount(1);
    await box.evaluate(node=>Promise.all(node.getAnimations().map(a=>a.finished)));
    await page.screenshot({path:testInfo.outputPath(provider+'-'+theme+'-list.png')});
-   await box.getByRole('button',{name:'会话详情',exact:true}).click();
+   await box.getByRole('button',{name:'채팅 세부정보',exact:true}).click();
    await page.keyboard.press('Escape');
-   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
+   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
    await expect(page.locator('#app')).not.toHaveClass(/chat-open/);
    await page.keyboard.press('Escape');await expect(box).toHaveCount(0);
    await openMenu();
-   await box.getByRole('button',{name:'修改聊天名称',exact:true}).click();
-   await expect(box.getByRole('textbox',{name:'聊天名称',exact:true})).toHaveValue(provider+' · 页面交互验证');
-   await box.getByRole('textbox',{name:'聊天名称',exact:true}).fill('返回不保存这个名称');
+   await box.getByRole('button',{name:'채팅 이름 바꾸기',exact:true}).click();
+   await expect(box.getByRole('textbox',{name:'채팅 이름',exact:true})).toHaveValue(provider+' · 페이지 대화형 검증');
+   await box.getByRole('textbox',{name:'채팅 이름',exact:true}).fill('이 이름을 저장하지 않고 돌아가기');
    await box.dispatchEvent('cancel',{cancelable:true});
-   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
-   for(const label of ['项目','分区']){
+   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
+   for(const label of ['프로젝트 목록','부분']){
     await box.getByRole('button',{name:label,exact:true}).click();
-    await expect(box.getByRole('button',{name:'示例'+label,exact:true})).toBeVisible();
-    const local=provider==='Claude'||provider==='DSH'&&label==='分区';
-    await expect(box.getByText('仅在 Bridge 中生效',{exact:true})).toHaveCount(local?1:0);
-    await expect(box.getByRole('textbox',{name:label==='项目'?'新项目名称':'新分区名称',exact:true})).toHaveCount(local?1:0);
-    await box.getByRole('button',{name:'返回会话菜单',exact:true}).click();
-    await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
+    await expect(box.getByRole('button',{name:'예'+label,exact:true})).toBeVisible();
+    const local=provider==='Claude'||provider==='DSH'&&label==='부분';
+    await expect(box.getByText('Bridge에만 적용됩니다.',{exact:true})).toHaveCount(local?1:0);
+    await expect(box.getByRole('textbox',{name:label==='프로젝트 목록'?'새 프로젝트 이름':'새 섹션 이름',exact:true})).toHaveCount(local?1:0);
+    await box.getByRole('button',{name:'채팅 메뉴로 돌아가기',exact:true}).click();
+    await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
    }
-   await box.getByRole('button',{name:'停止任务并归档…',exact:true}).click();
-   const confirm=box.getByRole('button',{name:'确认归档',exact:true}),cancel=box.getByRole('button',{name:'取消',exact:true});
+   await box.getByRole('button',{name:'중지하고 보관처리하세요…',exact:true}).click();
+   const confirm=box.getByRole('button',{name:'아카이브 확인',exact:true}),cancel=box.getByRole('button',{name:'취소',exact:true});
    await expect(cancel).toBeFocused();
    const left=await confirm.boundingBox(),right=await cancel.boundingBox();
    expect(left.x).toBeLessThan(right.x);expect(Math.abs(left.width-right.width)).toBeLessThan(1);expect(left.height).toBe(right.height);
@@ -422,10 +422,10 @@ for(const provider of ['Codex','Claude','DSH']){
    expect(styles[0]).toEqual(styles[1]);
    await page.screenshot({path:testInfo.outputPath(provider+'-'+theme+'-list-confirm.png')});
    await cancel.click();
-   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
-   await box.getByRole('button',{name:'停止任务并归档…',exact:true}).click();
+   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
+   await box.getByRole('button',{name:'중지하고 보관처리하세요…',exact:true}).click();
    await box.dispatchEvent('cancel',{cancelable:true});
-   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 页面交互验证');
+   await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
    if(page.viewportSize().width<=640){
     const handle=box.locator('.sm-handle');
     await handle.dispatchEvent('pointerdown',{pointerType:'touch',pointerId:8,button:0,clientX:100,clientY:100});
@@ -460,15 +460,15 @@ test('SSH retry lives in accounts and preserves other controls',async({page},tes
     accountsPanel.accept(value);document.getElementById('accounts-dialog').showModal();
   });
   const dialog=page.locator('#accounts-dialog');
-  const retry=dialog.getByRole('button',{name:'重试 SSH 连接',exact:true});
+  const retry=dialog.getByRole('button',{name:'SSH 연결 재시도',exact:true});
   await expect(retry).toBeEnabled();
   await expect(dialog.getByText('Offline SSH',{exact:true})).toBeVisible();
-  await expect(dialog.getByText(/下次自动重试/)).toBeVisible();
+  await expect(dialog.getByText(/다음 자동 재시도:/)).toBeVisible();
   await retry.scrollIntoViewIfNeeded();
   await page.screenshot({path:testInfo.outputPath('ssh-accounts-retry.png')});
   await retry.click();await expect(retry).toBeDisabled();
   expect(await page.evaluate(()=>window.__sshRetryCalls)).toEqual([{action:'retrySsh',host:'remote:fixture'}]);
-  await expect(dialog.getByRole('button',{name:'刷新',exact:true})).toBeEnabled();
+  await expect(dialog.getByRole('button',{name:'새로고침',exact:true})).toBeEnabled();
 });
 
 test('reset outlook is opt-in and fits both themes',async({page},testInfo)=>{
@@ -481,21 +481,21 @@ test('reset outlook is opt-in and fits both themes',async({page},testInfo)=>{
     accountsPanel.accept(value);
     document.getElementById('accounts-dialog').showModal();
   });
-  await expect(page.locator('label:has(#appearance-reset-dynamic)')).toHaveText('Codex官方重置动态');
+  await expect(page.locator('label:has(#appearance-reset-dynamic)')).toHaveText('Codex 공식 재설정 업데이트');
   const card=page.locator('.accounts-global-reset');
   for(const theme of ['light','dark']){
     await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
     await expect(card).toBeVisible();
-    await expect(card).toContainText('第三方统计与预测');
+    await expect(card).toContainText('제3자 통계 및 예측');
     await expect(card).toContainText('24%');
     await expect(card).toContainText('48%');
-    await expect(card.getByRole('button',{name:'开启重置动态提醒'})).toHaveAttribute('aria-pressed','false');
-    await expect(card.locator('.accounts-global-reminder')).toHaveText('提醒已关闭');
-    await card.getByRole('button',{name:'开启重置动态提醒'}).click();
-    await expect(card.locator('.accounts-global-reminder')).toHaveText('提醒已开启');
-    await expect(card.getByRole('button',{name:'关闭重置动态提醒'})).toHaveAttribute('aria-pressed','true');
-    await card.getByRole('button',{name:'关闭重置动态提醒'}).click();
-    await expect(card.locator('.accounts-global-reminder')).toHaveText('提醒已关闭');
+    await expect(card.getByRole('button',{name:'업데이트 알림 재설정 활성화'})).toHaveAttribute('aria-pressed','false');
+    await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 꺼짐');
+    await card.getByRole('button',{name:'업데이트 알림 재설정 활성화'}).click();
+    await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 켜짐');
+    await expect(card.getByRole('button',{name:'업데이트 알림 재설정 비활성화'})).toHaveAttribute('aria-pressed','true');
+    await card.getByRole('button',{name:'업데이트 알림 재설정 비활성화'}).click();
+    await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 꺼짐');
     const bounds=await card.boundingBox();
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x+bounds.width).toBeLessThanOrEqual(page.viewportSize().width);
@@ -511,7 +511,7 @@ test('reset outlook is opt-in and fits both themes',async({page},testInfo)=>{
   expect(alignment.length).toBeGreaterThan(0);
   for(const row of alignment){expect(row.normal).toBeLessThanOrEqual(1);expect(row.wrapped).toBeLessThanOrEqual(1);}
   await page.evaluate(()=>accountsPanel.accept({...accountsPanel.value,globalReset:{...accountsPanel.value.globalReset,state:'error',stale:true}}));
-  await expect(card).toContainText('数据延迟');
+  await expect(card).toContainText('데이터 지연');
   await expect(card.locator('.accounts-global-odds')).toHaveCount(0);
   await page.evaluate(()=>accountsPanel.accept({...accountsPanel.value,resetDynamicEnabled:false,globalReset:null}));
   await expect(card).toBeHidden();
@@ -542,10 +542,10 @@ test('Codex project trust cancellation prevents creation and confirmation stays 
    let pending=form.onsubmit({preventDefault(){}});await tick();
    let trust=[...document.querySelectorAll('dialog[open]')].find(d=>d!==dialog);
    if(!trust?.textContent.includes('/synthetic/project')||!trust.textContent.includes('SSH fixture'))throw Error('Missing exact consent target');
-   [...trust.querySelectorAll('button')].find(b=>b.textContent==='取消').click();await pending;
+   [...trust.querySelectorAll('button')].find(b=>b.textContent==='취소').click();await pending;
    const cancelled=calls.length===1&&!confirmed&&$('new-chat-title').value==='Synthetic';
    calls.length=0;pending=form.onsubmit({preventDefault(){}});await tick();trust=[...document.querySelectorAll('dialog[open]')].find(d=>d!==dialog);
-   [...trust.querySelectorAll('button')].find(b=>b.textContent==='确认信任').click();await pending;
+   [...trust.querySelectorAll('button')].find(b=>b.textContent==='신뢰 확인').click();await pending;
    return {cancelled,calls,confirmed};
   }finally{api=oldApi;dialog.close();sessionStorage.removeItem('new-chat-attempt');}
  });
@@ -611,9 +611,9 @@ test('independent Codex list and project picker stay in the selected configurati
 test('restored independent Codex selection creates in its own configuration',async({page})=>{
  const entry='codex:'+'a'.repeat(32),reads=[];
  await page.addInitScript(value=>localStorage.setItem('bridge-client',value),entry);
- await page.route('**/api/clients',route=>route.fulfill({json:{clients:[{id:'codex',name:'Codex',enabled:true},{id:entry,name:'工作 Codex',kind:'codex-local',enabled:true,capabilities:{create:true,accounts:true}}]}}));
- await page.route('**/api/projects*',route=>{reads.push(new URL(route.request().url()).searchParams.get('entry'));return route.fulfill({json:{projects:[{key:'cli|'+entry+'|fixture',name:'独立项目',cwd:'/fixture',host:entry,type:'cli'}],environments:[{key:'cli|'+entry,type:'cli',host:entry,name:'工作 Codex'}]}});});
- await ready(page,'session-menu');await expect(page.locator('.client-picker')).toContainText('工作 Codex');
+ await page.route('**/api/clients',route=>route.fulfill({json:{clients:[{id:'codex',name:'Codex',enabled:true},{id:entry,name:'일하다 Codex',kind:'codex-local',enabled:true,capabilities:{create:true,accounts:true}}]}}));
+ await page.route('**/api/projects*',route=>{reads.push(new URL(route.request().url()).searchParams.get('entry'));return route.fulfill({json:{projects:[{key:'cli|'+entry+'|fixture',name:'독립 프로젝트',cwd:'/fixture',host:entry,type:'cli'}],environments:[{key:'cli|'+entry,type:'cli',host:entry,name:'일하다 Codex'}]}});});
+ await ready(page,'session-menu');await expect(page.locator('.client-picker')).toContainText('일하다 Codex');
  await page.locator('#new-chat').click();await expect(page.locator('#new-chat-submit')).toBeEnabled();
  expect(reads).toEqual([entry]);await expect(page.locator('#new-chat-type')).toHaveValue('cli');await expect(page.locator('#new-chat-type')).toBeDisabled();
  expect(await page.evaluate(()=>newChatEnvironment().host)).toBe(entry);
@@ -624,13 +624,13 @@ test('independent Codex clients have separate navigation and account scopes',asy
  const result=await page.evaluate(async()=>{
   const entry='codex:'+'a'.repeat(32),original=api,calls=[];
   try{
-   api=async(url,body)=>{calls.push({url,write:!!body});if(url.startsWith('/api/accounts'))return {scope:'profile',scopeLabel:'工作 Codex',current:{kind:'api',name:'独立 API'},accounts:[],switch:{phase:'idle'},management:{external:false},reminders:{},canSwitch:true,canManageDesktop:false};return {sessions:[],complete:true};};
-   clientNavigation.applyClients({clients:[{id:'codex',name:'Codex',enabled:true,entries:[{id:'desktop',name:'Codex',enabled:true}]},{id:entry,name:'工作 Codex',kind:'codex-local',enabled:true,capabilities:{create:true,accounts:true}}]});
+   api=async(url,body)=>{calls.push({url,write:!!body});if(url.startsWith('/api/accounts'))return {scope:'profile',scopeLabel:'일하다 Codex',current:{kind:'api',name:'독립적인 API'},accounts:[],switch:{phase:'idle'},management:{external:false},reminders:{},canSwitch:true,canManageDesktop:false};return {sessions:[],complete:true};};
+   clientNavigation.applyClients({clients:[{id:'codex',name:'Codex',enabled:true,entries:[{id:'desktop',name:'Codex',enabled:true}]},{id:entry,name:'일하다 Codex',kind:'codex-local',enabled:true,capabilities:{create:true,accounts:true}}]});
    await clientNavigation.choose(entry);await openCurrentAccounts();await accountsPanel.refresh();
    return {selected:clientNavigation.activeClient(),buttons:[...document.querySelectorAll('.client-switch button')].map(b=>({text:b.textContent,selected:b.classList.contains('selected')})),entry:codexAccountEntry,selectorHidden:!accountEntryControls||accountEntryControls.hidden,calls,refreshHidden:accountsPanel.refreshButton.hidden,updateHidden:accountsPanel.updates.hidden};
   }finally{api=original;}
  });
- expect(result.buttons).toEqual([{text:'Codex',selected:false},{text:'工作 Codex',selected:true}]);
+ expect(result.buttons).toEqual([{text:'Codex',selected:false},{text:'일하다 Codex',selected:true}]);
  expect(result.selected).toBe(result.entry);expect(result.selectorHidden).toBe(true);expect(result.refreshHidden).toBe(false);expect(result.updateHidden).toBe(true);
  expect(result.calls.filter(x=>x.url.startsWith('/api/accounts')).every(x=>x.url.includes(encodeURIComponent(result.entry)))).toBe(true);
  await info.attach('independent-codex-accounts',{body:await page.screenshot(),contentType:'image/png'});
@@ -638,12 +638,12 @@ test('independent Codex clients have separate navigation and account scopes',asy
 
 test('shared client shell preserves navigation scroll and switches exact instances from its heading',async({page},info)=>{
  const entry='codex:'+'a'.repeat(32),other='codex:'+'b'.repeat(32),reads=[];
- const clients=[{id:'codex',name:'Codex'}, {id:'claude',name:'Claude'}, {id:'deepseek',name:'DSH'}, {id:'zcode',name:'ZCode'}, {id:entry,name:'工作 Codex'}, {id:other,name:'个人 Codex'}].map(row=>({...row,enabled:true,configured:true,connected:true,capabilities:{accounts:true,create:true}}));
+ const clients=[{id:'codex',name:'Codex'}, {id:'claude',name:'Claude'}, {id:'deepseek',name:'DSH'}, {id:'zcode',name:'ZCode'}, {id:entry,name:'일하다 Codex'}, {id:other,name:'개인의 Codex'}].map(row=>({...row,enabled:true,configured:true,connected:true,capabilities:{accounts:true,create:true}}));
  await page.route('**/api/clients',route=>route.fulfill({json:{clients}}));
  await page.route('**/api/sessions?*',route=>{reads.push(new URL(route.request().url()).searchParams.get('host'));return route.fulfill({json:{sessions:[],remoteHosts:[],availableSources:[],complete:true}});});
  await ready(page,'session-menu');
  await expect(page.locator('.client-switch button')).toHaveCount(6);
- await expect(page.locator('.client-picker')).not.toContainText('聊天');
+ await expect(page.locator('.client-picker')).not.toContainText('채팅');
  const aligned=await page.locator('.client-picker').evaluate(node=>{const icon=node.querySelector('.client-icon').getBoundingClientRect(),name=node.querySelector('.client-badge-name').getBoundingClientRect();return Math.abs(icon.top+icon.height/2-name.top-name.height/2)<1;});expect(aligned).toBe(true);
  await info.attach('client-header',{body:await page.locator('.list-heading').screenshot(),contentType:'image/png'});
  await page.locator('.client-switch').hover();await page.mouse.wheel(140,0);
@@ -683,7 +683,7 @@ test('shared client shell preserves navigation scroll and switches exact instanc
 
 test('every desktop client uses the shared next-level management shell',async({page},info)=>{
  const root=path.resolve(__dirname,'../..');
- const clients=[{id:'codex',name:'Codex'},{id:'claude',name:'Claude'},{id:'deepseek',name:'DSH'},{id:'zcode',name:'ZCode',configurationNotice:'原 App 账号',capabilities:{accounts:true}}, {id:'codex:'+'a'.repeat(32),name:'工作 Codex',kind:'codex-local'}, {id:'wsl:'+'b'.repeat(32),name:'Ubuntu Codex',kind:'wsl-cli'}].map(c=>({...c,enabled:true,configured:true,installed:true,connected:true}));
+ const clients=[{id:'codex',name:'Codex'},{id:'claude',name:'Claude'},{id:'deepseek',name:'DSH'},{id:'zcode',name:'ZCode',configurationNotice:'기존 App 계정',capabilities:{accounts:true}}, {id:'codex:'+'a'.repeat(32),name:'일하다 Codex',kind:'codex-local'}, {id:'wsl:'+'b'.repeat(32),name:'Ubuntu Codex',kind:'wsl-cli'}].map(c=>({...c,enabled:true,configured:true,installed:true,connected:true}));
  const bootstrap=`window.testCalls=[];window.bridgeDesktop={};window.loadWslAccounts=async()=>{};
  window.testPanel=new DesktopConnectionsPanel({root:document.getElementById('desktop-connections'),feedback:message=>{throw Error(message)},api:{desktopSessions:async body=>{testCalls.push(body);return {accounts:[],activeIds:[],capabilities:{quota:false}}},cliAccess:async body=>{testCalls.push(body);return {provider:body.provider,entry:body.entry,available:true,accounts:[],capabilities:{}}}}});
  testPanel.clients=${JSON.stringify(clients)};testPanel.renderClients();document.querySelectorAll('[data-panel]').forEach(node=>node.hidden=!['accounts','account','desktop-sessions','harness'].includes(node.dataset.panel));GatewayLayout.tab('accounts');`;
@@ -696,7 +696,7 @@ test('every desktop client uses the shared next-level management shell',async({p
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.setViewportSize({width:1200,height:950});await page.goto('/desktop/index.html');
  for(const client of clients){
-  await page.locator('[data-client-id="'+client.id+'"] button').filter({hasText:/^管理$/}).click();
+  await page.locator('[data-client-id="'+client.id+'"] button').filter({hasText:/^관리$/}).click();
   await expect(page.locator('#clients-page')).toBeHidden();await expect(page.locator('.client-config-back')).toBeInViewport();
   const section=client.kind==='codex-local'?'codex':client.id;
   await expect(page.locator('[data-client-config="'+section+'"]:visible').first()).toBeVisible();
@@ -722,7 +722,7 @@ test('shared native API editors keep production form layout and synthetic model 
       const panel=provider==='codex'?new CliAccessPanel({root,provider,formOnly:true,read:async()=>state,request}):new DesktopClientAccountsPanel({root,provider,desktop:true,read:async()=>state,request,visible:()=>false});
       if(provider==='codex')await panel.refresh();else{panel.accept(state);panel.addApiButton.click();}
       const editor=provider==='codex'?panel:panel.apiEditor;
-      editor.name.input.value='独立测试 API';editor.baseUrl.input.value='https://synthetic.invalid/v1';editor.key.input.value='synthetic-key';
+      editor.name.input.value='독립적인 테스트 API';editor.baseUrl.input.value='https://synthetic.invalid/v1';editor.key.input.value='synthetic-key';
       editor.fetchModels.click();const end=performance.now()+1500;while(editor.draftLoading){if(performance.now()>end)throw Error('Synthetic discovery timed out');await new Promise(resolve=>setTimeout(resolve,10));}
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       const controls=[...editor.form.querySelectorAll('input,select,textarea,button')].filter(n=>n.getClientRects().length),box=dialog.getBoundingClientRect();
@@ -748,12 +748,12 @@ test('native saved and connected composer keeps production control geometry and 
     document.getElementById('login').hidden=true;
     const root=document.createElement('div');root.className='app';root.id='composer-layout-test';root.style.cssText='position:fixed;inset:0;background:var(--page);z-index:10';document.body.append(root);
     const select=document.createElement('select');for(const id of ['codex','zcode'])select.add(new Option(id,id));
-    const session={id:'sess_fixture',title:'ZCode 连接状态布局验收',cwd:'/fixture',model:'account:zai-start-plan/GLM-5.3-Flash$low',modelDisplayName:'GLM-5.3-Flash',effort:'low',composerCapabilities:{models:true,skills:true,permissions:true,attachments:true,plan:true,goal:true}};
-    const history={session:{...session,status:'unknown',readOnly:true,connectionState:'detached'},readOnly:true,capabilities:{send:false,resume:true,plan:false,goal:false},messages:Array.from({length:20},(_,i)=>({id:'reply-'+i,role:'assistant',text:'仅供布局验证的历史消息 '+i+'。保留阅读位置与上传附件。'}))};
-    const live={session:{...session,status:'idle',runtimeKnown:true,connectionState:'ready',permissionMode:'build',permissionLabel:'变更前确认'},capabilities:{send:true,models:true,skills:true,permissions:true,attachments:true,uploadFiles:true,plan:true,goal:true},messages:history.messages};
+    const session={id:'sess_fixture',title:'ZCode 연결 상태 레이아웃 승인',cwd:'/fixture',model:'account:zai-start-plan/GLM-5.3-Flash$low',modelDisplayName:'GLM-5.3-Flash',effort:'low',composerCapabilities:{models:true,skills:true,permissions:true,attachments:true,plan:true,goal:true}};
+    const history={session:{...session,status:'unknown',readOnly:true,connectionState:'detached'},readOnly:true,capabilities:{send:false,resume:true,plan:false,goal:false},messages:Array.from({length:20},(_,i)=>({id:'reply-'+i,role:'assistant',text:'레이아웃 확인 전용 기록 메시지 '+i+'。계속해서 위치를 읽고 첨부파일을 업로드하세요。'}))};
+    const live={session:{...session,status:'idle',runtimeKnown:true,connectionState:'ready',permissionMode:'build',permissionLabel:'변경 전 확인'},capabilities:{send:true,models:true,skills:true,permissions:true,attachments:true,uploadFiles:true,plan:true,goal:true},messages:history.messages};
     const view=new DesktopSessionsView({root,select,notify(){},onSelect(){},csrf:()=>'',onUnauthorized(){},request:async(url,body)=>{if(body)throw Error('Unexpected write');return url.includes('/detail')?history:url.includes('/workspace')?{entries:[],project:'/fixture'}:{sessions:[session]};}});
     view.setClientStates([{id:'zcode',enabled:true,connected:true,historyAvailable:true}]);await view.choose('zcode');await view.open(session.id);clearTimeout(view.timer);
-    view.input.value='保留这份尚未发送的草稿';view.attachments.rows.push({id:'fixture-upload',name:'notes.txt',size:20,status:'ready'});view.attachments.render();view.messages.scrollTop=120;view.rememberReading();
+    view.input.value='이 초안을 보내지 않은 상태로 유지';view.attachments.rows.push({id:'fixture-upload',name:'notes.txt',size:20,status:'ready'});view.attachments.render();view.messages.scrollTop=120;view.rememberReading();
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const items=[view.modelButton,view.skillsButton,view.permissionsButton,view.contextButton,view.composerToggle,view.attachButton,view.mode,view.workMode,view.send];
     const measure=()=>items.map(node=>{const b=node.getBoundingClientRect();return {left:b.left,top:b.top,width:b.width,height:b.height,hidden:node.hidden};});
@@ -763,7 +763,7 @@ test('native saved and connected composer keeps production control geometry and 
   expect(before.disabled).toBe(true);expect(before.text).toBe('GLM-5.3-Flash');expect(before.modelLabelWidth).toBeGreaterThanOrEqual(50);expect(before.rects.every(r=>!r.hidden&&r.width>10)).toBe(true);
   await testInfo.attach('composer-before',{body:await page.locator('#composer-layout-test .ds-composer').screenshot(),contentType:'image/png'});
   const after=await page.evaluate(async()=>{const f=__composerLayout;f.view.applyDetail(f.live);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {rects:f.measure(),draft:f.view.input.value,attachments:f.view.attachments.rows.map(row=>row.id),sameMessage:f.view.messageList.firstElementChild===f.first,scroll:f.view.messages.scrollTop,canSend:!f.view.send.disabled,formFits:f.view.form.scrollWidth<=f.view.form.clientWidth+1};});
-  expect(after.canSend).toBe(true);expect(after.draft).toBe('保留这份尚未发送的草稿');expect(after.attachments).toEqual(['fixture-upload']);expect(after.sameMessage).toBe(true);expect(Math.abs(after.scroll-before.scroll)).toBeLessThanOrEqual(1);
+  expect(after.canSend).toBe(true);expect(after.draft).toBe('이 초안을 보내지 않은 상태로 유지');expect(after.attachments).toEqual(['fixture-upload']);expect(after.sameMessage).toBe(true);expect(Math.abs(after.scroll-before.scroll)).toBeLessThanOrEqual(1);
   for(let i=0;i<after.rects.length;i++)for(const key of ['left','top','width','height'])expect(Math.abs(after.rects[i][key]-before.rects[i][key]),'control '+i+' '+key).toBeLessThanOrEqual(1);
   const width=testInfo.project.use.viewport.width;expect(after.formFits).toBe(true);expect(after.rects.slice(6).every(r=>r.left>=0&&r.left+r.width<=width+1)).toBe(true);
   await testInfo.attach('composer-after',{body:await page.locator('#composer-layout-test .ds-composer').screenshot(),contentType:'image/png'});
@@ -778,7 +778,7 @@ test('shared native API save actions match Codex and remain reachable by dialog 
       const dialog=document.createElement('dialog');dialog.className='picker';dialog.id='native-api-footer';const root=document.createElement('div');dialog.append(root);document.body.append(dialog);dialog.showModal();
       const value={accounts:[],activeIds:[],canSwitch:true,capabilities:{quota:false,addApi:true,...provider==='zcode'?{apiFormats:[{value:'openai-responses',label:'OpenAI Responses'}]}:{}}};
       const panel=new DesktopClientAccountsPanel({root,provider,desktop:true,visible:()=>false,read:async()=>value,request:async()=>{throw Error('No API request expected');}});
-      panel.accept(value);panel.addApiButton.click();panel.editName.input.value='独立测试 API';panel.editUrl.input.value='https://synthetic.invalid/v1';panel.editKey.input.value='synthetic-key';panel.editModels.input.value='fixture-model';
+      panel.accept(value);panel.addApiButton.click();panel.editName.input.value='독립적인 테스트 API';panel.editUrl.input.value='https://synthetic.invalid/v1';panel.editKey.input.value='synthetic-key';panel.editModels.input.value='fixture-model';
       panel.editSubmit.scrollIntoView({block:'end'});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       const box=dialog.getBoundingClientRect(),save=panel.editSubmit.getBoundingClientRect(),cancel=panel.editCancel.getBoundingClientRect();
       const style=getComputedStyle(panel.editSubmit),baseline=getComputedStyle(codexCliAccessPanel.save);globalThis.__nativeApiFooter={dialog,panel};return {primaryMatches:['backgroundColor','borderTopColor','color','fontWeight'].every(key=>style[key]===baseline[key]),scrollable:dialog.scrollHeight>dialog.clientHeight,visible:save.width>30&&save.top>=box.top&&save.bottom<=box.bottom+1&&save.left>=box.left&&save.right<=box.right,oneRow:Math.abs(save.top-cancel.top)<1};
@@ -790,27 +790,27 @@ test('shared native API save actions match Codex and remain reachable by dialog 
 });
 
 test('inline account connection methods confirm switches and keep normal lists quiet',async({page},testInfo)=>{
- const modes=[{id:'private-pipe',label:'本机连接',description:'从网关启动 ZCode，沿用原 App 的账号和项目。',configured:true,available:true},{id:'official-remote',label:'官方远控',description:'使用原 App 的同一官方账号；会话经过官方中继。',configured:true,available:true}];
+ const modes=[{id:'private-pipe',label:'로컬 연결',description:'게이트웨이에서 시작 ZCode，원본을 사용하세요 App 계정 및 프로젝트。',configured:true,available:true},{id:'official-remote',label:'공식 원격 연결',description:'원본을 사용하세요 App 동일한 공식 계정; 해당 대화는 공식 중계를 통해 이루어졌습니다.。',configured:true,available:true}];
  let client={id:'zcode',name:'ZCode',enabled:true,configured:true,installed:true,connected:true,running:true,historyAvailable:true,connectionMode:'private-pipe',connectionModes:modes,capabilities:{accounts:true,create:true}},writes=[];
  const clients=()=>[{id:'codex',name:'Codex',enabled:true,configured:true,connected:true},client];
  await page.route('**/api/clients',route=>{if(route.request().method()==='POST'){const body=route.request().postDataJSON();writes.push(body);client={...client,connectionMode:body.connectionMode};}return route.fulfill({json:{clients:clients(),gatewayRunning:true}});});
- await page.route('**/api/desktop-sessions/zcode/list',route=>route.fulfill({json:{sessions:[{id:'sess_fixture',title:'独立布局验收聊天',cwd:'/fixture',backend:'desktop'}],connected:false,readOnly:true,sessionAccess:true}}));
- await page.route('**/api/desktop-sessions/zcode/accounts',route=>route.fulfill({json:{accounts:[],activeIds:[],current:{name:'官方账号'},capabilities:{quota:false,addApi:false}}}));
+ await page.route('**/api/desktop-sessions/zcode/list',route=>route.fulfill({json:{sessions:[{id:'sess_fixture',title:'독립적인 레이아웃 승인 채팅',cwd:'/fixture',backend:'desktop'}],connected:false,readOnly:true,sessionAccess:true}}));
+ await page.route('**/api/desktop-sessions/zcode/accounts',route=>route.fulfill({json:{accounts:[],activeIds:[],current:{name:'공식 계정'},capabilities:{quota:false,addApi:false}}}));
  await ready(page,'session-menu');await page.evaluate(()=>clientNavigation.choose('zcode'));
  await expect(page.locator('.ds-list-status')).toHaveText('');await expect(page.locator('.ds-list-status')).toBeHidden();
  await page.locator('#accounts-button').click();
  const options=page.locator('.accounts-management-action .client-connection-options'),local=options.locator('[data-connection-mode="private-pipe"]'),official=options.locator('[data-connection-mode="official-remote"]');
  await expect(local).toBeVisible();await expect(official).toBeVisible();await expect(official).toBeEnabled();
  const layout=await options.evaluate(node=>{const box=node.getBoundingClientRect(),buttons=[...node.children].map(button=>button.getBoundingClientRect());return {sameRow:Math.abs(buttons[0].top-buttons[1].top)<1,fits:buttons.every(b=>b.left>=box.left&&b.right<=box.right+1),labels:[...node.children].map(b=>b.textContent)};});
- expect(layout.sameRow).toBe(true);expect(layout.fits).toBe(true);expect(layout.labels).toEqual(['本机连接','官方远控']);
+ expect(layout.sameRow).toBe(true);expect(layout.fits).toBe(true);expect(layout.labels).toEqual(['로컬 연결','공식 원격 연결']);
  await testInfo.attach('inline-account-methods',{body:await page.locator('dialog[open]').screenshot(),contentType:'image/png'});
- await official.click();const confirm=page.locator('.client-disable-dialog');await expect(confirm).toBeVisible();await expect(confirm).toContainText('切换应用接入方式');await expect(confirm).toContainText('不会退出或重启电脑 App');expect(writes).toHaveLength(0);
- await confirm.getByRole('button',{name:'取消',exact:true}).click();expect(writes).toHaveLength(0);await expect(local).toHaveAttribute('aria-pressed','true');
+ await official.click();const confirm=page.locator('.client-disable-dialog');await expect(confirm).toBeVisible();await expect(confirm).toContainText('애플리케이션 접근 방법 전환');await expect(confirm).toContainText('컴퓨터를 종료하거나 다시 시작하지 않습니다. App');expect(writes).toHaveLength(0);
+ await confirm.getByRole('button',{name:'취소',exact:true}).click();expect(writes).toHaveLength(0);await expect(local).toHaveAttribute('aria-pressed','true');
  await official.click();await expect(confirm).toBeVisible();await testInfo.attach('mode-switch-confirmation',{body:await confirm.screenshot(),contentType:'image/png'});
- await confirm.getByRole('button',{name:'确认切换',exact:true}).click();await expect(official).toHaveAttribute('aria-pressed','true');expect(writes).toEqual([{provider:'zcode',enabled:true,connectionMode:'official-remote'}]);await expect(page.locator('dialog[open]')).toHaveCount(1);
+ await confirm.getByRole('button',{name:'스위치 확인',exact:true}).click();await expect(official).toHaveAttribute('aria-pressed','true');expect(writes).toEqual([{provider:'zcode',enabled:true,connectionMode:'official-remote'}]);await expect(page.locator('dialog[open]')).toHaveCount(1);
  await page.evaluate(()=>document.querySelector('dialog[open]').close());
- await page.evaluate(()=>clientNavigation.applyClients({clients:clientNavigation.clients.map(row=>row.id==='zcode'?{...row,connected:false,retryable:true,setupStatus:'needs-retry',reason:'测试断线提示'}:row)}));
- await expect(page.locator('.ds-list-status')).toContainText('测试断线提示');await expect(page.locator('.ds-list-status')).toBeVisible();
+ await page.evaluate(()=>clientNavigation.applyClients({clients:clientNavigation.clients.map(row=>row.id==='zcode'?{...row,connected:false,retryable:true,setupStatus:'needs-retry',reason:'테스트 연결 해제 프롬프트'}:row)}));
+ await expect(page.locator('.ds-list-status')).toContainText('테스트 연결 해제 프롬프트');await expect(page.locator('.ds-list-status')).toBeVisible();
 });
 
 test('new-chat models use shared choices before the first input', async ({page}, testInfo) => {
@@ -828,20 +828,20 @@ test('new-chat models use shared choices before the first input', async ({page},
     codexRequests.push(route.request().postDataJSON());
     await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'Fixture intentionally stops before creating a thread'})});
   });
-  await ready(page,'session-menu');await page.evaluate(async()=>{await BridgeFeatures.load('chat');BridgeI18n.setLanguage('zh');await document.fonts.ready;});
+  await ready(page,'session-menu');await page.evaluate(async()=>{await BridgeFeatures.load('chat');BridgeI18n.setLanguage('ko');await document.fonts.ready;});
   await page.locator('#new-chat').click();
   const dialog=page.locator('#new-chat-dialog');
-  await expect(dialog.locator('[aria-label="模型"]')).toHaveValue('preferred');
-  await expect(dialog.locator('[aria-label="思考强度"]')).toHaveValue('low');
-  await dialog.getByRole('button',{name:'刷新模型',exact:true}).click();
-  await expect(dialog.getByRole('button',{name:'刷新模型',exact:true})).toBeEnabled();
+  await expect(dialog.locator('[aria-label="모델"]')).toHaveValue('preferred');
+  await expect(dialog.locator('[aria-label="추론 강도"]')).toHaveValue('low');
+  await dialog.getByRole('button',{name:'모델 새로 고침',exact:true}).click();
+  await expect(dialog.getByRole('button',{name:'모델 새로 고침',exact:true})).toBeEnabled();
   expect(codexRequests.some(value=>typeof value==='string'&&value.includes('refresh=true'))).toBe(true);
-  await dialog.locator('[aria-label="模型"]').selectOption('alternate');await dialog.locator('[aria-label="思考强度"]').selectOption('high');
+  await dialog.locator('[aria-label="모델"]').selectOption('alternate');await dialog.locator('[aria-label="추론 강도"]').selectOption('high');
   expect(await dialog.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
   await testInfo.attach('creation-models-codex',{body:await page.screenshot(),contentType:'image/png'});
   await dialog.locator('#new-chat-submit').click();await expect.poll(()=>codexRequests.some(value=>value?.model==='alternate')).toBe(true);
   const submitted=codexRequests.find(value=>value?.model==='alternate');expect(submitted.effort).toBe('high');expect(submitted.modelCatalogIdentity).toBe('fixture-account');
-  await dialog.getByRole('button',{name:'关闭新建聊天',exact:true}).click();
+  await dialog.getByRole('button',{name:'새 채팅 대화 상자 닫기',exact:true}).click();
   await page.evaluate(readFileSync(path.join(__dirname,'creation-models.browser.js'),'utf8'));
   for(const provider of ['claude','deepseek','zcode']){
     expect((await page.evaluate(provider=>runCreationModelsBrowserChecks(provider),provider)).passed).toBeGreaterThan(8);
@@ -851,7 +851,7 @@ test('new-chat models use shared choices before the first input', async ({page},
 });
 
 test('cached new-chat choices survive catalog verification', async ({page}) => {
-  await ready(page,'session-menu');await page.evaluate(async()=>{await BridgeFeatures.load('chat');BridgeI18n.setLanguage('zh');});
+  await ready(page,'session-menu');await page.evaluate(async()=>{await BridgeFeatures.load('chat');BridgeI18n.setLanguage('ko');});
   await page.evaluate(()=>{
     const catalog={models:[{id:'native-default',efforts:['high']},{id:'chosen',efforts:['low','high'],defaultEffort:'high'}],currentModel:'native-default',currentEffort:'high',cache:{identity:'account-a'},capabilities:{models:true,effort:true}};
     const cache=new Map(),root=document.createElement('section');root.id='creation-cache-race';root.style.cssText='position:fixed;inset:0;background:var(--page);z-index:30';document.body.append(root);
@@ -860,7 +860,7 @@ test('cached new-chat choices survive catalog verification', async ({page}) => {
     window.__creationCacheRace={picker,catalog,root};
     window.__creationCacheRace.pending=picker.load('scope',()=>new Promise(resolve=>window.__creationCacheRace.finish=resolve));
   });
-  const root=page.locator('#creation-cache-race'),model=root.locator('[aria-label="模型"]'),effort=root.locator('[aria-label="思考强度"]');
+  const root=page.locator('#creation-cache-race'),model=root.locator('[aria-label="모델"]'),effort=root.locator('[aria-label="추론 강도"]');
   await model.selectOption('chosen');await effort.selectOption('low');
   await page.evaluate(async()=>{const value=window.__creationCacheRace;value.finish(value.catalog);await value.pending;});
   await expect(model).toHaveValue('chosen');await expect(effort).toHaveValue('low');
@@ -886,12 +886,12 @@ test('Antigravity shared chat preserves source identity and composer geometry wh
   document.getElementById('login').hidden=true;const root=document.createElement('div');root.id='agy-chat';root.className='app';root.style.cssText='position:fixed;inset:0;background:var(--page);z-index:10';document.body.append(root);
   const select=document.createElement('select');for(const id of ['codex','antigravity'])select.add(new Option(id,id));
   const presentation={models:true,skills:true,permissions:true,attachments:true,plan:true,goal:true};
-  const sessions=['app','cli','ide'].map((backend,index)=>({id:backend+'-session',title:['项目进度整理','测试失败排查','接口文档更新'][index],cwd:'/workspace/project',backend,model:'Gemini Pro',permissionMode:'desktop',permissionLabel:'电脑端处理',composerCapabilities:presentation,updatedAt:1794200000-index*60}));
-  const messages=[{id:'user',role:'user',text:'请检查当前项目的测试结果。',timestamp:1794200000000},{id:'reply',role:'assistant',text:'已整理测试结果，接下来检查失败的用例。',timestamp:1794200060000}];
+  const sessions=['app','cli','ide'].map((backend,index)=>({id:backend+'-session',title:['프로젝트 진행 계획','테스트 실패 문제 해결','인터페이스 문서 업데이트'][index],cwd:'/workspace/project',backend,model:'Gemini Pro',permissionMode:'desktop',permissionLabel:'PC 처리',composerCapabilities:presentation,updatedAt:1794200000-index*60}));
+  const messages=[{id:'user',role:'user',text:'현재 프로젝트의 테스트 결과를 확인해주세요。',timestamp:1794200000000},{id:'reply',role:'assistant',text:'테스트 결과가 정리되었습니다. 이제 실패한 사용 사례를 확인하세요.。',timestamp:1794200060000}];
   const caps={send:true,models:true,effort:false,skills:false,permissions:true,attachments:true,plan:false,goal:false,queue:false,steer:false};
   const client={id:'antigravity',name:'Antigravity',enabled:true,connected:true,historyAvailable:true};let catalogCase='normal';
   const view=new DesktopSessionsView({root,select,notify(){},onSelect(){},csrf:()=>'',onUnauthorized(){},request:async(url,body)=>{
-   if(body)throw Error('Unexpected write');if(url.includes('/catalog')){if(catalogCase==='error')throw Error('模型目录暂不可用');return {models:catalogCase==='empty'?[]:[{id:'Gemini Pro',name:'Gemini Pro'}],capabilities:{models:true,effort:false,manualModels:false},cache:{identity:'synthetic-source'}};}
+   if(body)throw Error('Unexpected write');if(url.includes('/catalog')){if(catalogCase==='error')throw Error('모델 디렉터리를 일시적으로 사용할 수 없습니다.');return {models:catalogCase==='empty'?[]:[{id:'Gemini Pro',name:'Gemini Pro'}],capabilities:{models:true,effort:false,manualModels:false},cache:{identity:'synthetic-source'}};}
    if(url.includes('/detail'))return {session:{...sessions.find(row=>url.includes(row.id))||sessions[0],status:'idle',connectionState:'ready'},capabilities:caps,messages};
    return url.includes('/workspace')?{entries:[],project:'/workspace/project'}:{connected:true,sessions};
   }});view.setClientStates([client]);await view.choose('antigravity');clearTimeout(view.timer);
@@ -901,17 +901,17 @@ test('Antigravity shared chat preserves source identity and composer geometry wh
  expect(result.labels).toEqual(['APP','CLI','IDE']);expect(result.options).toEqual(['all','app','cli','ide']);
  await page.screenshot({path:path.join(__dirname,'../../.tmp/feedback-20261110/agy-'+info.project.name+'-list.png')});
  await page.locator('#agy-chat .ds-surface').selectOption('cli');await expect(page.locator('#agy-chat .ds-session-row')).toHaveCount(1);await page.locator('#agy-chat .ds-session-row').click();
- await expect(page.locator('#agy-chat .ds-title')).toHaveText('测试失败排查');
- const before=await page.evaluate(()=>{const v=__agyChat.view;clearTimeout(v.timer);v.input.value='请继续检查';v.input.oninput();const controls=[v.modelButton,v.skillsButton,v.permissionsButton,v.contextButton,v.composerToggle,v.attachButton,v.mode,v.workMode,v.send];__agyChat.controls=controls;return controls.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,top:b.top,width:b.width,height:b.height,hidden:n.hidden,disabled:n.disabled};});});
+ await expect(page.locator('#agy-chat .ds-title')).toHaveText('테스트 실패 문제 해결');
+ const before=await page.evaluate(()=>{const v=__agyChat.view;clearTimeout(v.timer);v.input.value='계속 확인해 주세요';v.input.oninput();const controls=[v.modelButton,v.skillsButton,v.permissionsButton,v.contextButton,v.composerToggle,v.attachButton,v.mode,v.workMode,v.send];__agyChat.controls=controls;return controls.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,top:b.top,width:b.width,height:b.height,hidden:n.hidden,disabled:n.disabled};});});
  expect(before.every(row=>!row.hidden&&row.width>10)).toBe(true);expect(before[1].disabled).toBe(true);expect(before[7].disabled).toBe(true);expect(before[8].disabled).toBe(false);
  await page.screenshot({path:path.join(__dirname,'../../.tmp/feedback-20261110/agy-'+info.project.name+'-connected.png')});
  const after=await page.evaluate(()=>{const f=__agyChat,v=f.view;v.clientStates=[{...f.client,connected:false}];v.applyDetail({session:{...f.sessions[1],readOnly:true,status:'idle',connectionState:'detached'},capabilities:{...f.caps,send:false,models:false,permissions:false,attachments:false},messages:f.messages});return {controls:f.controls.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,top:b.top,width:b.width,height:b.height,hidden:n.hidden,disabled:n.disabled};}),draft:v.input.value,overflow:v.form.scrollWidth>v.form.clientWidth+1};});
- expect(after.draft).toBe('请继续检查');expect(after.overflow).toBe(false);expect(after.controls.every(row=>!row.hidden)).toBe(true);expect(after.controls[8].disabled).toBe(true);
+ expect(after.draft).toBe('계속 확인해 주세요');expect(after.overflow).toBe(false);expect(after.controls.every(row=>!row.hidden)).toBe(true);expect(after.controls[8].disabled).toBe(true);
  for(let i=0;i<before.length;i++)for(const key of ['left','top','width','height'])expect(Math.abs(before[i][key]-after.controls[i][key]),i+' '+key).toBeLessThanOrEqual(1);
  await page.screenshot({path:path.join(__dirname,'../../.tmp/feedback-20261110/agy-'+info.project.name+'-offline.png')});
  await page.evaluate(async()=>{const f=__agyChat;f.view.clientStates=[f.client];f.view.applyDetail({session:{...f.sessions[1],status:'idle',connectionState:'ready'},capabilities:f.caps,messages:f.messages});f.setCatalog('empty');await f.view.models();});
- await expect(page.locator('.ds-model-dialog[open]')).toContainText('暂未提供可用模型');await expect(page.locator('.ds-model-dialog[open] .primary')).toBeDisabled();await page.evaluate(()=>__agyChat.view.modelDialog.close());
- await page.evaluate(async()=>{__agyChat.setCatalog('error');await __agyChat.view.models();});await expect(page.locator('.ds-model-dialog[open]')).toContainText('模型目录暂不可用');await expect(page.locator('.ds-model-dialog[open] .primary')).toBeDisabled();
+ await expect(page.locator('.ds-model-dialog[open]')).toContainText('사용 가능한 모델이 없습니다.');await expect(page.locator('.ds-model-dialog[open] .primary')).toBeDisabled();await page.evaluate(()=>__agyChat.view.modelDialog.close());
+ await page.evaluate(async()=>{__agyChat.setCatalog('error');await __agyChat.view.models();});await expect(page.locator('.ds-model-dialog[open]')).toContainText('모델 디렉터리를 일시적으로 사용할 수 없습니다.');await expect(page.locator('.ds-model-dialog[open] .primary')).toBeDisabled();
  await page.evaluate(()=>{__agyChat.view.clear();__agyChat.root.remove();delete globalThis.__agyChat;});
 });
 
@@ -926,12 +926,12 @@ test('Antigravity shared installation form loads saved inventory and registers A
  await page.route('**/web/**',route=>{const filename=new URL(route.request().url()).pathname;try{return route.fulfill({body:readFileSync(path.resolve(root,'.'+filename)),contentType:filename.endsWith('.js')?'text/javascript':filename.endsWith('.css')?'text/css':'image/png'});}catch{return route.abort();}});
  await page.goto('/desktop/index.html');await page.waitForFunction(()=>window.inventoryReady);
  expect(await page.evaluate(()=>testCalls.filter(body=>body.action==='scan').length)).toBe(0);
- for(const [language,application] of [['zh','/Applications/Antigravity.app'],['en','/user/.gemini/bin/agy']]){
+ for(const [language,application] of [['ko','/Applications/Antigravity.app'],['en','/user/.gemini/bin/agy']]){
   await page.evaluate(language=>{GatewayLayout.selectClient(null);BridgeI18n.setLanguage(language);},language);
   await page.locator('#add-client').click();await page.locator('dialog[open]').getByRole('button',{name:'Antigravity',exact:true}).click();
   const dialog=page.locator('dialog[open]');await expect(dialog.locator('input')).toHaveCount(1);
   await expect(dialog.locator('.hint')).toContainText('agy');
-  await dialog.locator('input').fill(application);await page.screenshot({path:path.join(root,'.tmp/agy-add-'+info.project.name+'-'+language+'.png')});await dialog.getByRole('button',{name:language==='en'?'Save settings':'保存配置',exact:true}).click();
+  await dialog.locator('input').fill(application);await page.screenshot({path:path.join(root,'.tmp/agy-add-'+info.project.name+'-'+language+'.png')});await dialog.getByRole('button',{name:language==='en'?'Save settings':'설정 저장',exact:true}).click();
   await expect(dialog).toHaveCount(0);await expect(page.locator('[data-antigravity-management]')).toBeVisible();
   const saved=await page.evaluate(()=>testCalls.filter(body=>body.operation==='save').at(-1));
   expect(saved).toEqual({action:'client-profiles',operation:'save',family:'antigravity',kind:'default-application',application});
@@ -943,30 +943,30 @@ test('Antigravity desktop management configures existing models and approvals pe
  await page.setViewportSize({width:Math.max(820,page.viewportSize().width),height:900});
  const root=path.resolve(__dirname,'../..');
  const bootstrap=`window.testCalls=[];window.bridgeDesktop={};window.__agyFail=false;window.__agyModelsFail=false;
- const client={id:'antigravity',name:'Antigravity',enabled:true,configured:true,installed:true,connected:true,accountNotice:'账号与登录由原客户端管理',capabilities:{accounts:false,management:true}};
- const sources=['app','cli','ide'].map((id,index)=>({id,name:['Antigravity App','Antigravity CLI','Antigravity IDE'][index],historyAvailable:id!=='ide',connected:id==='cli',sessions:id==='ide'?[]:[{id:id+'-session',title:id==='cli'?'测试失败排查':'项目进度整理',model:'',permissionMode:'desktop'}]}));
- const state=()=>({enabled:true,surfaces:sources,plugin:{active:true},permissionOptions:[{value:'desktop',label:'电脑端处理'},{value:'mobile-ask',label:'手机端审批'},{value:'auto-allow',label:'自动允许'}]});
- window.testPanel=new DesktopConnectionsPanel({root:document.getElementById('desktop-connections'),feedback(){},api:{desktopSessions:async body=>{testCalls.push(body);if(window.__agyFail)throw Error('配置读取失败');if(body.operation==='catalog'&&window.__agyModelsFail)throw Error('模型目录暂不可用');if(body.operation==='catalog')return {models:[{id:'cli-model',name:'Gemini Pro'}],cache:{identity:'cli-account'},capabilities:{models:true,manualModels:true,manualEffort:false,effort:false}};if(['settings','access'].includes(body.operation)){if(body.surface!=='cli'||body.sessionId!=='cli-session')throw Error('Wrong source');const row=sources[1].sessions[0];if(body.operation==='settings')row.model=body.model;else row.permissionMode=body.mode;return {status:'accepted'};}return state();}}});testPanel.clients=[client];testPanel.renderClients();document.querySelectorAll('[data-panel]').forEach(node=>node.hidden=!['accounts','account','desktop-sessions','harness'].includes(node.dataset.panel));GatewayLayout.tab('accounts');`;
+ const client={id:'antigravity',name:'Antigravity',enabled:true,configured:true,installed:true,connected:true,accountNotice:'계정 및 로그인은 원래 클라이언트에서 관리됩니다.',capabilities:{accounts:false,management:true}};
+ const sources=['app','cli','ide'].map((id,index)=>({id,name:['Antigravity App','Antigravity CLI','Antigravity IDE'][index],historyAvailable:id!=='ide',connected:id==='cli',sessions:id==='ide'?[]:[{id:id+'-session',title:id==='cli'?'테스트 실패 문제 해결':'프로젝트 진행 계획',model:'',permissionMode:'desktop'}]}));
+ const state=()=>({enabled:true,surfaces:sources,plugin:{active:true},permissionOptions:[{value:'desktop',label:'PC 처리'},{value:'mobile-ask',label:'모바일 앱 승인'},{value:'auto-allow',label:'자동으로 허용'}]});
+ window.testPanel=new DesktopConnectionsPanel({root:document.getElementById('desktop-connections'),feedback(){},api:{desktopSessions:async body=>{testCalls.push(body);if(window.__agyFail)throw Error('구성 읽기 실패');if(body.operation==='catalog'&&window.__agyModelsFail)throw Error('모델 디렉터리를 일시적으로 사용할 수 없습니다.');if(body.operation==='catalog')return {models:[{id:'cli-model',name:'Gemini Pro'}],cache:{identity:'cli-account'},capabilities:{models:true,manualModels:true,manualEffort:false,effort:false}};if(['settings','access'].includes(body.operation)){if(body.surface!=='cli'||body.sessionId!=='cli-session')throw Error('Wrong source');const row=sources[1].sessions[0];if(body.operation==='settings')row.model=body.model;else row.permissionMode=body.mode;return {status:'accepted'};}return state();}}});testPanel.clients=[client];testPanel.renderClients();document.querySelectorAll('[data-panel]').forEach(node=>node.hidden=!['accounts','account','desktop-sessions','harness'].includes(node.dataset.panel));GatewayLayout.tab('accounts');`;
  await page.route('**/desktop/**',async route=>{const filename=new URL(route.request().url()).pathname;if(filename==='/desktop/shell/renderer.js')return route.fulfill({contentType:'text/javascript',body:bootstrap});const file=path.resolve(root,'.'+filename);if(!file.startsWith(root+path.sep))return route.abort();try{return route.fulfill({body:readFileSync(file),contentType:filename.endsWith('.html')?'text/html':filename.endsWith('.js')?'text/javascript':filename.endsWith('.css')?'text/css':'image/png'});}catch{return route.abort();}});
  await page.route('**/web/**',route=>{const filename=new URL(route.request().url()).pathname;try{return route.fulfill({body:readFileSync(path.resolve(root,'.'+filename)),contentType:filename.endsWith('.js')?'text/javascript':filename.endsWith('.css')?'text/css':'image/png'});}catch{return route.abort();}});
- await page.goto('/desktop/index.html');await page.locator('[data-client-id="antigravity"] button').filter({hasText:/^管理$/}).click();
- const panel=page.locator('[data-antigravity-management]');await expect(panel.locator(':scope > [role=status]')).toContainText('本机历史可用 · 原生服务未连接');
- await expect(panel.getByRole('button',{name:'应用模型',exact:true})).toBeDisabled();await panel.getByLabel('会话来源',{exact:true}).selectOption('cli');await expect(panel.getByLabel('聊天',{exact:true})).toHaveValue('cli-session');
- await panel.getByLabel('模型',{exact:true}).selectOption('cli-model');await panel.getByRole('button',{name:'应用模型',exact:true}).click();
- await page.evaluate(()=>window.__agyModelsFail=true);await panel.getByRole('button',{name:'刷新模型',exact:true}).click();await expect(panel.locator('.project-picker-models [role=status]')).toContainText('可手动填写模型');await panel.getByLabel('模型',{exact:true}).selectOption('__manual__');await panel.getByLabel('手动输入模型',{exact:true}).fill('MODEL_PLACEHOLDER_M525');await expect(panel.getByRole('button',{name:'应用模型',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'应用模型',exact:true}).click();await expect(panel.getByLabel('手动输入模型',{exact:true})).toHaveValue('MODEL_PLACEHOLDER_M525');
- await panel.getByLabel('审批方式',{exact:true}).selectOption('mobile-ask');await panel.getByRole('button',{name:'应用审批方式',exact:true}).click();await expect(panel.getByLabel('审批方式',{exact:true})).toHaveValue('mobile-ask');
+ await page.goto('/desktop/index.html');await page.locator('[data-client-id="antigravity"] button').filter({hasText:/^관리$/}).click();
+ const panel=page.locator('[data-antigravity-management]');await expect(panel.locator(':scope > [role=status]')).toContainText('원주민 역사 사용 가능 · 기본 서비스가 연결되지 않았습니다');
+ await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeDisabled();await panel.getByLabel('세션 소스',{exact:true}).selectOption('cli');await expect(panel.getByLabel('채팅',{exact:true})).toHaveValue('cli-session');
+ await panel.getByLabel('모델',{exact:true}).selectOption('cli-model');await panel.getByRole('button',{name:'애플리케이션 모델',exact:true}).click();
+ await page.evaluate(()=>window.__agyModelsFail=true);await panel.getByRole('button',{name:'모델 새로 고침',exact:true}).click();await expect(panel.locator('.project-picker-models [role=status]')).toContainText('모델을 수동으로 채울 수 있습니다.');await panel.getByLabel('모델',{exact:true}).selectOption('__manual__');await panel.getByLabel('수동으로 모델 입력',{exact:true}).fill('MODEL_PLACEHOLDER_M525');await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'애플리케이션 모델',exact:true}).click();await expect(panel.getByLabel('수동으로 모델 입력',{exact:true})).toHaveValue('MODEL_PLACEHOLDER_M525');
+ await panel.getByLabel('승인방법',{exact:true}).selectOption('mobile-ask');await panel.getByRole('button',{name:'신청 승인 방법',exact:true}).click();await expect(panel.getByLabel('승인방법',{exact:true})).toHaveValue('mobile-ask');
  await page.screenshot({path:path.join(root,'.tmp/feedback-20261110/agy-'+info.project.name+'-management-'+page.viewportSize().width+'.png'),fullPage:true});
  const writes=await page.evaluate(()=>testCalls.filter(row=>['settings','access'].includes(row.operation)));expect(writes.map(row=>row.surface)).toEqual(['cli','cli','cli']);expect(writes.map(row=>row.sessionId)).toEqual(['cli-session','cli-session','cli-session']);expect(writes[0].modelCatalogIdentity).toBe('cli-account');expect(writes[1]).toMatchObject({model:'MODEL_PLACEHOLDER_M525',manualModel:true,modelCatalogIdentity:'cli-account'});expect(await page.evaluate(()=>testCalls.some(row=>row.action==='accounts'))).toBe(false);
- await panel.getByLabel('会话来源',{exact:true}).selectOption('ide');await expect(panel.locator(':scope > [role=status]')).toContainText('未发现本机历史');await expect(panel.getByRole('button',{name:'应用审批方式',exact:true})).toBeDisabled();
- await page.evaluate(()=>window.__agyFail=true);await panel.getByRole('button',{name:'重新加载',exact:true}).click();await expect(panel.locator(':scope > [role=alert]')).toContainText('配置读取失败');await expect(panel.getByRole('button',{name:'应用模型',exact:true})).toBeDisabled();
+ await panel.getByLabel('세션 소스',{exact:true}).selectOption('ide');await expect(panel.locator(':scope > [role=status]')).toContainText('지역 기록을 찾을 수 없습니다.');await expect(panel.getByRole('button',{name:'신청 승인 방법',exact:true})).toBeDisabled();
+ await page.evaluate(()=>window.__agyFail=true);await panel.getByRole('button',{name:'다시 불러오기',exact:true}).click();await expect(panel.locator(':scope > [role=alert]')).toContainText('구성 읽기 실패');await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeDisabled();
 });
 
 test('shared session menu retains working chat notification settings without a composer reminder',async({page})=>{
- let writes=[];await page.route('**/api/desktop-sessions/claude/detail?*',route=>route.fulfill({json:{session:{id:'claude-synthetic-0',title:'Claude · 页面交互验证',cwd:'/synthetic/project',status:'idle'},capabilities:{send:true},messages:[]}}));
+ let writes=[];await page.route('**/api/desktop-sessions/claude/detail?*',route=>route.fulfill({json:{session:{id:'claude-synthetic-0',title:'Claude · 페이지 대화형 검증',cwd:'/synthetic/project',status:'idle'},capabilities:{send:true},messages:[]}}));
  await page.route('**/api/desktop-sessions/claude/notifications?*',route=>{const body=route.request().postDataJSON();if(body)writes.push(body);return route.fulfill({json:{available:true,requests:body?.requests||'inherit',completion:body?.completion||'off'}});});
- await ready(page,'session-menu');await page.locator('#client-switch').getByRole('button',{name:'Claude',exact:true}).click();const row=page.locator('.ds-session-row:visible').filter({hasText:'Claude · 页面交互验证'}).first();await expect(row).toBeVisible();
+ await ready(page,'session-menu');await page.locator('#client-switch').getByRole('button',{name:'Claude',exact:true}).click();const row=page.locator('.ds-session-row:visible').filter({hasText:'Claude · 페이지 대화형 검증'}).first();await expect(row).toBeVisible();
  if(page.viewportSize().width<=640){await row.dispatchEvent('pointerdown',{pointerType:'touch',button:0,clientX:80,clientY:150});await expect(page.locator('dialog.session-menu')).toBeVisible();await row.dispatchEvent('pointerup',{pointerType:'touch',button:0});}else await row.click({button:'right'});
- await page.locator('dialog.session-menu').getByRole('button',{name:'聊天通知设置',exact:true}).click();const dialog=page.locator('dialog[open]').filter({hasText:'聊天通知设置'});await expect(dialog).toBeVisible();await dialog.getByLabel('请求处理通知',{exact:true}).selectOption('on');await dialog.getByLabel('运行完毕通知',{exact:true}).selectOption('inherit');await dialog.getByRole('button',{name:'保存配置',exact:true}).click();await expect(dialog).toHaveCount(0);expect(writes).toEqual([{requests:'on',completion:'inherit'}]);expect(await page.locator('.ds-composer .composer-tools').getByRole('button',{name:/提醒/}).count()).toBe(0);
+ await page.locator('dialog.session-menu').getByRole('button',{name:'채팅 알림 설정',exact:true}).click();const dialog=page.locator('dialog[open]').filter({hasText:'채팅 알림 설정'});await expect(dialog).toBeVisible();await dialog.getByLabel('승인 알림',{exact:true}).selectOption('on');await dialog.getByLabel('완료 알림',{exact:true}).selectOption('inherit');await dialog.getByRole('button',{name:'설정 저장',exact:true}).click();await expect(dialog).toHaveCount(0);expect(writes).toEqual([{requests:'on',completion:'inherit'}]);expect(await page.locator('.ds-composer .composer-tools').getByRole('button',{name:/채팅 알림/}).count()).toBe(0);
 });
 
 

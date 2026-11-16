@@ -23,7 +23,7 @@ def platform_pipe():
     elif sys.platform == 'linux':
         from bridge.platforms.linux import zcode_pipe
     else:
-        raise ValueError('此平台没有该私有连接')
+        raise ValueError('이 플랫폼에는 비공개 연결이 없습니다.')
     return zcode_pipe
 
 
@@ -54,35 +54,35 @@ def require_peer(conn, profile, application, *, server):
         with socket.fromfd(conn.fileno(), socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             pid, uid, _ = struct.unpack('3i', sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
         if uid != os.getuid():
-            raise PermissionError('私有连接用户不匹配')
+            raise PermissionError('비공개 연결 사용자 불일치')
         argv = [os.fsdecode(arg) for arg in (Path('/proc')/str(pid)/'cmdline').read_bytes().split(b'\0')[:-1]]
     owner = native.identity(pid)
     prefix = gateway_command()
     if owner['image'] != native.identity(os.getpid())['image']:
-        raise PermissionError('私有连接的网关程序不匹配')
+        raise PermissionError('개인 연결 게이트웨이 프로그램이 일치하지 않습니다')
     # An OS-verified executable and the exact serving role are both required.
     expected = prefix[1:] + holder_args(profile, application)
     if server:
         control = json.loads((profile/'gateway-control.json').read_text(encoding='utf-8'))
         if control['pid'] != pid:
-            raise PermissionError('仅允许当前资料目录的运行中网关接入')
+            raise PermissionError('현재 데이터 디렉터리의 실행 중인 게이트웨이에만 액세스가 허용됩니다.')
         expected = prefix[1:] + ['serve', '--data-dir', str(profile)]
         if argv[-1:] == ['--connection-secrets-stdin']:
             expected.append('--connection-secrets-stdin')
     if argv[1:] != expected:
-        raise PermissionError('私有连接的程序角色或资料目录不匹配')
+        raise PermissionError('비공개 연결의 프로그램 역할 또는 프로필이 일치하지 않습니다.')
 
 
 def receive(conn, timeout):
     if not conn.poll(timeout):
-        raise TimeoutError('ZCode 私有连接等待超时，请核对原操作回执')
+        raise TimeoutError('ZCode 비공개 연결 시간이 초과되었습니다. 원본 작업 영수증을 확인하세요.')
     return json.loads(conn.recv_bytes(MAX_FRAME))
 
 
 def send(conn, value):
     message = json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode()
     if len(message) > MAX_FRAME:
-        raise ValueError('ZCode 私有请求超出大小限制')
+        raise ValueError('ZCode 비공개 요청이 크기 제한을 초과했습니다.')
     conn.send_bytes(message)
 
 
@@ -107,7 +107,7 @@ class LocalPipeClient:
             send(conn, message)
             reply = receive(conn, timeout)
             if reply.get('ok') is not True:
-                raise ValueError(reply.get('error', 'ZCode 私有连接失败'))
+                raise ValueError(reply.get('error', 'ZCode 비공개 연결 실패'))
             return reply['value']
 
     def owner(self):
@@ -132,7 +132,7 @@ class LocalPipeClient:
                 return self._request({'command': 'initialize'}, timeout=30)
             except (ConnectionRefusedError, FileNotFoundError):
                 if proc.poll() is not None or time.monotonic() >= deadline:
-                    raise ValueError('无法启动本机 ZCode 私有连接')
+                    raise ValueError('이 컴퓨터를 시작할 수 없습니다. ZCode 비공개 연결')
                 time.sleep(.1)
 
     def request_quit(self, owner):
@@ -149,7 +149,7 @@ def serve(profile, application):
     native = platform_pipe()
     profile, application = Path(profile).resolve(strict=True), Path(application).resolve(strict=True)
     if not native.is_supported(application):
-        raise ValueError('未找到此安装的 ZCode')
+        raise ValueError('이 설치에서는 찾을 수 없습니다. ZCode')
     endpoint = address(profile)
     listener = (native.local_listener(endpoint) if sys.platform == 'win32'
                 else Listener(endpoint, family='AF_UNIX', backlog=4))
@@ -163,25 +163,25 @@ def serve(profile, application):
         if message == {'command': 'initialize'} and not launched:
             with initializing:
                 if closing.is_set():
-                    raise ValueError('ZCode 私有连接已关闭')
+                    raise ValueError('ZCode 비공개 연결이 종료되었습니다.')
                 launched.extend(native.launch(application))
                 started.set()  # Keep both ends until the original App exits.
         if launched:
             pid = launched[0]
             owner = native.runtime_owner(application, pid, timeout=0 if state else 15) if sys.platform == 'linux' else native.identity(pid)
             if sys.platform != 'linux' and os.path.normcase(owner['image']) != os.path.normcase(str(application)):
-                raise ValueError('原 ZCode 进程身份不匹配')
+                raise ValueError('기존 ZCode 프로세스 ID 불일치')
             if not state:
                 transport = (PipeTransport(None, None, application, stream=launched[1]) if sys.platform == 'win32'
                              else PipeTransport(launched[1], launched[2], owner['image']))
                 state.update(owner=owner, transport=transport)
             if state['owner'] != owner:
-                raise ValueError('ZCode 原进程已变化')
+                raise ValueError('ZCode 원래 프로세스가 변경되었습니다.')
         if message == {'command': 'status'}:
             return state.get('owner') if state and not state['transport'].broken else None
         if message == {'command': 'initialize'}:
             if state['transport'].broken:
-                raise ValueError('ZCode 私有管道已中断，请在应用管理中重新初始化连接')
+                raise ValueError('ZCode 프라이빗 파이프가 중단되었습니다. 애플리케이션 관리에서 연결을 다시 초기화하세요.')
             return state['owner']
         if sys.platform == 'win32' and state and message == {'command': 'quit-original', 'owner': state['owner']}:
             if not state.get('quitPending'):
@@ -196,10 +196,10 @@ def serve(profile, application):
             return True
         if (not state or not isinstance(message, dict) or set(message) != {'command', 'owner', 'native'}
                 or message['command'] != 'operation' or message['owner'] != state['owner']):
-            raise ValueError('ZCode 原会话连接已变化')
+            raise ValueError('ZCode 원래 세션 연결이 변경되었습니다.')
         request = message['native']
         if not isinstance(request, dict) or set(request) - KEYS or request.get('action') not in ACTIONS:
-            raise ValueError('未知的 ZCode 原生操作')
+            raise ValueError('알려지지 않은 ZCode 기본 작동')
         return state['transport'].call(request)
 
     def handle_requests():

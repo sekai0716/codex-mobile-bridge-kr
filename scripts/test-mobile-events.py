@@ -31,6 +31,23 @@ public interface SharedPreferences {boolean getBoolean(String k,boolean d);Strin
 stubs['io/github/try2love/codexbridge/TaskNotifications.java'] = r'''package io.github.try2love.codexbridge;
 final class TaskNotifications {static long fail=-1;static void show(android.content.Context context,String origin,String stream,org.json.JSONObject event,String channel)throws Exception {if(event.getLong("sequence")==fail)throw new java.io.IOException("Delivery unavailable");MobileEventTests.deliveredEvents.add(event);MobileEventTests.delivered.add(origin+":"+stream+":"+event.getLong("sequence"));}}
 '''
+# 알림 수신기가 사용하는 실제 채널 선택 규칙만 JVM 픽스처에 포함한다.
+# 전체 클래스는 Android 보안 저장소에도 의존하므로 이 알림 테스트와 분리한다.
+channels = (ROOT / 'mobile/android/src/io/github/try2love/codexbridge/GatewayChannels.java').read_text(encoding='utf-8')
+def channel_method(signature):
+    start = channels.index(signature)
+    end = channels.index('{', start) + 1
+    depth = 1
+    while depth:
+        depth += (channels[end] == '{') - (channels[end] == '}')
+        end += 1
+    return channels[start:end]
+stubs['io/github/try2love/codexbridge/GatewayChannels.java'] = (
+    'package io.github.try2love.codexbridge;import android.content.SharedPreferences;'
+    'import org.json.JSONObject;import java.util.Collections;final class GatewayChannels {'
+    + '\n'.join(channel_method(signature) for signature in (
+        ' static String preferenceKey(', ' static String selectionId(',
+        ' static boolean enabled(', ' static JSONObject record(')) + '\n}')
 for name, source in stubs.items():
     path = WORK / name
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +68,7 @@ subprocess.run([java_tool('javac'), '-encoding', 'UTF-8', '-cp', str(jar), '-d',
                *[str(WORK / name) for name in stubs],
                *[str(source / (name + '.java')) for name in
                  ('NotificationSources', 'NotificationReceiver', 'NotificationCheckpoint', 'GatewayURL', 'EventClient', 'ComputerNotifications')],
+               str(ROOT / 'mobile/tests/FixtureTLS.java'),
                str(ROOT / 'mobile/tests/MobileEventTests.java')], check=True)
 subprocess.run([java_tool('java'), '-Dsun.net.http.allowRestrictedHeaders=true', '-cp',
                 str(WORK) + os.pathsep + str(jar), 'io.github.try2love.codexbridge.MobileEventTests'], check=True)

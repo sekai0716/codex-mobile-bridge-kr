@@ -4,7 +4,7 @@ async function runImageSaveChecks(){
   const check=(ok,label)=>{if(!ok)throw Error(label);passed++;},id='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
   const anchor=document.createElement('button');document.body.append(anchor);
   const dialog=()=>document.getElementById('image-preview-dialog');
-  const name='Screenshot_2026-11-01_很长的原始图片文件名.png';
+  const name='Screenshot_2026-11-01_매우 긴 원본 이미지 파일 이름.png';
   const open=url=>{anchor.dataset.imagePreview=url;anchor.dataset.imageName=name;anchor.click();};
   BridgeImageViewer.configureComposer({scope:()=> 'fixture',canReuse:()=>true,add:()=>true});
   try{
@@ -17,10 +17,10 @@ async function runImageSaveChecks(){
       check(toolbar.scrollWidth<=toolbar.clientWidth+1,'toolbar fits viewport');
       check(controls&&controls.lastElementChild===save&&save.previousElementSibling.id==='image-preview-fit','save is last, after fit');
       check(controls.scrollWidth<=controls.clientWidth+1&&rect.right<=innerWidth,'footer fits viewport');
-      check(save.querySelector('svg')&&save.getAttribute('aria-label')===BridgeI18n.t('保存到本地')&&!save.textContent,'save uses accessible icon only');
+      check(save.querySelector('svg')&&save.getAttribute('aria-label')===BridgeI18n.t('로컬에 저장')&&!save.textContent,'save uses accessible icon only');
       const reuse=document.getElementById('image-preview-reuse'),reuseRect=reuse.getBoundingClientRect();
       const close=document.getElementById('image-preview-close').getBoundingClientRect(),title=document.getElementById('image-preview-title').getBoundingClientRect();
-      check(!reuse.hidden&&reuse.textContent===BridgeI18n.t('引用'),'short reference label');
+      check(!reuse.hidden&&reuse.textContent===BridgeI18n.t('인용하다'),'short reference label');
       check(close.right<=title.left&&title.right<=reuseRect.left&&reuseRect.right<=innerWidth,'header order fits without overlap');
       check(Math.abs(close.top+close.height/2-reuseRect.top-reuseRect.height/2)<1&&toolbar.children.length===3,'header stays one row');
       check(getComputedStyle(reuse).whiteSpace==='nowrap','reuse label stays horizontal');

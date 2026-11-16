@@ -48,7 +48,7 @@ test('failed uploads block send and retry keeps the same attachment id',async()=
  const ui=fixture();ui.setUpload(()=>{throw Error('offline');});ui.panel.add([file('a.txt')]);await tick();
  assert.equal(ui.panel.ready(),false);assert.equal(ui.panel.rows[0].status,'failed');
  ui.setUpload(async(key,id,file)=>({id,name:file.name,size:file.size}));
- const card=ui.root.children[0];card.children.find(n=>n.tag==='button'&&n.textContent==='重试').onclick();await tick();
+ const card=ui.root.children[0];card.children.find(n=>n.tag==='button'&&n.textContent==='다시 시도').onclick();await tick();
  assert.equal(ui.calls[0][1],ui.calls[1][1]);assert.equal(ui.panel.ready(),true);
 });
 test('removing a pending upload or logging out prevents delayed results restoring the draft',async()=>{
@@ -88,7 +88,7 @@ test('asynchronous historical baseline is not a new completion, observed running
 });
 
 test('host references keep structured identity without uploading, survive reload and stay chat-scoped',()=>{
- const ui=fixture(),info={path:'中文/file.txt',absolutePath:'D:\\project\\中文\\file.txt',name:'file.txt',size:900*1024*1024,kind:'file'};
+ const ui=fixture(),info={path:'중국어/file.txt',absolutePath:'D:\\project\\중국어\\file.txt',name:'file.txt',size:900*1024*1024,kind:'file'};
  assert.equal(ui.panel.addReference(info),true);assert.equal(ui.calls.length,0);assert.equal(ui.panel.ids().length,0);
  assert.deepEqual(JSON.parse(JSON.stringify(ui.panel.references())),[{path:info.path,absolutePath:info.absolutePath}]);
  const id=ui.panel.rows[0].id;assert.equal(ui.panel.addReference(info),true);assert.equal(ui.panel.rows.length,1);

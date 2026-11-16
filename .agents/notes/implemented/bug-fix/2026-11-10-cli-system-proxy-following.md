@@ -1,60 +1,60 @@
-# Agent Note: CLI 网络诊断与原生系统代理跟随
+# Agent Note: CLI 네트워크 진단 및 기본 시스템 에이전트 후속 조치
 
 Status: implemented
 
-## 问题
+## 문제
 
-原生 CLI 服务继承的回环代理端口失效后，系统代理可能已经可用。将环境变化诊断作为继续会话的前置拒绝，会挡住仍可工作的本地 provider、NO_PROXY、已有连接和原生认证刷新；只更换一次启动环境，又会在代理下次换端口时复发。
+네이티브 CLI 서비스에서 상속된 루프백 프록시 포트가 만료된 후 시스템 프록시를 사용할 수 있습니다. 세션을 계속하기 위해 환경 변경 진단을 사전 거부로 사용하여 로컬 provider、NO_PROXY、기존 연결 및 기본 인증 새로 고침 시작 환경을 한 번만 변경하면 다음에 에이전트가 포트를 변경할 때 반복됩니다.。
 
-## 决策
+## 결정
 
-普通继续会话把环境诊断作为参考，由既有原生执行器裁决接续和请求。旧代理端口失效或凭据文件变化本身不再前置阻断。尚未核对的配置写入只阻止重复配置和服务维护，仍允许既有原生接续；排空、停止和启动的生命周期回执继续阻止新操作。原 owner、provider、auth、cwd 及原生身份校验保持。
+일반 연속 세션에서는 환경 진단을 참조로 사용하고 기존 기본 실행기가 연속 및 요청을 결정하도록 합니다. 이전 프록시 포트가 만료되거나 자격 증명 파일 변경 자체가 더 이상 사전 차단되지 않습니다. 확인되지 않은 구성 쓰기는 반복되는 구성 및 서비스 유지 관리만 방지하고 기존 기본 연결을 계속 허용합니다. 배수, 중지 및 시작에 대한 수명 주기 영수증이 계속해서 새로운 작업을 방지합니다. 원래의 owner、provider、auth、cwd 및 기본 신원 확인이 유지됩니다.。
 
-macOS 明确确认的失效回环代理恢复增加一项 Codex CLI 用户设置。通过同一原生服务的 `config/read(includeLayers=true)` 取得所选 home 的有效、非 profile user layer version，再以 `config/value/write` 只写 `features.respect_system_proxy=true`，使用 `mergeStrategy=replace` 与 `expectedVersion`。这是持久的 CLI 原生配置，确认文案说明它影响同一 home 后续加载的会话；不修改系统代理、provider、认证或目录。其他 feature 是否配置不影响该项默认值判断。
+macOS 명시적으로 확인된 실패한 루프백 에이전트 복구 항목을 추가했습니다. Codex CLI 사용자 설정. 동일한 기본 서비스를 통해 `config/read(includeLayers=true)` 선발되다 home 유효, 비 profile user layer version，다시 `config/value/write` 쓰기 전용 `features.respect_system_proxy=true`，사용 `mergeStrategy=replace` 및 `expectedVersion`。이것은 지속된다 CLI 기본 구성, 동일한 영향을 미치는 복사 상태를 확인하세요. home 이후에 로드된 세션; 시스템 에이전트를 수정하지 않습니다.、provider、인증 또는 디렉토리. 다른 feature 설정 여부는 본 항목의 기본값 판단에 영향을 미치지 않습니다.。
 
-版本冲突、策略拒绝或配置写入未知时，不开始服务退出，也不自动重放写入。未知写入保留 `configuringUnknown` 回执，显式检查只核验配置，确认已保存后仍须重新确认恢复。`okOverridden` 只证明文件已写：旧 daemon 保存的 false session flag 可在后续普通 fresh Start 清除，其他管理或 profile 覆盖不能绕过。写后再次核验用户值与版本，启动后读取实际生效值。
+버전 충돌, 정책 거부 또는 알 수 없는 구성 쓰기가 있는 경우 서비스 종료가 시작되지 않고 쓰기가 자동으로 재생되지 않습니다. 알 수 없는 쓰기 예약됨 `configuringUnknown` 영수증, 명시적 확인은 구성만 확인합니다. 저장되었음을 확인한 후에도 복구를 다시 확인해야 합니다.。`okOverridden` 문서가 작성되었다는 것만 증명합니다: old daemon 저장됨 false session flag 앞으로도 평범해질 수 있어 fresh Start 클리어, 기타 관리 또는 profile 보장을 우회할 수 없습니다. 쓴 후 다시 사용자 값과 버전을 확인하고, 기동 후 실제 유효값을 읽어 보시기 바랍니다.。
 
-首次旧服务恢复沿用[明确确认的共享服务维护](2026-11-10-cli-release-and-safe-recovery.md)：核验该配置所有任务与原进程代次，正常排空，确认退出后执行普通 `daemon start`，再核对原线程身份。若外部已经启动新服务，普通 Start 只加入并核验，不追加 Restart。启用后原生新 HTTP 请求按系统代理选路，受原生缓存期限约束；代理后续换端口不触发 Bridge 停止共享服务，也不重发已发送或结果未知的消息。Linux 沿用原确认恢复入口，本次不新增系统代理跟随设置。
+처음으로 복원된 이전 서비스[명시적으로 인정된 공유 서비스 유지 관리](2026-11-10-cli-release-and-safe-recovery.md)：이 구성의 모든 작업이 원래 프로세스와 동일한 세대인지 확인하고 정상적으로 비운 다음 종료를 확인한 후 정상적인 작업을 실행합니다. `daemon start`，원본 스레드의 ID를 다시 확인하세요. 외부에서 새로운 서비스가 시작된 경우 일반적으로 Start 가입 및 인증만 하고 추가는 하지 마세요 Restart。활성화 후 네이티브 신규 HTTP 요청은 시스템 프록시에 따라 라우팅되며 기본 캐시 기간이 적용됩니다. 프록시에 의한 후속 포트 변경은 트리거되지 않습니다. Bridge 공유 서비스를 중지하고 전송되었거나 결과를 알 수 없는 메시지를 다시 보내지 마세요.。Linux 원래의 확인 복구 입구가 사용되며, 이번에는 새로운 시스템 에이전트 팔로우 설정이 추가되지 않습니다.。
 
-## 账号、provider 与注入定义的明确恢复
+## 계정、provider 주입 정의를 통한 명시적 복구
 
-本轮扩展继续复用上述确认与回执。受管接入先核验同 home 当前选择、保存凭据来源与配置；旧 activeId 的文件已被原 App/CLI 改变时，明确回退为“按此 home 当前原生配置继续”，不借旧保存账号授权。外部采用路径不改 auth/config，绑定原 id/cwd/provider、当前目标、文件身份和原生配置层版本；keyring/auto 不能仅凭 auth.json 充当已核验新账号，保持准确的能力限制。
+이번 확장에서는 위의 확인 및 영수증을 계속해서 재사용합니다. 관리형 액세스에 대한 동의를 먼저 확인하세요. home 현재 선택, 저장된 자격 증명 소스 및 구성 오래된 activeId 파일은 원본이구요 App/CLI 변경 시 명시적으로 다음으로 대체“여기를 클릭하세요 home 현재 기본 구성이 계속됩니다.”，기존에 저장된 계정 인증을 빌려오지 마세요. 외부 채택 경로는 변경되지 않습니다. auth/config，제본 원본 id/cwd/provider、현재 대상, 파일 ID 및 기본 구성 계층 버전；keyring/auto 전적으로 의지할 수는 없다 auth.json 검증된 새 계정으로 활동하고 정확한 용량 제한을 유지합니다.。
 
-openai/bridge_api 仍明确映射所选同一接入时保留旧 provider。确需变更时只给本次目标线程传 modelProvider，保留 id、历史、cwd、模型与权限的其他原生语义；普通 attach 不允许覆盖。恢复在已确认维护后的 cold 状态执行，loaded 会被拒绝，不自动退订重建。notLoaded 检查与 resume 仍不是跨客户端原子操作，其他客户端必须在明确恢复期间保持静默；不能将这个路径变成普通自动重连。
+openai/bridge_api 선택한 동일한 액세스를 명시적으로 매핑하면 이전 액세스 권한이 유지됩니다. provider。실제로 변경이 필요한 경우 대상 스레드만 이번에 전달됩니다. modelProvider，예약하다 id、역사、cwd、모델 및 권한에 대한 기타 기본 의미 체계 정상 attach 덮어쓰기는 허용되지 않습니다. 유지보수 확인 후 복원 cold 상태 저장 실행，loaded 거부되며 자동으로 구독이 취소되거나 재설정되지 않습니다.。notLoaded 확인해보세요 resume 여전히 클라이언트 간 원자성 작업은 아니므로 다른 클라이언트는 명시적 복구 중에 침묵을 유지해야 합니다. 이 경로는 일반 자동 재연결로 전환될 수 없습니다.。
 
-目标环境仅来自已选择接入或同 home 原生进程中目标明示的变量。清除旧通用 API key/base URL 与已知旧绑定，覆盖目标所需变量；缺新 env_key 或 header 变量时准确报缺来源，不猜网关或新终端 shell，也不拿旧 key 兜底。配置读取不证明 loaded 的 factory 已更新，注入定义变化仍需这一次维护。
+대상 환경은 선택한 액세스 또는 피어에서만 제공됩니다. home 기본 프로세스에서 명시적인 대상이 있는 변수입니다. 기존 일반 지우기 API key/base URL 알려진 이전 항목에 바인딩하여 대상에 필요한 변수를 덮어씁니다. 새로운 것을 놓치다 env_key 또는 header 게이트웨이나 새 터미널을 추측하지 않고 변수를 사용할 때 누락된 소스를 정확하게 보고합니다. shell，오래된 것도 가져가지 마세요 key 모든 세부 사항을 공개합니다. 구성 읽기가 증명되지 않음 loaded 의 factory 업데이트된 주입 정의 변경에는 이번에도 유지 관리가 필요합니다.。
 
-resuming 在实际 resume 派发前持久化。只读核对要求同 home、代际、配置、目标摘要与 id/cwd；同 provider 必须见证先 cold 后当前 loaded，不能把写前回执等同执行。A→B 已持久为 B 时，即使当前 notLoaded 也只解除维护阻挡；后续仅普通无 override 接续。核对均保留原 resume ACK 为 unknown，不授予 factory 来源证明。connected 早返回但未派发时不会报目标已完成。
+resuming 실제로는 resume 파견되기 전에 지속하십시오. 읽기 전용 확인 요구 사항은 다음과 동일합니다. home、생성, 구성, 목표 요약 및 비교 id/cwd；같은 provider 먼저 목격해야합니다 cold 포스트 현재 loaded，사전 쓰기 영수증은 실행과 동일시될 수 없습니다.。A→B 으로 지속되어 왔습니다. B 언제, 현재라고 하더라도 notLoaded 유지보수 블록만 해제됩니다. 후속 단계는 정상적이고 차단되지 않습니다. override 계속하다. 원본을 확인하고 보관하세요 resume ACK ～을 위한 unknown，부여되지 않음 factory 원산지 증명。connected 일찍 돌아왔지만 파견하지 않은 경우에는 목표가 달성된 것으로 보고되지 않습니다.。
 
-只有本 Bridge 在上述明确 quiet 恢复后实际 cold 接续成功、且订阅/metadata 仍属于同一原生代际时，才给该线程记无密钥的 file-auth factory 标记。此时 API-file 与 getAuthStatus 缓存可在内存比较，证明不符才阻新 send，保留阅读/停止。release、卸载或未验证的重新 attach 失去标记。来源未知的外部 loaded 线程不能凭 current config 得到该标记；也不以 ChatGPT token 字节变化误判正常同账户刷新。
+이것만 Bridge 위의 클리어에서 quiet 복구 후 실제 cold 연결 및 구독이 완료되었습니다./metadata 여전히 동일한 기본 세대에 속하는 경우에만 스레드는 키 없이 기록됩니다. file-auth factory 표시. 이 시간에 API-file 및 getAuthStatus 캐시는 메모리에서 비교할 수 있으며, 일관성이 없는 것으로 판명된 경우에만 새 업데이트가 차단됩니다. send，계속 읽으세요/멈추다。release、제거 또는 확인되지 않은 재설치 attach 잃어버린 마크. 출처를 알 수 없는 외부 loaded 스레드는 신뢰할 수 없습니다. current config 이 표시를 받으세요. 또는 ChatGPT token 바이트 변경 사항이 잘못 판단되어 동일한 계정이 새로 고쳐집니다.。
 
-原生 userAgent 前缀由首次 initialize 的 client_name 决定，并不代表可执行程序换版。真实连续恢复实验中，第一次产品核验连接锁定为 `codex-mobile-bridge-network-verify/0.164.0 (Mac OS 15.6.1; arm64) dumb (codex-tui; 1)`，仅认 codex-tui 会误拒第二次恢复及账号同步。因此共享版本判定仅增加当前代码已有的 Bridge client_name，仍精确限制 0.164.0，并继续核验 home/进程；未来版本和任意新后缀不据此放行。账号 `_api_runtime` 复用这一判定。
+네이티브 userAgent 첫 번째 접두어 initialize 의 client_name 이 결정은 실행 가능한 프로그램의 버전 변경을 의미하지 않습니다. 실제 연속복구 실험에서는 첫 번째 제품 검증 연결이 다음과 같이 잠깁니다. `codex-mobile-bridge-network-verify/0.164.0 (Mac OS 15.6.1; arm64) dumb (codex-tui; 1)`，인식만 가능 codex-tui 두 번째 복구 및 계정 동기화가 실수로 거부됩니다. 따라서 공유 버전 판단은 현재 코드의 기존 코드만 추가하게 됩니다. Bridge client_name，여전히 정확하게 제한됨 0.164.0，계속해서 확인하고 home/프로세스; 향후 버전과 새로운 접미사는 이에 따라 출시되지 않습니다. 계정 `_api_runtime` 이 결정을 재사용。
 
-另一项原生字段差异是 ThreadResumeResponse 顶层 modelProvider 表示当前 SessionConfigured，nested thread 与后续 thread/read 却可能长期保留旧历史摘要，短等待不能纠正。首次明确迁移以预原身份、明确目标及已确认顶层实际 provider 为依据；当前连接只接受这个唯一历史旧值，输出实际 runtime 身份，第三 provider/id/cwd 或卸载仍撤销访问。普通无 override 接续只有在当前原生 Store 持久 provider 与 resume 顶层实际 provider 一致时，才重建该历史摘要解释；不改 DB/历史，不把任意 mismatch 当成迁移授权。释放清除旧连接标记，再接续仍需重新取得这份双原生依据。
+또 다른 기본 필드 차이점은 다음과 같습니다. ThreadResumeResponse 최상위 수준 modelProvider 현재를 나타냅니다. SessionConfigured，nested thread 그리고 후속 조치 thread/read 다만, 이전 이력 요약은 장기간 보관될 수 있어 단시간에 수정될 수 없습니다. 사전 정체성, 명확한 목표 및 확인된 최상위 현실을 갖춘 최초의 명확한 마이그레이션 provider 기반; 현재 연결은 이 고유한 과거 값만 받아들이고 실제 값을 출력합니다. runtime 정체성, 세 번째 provider/id/cwd 또는 제거해도 여전히 액세스 권한이 취소됩니다. 보통 없음 override 연속은 현재에만 기본입니다. Store 일종의 튼튼한 나사 provider 및 resume 최상위 현실 provider 일관성이 있으면 역사적 요약 설명이 재구성됩니다. 변하지 마세요 DB/역사는 임의적이지 않다 mismatch 마이그레이션 승인으로 처리됩니다. 이전 연결 표시를 해제하고 지웁니다. 계속하기 전에 이 이중 출처 기반을 다시 얻어야 합니다.。
 
-## 备选方案
+## 대안
 
-- 自动退出整个 daemon 能刷新环境，但已接纳的 turn 可在排空期间创建后台终端，最终退出会清理该终端。因此保留明确确认，不自动停止共享服务。
-- `unsubscribe → resume config` 只重建目标线程，影响面较小；但两次空闲、无后台快照后，另一个合法客户端仍可创建并留下后台终端再退订。原生重建会杀掉该终端，故不采用。跨客户端同线程 RPC 串行不能覆盖这一组请求之间的窗口。
-- `daemon start -c features.respect_system_proxy=true` 看似是进程级最小改动，但 0.164.0 CLI 不把参数传给 child。`restart -c` 能生效，却持久化 daemon settings，且可能终止预读后由外部启动的新进程，不能替代普通 Start。
-- 热加载配置可保留任务，但既有 ModelClient 的代理策略不变。已订阅线程的 `thread/resume.config` 覆盖也被忽略；均不能作为现有坏连接的无损热更新。
+- 자동으로 전체 종료 daemon 환경을 새로 고칠 수 있지만 허용되었습니다. turn 드레이닝 중에 배경 터미널이 생성될 수 있으며 최종 종료 시 터미널이 정리됩니다. 따라서 명시적인 확인이 유지되며 공유 서비스가 자동으로 중지되지 않습니다.。
+- `unsubscribe → resume config` 대상 스레드만 재구축되며 영향은 작습니다. 그러나 백그라운드 스냅샷 없이 두 번의 유휴 시간이 지난 후에도 다른 합법적인 클라이언트는 여전히 백그라운드 터미널을 생성하고 떠난 다음 구독을 취소할 수 있습니다. 기본 재구성으로 인해 터미널이 종료되므로 사용되지 않습니다. 클라이언트 간 동일 스레드 RPC 직렬화는 이 요청 집합 사이의 창을 포함할 수 없습니다.。
+- `daemon start -c features.respect_system_proxy=true` 프로세스 수준에서는 최소한의 변화인 것 같지만, 0.164.0 CLI 매개변수를 전달하지 마세요. child。`restart -c` 효과가 있지만 지속됩니다 daemon settings，그리고 미리 읽은 후 외부에서 시작된 새로운 프로세스를 종료할 수 있으며 일반 프로세스를 대체할 수는 없습니다. Start。
+- 핫 리로딩 구성은 작업을 보존하지만 기존 ModelClient 에이전트 정책은 변경되지 않습니다. 구독한 스레드 `thread/resume.config` 덮어쓰기도 무시됩니다. 기존 불량 연결에 대한 무손실 핫 업데이트로 사용할 수 없습니다.。
 
-## 验证
+## 검증
 
-精确 Codex 0.164.0 的隔离原生实验确认：版本冲突不写文件；生产 helper 仅保存该项，保留其他 feature；即使旧 saved featureOverrides=false，普通 fresh Start 也会清除旧覆盖并读取用户配置 true。另一个真实快照含多个无关 feature、但未配置 respect_system_proxy，生产 helper 正常启用。两个实验均无模型调用，最终正常停止自有 daemon。helper 的 17 项定向测试及模块边界检查通过。
+정확한 Codex 0.164.0 격리 기본 실험에서는 다음을 확인했습니다. 버전 충돌로 인해 파일이 기록되지 않습니다. 생산 helper 이 항목만 저장하고 다른 항목은 유지하세요. feature；늙었어도 saved featureOverrides=false，평범한 fresh Start 또한 이전 재정의를 지우고 사용자 구성을 읽습니다. true。또 다른 실제 스냅샷에는 관련되지 않은 여러 개의 스냅샷이 포함되어 있습니다. feature、하지만 구성되지 않았습니다 respect_system_proxy，생산 helper 정상적으로 활성화합니다. 두 실험 모두 모델 호출이 없었고 결국 정상적으로 중단되었습니다. daemon。helper 의 17 타겟 테스트 및 모듈 경계 검사 통과。
 
-隔离 HTTPS/CONNECT 夹具使用自有 0.164.0 副本、测试证书、固定模型响应和仅注入测试进程的系统代理解析输入，未修改全局系统代理。测试副本仅调整测试签名以加载解析 shim，`__text` 哈希与原版一致，正式二进制及签名未改。同一线程经历两次代理端口变化，均经新代理产生实际 CONNECT 并完成回复，分别耗时 75.68、75.78 秒；daemon PID、原后台终端 ID 和另一个活跃 turn 保留。夹具与清理回执位于 `.tmp/cli-network-live-20261110/`。这是受控原生网络验证，不等同于正式 App、真实账号、手机或其他平台验收。
+격리 HTTPS/CONNECT 나만의 비품을 사용하세요 0.164.0 복제본, 테스트 인증서, 고정 모델 응답 및 시스템 에이전트 구문 분석 입력은 테스트 프로세스에만 삽입되며 전역 시스템 에이전트는 수정되지 않습니다. 테스트 복사본은 구문 분석을 로드하기 위해 테스트 서명만 조정합니다. shim，`__text` 해시는 원본 버전과 일치하며 공식 바이너리와 서명은 변경되지 않았습니다. 동일한 스레드에서 두 개의 프록시 포트 변경이 발생했으며 둘 다 새 프록시를 통해 실제 데이터를 생성했습니다. CONNECT 답변을 완료하는 데 각각 시간이 많이 걸립니다. 75.68、75.78 두번째；daemon PID、원래 백엔드 터미널 ID 그리고 또 다른 활동 turn 예약하다. 비품 및 청소 영수증은 다음 위치에 있습니다. `.tmp/cli-network-live-20261110/`。이는 통제된 기본 네트워크 검증이며 공식 검증과 동일하지 않습니다. App、실계좌, 휴대폰 또는 기타 플랫폼 수용。
 
-原生热加载无效、单线程重建杀后台进程、Start 参数未转发与单项配置 CAS 的证据在 `.tmp/feedback-followup-20261110/cli-network-options/`。产品事务回归由同批 `test_cli_network_recovery.py` 覆盖；不以提交回执或静态读取代替完整模型回复。
+기본 핫 리로딩은 유효하지 않으며 단일 스레드 재구성으로 인해 백그라운드 프로세스가 종료됩니다.、Start 전달되지 않은 매개변수 및 단일 구성 CAS 증거는 `.tmp/feedback-followup-20261110/cli-network-options/`。제품 거래는 동일한 배치로 반환됩니다. `test_cli_network_recovery.py` 보수; 전체 모델 응답 대신 커밋 수신이나 정적 읽기로 응답하지 마세요.。
 
-后续产品 HTTP 集成证据位于 `.tmp/cli-recovery-integration-20261110/`。`run-16261/result.json` 验证缺新变量准确拒绝且无退出/请求，以及 file-auth 已知 factory 下外部文件 B/缓存 A 阻新 send、view/interrupt 仍成功；`run-24662/result.json` 验证同 provider 维护后 KEY_B/staticB/headerB 实际请求、连续第二次 provider 迁移到 other-only 端点，以及正常 release→普通无 override reattach 后仍使用 other-only，保留同 ID/cwd 与四轮历史，均正常清理。原生摘要旧值原样保留在证据中，没有改写它伪装成功。
+후속 제품 HTTP 통합 증거는 다음 위치에 있습니다. `.tmp/cli-recovery-integration-20261110/`。`run-16261/result.json` 누락된 새 변수가 종료하지 않고 정확하게 거부되는지 확인/요청하고, file-auth 알려진 factory 외부 파일 다운로드 B/은닉처 A 블록 혁신 send、view/interrupt 여전히 성공；`run-24662/result.json` 동일한지 확인하세요. provider 유지보수 후 KEY_B/staticB/headerB 실제 요청, 두 번째 연속 provider 다음으로 마이그레이션 other-only 엔드포인트도 정상 release→보통 없음 override reattach 이후에도 계속 사용 other-only，동일하게 유지 ID/cwd 4라운드 내역으로 모두 정상적으로 정리됩니다. 네이티브 다이제스트의 이전 값은 덮어쓰지 않고 그대로 증거에 유지됩니다. 성공적으로 위장되었습니다.。
 
-## 影响
+## 영향
 
-普通接续保留原生可恢复机会；明确启用后，后续代理端口变化可由原生处理，减少共享服务维护。代价是该 home 的 CLI 用户配置新增持久选项，且首次旧运行时仍受原有排空边界限制。原生成功系统路由缓存为 60 秒，活跃连接另有生命周期，不承诺瞬时切换或无条件无损迁移。
+일반 연결은 기본 복구 가능성을 유지합니다. 명시적으로 활성화한 후에는 후속 프록시 포트 변경 사항을 기본적으로 처리할 수 있으므로 공유 서비스 유지 관리가 줄어듭니다. 가격은 home 의 CLI 새로운 지속성 옵션이 사용자 구성에 추가되었으며 첫 번째 이전 실행에는 여전히 원래 배수 경계가 적용됩니다. 기본 성공적인 시스템 경로 캐시는 다음과 같습니다. 60 둘째, 활성 연결에는 다른 수명 주기가 있으며 즉각적인 전환이나 무조건적인 무손실 마이그레이션은 보장되지 않습니다.。
 
-## 相关记录审计
+## 관련 기록 감사
 
-[本机主 CLI 跟随已核验的代理端口](../feature/2026-11-11-cli-follows-current-proxy.md)另行加入同一配置的自动环境恢复；它不修改本篇需要明确确认的原生配置写入。
+[이 기계의 호스트 CLI 확인된 프록시 포트를 따르세요.](../feature/2026-11-11-cli-follows-current-proxy.md)동일한 구성에 대해 또 다른 자동 환경 복구를 추가합니다. 이 문서에서 명시적으로 확인해야 하는 기본 구성 쓰기를 수정하지 않습니다.。
 
-[CLI 释放与恢复修复](2026-11-10-cli-release-and-safe-recovery.md)部分重叠：保留不自动停止共享服务、确认、任务核验和未知回执，只细化普通诊断与明确启用后的原生跟随。[独立 Codex 管理](../feature/2026-11-02-independent-codex-management.md)部分重叠：保留配置隔离与原环境身份，补充后续端口变化不再依赖旧启动变量。[CLI 继续聊天](../feature/2026-10-14-codex-cli-resume.md)部分重叠：普通继续仍不覆盖配置，单项设置只属于明确确认的网络恢复。[上下文与后台控制](../feature/2026-11-01-native-context-and-background-controls.md)部分重叠：保留旧代理故障和活动任务不受干预的历史证据，不把隔离成功改写为原服务已恢复。[CLI 模型目录环境](../feature/2026-10-18-local-cli-daemon-model-environment.md)管理目录端点和凭据读取，与本次系统代理选择无关，保持不变。泛“CLI 恢复”命中的 Desktop、Claude、WSL、归档、通知及初始化记录不改变；现有 proposed TCC 笔记不在本次范围。
+[CLI 릴리스 및 복구 수리](2026-11-10-cli-release-and-safe-recovery.md)부분 중복: 자동으로 중지되지 않는 공유 서비스, 확인, 작업 확인 및 알 수 없는 수신을 유지하고 명시적인 활성화 후 공통 진단 및 기본 후속 조치만 구체화합니다.。[독립적인 Codex 관리하다](../feature/2026-11-02-independent-codex-management.md)부분 중복: 구성 격리 및 원래 환경 ID를 유지하고 후속 포트 변경이 더 이상 이전 시작 변수에 의존하지 않도록 보완합니다.。[CLI 계속 채팅해](../feature/2026-10-14-codex-cli-resume.md)부분 중복: 일반 연속은 여전히 ​​구성을 덮어쓰지 않으며 개별 설정은 명시적으로 확인된 네트워크 복구에만 속합니다.。[상황별 및 배경 제어](../feature/2026-11-01-native-context-and-background-controls.md)부분 중복: 이전 에이전트 오류 및 활성 작업에 대한 기록 증거를 개입 없이 유지하고 원래 서비스가 복원되었으므로 격리 성공을 다시 작성하지 않습니다.。[CLI 모델 디렉토리 환경](../feature/2026-10-18-local-cli-daemon-model-environment.md)관리 디렉터리 끝점 및 자격 증명 읽기는 이 시스템 프록시 선택과 독립적이며 변경되지 않습니다. 팬-“CLI 다시 덮다”때리다 Desktop、Claude、WSL、보관, 알림 및 초기화 기록은 변경되지 않습니다. 기존의 proposed TCC 참고 사항은 이 문서의 범위에 포함되지 않습니다.。

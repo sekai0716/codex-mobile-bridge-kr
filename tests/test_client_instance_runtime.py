@@ -54,7 +54,7 @@ class InstanceRuntimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.manager.control({**request,'confirmed':False})
         child.db.execute('INSERT INTO requests VALUES (?,?,?)', ('unknown','fixture','{"status":"unknown"}'))
         child.db.commit()
-        with self.assertRaisesRegex(ValueError, '待核对'):self.manager.control(request)
+        with self.assertRaisesRegex(ValueError, "이\\ 연결에는\\ 대기\\ 중이거나\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."):self.manager.control(request)
         self.assertFalse(child.closed.is_set())
         child.db.execute('UPDATE requests SET result=?', ('{"status":"complete"}',));child.db.commit()
         with patch.object(child, 'close', wraps=child.close) as close:
@@ -135,9 +135,9 @@ class InstanceRuntimeTests(unittest.TestCase):
         child = self.manager.resolve_instance('deepseek', row['id'], require_enabled=False)
         (self.root/'one').rename(self.root/'previous')
         (self.root/'one').mkdir()
-        with self.assertRaisesRegex(ValueError, '身份'):
+        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):
             self.manager.resolve_instance('deepseek', row['id'], require_enabled=False)
-        with self.assertRaisesRegex(ValueError, '身份'):
+        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):
             child._descriptor('deepseek')
 
     def test_notifications_keep_family_icon_and_full_instance_host(self):
@@ -222,17 +222,17 @@ class ProfileProcessTests(unittest.TestCase):
                    {'id': 'default-upstream', 'credentialSource': 'user-env'}]
         adapter.call.return_value = {'credentialSourcesVersion': 1, 'current': {'id': 'default-upstream'}, 'sources': sources}
         manager = SimpleNamespace(adapters={'deepseek': adapter})
-        with self.assertRaisesRegex(ValueError, '所选模型'):
+        with self.assertRaisesRegex(ValueError, '선택한 모델'):
             require_deepseek_account(manager, 'send', 'chat', {'model': 'private-upstream/forged'})
         adapter.call.return_value = {'credentialSourcesVersion': 1, 'current': {'id': 'private-upstream'}, 'sources': sources}
         require_deepseek_account(manager, 'send', 'chat', {})
         require_deepseek_account(manager, 'settings', 'chat', {'model': 'private-upstream/own-model'})
         adapter.call.return_value = {'current': {'id': 'private-upstream'},
                                     'sources': [{'id': 'private-upstream'}]}
-        with self.assertRaisesRegex(ValueError, '独立 DSH'):
+        with self.assertRaisesRegex(ValueError, "이\\ 독립\\ DSH\\ 연결이\\ 계정\\ 소스를\\ 제공하지\\ 않았습니다\\.\\ 독립적으로\\ 구성된\\ 연결을\\ 준비한\\ 후\\ 다시\\ 시도하십시오\\."):
             require_deepseek_account(manager, 'send', 'chat', {})
         adapter.call.return_value = {'credentialSourcesVersion': 1, 'current': None, 'sources': []}
-        with self.assertRaisesRegex(ValueError, '登录账号'):
+        with self.assertRaisesRegex(ValueError, "먼저\\ 여기서\\ 독립해주세요\\ DSH\\ 구성에서\\ 계정\\ 또는\\ 애플리케이션에\\ 로그인\\ API\\ 연결"):
             require_deepseek_account(manager, 'send', 'chat', {})
         adapter.call.return_value = {'session': {'requests': [{'id': 'approval', 'needsInput': False}]}}
         require_deepseek_account(manager, 'respond', 'chat', {'requestId': 'approval', 'decision': 'decline'})
@@ -302,7 +302,7 @@ class ProfileProcessTests(unittest.TestCase):
     def test_matching_profile_without_launch_identity_is_not_attached(self):
         descriptor = {'nativeProfile': resolve_profile('deepseek', (ROOT/'.tmp/fixture').resolve(), platform='linux'),
                       'profileLaunchReceipt': '/not-present/receipt.json'}
-        with self.assertRaisesRegex(ValueError, '不是由网关启动'):
+        with self.assertRaisesRegex(ValueError, "이\\ 독립적인\\ 구성은\\ 게이트웨이에\\ 의해\\ 시작되지\\ 않습니다\\.\\ 구성을\\ 정상적으로\\ 종료하고\\ 게이트웨이에서\\ 시작하십시오\\."):
             require_owned(descriptor, {'running': True, 'unknown': False, 'mainPids': [22]})
 
     def test_normal_quit_waits_only_for_verified_selected_processes(self):

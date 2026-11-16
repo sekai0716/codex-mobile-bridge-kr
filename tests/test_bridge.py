@@ -232,7 +232,7 @@ class IntegrationTests(unittest.TestCase):
         self.bridge.for_host = lambda host: remote
         rows = self.bridge.list()
         self.assertEqual(rows[0]['host'], 'remote:test')
-        self.assertEqual(self.bridge.host_errors, [{'host': 'local', 'label': '此电脑', 'error': 'Database temporarily unavailable'}])
+        self.assertEqual(self.bridge.host_errors, [{'host': 'local', 'label': '이 컴퓨터', 'error': 'Database temporarily unavailable'}])
 
     def test_host_scoped_list_never_reads_another_host(self):
         self.bridge.hosts.hosts = lambda: {'remote:slow': {'alias': 'slow'}}
@@ -543,7 +543,7 @@ class IntegrationTests(unittest.TestCase):
         self.fixture.loaded = False
         self.bridge.store.history = lambda tid, **kwargs: state()
         with patch('bridge.app.service.open_in_desktop', side_effect=OSError('handler unavailable')):
-            with self.assertRaisesRegex(IPCError, '未发送'):
+            with self.assertRaisesRegex(IPCError, "데스크톱\\ 실행\\ 연결을\\ 사용할\\ 수\\ 없습니다\\.\\ 연결을\\ 다시\\ 구축해\\ 보세요\\.\\ 아무것도\\ 전송되지\\ 않았습니다\\."):
                 self.bridge.send(THREAD, 'hello', str(uuid.uuid4()))
         self.assertFalse(self.bridge.submissions)
         self.assertFalse(any(r['method'] == 'thread-follower-start-turn' for r in self.fixture.requests))
@@ -553,9 +553,9 @@ class IntegrationTests(unittest.TestCase):
         from unittest.mock import patch
         ipc = DesktopIPC('unused')
         with patch.object(ipc, '_send'), patch('bridge.clients.codex.ipc.Future.result', side_effect=TimeoutError):
-            with self.assertRaisesRegex(IPCError, '桌面读取超时'):
+            with self.assertRaisesRegex(IPCError, "데스크탑\\ 읽기\\ 시간\\ 초과;\\ 라이브\\ 세션\\ 상태가\\ 아직\\ 획득되지\\ 않았습니다\\.。"):
                 ipc.request('thread-owner-discovery', {}, timeout=0)
-            with self.assertRaisesRegex(IPCError, '操作可能已提交'):
+            with self.assertRaisesRegex(IPCError, '작업이 제출되었을 수 있습니다.'):
                 ipc.request('thread-follower-start-turn', {}, timeout=0)
         self.assertFalse(ipc.pending)
 
@@ -606,7 +606,7 @@ class IntegrationTests(unittest.TestCase):
         self.bridge.respond(THREAD,'computer',{'action':'accept','content':{}})
         self.assertNotIn('_meta',self.fixture.requests[-1]['params']['response'])
         with session.condition:session.state['requests']=[]
-        with self.assertRaisesRegex(ValueError,'已处理或已过期'):
+        with self.assertRaisesRegex(ValueError,'처리되었거나 만료되었습니다.'):
             self.bridge.respond(THREAD,'computer',{'action':'accept','persist':'always'})
 
     def test_stale_and_pending_approval_routing(self):
@@ -742,7 +742,7 @@ class IntegrationTests(unittest.TestCase):
             return original_target(thread_id)
 
         with patch.object(self.bridge, '_target', side_effect=resolve_target):
-            with self.assertRaisesRegex(ValueError, '已处理或已过期'):
+            with self.assertRaisesRegex(ValueError, '처리되었거나 만료되었습니다.'):
                 self.bridge.respond(THREAD, pending['id'], {'answers': {question: ['stale']}})
         self.assertFalse(self.bridge.submissions)
         self.assertFalse(any(r['method'] in ('thread-follower-start-turn', 'thread-follower-steer-turn')
@@ -784,7 +784,7 @@ class IntegrationTests(unittest.TestCase):
             self.bridge.settings(THREAD, 'model-b', 'ultra')
 
     def test_unicode_model_id_from_cc_switch_can_be_applied(self):
-        model = 'xmy:日卡/deepseek-v4.1-flash'
+        model = 'xmy:\u65e5\u5361/deepseek-v4.1-flash'
         self.bridge.catalog_reader.get_kind = lambda *a, **k: {
             'models': [{'id': model, 'efforts': ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']}],
             'modelSource': 'api'}
@@ -964,7 +964,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(rows[0]['projectName'], 'Work')
         unassigned = hosts.decorate([{'id': 'unassigned', 'cwd': '/work/sub'}], 'remote', 'Server')[0]
         self.assertEqual(unassigned['projectKey'], 'remote|unassigned')
-        self.assertEqual(unassigned['projectName'], '未归类')
+        self.assertEqual(unassigned['projectName'], '분류되지 않음')
         with self.assertRaises(KeyError):
             self.bridge.for_host('unconfigured-host')
 
@@ -1076,12 +1076,12 @@ class IntegrationTests(unittest.TestCase):
         emit({'type': 'patches', 'baseRevision': 52, 'revision': 53,
               'patches': [{'op': 'remove', 'path': ['requests']}]}, version=99)
         self.assertFalse(session.connected)
-        self.assertIn('更新 Bridge', session.error)
+        self.assertIn("Codex 세션 형식이 변경되었습니다. Bridge 업데이트; 기록과 초안은 계속 사용할 수 있습니다.", session.error)
         self.assertEqual(session.state, saved_state)
         self.assertFalse(session.rebuild_recommended)
         self.assertFalse(session.access['canSend'])
         request_count = len(self.fixture.requests)
-        with self.assertRaisesRegex(IPCError, '更新 Bridge'):
+        with self.assertRaisesRegex(IPCError, "Codex\\ 세션\\ 형식이\\ 변경되었습니다\\.\\ Bridge\\ 업데이트;\\ 기록과\\ 초안은\\ 계속\\ 사용할\\ 수\\ 있습니다\\."):
             self.bridge._call(session, 'thread-follower-start-turn', {})
         self.assertEqual(len(self.fixture.requests), request_count)
         emit({'type': 'snapshot', 'revision': 54, 'conversationState': state()}, version=13)
@@ -1101,7 +1101,7 @@ class IntegrationTests(unittest.TestCase):
                 'params': {'hostId': 'local', 'conversationId': THREAD, 'change': change}})
             self.assertFalse(session.connected)
             self.assertFalse(session.access['canSend'])
-            self.assertIn('更新 Bridge', session.error)
+            self.assertIn("Codex 세션 형식이 변경되었습니다. Bridge 업데이트; 기록과 초안은 계속 사용할 수 있습니다.", session.error)
             self.bridge._event({'method': 'thread-stream-state-changed', 'version': 13, 'sourceClientId': 'owner',
                 'params': {'hostId': 'local', 'conversationId': THREAD,
                            'change': {'type': 'snapshot', 'revision': 1, 'conversationState': state()}}})
@@ -1176,7 +1176,7 @@ class ModelTests(unittest.TestCase):
                 request = normalize_state(value)['requests'][0]
                 self.assertEqual(request['id'], 'pending')
                 self.assertFalse(request['supported'])
-                self.assertEqual(request['params'], {'message': '请在桌面 App 处理此请求'})
+                self.assertEqual(request['params'], {'message': "데스크톱 앱에서 이 요청을 처리하세요."})
 
     @unittest.skipUnless(os.name == 'nt', 'Windows drive path syntax')
     def test_reference_path_accepts_windows_drive_paths(self):
@@ -1336,7 +1336,7 @@ class HttpTests(unittest.TestCase):
         manager = self.server.desktop_sessions = Mock()
         def require(provider):
             if provider != identifier:
-                raise ValueError('此应用已关闭，请在应用管理中开启')
+                raise ValueError("이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요.")
         manager.require_enabled.side_effect = require
         self.server.bridge.for_host = lambda host: target if host == identifier else self.server.bridge
         headers = self.login()
@@ -1345,7 +1345,7 @@ class HttpTests(unittest.TestCase):
         path = '/api/sessions/' + THREAD + '/timeline?host=' + identifier
         self.assertEqual(self.request('GET', path, headers=headers)[0], 200)
         target.timeline_read.assert_called_once()
-        manager.require_enabled.side_effect = ValueError('此应用已关闭，请在应用管理中开启')
+        manager.require_enabled.side_effect = ValueError("이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요.")
         target.timeline_read.reset_mock()
         self.assertEqual(self.request('GET', path, headers=headers)[0], 400)
         target.timeline_read.assert_not_called()
@@ -1435,7 +1435,7 @@ class HttpTests(unittest.TestCase):
         self.assertTrue(body['complete'])
         self.assertEqual(self.server.bridge.last_list['limit'], 201)
         self.assertTrue(self.server.bridge.last_list['local_only'])
-        self.server.bridge.host_errors = [{'host': 'local', 'label': '此电脑', 'error': 'Offline'}]
+        self.server.bridge.host_errors = [{'host': 'local', 'label': '이 컴퓨터', 'error': 'Offline'}]
         status, _, body = self.request('GET', '/api/sessions?scope=host&host=local', headers=headers)
         self.assertEqual(status, 200)
         self.assertFalse(body['complete'])
@@ -1576,8 +1576,8 @@ class HttpTests(unittest.TestCase):
     def test_gateway_language_updates_without_restart_and_before_login(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as folder:
             self.server.ui_language_path = Path(folder) / 'ui-language.json'
-            self.assertEqual(self.request('GET', '/api/auth')[2]['uiLanguage'], 'zh')
-            for value, expected in [('{"language":"en"}', 'en'), ('{"language":"zh"}', 'zh'), ('broken', 'zh')]:
+            self.assertEqual(self.request('GET', '/api/auth')[2]['uiLanguage'], 'ko')
+            for value, expected in [('{"language":"en"}', 'en'), ('{"language":"ko"}', 'ko'), ('broken', 'ko')]:
                 self.server.ui_language_path.write_text(value)
                 status, _, data = self.request('GET', '/api/auth')
                 self.assertEqual(status, 200)
@@ -1798,7 +1798,7 @@ class HttpTests(unittest.TestCase):
             self.assertNotIn('private-sign-secret', json.dumps(saved))
             self.assertEqual(self.request('GET', path)[0], 401)
             self.assertEqual(self.request('POST', path, {'webhookSignSecret': 'other'}, {'Cookie': headers['Cookie']})[0], 403)
-            with patch('bridge.api.httpd.publish_webhook', side_effect=WebhookDeliveryError('飞书未接受通知（19021：签名或时间无效）')):
+            with patch('bridge.api.httpd.publish_webhook', side_effect=WebhookDeliveryError('Feishu는 알림을 수락하지 않았습니다.（19021：잘못된 서명 또는 시간）')):
                 status, _, error = self.request('POST', path + '/test', {}, headers)
                 self.assertNotEqual(status, 200)
                 self.assertIn('19021', json.dumps(error))
@@ -1825,14 +1825,14 @@ class HttpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as directory:
             self.server.notifications = Notifications(None, directory)
             path = '/api/notifications/channels/webhook'
-            self.assertEqual(self.request('POST', path + '/endpoints', {'action': 'upsert', 'webhookName': '飞书'})[0], 401)
+            self.assertEqual(self.request('POST', path + '/endpoints', {'action': 'upsert', 'webhookName': 'Feishu'})[0], 401)
             auth = self.login()
-            self.assertEqual(self.request('POST', path + '/endpoints', {'action': 'upsert', 'webhookName': '飞书'},
+            self.assertEqual(self.request('POST', path + '/endpoints', {'action': 'upsert', 'webhookName': 'Feishu'},
                                           {'Cookie': auth['Cookie']})[0], 403)
             self.assertEqual(self.request('GET', path + '/endpoints', headers=auth)[0], 405)
             url = 'https://open.feishu.cn/open-apis/bot/v2/hook/private-token'
             status, _, saved = self.request('POST', path + '/endpoints', {'action': 'upsert',
-                'webhookName': '飞书', 'webhookEnabled': True, 'webhookUrl': url,
+                'webhookName': 'Feishu', 'webhookEnabled': True, 'webhookUrl': url,
                 'webhookSignEnabled': True, 'webhookSignSecret': 'private-sign'}, auth)
             self.assertEqual(status, 200)
             webhook_id = saved['selectedWebhookId']
@@ -2076,7 +2076,7 @@ class HttpTests(unittest.TestCase):
         status, _, body = self.request('GET', '/api/sessions/' + THREAD + '/timeline', headers=self.login())
         self.assertEqual(status, 409)
         self.assertIn('retry', body['error'])
-        self.assertNotIn('日志', body['error'])
+        self.assertNotIn('통나무', body['error'])
 
     def test_remote_transport_rebuild_requires_auth_csrf_and_explicit_flags(self):
         from types import SimpleNamespace
@@ -2196,7 +2196,7 @@ class HttpTests(unittest.TestCase):
 
     def test_large_session_response_compression_and_negotiation(self):
         import gzip
-        view = {'id': THREAD, 'turns': [{'messages': [{'text': '公式与历史内容 ' * 50000}]}]}
+        view = {'id': THREAD, 'turns': [{'messages': [{'text': '수식 및 기록 콘텐츠 ' * 50000}]}]}
         self.server.bridge.view = lambda *args, **kwargs: view
         auth = self.login()
         for encoding, compressed in [('gzip, deflate, br', True), ('gzip;q=0', False), ('identity', False)]:

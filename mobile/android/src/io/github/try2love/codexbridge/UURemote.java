@@ -63,8 +63,8 @@ final class UURemote {
  private Uri.Builder base(String action){return new Uri.Builder().scheme("uuremote").authority("external").appendPath("device").appendPath(action);}
  String open(String mode){
   if(!enabled()||!("full".equals(mode)||"pip".equals(mode)))return "";
-  if("pip".equals(mode)&&!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))return "当前设备不支持 UU 小窗，请使用全屏远控";
-  if(pending().has("nonce"))return "UU 请求正在处理中";
+  if("pip".equals(mode)&&!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))return "작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.";
+  if(pending().has("nonce"))return "UU Remote 요청을 처리 중입니다.";
   String id=prefs.getString("uu.binding:"+scope,"");
   String kind=id.isEmpty()?"bind":mode,nonce=UUID.randomUUID().toString();
   Uri.Builder callback=new Uri.Builder().scheme(scheme()).authority("result");
@@ -76,7 +76,7 @@ final class UURemote {
   }
   Intent intent=new Intent(Intent.ACTION_VIEW,request.build()).setPackage(PACKAGE);
   String version=installedVersion();
-  if(knownTooOld(version))return "请安装或更新 UU 远程至 4.42.0 及以上版本";
+  if(knownTooOld(version))return "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.";
   try{
    if(!kind.equals("full"))prefs.edit().putString(PENDING,new JSONObject().put("scope",scope).put("kind",kind)
       .put("nonce",nonce).put("until",System.currentTimeMillis()+600000).toString()).apply();
@@ -84,11 +84,11 @@ final class UURemote {
    context.startActivity(intent);return "";
   }catch(ActivityNotFoundException missing){
    prefs.edit().remove(PENDING).apply();
-   return version!=null?"系统未能打开已安装的 UU 远程的远控入口":"找不到 UU 远控入口，请确认 UU 安装在当前手机用户下";
+   return version!=null?"Android가 설치된 UU 원격 앱에서 원격 제어 링크를 열 수 없습니다.":"UU 원격 링크 처리기를 찾을 수 없습니다. 이 Android 프로필에 UU 원격이 설치되어 있는지 확인하세요.";
   }catch(SecurityException denied){
    prefs.edit().remove(PENDING).apply();
-   return "系统阻止了应用跳转，请允许 Codex Bridge 打开 UU 远程";
-  }catch(Exception e){prefs.edit().remove(PENDING).apply();return "无法打开 UU 远程";}
+   return "Android에서 실행을 차단했습니다. Codex Bridge가 UU Remote를 열 수 있도록 허용하세요.";
+  }catch(Exception e){prefs.edit().remove(PENDING).apply();return "UU Remote를 열 수 없습니다.";}
  }
  private static String one(Uri uri,String name){List<String> values=uri.getQueryParameters(name);return values.size()==1?values.get(0):null;}
  /** null means an unrelated URL. An empty result consumes a stale or unsolicited callback. */
@@ -101,14 +101,14 @@ final class UURemote {
   if("bind".equals(p.optString("kind"))){
    String id=one(uri,"anonymous_device_id");
    if(id!=null&&!id.isEmpty()&&id.length()<=4096&&!uri.getQueryParameterNames().contains("error")){
-    prefs.edit().putString("uu.binding:"+device,id).apply();return "UU 设备已绑定，请再次选择小窗或远控";
+    prefs.edit().putString("uu.binding:"+device,id).apply();return "기기가 연결되었습니다. 작은 화면 또는 원격 제어를 다시 선택하세요.";
    }
-   return "user_cancel".equals(one(uri,"error"))?"":"UU 绑定未完成，请在 UU 中确认账号和设备";
+   return "user_cancel".equals(one(uri,"error"))?"":"기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.";
   }
-  if("success".equals(one(uri,"status"))&&!uri.getQueryParameterNames().contains("reason"))return "UU 小窗已开启";
-  if(!"failure".equals(one(uri,"status")))return "UU 小窗未能开启，请检查设备或重试";
+  if("success".equals(one(uri,"status"))&&!uri.getQueryParameterNames().contains("reason"))return "UU Remote 작은 화면이 열렸습니다.";
+  if(!"failure".equals(one(uri,"status")))return "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.";
   String reason=one(uri,"reason");
-  if("device_not_found".equals(reason)){unlink(device);return "UU 设备已失效，请重新绑定";}
-  return "device_offline".equals(reason)?"UU 设备离线":"pip_unsupported".equals(reason)?"当前设备不支持 UU 小窗，请使用全屏远控":"user_cancel".equals(reason)?"":"UU 小窗未能开启，请检查设备或重试";
+  if("device_not_found".equals(reason)){unlink(device);return "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.";}
+  return "device_offline".equals(reason)?"UU Remote 기기가 오프라인 상태입니다.":"pip_unsupported".equals(reason)?"작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.":"user_cancel".equals(reason)?"":"작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.";
  }
 }

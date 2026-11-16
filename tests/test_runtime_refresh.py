@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class RuntimeRefreshTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir=ROOT / '.tmp', prefix='runtime 中文 ')
+        self.temp = tempfile.TemporaryDirectory(dir=ROOT / '.tmp', prefix='runtime 중국어 ')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.old = self.root / 'old' / 'codex.exe'

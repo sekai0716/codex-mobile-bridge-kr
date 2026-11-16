@@ -94,7 +94,7 @@ class RegistryTests(unittest.TestCase):
         identifier = entry_id('Ubuntu', 'fixture', '/mnt/c/shared')
         self.entries.candidates[identifier] = {'id': identifier, 'distribution': 'Ubuntu', 'user': 'fixture',
             'home': '/mnt/c/shared', 'windowsHome': str(self.entries.desktop_home), 'label': 'shared'}
-        with self.assertRaisesRegex(ValueError, '共用同一'):
+        with self.assertRaisesRegex(ValueError, "이\\ WSL\\ 입구와\\ 데스크탑이\\ 동일하게\\ 공유됩니다\\.\\ Codex\\ 디렉터리,\\ 반복적으로\\ 액세스할\\ 수\\ 없음"):
             self.entries.configure(identifier, True)
         self.assertFalse(self.entries.path.exists())
 
@@ -347,7 +347,7 @@ class WslSessionTests(unittest.TestCase):
         private_json(self.entry.data_dir/'cli-daemon-recovery.json',
                      {'phase':'waiting','targetGeneration':{'pid':19}})
         request_id = str(uuid.uuid4())
-        with self.assertRaisesRegex(IPCError,'新操作未发送'):
+        with self.assertRaisesRegex(IPCError,'새 작업이 전송되지 않았습니다.'):
             self.entry.send(self.identifier,'New draft',request_id,mode='queue')
         self.assertNotIn(self.identifier+':send:'+request_id,self.entry.receipts)
         turn = str(uuid.uuid4())
@@ -405,11 +405,11 @@ class WslSessionTests(unittest.TestCase):
         with patch.object(self.entry, 'read') as read, patch.object(self.entry.uploads, 'put') as put, \
                 patch.object(self.entry.uploads, 'set_thumb') as thumb:
             for action in ('upload', 'git-action'):
-                with self.assertRaisesRegex(IPCError, '已关闭'):
+                with self.assertRaisesRegex(IPCError, "WSL\\ 입구가\\ 폐쇄되었습니다"):
                     self.entry.workspace(self.identifier, action, {})
-            with self.assertRaisesRegex(IPCError, '已关闭'):
+            with self.assertRaisesRegex(IPCError, "WSL 입구가 폐쇄되었습니다"):
                 self.entry.upload(self.identifier, str(uuid.uuid4()), 'fixture.txt', b'fixture')
-            with self.assertRaisesRegex(IPCError, '已关闭'):
+            with self.assertRaisesRegex(IPCError, "WSL 입구가 폐쇄되었습니다"):
                 self.entry.upload_thumb(self.identifier, str(uuid.uuid4()), b'fixture', 1, 1)
             read.assert_not_called()
             put.assert_not_called()
@@ -422,7 +422,7 @@ class WslSessionTests(unittest.TestCase):
                      lambda: self.entry.project_directories(self.entry.host, '/fixture', name='new'),
                      lambda: self.entry.create_chat(self.entry.host + '|independent', 'Fixture', str(uuid.uuid4()))]
             for call in calls:
-                with self.assertRaisesRegex(IPCError, '已关闭'):
+                with self.assertRaisesRegex(IPCError, "WSL\\ 입구가\\ 폐쇄되었습니다"):
                     call()
             runtime.assert_not_called()
             read.assert_not_called()
@@ -695,7 +695,7 @@ class WslSessionTests(unittest.TestCase):
                                         modelProvider='original-provider')
         self.entry.store.get = lambda identifier: {'id': identifier, 'cwd': '/home/fixture/project',
                                                    'model_provider': 'original-provider'}
-        with self.assertRaisesRegex(IPCError, '提供商与当前接入不同'):
+        with self.assertRaisesRegex(IPCError, "이\\ 기록\\ 세션의\\ 제공자는\\ 현재\\ 액세스와\\ 다릅니다\\.\\ 원래\\ 설정은\\ 유지되었습니다\\.\\ 먼저\\ 액세스\\ 관리\\ 도구에서\\ 원래\\ 액세스를\\ 선택하세요\\."):
             self.entry.activate(self.identifier)
         self.assertFalse(any(m in ('thread/resume', 'turn/start') for m, _ in self.entry.server.calls))
 
@@ -726,9 +726,9 @@ class WslSessionTests(unittest.TestCase):
             return request(method, params)
         self.entry.server.request = unknown
         uncertain = str(uuid.uuid4())
-        with self.assertRaisesRegex(IPCError, '不会重复创建'): self.entry.create_chat(project, 'Unknown', uncertain)
+        with self.assertRaisesRegex(IPCError, '반복적으로 생성되지 않습니다.'): self.entry.create_chat(project, 'Unknown', uncertain)
         self.entry.server.request = Mock(side_effect=AssertionError('Must not replay native creation'))
-        with self.assertRaisesRegex(IPCError, '不会重复创建'): self.entry.create_chat(project, 'Unknown', uncertain)
+        with self.assertRaisesRegex(IPCError, '반복적으로 생성되지 않습니다.'): self.entry.create_chat(project, 'Unknown', uncertain)
 
     def test_blank_wsl_chat_is_materialized_without_a_name_or_model_turn(self):
         self.entry.store.list=lambda **kwargs:[{'cwd':'/home/fixture/project'}]
@@ -770,7 +770,7 @@ class WslSessionTests(unittest.TestCase):
         calls=[params for method,params in self.entry.server.calls if method=='thread/start']
         self.assertEqual(len(calls),1);self.assertEqual(calls[0]['model'],'selected-model');self.assertEqual(calls[0]['config'],{'model_reasoning_effort':'low'})
         self.assertFalse(any(method=='turn/start' for method,_ in self.entry.server.calls))
-        with self.assertRaisesRegex(ValueError,'不同内容'):
+        with self.assertRaisesRegex(ValueError,"동일한\\ 생성\\ 요청을\\ 다른\\ 콘텐츠에\\ 사용할\\ 수\\ 없습니다\\."):
             self.entry.create_chat(project,'Chosen',attempt,model_options={**selected,'model':'other'})
 
     def test_passive_connection_does_not_start_codex_and_explicit_connect_can_start_it(self):
@@ -789,7 +789,7 @@ class WslSessionTests(unittest.TestCase):
     def test_uncertain_send_survives_restart_and_is_never_replayed(self):
         submission = str(uuid.uuid4())
         self.entry.server.fail_send = True
-        with self.assertRaisesRegex(IPCError, '不会重复发送'):
+        with self.assertRaisesRegex(IPCError, "결과를\\ 확인해야\\ 합니다\\.\\ 원본을\\ 확인하세요\\.\\ WSL\\ 대화;\\ 반복적으로\\ 전송되지\\ 않습니다"):
             self.entry.send(self.identifier, 'synthetic input', submission)
         restarted = self.make_entry()
         self.addCleanup(restarted.close)
@@ -822,7 +822,7 @@ class WslSessionTests(unittest.TestCase):
                         action = lambda: entry.settings(self.identifier, 'fixture-model', 'high')
                     else:
                         action = lambda: getattr(entry, operation)(self.identifier)
-                    with self.assertRaisesRegex(IPCError, '身份或接入已变化'):
+                    with self.assertRaisesRegex(IPCError, "기존\\ WSL\\ 세션\\ ID\\ 또는\\ 액세스가\\ 변경되었으며\\ 작업이\\ 전송되지\\ 않았습니다\\.\\ 원래\\ 세션을\\ 다시\\ 확인하세요\\."):
                         action()
                     self.assertFalse(any(method in ('thread/resume', 'turn/start', 'turn/interrupt',
                                                      'thread/settings/update') for method, _ in entry.server.calls))
@@ -908,7 +908,7 @@ class WslSessionTests(unittest.TestCase):
                 result['thread']['modelProvider'] = 'different'
             return result
         self.entry.server.request = changed
-        with self.assertRaisesRegex(IPCError, '尚未发送'):
+        with self.assertRaisesRegex(IPCError, "기존\\ WSL\\ 세션\\ 설정\\ 또는\\ 연결이\\ 변경되었으며\\ 작업이\\ 전송되지\\ 않았습니다\\.\\ 원래\\ 세션을\\ 다시\\ 확인하세요\\."):
             self.entry.send(self.identifier, 'do not send', str(uuid.uuid4()))
         self.assertFalse(self.entry.receipts_path.exists())
         self.assertFalse(any(m == 'turn/start' for m, _ in self.entry.server.calls))
@@ -941,13 +941,13 @@ class WslSessionTests(unittest.TestCase):
     def test_catalog_normalizes_paged_native_models_and_keeps_group_ids_and_efforts(self):
         request = self.entry.server.request
         pages = iter([{'data': [None, {'id': 'internal', 'model': 'group/auto-gpt-6-1-sol',
-                    'displayName': '分组模型', 'supportedReasoningEfforts': [{'reasoningEffort': 'high'}],
+                    'displayName': '그룹화 모델', 'supportedReasoningEfforts': [{'reasoningEffort': 'high'}],
                     'defaultReasoningEffort': 'high'}], 'nextCursor': 'second'},
                       {'data': [{'id': 'group/id-only', 'displayName': ''}, {'model': 'hidden', 'hidden': True}]}])
         self.entry.server.request = lambda method, params: next(pages) if method == 'model/list' else request(method, params)
         result = self.entry.catalog(self.identifier, kind='models')
         self.assertEqual([(m['id'], m['name']) for m in result['models']],
-                         [('group/auto-gpt-6-1-sol', '分组模型'), ('group/id-only', 'group/id-only')])
+                         [('group/auto-gpt-6-1-sol', '그룹화 모델'), ('group/id-only', 'group/id-only')])
         self.assertEqual(result['models'][0]['efforts'], ['high'])
         self.assertEqual(result['models'][0]['defaultEffort'], 'high')
 

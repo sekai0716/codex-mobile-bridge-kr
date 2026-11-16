@@ -22,7 +22,7 @@ final class DshMobileStore {
  static String save(Context c,String input)throws Exception {
   String url=DshMobileURL.connection(input),id=null;for(String candidate:ids(c))if(url.equals(load(c,candidate))){id=candidate;break;}if(id==null)id=UUID.randomUUID().toString();
   Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,key());cipher.updateAAD(id.getBytes(StandardCharsets.UTF_8));byte[] encrypted=cipher.doFinal(url.getBytes(StandardCharsets.UTF_8)),iv=cipher.getIV(),result=new byte[iv.length+encrypted.length];System.arraycopy(iv,0,result,0,iv.length);System.arraycopy(encrypted,0,result,iv.length,encrypted.length);
-  if(!prefs(c).edit().putString(id,Base64.encodeToString(result,Base64.NO_WRAP)).commit())throw new Exception("无法保存 DSH Mobile 连接");return id;
+  if(!prefs(c).edit().putString(id,Base64.encodeToString(result,Base64.NO_WRAP)).commit())throw new Exception("DSH Mobile 연결을 저장할 수 없습니다.");return id;
  }
  static String load(Context c,String id){try{byte[] bytes=Base64.decode(prefs(c).getString(id,""),Base64.NO_WRAP);if(bytes.length<29||bytes.length>32768)return null;Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,key(),new GCMParameterSpec(128,bytes,0,12));cipher.updateAAD(id.getBytes(StandardCharsets.UTF_8));return DshMobileURL.connection(new String(cipher.doFinal(bytes,12,bytes.length-12),StandardCharsets.UTF_8));}catch(Exception invalid){return null;}}
  static void remove(Context c,String id){prefs(c).edit().remove(id).commit();}

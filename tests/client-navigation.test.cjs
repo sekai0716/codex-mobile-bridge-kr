@@ -37,7 +37,7 @@ test('network recovery changes once and refreshes a lost write response without 
 test('failed recovery reconciliation disables writes until a successful explicit read',async()=>{
   const {nav}=fixture(),panel=networkPanel(nav),calls=[];nav.networkAdaptationState={enabled:false};
   nav.request=async(path,body)=>{calls.push(body);throw Error('disconnected');};await nav.setNetworkAdaptation(true);
-  assert.equal(calls.length,2);assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/尚未确认/);
+  assert.equal(calls.length,2);assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/(?:네트워크 복구 설정이 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로 고치세요\.|작업 결과가 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로고침하세요\.)/);
   await nav.setNetworkAdaptation(true);assert.equal(calls.length,2);
   nav.request=async()=>({enabled:true});await nav.readNetworkAdaptation();assert.equal(panel.box.checked,true);assert.equal(panel.box.disabled,false);
 });
@@ -49,9 +49,9 @@ test('network recovery prevents overlapping operations and leaves closed dialogs
 });
 test('older, malformed and password-free gateway responses do not leave active recovery controls',async()=>{
   const {nav}=fixture(),panel=networkPanel(nav);
-  nav.request=async()=>{throw Object.assign(Error('Not found'),{status:404});};await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/更新网关/);
-  nav.request=async()=>({});await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/读取失败/);
-  nav.request=async()=>({enabled:false,canEdit:false});await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/免密访问/);
+  nav.request=async()=>{throw Object.assign(Error('Not found'),{status:404});};await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/네트워크 복구를 사용하려면 게이트웨이를 업데이트하세요\./);
+  nav.request=async()=>({});await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/로드할 수 없습니다\./);
+  nav.request=async()=>({enabled:false,canEdit:false});await nav.readNetworkAdaptation();assert.equal(panel.box.disabled,true);assert.match(panel.status.textContent,/(?:이 설정은 로그인하지 않으면 원격으로 변경할 수 없습니다\. 게이트웨이 앱을 사용하세요\.|비밀번호 없는 액세스)/);
   nav.request=()=>{throw Error('must not write');};await nav.setNetworkAdaptation(true);
 });
 test('notification settings stay hidden on shared relay while remaining actions use all columns',()=>{
@@ -130,7 +130,7 @@ test('an unanswered initialization prompt blocks duplicate operations and stale 
 
 test('pending client status preserves selection and uncertain operation evidence',async()=>{
  const {nav}=fixture(),notices=[];nav.notify=value=>notices.push(value);
- nav.operationFailures=new Map([['claude',{action:'quit',uncertain:true,message:'结果未知'}]]);
+ nav.operationFailures=new Map([['claude',{action:'quit',uncertain:true,message:'결과는 알 수 없음'}]]);
  nav.request=async()=>({pending:true,clients:[]});
  await nav.refresh();
  assert.equal(nav.provider,'claude');assert.equal(nav.clients.length,3);
@@ -141,41 +141,41 @@ test('pending client status preserves selection and uncertain operation evidence
 test('pending client status uses existing fast poll and applies only complete results',async()=>{
  const {nav}=fixture();let reads=0;const current=nav.clients;
  nav.applyClients=data=>{nav.clients=data.clients;};
- nav.request=async()=>++reads===1?{pending:true,clients:[]}:{pending:false,clients:[{...current[0],name:'新状态'}]};
+ nav.request=async()=>++reads===1?{pending:true,clients:[]}:{pending:false,clients:[{...current[0],name:'새로운 상태'}]};
  await nav.refresh();assert.equal(nav.clients.length,3);
  await nav.poll(true);assert.equal(reads,2);assert.equal(nav.clients.length,1);
- assert.equal(nav.clients[0].name,'新状态');assert.equal(nav.statusPending,false);
+ assert.equal(nav.clients[0].name,'새로운 상태');assert.equal(nav.statusPending,false);
 });
 
 test('unknown mobile quit requires a successful status read before retry and ignores late replies',async()=>{
  const ui=fixture(),nav=ui.nav;nav.lifecycleTimeout=5;const client={id:'claude',name:'Claude',enabled:true,configured:true,installed:true,connected:true,running:true};nav.clients=[client];nav.provider='claude';let finish,reads=0,mutations=0,readable=false;
  nav.request=(url,body)=>{if(body){mutations++;return new Promise(resolve=>finish=resolve);}reads++;return readable?Promise.resolve({clients:[client]}):Promise.reject(Error('status offline'));};
- await assert.rejects(nav.toggle('claude',false),/尚未确认/);assert.equal(nav.pending.size,0);assert.equal(nav.hasUncertain(),true);assert.equal(nav.clients[0].connected,true);assert.equal(nav.managementState(nav.clients[0]),'结果待确认');
+ await assert.rejects(nav.toggle('claude',false),/(?:네트워크 복구 설정이 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로 고치세요\.|작업 결과가 확인되지 않았습니다\. 다시 시도하기 전에 상태를 새로고침하세요\.)/);assert.equal(nav.pending.size,0);assert.equal(nav.hasUncertain(),true);assert.equal(nav.clients[0].connected,true);assert.equal(nav.managementState(nav.clients[0]),'처리 결과 미확인');
  const before=reads;await nav.poll();await nav.retryOperation('claude');await nav.toggle('claude',false);assert.equal(reads,before);assert.equal(mutations,1);await nav.refresh();assert.equal(nav.hasUncertain(),true);
  readable=true;await nav.refresh();assert.equal(nav.hasUncertain(),false);finish({clients:[{...client,enabled:false,running:false,connected:false}]});await Promise.resolve();await Promise.resolve();assert.equal(nav.clients[0].enabled,true);assert.equal(nav.clients[0].connected,true);
  ui.setChoice(null);await nav.retryOperation('claude');assert.equal(ui.choices.length,2);assert.equal(mutations,1);
 });
 
 test('an explicit quit rejection remains visible without rewriting the connection or replaying on unlock',async()=>{
- const ui=fixture(),nav=ui.nav,reason='Windows 已锁定；请解锁电脑后重试初始化连接';nav.clients=[{id:'claude',enabled:true,configured:true,installed:true,connected:true,running:true}];nav.provider='claude';let writes=0;
+ const ui=fixture(),nav=ui.nav,reason='Windows가 잠겨 있습니다. 컴퓨터를 잠금 해제한 다음 연결 초기화를 다시 시도하십시오.';nav.clients=[{id:'claude',enabled:true,configured:true,installed:true,connected:true,running:true}];nav.provider='claude';let writes=0;
  nav.request=async(url,body)=>{if(body){writes++;throw Object.assign(Error(reason),{status:409});}return {clients:nav.clients,windowsSession:{state:'locked',interactive:false,reason}};};
- await assert.rejects(nav.toggle('claude',false),/Windows/);assert.equal(nav.hasUncertain(),false);assert.equal(nav.operationFailures.get('claude').message,reason);assert.equal(nav.runtimeState(nav.clients[0]),'已连接');await nav.refresh();assert.equal(nav.operationFailures.get('claude').message,reason);
+ await assert.rejects(nav.toggle('claude',false),/Windows/);assert.equal(nav.hasUncertain(),false);assert.equal(nav.operationFailures.get('claude').message,reason);assert.equal(nav.runtimeState(nav.clients[0]),'연결됨');await nav.refresh();assert.equal(nav.operationFailures.get('claude').message,reason);
  nav.applyClients({clients:nav.clients,windowsSession:{state:'unlocked',interactive:true}});assert.equal(writes,1);assert.equal(ui.initializations.length,0);
 });
 
 test('mobile connection progress survives launch acknowledgment and fast polls stop at a terminal state',async()=>{
- const ui=fixture(),nav=ui.nav;nav.clients=[{id:'deepseek',enabled:false,selectable:true,configured:true,running:false,connected:false,reason:'客户端已配置，可开启桌面应用'}];nav.provider='deepseek';nav.gatewayRunning=true;let finish,reads=0;const snapshots=[];
+ const ui=fixture(),nav=ui.nav;nav.clients=[{id:'deepseek',enabled:false,selectable:true,configured:true,running:false,connected:false,reason:'앱이 구성되었으며 열 준비가 되었습니다.'}];nav.provider='deepseek';nav.gatewayRunning=true;let finish,reads=0;const snapshots=[];
  nav.view.setClientStates=clients=>snapshots.push(clients);nav.request=(url,body)=>body?new Promise(resolve=>finish=resolve):Promise.resolve({clients:[{...nav.clients[0],connectionState:'connected',connected:true,running:true}]});
- const starting=nav.toggle('deepseek',true);assert.equal(nav.runtimeState(nav.clients[0]),'正在启动应用…');assert.equal(snapshots.at(-1)[0].pendingEnable,true);assert.equal(nav.clients[0].running,false);
- finish({clients:[{...nav.clients[0],connectionState:'connecting',reason:'Harness 已启动，正在等待桌面连接'}]});await starting;
- assert.equal(nav.managementState(nav.clients[0]),'已启用');assert.equal(nav.runtimeState(nav.clients[0]),'正在连接，请稍候…');
- const read=nav.request;nav.request=(...args)=>{reads++;return read(...args);};await nav.poll(true);assert.equal(reads,1);assert.equal(nav.runtimeState(nav.clients[0]),'已连接');await nav.poll(true);assert.equal(reads,1);
+ const starting=nav.toggle('deepseek',true);assert.equal(nav.runtimeState(nav.clients[0]),'앱을 시작하는 중…');assert.equal(snapshots.at(-1)[0].pendingEnable,true);assert.equal(nav.clients[0].running,false);
+ finish({clients:[{...nav.clients[0],connectionState:'connecting',reason:'Harness가 시작되었습니다. 데스크톱 연결을 기다리는 중입니다.'}]});await starting;
+ assert.equal(nav.managementState(nav.clients[0]),'사용');assert.equal(nav.runtimeState(nav.clients[0]),'연결 중입니다. 잠시 기다려 주세요…');
+ const read=nav.request;nav.request=(...args)=>{reads++;return read(...args);};await nav.poll(true);assert.equal(reads,1);assert.equal(nav.runtimeState(nav.clients[0]),'연결됨');await nav.poll(true);assert.equal(reads,1);
  nav.clients[0].connected=false;nav.clients[0].connectionState='connecting';ui.document.hidden=true;await nav.poll(true);assert.equal(reads,1);
 });
 
 test('mobile fast polls deduplicate reads and retry sends the same enabled=true request',async()=>{
  const {nav}=fixture();nav.clients=[{id:'deepseek',enabled:true,selectable:true,configured:true,running:false,connected:false,connectionState:'connecting'}];nav.provider='deepseek';let finish,reads=0;nav.request=()=>{reads++;return new Promise(resolve=>finish=resolve);};
- const first=nav.poll(true);await nav.poll(true);assert.equal(reads,1);finish({clients:[{...nav.clients[0],connectionState:'timeout',retryable:true}]});await first;await nav.poll(true);assert.equal(reads,1);assert.equal(nav.runtimeState(nav.clients[0]),'连接超时');
+ const first=nav.poll(true);await nav.poll(true);assert.equal(reads,1);finish({clients:[{...nav.clients[0],connectionState:'timeout',retryable:true}]});await first;await nav.poll(true);assert.equal(reads,1);assert.equal(nav.runtimeState(nav.clients[0]),'연결 시간이 초과되었습니다.');
  let body;nav.request=async(url,value)=>{body=value;return {clients:[{...nav.clients[0],connectionState:'connecting',retryable:false}]};};await nav.toggle('deepseek',true);assert.equal(body.enabled,true);assert.equal(body.provider,'deepseek');assert.equal(nav.clients[0].connected,false);
 });
 test('disabling the active client updates the switcher immediately and stale polling cannot restore it',async()=>{
@@ -259,15 +259,15 @@ test('a slow notification link cannot reopen a chat after the user switches clie
 
 test('client preferences and observed runtime remain separate during a pending operation',async()=>{
  const {nav}=fixture();nav.gatewayRunning=true;const client=nav.clients.find(row=>row.id==='claude');client.connected=true;client.running=true;let finish;nav.request=()=>new Promise(resolve=>finish=resolve);
- const pending=nav.toggle('claude',false);await Promise.resolve();const optimistic=nav.clients.find(row=>row.id==='claude');assert.equal(nav.managementState(optimistic),'正在退出应用…');assert.equal(nav.runtimeState(optimistic),'已连接');await nav.toggle('deepseek',false);assert.equal(nav.pending.size,1);
- finish({clients:nav.clients.map(row=>row.id==='claude'?{...row,connected:false,running:false}:row),gatewayRunning:true});await pending;assert.equal(nav.managementState(nav.clients[1]),'未启用');assert.equal(nav.runtimeState(nav.clients[1]),'应用未运行');
+ const pending=nav.toggle('claude',false);await Promise.resolve();const optimistic=nav.clients.find(row=>row.id==='claude');assert.equal(nav.managementState(optimistic),'앱을 종료하는 중…');assert.equal(nav.runtimeState(optimistic),'연결됨');await nav.toggle('deepseek',false);assert.equal(nav.pending.size,1);
+ finish({clients:nav.clients.map(row=>row.id==='claude'?{...row,connected:false,running:false}:row),gatewayRunning:true});await pending;assert.equal(nav.managementState(nav.clients[1]),'사용 안 함');assert.equal(nav.runtimeState(nav.clients[1]),'앱이 실행되지 않음');
 });
 test('stopped gateway controls only startup preferences and preserves actual runtime evidence',async()=>{
  const {nav}=fixture();nav.gatewayRunning=false;nav.clients[1].running=true;nav.clients[1].connected=false;let finish;nav.request=()=>new Promise(resolve=>finish=resolve);
- const pending=nav.toggle('claude',false);assert.equal(nav.managementState(nav.clients[1]),'正在保存…');assert.equal(nav.runtimeState(nav.clients[1]),'应用运行中，尚未连接');finish({clients:nav.clients,gatewayRunning:false});await pending;assert.equal(nav.managementState(nav.clients[1]),'未选择，下次启动生效');assert.equal(nav.runtimeState({...nav.clients[1],running:undefined}),'尚未连接');
+ const pending=nav.toggle('claude',false);assert.equal(nav.managementState(nav.clients[1]),'절약…');assert.equal(nav.runtimeState(nav.clients[1]),'앱 실행 중; 연결되지 않음');finish({clients:nav.clients,gatewayRunning:false});await pending;assert.equal(nav.managementState(nav.clients[1]),'다음 시작을 위해 꺼짐');assert.equal(nav.runtimeState({...nav.clients[1],running:undefined}),'연결되지 않음');
 });
 test('installed selectable clients can be enabled without pretending they are connected',async()=>{
- const {nav}=fixture();nav.clients[1]={id:'claude',installed:true,configured:false,selectable:true,enabled:false};nav.request=async()=>({clients:nav.clients,gatewayRunning:true});await nav.toggle('claude',true);assert.equal(nav.clients[1].enabled,true);assert.equal(nav.runtimeState(nav.clients[1]),'尚未连接');
+ const {nav}=fixture();nav.clients[1]={id:'claude',installed:true,configured:false,selectable:true,enabled:false};nav.request=async()=>({clients:nav.clients,gatewayRunning:true});await nav.toggle('claude',true);assert.equal(nav.clients[1].enabled,true);assert.equal(nav.runtimeState(nav.clients[1]),'연결되지 않음');
 });
 
 test('the computer-list shortcut exists only in the native mobile shell',()=>{
@@ -283,7 +283,7 @@ test('mobile close choices send an explicit desktop quit intent and distinct pen
   const pending=nav.toggle('claude',false);assert.equal(nav.clients[1].enabled,true);await Promise.resolve();
   assert.equal(calls.length,1);assert.equal(calls[0].quitDesktop,quitDesktop);assert.equal(calls[0].enabled,false);
   assert.equal(Object.hasOwn(calls[0],'forceDesktop'),forceDesktop);if(forceDesktop)assert.equal(calls[0].forceDesktop,true);
-  assert.equal(nav.managementState(nav.clients[1]),forceDesktop?'正在后台强制结束…':quitDesktop?'正在退出应用…':'正在停用接入…');
+  assert.equal(nav.managementState(nav.clients[1]),forceDesktop?'백그라운드에서 강제 종료 중…':quitDesktop?'앱을 종료하는 중…':'액세스를 비활성화하는 중…');
   finish({clients:nav.clients.map(row=>row.id==='claude'?{...row,connected:false,running:!quitDesktop}:row)});await pending;
   assert.equal(nav.clients[1].enabled,false);assert.equal(nav.clients[1].running,!quitDesktop);assert.equal(nav.pending.size,0);assert.equal(nav.pendingForceDesktop,false);
  }
@@ -342,17 +342,17 @@ test('remote main list shares WSL connect routing and blocks concurrent starts f
   nav.clients=[client];nav.gatewayRunning=true;const calls=[];let finish,refreshes=0;t.after(()=>finish?.({}));
   nav.request=(url,body)=>{calls.push({url,body:JSON.parse(JSON.stringify(body))});return new Promise(resolve=>finish=resolve);};
   nav.refresh=async()=>{refreshes++;};nav.renderManager();
-  const button=ui.controls().find(n=>n.tag==='button'&&n.textContent==='启动并连接 WSL');assert.ok(button);
+  const button=ui.controls().find(n=>n.tag==='button'&&n.textContent==='WSL 시작 및 연결');assert.ok(button);
   const pending=button.onclick();await nav.connectWsl(client.id);nav.renderManager();
-  assert.equal(ui.controls().find(n=>n.tag==='button'&&n.textContent==='正在连接，请稍候…').disabled,true);
+  assert.equal(ui.controls().find(n=>n.tag==='button'&&n.textContent==='연결 중입니다. 잠시 기다려 주세요…').disabled,true);
   assert.deepEqual(calls,[{url:'/api/wsl-accounts',body:{provider,entry:client.id,action:'connect'}}]);
   finish({provider,entry:client.id,available:true});await pending;assert.equal(refreshes,1);assert.equal(client.connected,false);assert.equal(client.enabled,true);
   for(const change of [{enabled:false},{distributionRunning:true},{connected:true}]){
-   nav.clients=[{...client,...change}];nav.renderManager();assert.equal(ui.controls().some(n=>n.tag==='button'&&n.textContent==='启动并连接 WSL'),false);
+   nav.clients=[{...client,...change}];nav.renderManager();assert.equal(ui.controls().some(n=>n.tag==='button'&&n.textContent==='WSL 시작 및 연결'),false);
   }
   nav.clients=[client];nav.gatewayRunning=false;await nav.connectWsl(client.id);assert.equal(calls.length,1);
   nav.gatewayRunning=true;ui.window.BridgeSharedRelay={};nav.renderManager();
-  assert.equal(ui.controls().some(n=>n.tag==='button'&&n.textContent==='启动并连接 WSL'),false);
+  assert.equal(ui.controls().some(n=>n.tag==='button'&&n.textContent==='WSL 시작 및 연결'),false);
   await nav.connectWsl(client.id);assert.equal(calls.length,1,'shared relay does not expose account mutation routes');
  }
 });
@@ -371,14 +371,14 @@ test('an uncertain WSL start refreshes without replay and waits for known distri
 test('app management offers force only through close choices and retains a disabled running app exit',async()=>{
  for(const id of ['codex','claude','deepseek']){
   const ui=managerFixture(),nav=ui.nav,client={id,name:id,enabled:true,configured:true,running:true,connected:true,canForceQuit:true};nav.clients=[client];nav.gatewayRunning=true;nav.renderManager();
-  assert.equal(ui.controls().some(node=>node.textContent==='强制关闭 App'),false);assert.equal(ui.controls().some(node=>node.textContent==='关闭电脑 App…'),false);
+  assert.equal(ui.controls().some(node=>node.textContent==='앱 강제 종료'),false);assert.equal(ui.controls().some(node=>node.textContent==='데스크톱 앱 닫기…'),false);
   Object.assign(client,{enabled:false,configured:false,selectable:false,connected:false});nav.renderManager();
-  const close=ui.controls().find(node=>node.textContent==='关闭电脑 App…');assert.ok(close);assert.equal(!!close.disabled,false);assert.equal(ui.controls().find(node=>node.attributes.role==='switch').disabled,true);
+  const close=ui.controls().find(node=>node.textContent==='데스크톱 앱 닫기…');assert.ok(close);assert.equal(!!close.disabled,false);assert.equal(ui.controls().find(node=>node.attributes.role==='switch').disabled,true);
   ui.setChoice(null);await close.onclick();assert.deepEqual(ui.choices,[id]);assert.equal(nav.clients[0].enabled,false);
   let body;ui.setChoice('force');nav.request=async(url,value)=>{body=value;return {clients:[{...client,running:false}]};};await close.onclick();
   assert.equal(body.enabled,false);assert.equal(body.quitDesktop,true);assert.equal(body.forceDesktop,true);assert.equal(body.forceConfirmed,true);
-  nav.renderManager();assert.equal(ui.controls().some(node=>node.textContent==='关闭电脑 App…'),false);
-  nav.clients=[{...client,running:true}];nav.gatewayRunning=false;nav.renderManager();assert.equal(ui.controls().some(node=>node.textContent==='关闭电脑 App…'),false);
+  nav.renderManager();assert.equal(ui.controls().some(node=>node.textContent==='데스크톱 앱 닫기…'),false);
+  nav.clients=[{...client,running:true}];nav.gatewayRunning=false;nav.renderManager();assert.equal(ui.controls().some(node=>node.textContent==='데스크톱 앱 닫기…'),false);
  }
 });
 
@@ -386,21 +386,21 @@ test('app management explicitly starts supported Claude Desktop alongside CLI ac
  const ui=managerFixture(),nav=ui.nav,client={id:'claude',name:'Claude',enabled:false,installed:true,
   selectable:true,connected:false,running:false,cliAvailable:true,canStartDesktop:true,setupStatus:'ready-to-connect'};
  nav.clients=[client];nav.gatewayRunning=true;nav.renderManager();
- let start=ui.controls().find(node=>node.textContent==='启动 Desktop');assert.ok(start);
+ let start=ui.controls().find(node=>node.textContent==='데스크톱 시작');assert.ok(start);
  client.enabled=true;client.retryable=true;nav.renderManager();
- start=ui.controls().find(node=>node.textContent==='启动 Desktop');assert.ok(start);
- assert.equal(ui.controls().some(node=>node.textContent==='重试连接'),false);
+ start=ui.controls().find(node=>node.textContent==='데스크톱 시작');assert.ok(start);
+ assert.equal(ui.controls().some(node=>node.textContent==='연결 재시도'),false);
  ui.setInitializeChoice(true);const calls=[];
  nav.request=async(url,body)=>{calls.push({url,body});return {clients:[{...client,connectionState:'connecting'}]};};
  await start.onclick();
  assert.deepEqual(ui.initializations,['claude']);
  assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/clients');
  assert.equal(calls[0].body.initializeDesktop,true);assert.equal(calls[0].body.enabled,true);
- assert.equal(require('../web/shared/i18n.js').translateEnglish('启动 Desktop'),'Start Desktop');
+ assert.equal(require('../web/shared/i18n.js').translateEnglish('데스크톱 시작'),'Start Desktop');
  for(const changed of [{running:true,canStartDesktop:false},{installed:false,canStartDesktop:false},
    {canStartDesktop:false,setupStatus:'unsupported'}]){
   nav.clients=[{...client,...changed}];nav.renderManager();
-  assert.equal(ui.controls().some(node=>node.textContent==='启动 Desktop'),false);
+  assert.equal(ui.controls().some(node=>node.textContent==='데스크톱 시작'),false);
  }
 });
 
@@ -408,8 +408,8 @@ test('app management keeps Desktop initialization for a running unconnected Clau
  const ui=managerFixture(),nav=ui.nav,client={id:'claude',name:'Claude',enabled:true,installed:true,
   selectable:true,connected:false,running:true,cliAvailable:true,canStartDesktop:false,canInitializeDesktop:true,setupStatus:'idle'};
  nav.clients=[client];nav.gatewayRunning=true;nav.renderManager();
- const initialize=ui.controls().find(node=>node.textContent==='初始化连接');assert.ok(initialize);
- assert.equal(ui.controls().some(node=>node.textContent==='启动 Desktop'),false);
+ const initialize=ui.controls().find(node=>node.textContent==='연결 초기화');assert.ok(initialize);
+ assert.equal(ui.controls().some(node=>node.textContent==='데스크톱 시작'),false);
  ui.setInitializeChoice(true);const calls=[];nav.request=async(url,body)=>{calls.push({url,body});return {clients:[client]};};
  await initialize.onclick();
  assert.deepEqual(ui.initializations,['claude']);
@@ -561,7 +561,7 @@ test('independent Codex profiles keep separate bottom identities and survive sta
 
 
 test('account management owns the shared connection chooser and releases its status subscription',async()=>{
- const {nav}=fixture(),values=[],selected=[];nav.clients=[{id:'zcode',enabled:true,connected:true,connectionMode:'official-remote',connectionModes:[{id:'private-pipe',label:'本机连接',configured:true},{id:'official-remote',label:'官方远控',configured:true}]}];
+ const {nav}=fixture(),values=[],selected=[];nav.clients=[{id:'zcode',enabled:true,connected:true,connectionMode:'official-remote',connectionModes:[{id:'private-pipe',label:'로컬 연결',configured:true},{id:'official-remote',label:'공식 원격 연결',configured:true}]}];
  nav.selectConnectionMode=async(id,mode)=>selected.push([id,mode]);const release=nav.bindAccountManagement({setManagementAction:value=>values.push(value)},'zcode');
  assert.equal(values.at(-1).client.connectionMode,'official-remote');await values.at(-1).select('private-pipe');assert.deepEqual(selected,[['zcode','private-pipe']]);
  nav.pending.add('zcode');for(const render of nav.accountManagementRenderers)render();assert.equal(values.at(-1).disabled,true);

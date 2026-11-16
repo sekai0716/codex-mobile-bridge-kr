@@ -9,7 +9,7 @@ from bridge.clients.manager import DesktopSessions
 from bridge.clients.errors import BridgeUnavailable
 
 ROOT = Path(__file__).resolve().parents[1]
-HISTORY = '客户端尚未提供当前可选模型，历史模型仅供查看'
+HISTORY = "클라이언트가 선택 가능한 모델을 제공하지 않았습니다. 과거 모델은 참조용으로만 표시됩니다."
 
 
 class ClaudeCatalogSources(unittest.TestCase):
@@ -47,7 +47,7 @@ class ClaudeCatalogSources(unittest.TestCase):
         self.assertEqual(rows['shared']['efforts'], ['high'])
         self.assertEqual(rows['historical']['source'], 'session-history')
         self.assertNotEqual(result.get('notice'), HISTORY)
-        self.assertIn('历史', result['notice'])
+        self.assertIn("목록에는 현재 연결의 모델과 과거 모델이 포함됩니다. 과거 모델 가용성은 고객이 확인해야 합니다.", result['notice'])
         cached = self.manager.model_store.read('api-account')[1]
         self.assertEqual(cached['groups'][0]['models'], result['models'])
         self.assertEqual(cached['modelSourcesVersion'], 1)
@@ -78,10 +78,10 @@ class ClaudeCatalogSources(unittest.TestCase):
         self.assertEqual({row['source'] for row in result['models']}, {'session-history'})
 
     def test_configured_models_are_not_claimed_as_upstream_results(self):
-        self.account['groups'][0].update(source='desktop-config', notice='配置来源提示')
+        self.account['groups'][0].update(source='desktop-config', notice='소스 프롬프트 구성')
         result = self.catalog(True)
         self.assertEqual(result['models'][0]['source'], 'desktop-config')
-        self.assertIn('配置来源提示', result['notice'])
+        self.assertIn('소스 프롬프트 구성', result['notice'])
 
     def test_all_models_confirmed_by_upstream_remove_history_warning_and_survive_cache(self):
         self.native['models'] = [self.native['models'][0]]

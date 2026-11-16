@@ -2,14 +2,14 @@
 const BridgeHtmlPreview=(()=>{
   const maxBytes=512*1024;
   function create({text,onEscape}){
-    if(typeof text!=='string'||new TextEncoder().encode(text).length>maxBytes)throw Error('HTML 预览内容超出文本大小限制');
+    if(typeof text!=='string'||new TextEncoder().encode(text).length>maxBytes)throw Error('HTML 미리보기 콘텐츠가 텍스트 크기 제한을 초과합니다.');
     const element=document.createElement('div');element.className='html-preview-frame';
     const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.setAttribute('referrerpolicy','no-referrer');
-    frame.setAttribute('title',typeof BridgeI18n==='undefined'?'HTML 预览':BridgeI18n.t('HTML 预览'));frame.setAttribute('data-i18n-title','HTML 预览');
+    frame.setAttribute('title',typeof BridgeI18n==='undefined'?'HTML 미리보기':BridgeI18n.t('HTML 미리보기'));frame.setAttribute('data-i18n-title','HTML 미리보기');
     frame.src=(window.BridgeRelayBase||'')+'/html-preview-shell';element.append(frame);
     let disposed=false,ready=null;
     const cleanup=()=>{window.removeEventListener('message',receive);clearTimeout(timer);};
-    const fail=()=>{cleanup();if(disposed)return;frame.remove();const notice=document.createElement('p');notice.textContent=typeof BridgeI18n==='undefined'?'HTML 预览无法加载，请查看源代码或下载文件':BridgeI18n.t('HTML 预览无法加载，请查看源代码或下载文件');notice.setAttribute('data-i18n','HTML 预览无法加载，请查看源代码或下载文件');element.append(notice);};
+    const fail=()=>{cleanup();if(disposed)return;frame.remove();const notice=document.createElement('p');notice.textContent=typeof BridgeI18n==='undefined'?'HTML 미리보기를 로드할 수 없습니다. 소스를 보거나 파일을 다운로드하세요.':BridgeI18n.t('HTML 미리보기를 로드할 수 없습니다. 소스를 보거나 파일을 다운로드하세요.');notice.setAttribute('data-i18n','HTML 미리보기를 로드할 수 없습니다. 소스를 보거나 파일을 다운로드하세요.');element.append(notice);};
     const receive=event=>{
       if(disposed||event.source!==frame.contentWindow||event.origin!=='null')return;
       if(ready&&event.data?.type==='bridge-html-preview-escape'&&event.data.instance===ready){onEscape?.();return;}

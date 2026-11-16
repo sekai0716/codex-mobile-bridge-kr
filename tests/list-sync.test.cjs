@@ -20,14 +20,14 @@ const settled=()=>new Promise(setImmediate);
 test('pull feedback is coalesced per frame and only changes text at the release threshold',()=>{
   const ui=fixture();ui.touch('touchstart',20);
   for(let y=32;y<=70;y++)ui.touch('touchmove',y);
-  assert.equal(ui.writes,0);ui.frame();assert.equal(ui.writes,1);assert.match(ui.status.textContent,/下拉/);
+  assert.equal(ui.writes,0);ui.frame();assert.equal(ui.writes,1);assert.match(ui.status.textContent,/당겨서 채팅 새로고침/);
   for(let y=71;y<=90;y++)ui.touch('touchmove',y);
   ui.frame();assert.equal(ui.writes,1);
-  ui.touch('touchmove',110);ui.frame();assert.equal(ui.writes,2);assert.match(ui.status.textContent,/松开/);
+  ui.touch('touchmove',110);ui.frame();assert.equal(ui.writes,2);assert.match(ui.status.textContent,/채팅을 새로고침하려면 버튼을 놓으세요\./);
 });
 
 test('successful refresh dismisses its hint within 800ms and resets pull offset',async()=>{
-  const ui=fixture();await ui.sync.update(true);assert.match(ui.status.textContent,/已更新/);
+  const ui=fixture();await ui.sync.update(true);assert.match(ui.status.textContent,/(?:업데이트됨|채팅이 업데이트되었습니다\.)/);
   ui.advance(800);assert.equal(ui.status.hidden,true);assert.equal(ui.root.style['--list-pull'],'0px');
 });
 
@@ -35,7 +35,7 @@ test('a new pull is not hidden by the previous success timer and background refr
   const ui=fixture();await ui.sync.update(true);ui.advance(400);
   ui.touch('touchstart',20);ui.touch('touchmove',110);ui.frame();
   await ui.sync.update();assert.equal(ui.calls,1);
-  ui.advance(3000);assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/松开/);
+  ui.advance(3000);assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/채팅을 새로고침하려면 버튼을 놓으세요\./);
   ui.touch('touchend',110);await settled();assert.equal(ui.calls,2);
 });
 
@@ -56,7 +56,7 @@ test('busy, hidden and unavailable lists reject pull gestures and failure remain
   const ui=fixture();ui.setReady(false);ui.touch('touchstart',20);ui.touch('touchmove',110);ui.frame();assert.equal(ui.status.hidden,true);ui.touch('touchend',110);
   ui.setReady(true);ui.setVisible(false);ui.touch('touchstart',20);ui.touch('touchmove',110);ui.frame();assert.equal(ui.status.hidden,true);ui.touch('touchend',110);assert.equal(ui.calls,0);
   ui.setVisible(true);let finish;ui.setRefresh(()=>new Promise(resolve=>{finish=resolve;}));const pending=ui.sync.update(true);ui.touch('touchstart',20);ui.touch('touchmove',110);ui.touch('touchend',110);assert.equal(ui.calls,1);finish();await pending;
-  ui.setRefresh(async()=>{throw Error('offline');});await ui.sync.update(true);ui.advance(5000);assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/点击重试/);
+  ui.setRefresh(async()=>{throw Error('offline');});await ui.sync.update(true);ui.advance(5000);assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/새로고침할 수 없습니다\. 다시 시도하려면 탭하세요\./);
   ui.setRefresh(async()=>{});ui.status.onclick();await settled();assert.equal(ui.calls,3);ui.advance(800);assert.equal(ui.status.hidden,true);
 });
 
@@ -65,13 +65,13 @@ test('pulling in the middle of the list does not intercept normal scrolling',asy
 });
 test('reset discards old feedback and keeps a newer refresh busy',async()=>{
  const ui=fixture();let finishOld,finishNew;ui.setRefresh(()=>new Promise(resolve=>finishOld=resolve));const old=ui.sync.update(true);ui.sync.reset();assert.equal(ui.status.hidden,true);
- ui.setRefresh(()=>new Promise(resolve=>finishNew=resolve));const current=ui.sync.update(true);finishOld();await old;assert.equal(ui.sync.busy,true);assert.match(ui.status.textContent,/正在刷新/);finishNew();await current;assert.equal(ui.sync.busy,false);assert.match(ui.status.textContent,/已更新/);
+ ui.setRefresh(()=>new Promise(resolve=>finishNew=resolve));const current=ui.sync.update(true);finishOld();await old;assert.equal(ui.sync.busy,true);assert.match(ui.status.textContent,/채팅 새로고침…/);finishNew();await current;assert.equal(ui.sync.busy,false);assert.match(ui.status.textContent,/(?:업데이트됨|채팅이 업데이트되었습니다\.)/);
 });
 
 test('transient automatic failures preserve an old list quietly, then offer retry',async()=>{
  const ui=fixture();ui.root.children.push({});ui.setRefresh(async()=>{throw Error('offline');});
  await ui.sync.update();await ui.sync.update();assert.equal(ui.status.hidden,true);
- await ui.sync.update();assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/点击重试/);
+ await ui.sync.update();assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/새로고침할 수 없습니다\. 다시 시도하려면 탭하세요\./);
  ui.setRefresh(async()=>{});await ui.sync.update();ui.advance(200);assert.equal(ui.status.hidden,true);
 });
 
@@ -89,5 +89,5 @@ test('automatic success hides an old error when the list reader acknowledges suc
 
 test('stale refresh results never dismiss current feedback or claim success',async()=>{
  const ui=fixture();let finish;ui.setRefresh(()=>new Promise(resolve=>finish=resolve));const stale=ui.sync.update(true);ui.sync.reset();ui.setRefresh(async()=>{throw Error('new failure');});await ui.sync.update(true);finish(false);await stale;
- assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/点击重试/);
+ assert.equal(ui.status.hidden,false);assert.match(ui.status.textContent,/새로고침할 수 없습니다\. 다시 시도하려면 탭하세요\./);
 });

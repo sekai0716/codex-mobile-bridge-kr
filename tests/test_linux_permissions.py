@@ -125,7 +125,7 @@ class LinuxScopeTests(unittest.TestCase):
         session = bridge.session(support.THREAD)
         with patch.object(bridge.catalog_reader, 'linux_permission_capabilities', return_value={}) as capabilities:
             with patch.object(linux_permissions.sys, 'platform', 'linux'), patch.object(bridge, '_call') as write:
-                with self.assertRaisesRegex(ValueError, '无法确认'):
+                with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
                     bridge.permissions(support.THREAD, 'auto-review')
                 write.assert_not_called()
                 bridge.linux_permission_options(support.THREAD)
@@ -207,7 +207,7 @@ class LinuxSidePermissionTests(unittest.TestCase):
                     return {}
                 return original(method, params, **kwargs)
             with self.subTest(response=response), patch.object(self.chat.runtime, 'request', side_effect=request):
-                with self.assertRaisesRegex(SideChatError, '尚未获运行时确认'):
+                with self.assertRaisesRegex(SideChatError, "런타임이\\ 권한\\ 변경을\\ 확인하지\\ 않았습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 상태를\\ 새로\\ 고치세요\\."):
                     self.chat.permissions('full-access', True)
                 self.assertEqual(self.chat.view()['permissionMode'], 'ask')
                 self.assertEqual(self.chat.turn_permissions['permissions'], ':workspace')
@@ -255,12 +255,12 @@ class LinuxSidePermissionTests(unittest.TestCase):
 
     def test_missing_capabilities_and_hidden_full_access_never_write(self):
         with patch.object(self.chat.runtime, 'request', return_value={}) as request:
-            with self.assertRaisesRegex(ValueError, '无法确认'): self.chat.permissions('auto-review')
+            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'): self.chat.permissions('auto-review')
             self.assertNotIn('thread/settings/update', [call.args[0] for call in request.call_args_list])
         (self.home/'.codex-global-state.json').write_text(json.dumps({'electron-persisted-atom-state':
             {'composer-permission-mode-visibility': {'full-access': False}}}))
         self.chat.runtime.calls.clear()
-        with self.assertRaisesRegex(ValueError, '桌面设置'): self.chat.permissions('full-access', True)
+        with self.assertRaisesRegex(ValueError, '데스크탑 설정'): self.chat.permissions('full-access', True)
         self.assertNotIn('thread/settings/update', [method for method, _ in self.chat.runtime.calls])
 
     def test_rejection_and_disconnect_do_not_apply_requested_permissions(self):

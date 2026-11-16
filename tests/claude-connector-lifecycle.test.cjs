@@ -74,7 +74,7 @@ test('two injectors awaiting one handoff cannot both own the renderer',async()=>
  ui.window.__claudeMobileBridge.stop();
  const results=await Promise.all(attempts);await oldRunning;
  assert.equal(results.filter(row=>row.ok).length,1);
- assert.match(results.find(row=>!row.ok).error.message,/状态已变化/);
+ assert.match(results.find(row=>!row.ok).error.message,/상태가 변경되었습니다./);
  assert.match(ui.errors.at(-1),/BRIDGE_OWNER_UNCONFIRMED.*\[(second|third)\]/);
  assert.equal(ui.nativeStops(),0);
 });
@@ -83,7 +83,7 @@ test('an unread signed request prevents foreign handoff',async()=>{
  const oldRunning=ui.inject(first);await waitFor(()=>ui.writes.length>0);
  const old=ui.window.__claudeMobileBridge;
  ui.requests.set(first.cwd,packet(first,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:0}));
- await assert.rejects(ui.inject(second),/未确认请求/);
+ await assert.rejects(ui.inject(second),/이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다\. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요\./);
  assert.match(ui.errors.at(-1),/BRIDGE_OWNER_UNCONFIRMED.*\[second\]/);
  assert.equal(ui.window.__claudeMobileBridge,old);
  assert.equal(old.status().stopped,false);
@@ -95,7 +95,7 @@ test('a request arriving during an offer cancels handoff without replay',async()
  const old=ui.window.__claudeMobileBridge,newRunning=ui.inject(second);
  await waitFor(()=>ui.writes.some(row=>row.generation==='first'&&row.handoffId));
  ui.requests.set(first.cwd,packet(first,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:0}));
- await assert.rejects(newRunning,/未确认请求/);
+ await assert.rejects(newRunning,/이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다\. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요\./);
  assert.equal(ui.window.__claudeMobileBridge,old);
  assert.equal(old.status().stopped,false);
  assert.equal(ui.calls.length,0);
@@ -108,7 +108,7 @@ test('foreign handoff waits for a pending response write',async()=>{
  ui.delayNextWrite();
  ui.requests.set(first.cwd,packet(first,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:0}));
  await waitFor(()=>old.status().writing&&ui.writePending());
- await assert.rejects(ui.inject(second),/请求进行中/);
+ await assert.rejects(ui.inject(second),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
  assert.match(ui.errors.at(-1),/BRIDGE_OWNER_BUSY.*\[second\]/);
  assert.equal(ui.window.__claudeMobileBridge,old);
  ui.releaseWrite();old.stop();await oldRunning;
@@ -129,7 +129,7 @@ test('a response write in progress blocks replacement and direct stop prevents a
  const old=ui.window.__claudeMobileBridge,baseline=ui.writes.length;
  ui.delayNextWrite();ui.requests.set(cfg.cwd,packet(cfg,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:0}));
  await waitFor(()=>old.status().writing&&ui.writePending());
- await assert.rejects(ui.inject(cfg),/请求进行中/);
+ await assert.rejects(ui.inject(cfg),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
  assert.equal(ui.window.__claudeMobileBridge,old);
  old.stop();ui.releaseWrite();await oldRunning;
  assert.equal(ui.writes.length,baseline+1,'an already submitted write completes, with no follow-up publish');
@@ -140,7 +140,7 @@ test('response signing is covered by the write guard and direct stop drops its r
  const old=ui.window.__claudeMobileBridge,baseline=ui.writes.length;
  ui.delayNextSign();ui.requests.set(cfg.cwd,packet(cfg,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:0}));
  await waitFor(()=>ui.signPending()&&old.status().writing);
- await assert.rejects(ui.inject(cfg),/请求进行中/);
+ await assert.rejects(ui.inject(cfg),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
  old.stop();ui.releaseSign();await oldRunning;
  assert.equal(ui.writes.length,baseline,'stopped connector must not submit a response after signing');
 });
@@ -151,7 +151,7 @@ test('CDP invocation advertises pending work and blocks same-owner replacement',
  const message=seq=>({token:cfg.token,generation:cfg.generation,seq,expires:Date.now()/1000+10,surface:'code',method:'getAll',args:[]});
  const first=old.invoke(message(1)),second=old.invoke(message(2));
  await waitFor(()=>old.status().busy);
- await assert.rejects(ui.inject(cfg),/请求进行中/);
+ await assert.rejects(ui.inject(cfg),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
  assert.equal(ui.window.__claudeMobileBridge,old);
  await waitFor(()=>finishes.length===2);finishes[0]();await first;
  assert.equal(old.status().busy,true,'one completed invoke cannot clear the other');
@@ -163,9 +163,9 @@ test('file operation remains owned after its display deadline until Desktop sett
  const old=ui.window.__claudeMobileBridge;let finish;
  ui.api.getAll=()=>new Promise(resolve=>{finish=()=>resolve([]);});
  ui.requests.set(cfg.cwd,packet(cfg,{type:'request',seq:1,surface:'code',method:'getAll',args:[],expires:Date.now()/1000+.8}));
- await waitFor(()=>ui.writes.some(row=>row.seq===1&&row.done&&/超时/.test(row.error)));
+ await waitFor(()=>ui.writes.some(row=>row.seq===1&&row.done&&/시간.*초과/.test(row.error)));
  assert.equal(old.status().busy,true,'timeout must not hide an unsettled native call');
- await assert.rejects(ui.inject(cfg),/请求进行中/);
+ await assert.rejects(ui.inject(cfg),/요청이 진행 중/);
  finish();await waitFor(()=>old.status().busy===false);
  old.stop();await running;
 });
@@ -178,6 +178,6 @@ test('overlapping timed-out publishes keep the write guard until both settle',as
  await waitFor(()=>finishes.length===2);
  finishes[0]();await new Promise(resolve=>setTimeout(resolve,10));
  assert.equal(old.status().writing,true,'first completion cannot clear a later pending write');
- await assert.rejects(ui.inject(cfg),/请求进行中/);
+ await assert.rejects(ui.inject(cfg),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
  old.stop();finishes[1]();await running;
 });

@@ -17,8 +17,8 @@ const BridgeSourceView = (() => {
   const wrapLabel = button => {
     const english = BridgeI18n.language() === 'en';
     button.textContent = button.dataset.wrap === 'true'
-      ? (english ? 'Original line width' : '原始行宽')
-      : (english ? 'Wrap lines' : '自动换行');
+      ? (english ? 'Original line width' : '원래 선 너비')
+      : (english ? 'Wrap lines' : '자동 줄 바꿈');
   };
   document.addEventListener('bridge-language', () => document.querySelectorAll('.wb-source-wrap').forEach(wrapLabel));
   const create = ({name, text, location}) => {

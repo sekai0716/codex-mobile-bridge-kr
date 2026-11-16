@@ -52,7 +52,7 @@ class NamedTunnel:
     def _run(self):
         delay = 2
         while not self.stopped.is_set():
-            self.status('connecting', '正在连接 Cloudflare 固定隧道…')
+            self.status('connecting', "Cloudflare 고정 터널 연결 중…")
             try:
                 # Ignore ambient cloudflared config and credentials. Token is not a command argument.
                 config = self.data_dir/('cloudflare-'+self.entry['id']+'.yml')
@@ -78,9 +78,9 @@ class NamedTunnel:
                                     failure['cause'], failure['connection'], failure['ray'])
                     if 'Registered tunnel connection' in line:
                         delay = 2
-                        self.status('connected', '固定隧道已连接；请检测域名是否指向当前网关。')
+                        self.status('connected', "고정터널이 연결되었습니다. 도메인이 이 게이트웨이에 도달하는지 확인하세요.")
                     elif 'ERR' in line or 'Unregistered tunnel connection' in line:
-                        self.status('retrying', '固定隧道连接异常，请检查 Token、公开主机名和网络。')
+                        self.status('retrying', "고정 터널 연결에 실패했습니다. 토큰, 공개 호스트 이름, 네트워크를 확인하세요.")
                 self.process.wait()
             except (OSError, ValueError):
                 pass
@@ -89,11 +89,11 @@ class NamedTunnel:
                     self.process.stdout.close()
             if self.stopped.is_set():
                 break
-            self.status('retrying', '固定隧道已断开，正在自动重连。')
+            self.status('retrying', "고정 터널이 연결 해제되었습니다. 자동으로 다시 연결됩니다.")
             if self.stopped.wait(delay):
                 break
             delay = min(30, delay*2)
-        self.status('stopped', '固定隧道已停止')
+        self.status('stopped', '고정 터널이 중지됨')
 
     def close(self):
         self.stopped.set()

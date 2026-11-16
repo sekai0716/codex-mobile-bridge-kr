@@ -398,7 +398,7 @@ class CliBridgeTests(CliBridgeFixture):
             self.assertTrue(started.wait(2))
             with patch.object(session.condition, 'wait_for', return_value=False):
                 for _ in range(2):
-                    with self.assertRaisesRegex(IPCError, '桌面连接检查未完成'):
+                    with self.assertRaisesRegex(IPCError, '데스크톱 연결 확인이 완료되지 않았습니다.'):
                         self.bridge.activate(self.thread_id)
             self.assertTrue(session.owner_probe_inflight)
             self.assertIsNone(session.desktop_owner_probe)
@@ -433,7 +433,7 @@ class CliBridgeTests(CliBridgeFixture):
         view = self.bridge.view(self.thread_id, attach=False)
         self.assertFalse(view['access']['canReconnect'])
         self.assertIn('Codex CLI', view['access']['reason'])
-        self.assertIn('安装或更新', view['access']['reason'])
+        self.assertIn("Codex CLI 데몬 또는 설치된 데몬 패키지를 찾을 수 없습니다. 컴퓨터에 Codex CLI를 설치하거나 업데이트하고 한 번 실행하세요.", view['access']['reason'])
         self.cli.attach.assert_not_called()
 
     def test_passive_view_reads_saved_history_without_native_join_or_navigation(self):
@@ -672,7 +672,7 @@ class CliBridgeTests(CliBridgeFixture):
 
     def test_owner_discovery_timeout_without_found_owner_allows_explicit_native_attempt(self):
         self.bridge.ipc.connect=Mock()
-        self.bridge.ipc.owner=Mock(side_effect=IPCError('桌面读取超时；尚未取得实时会话状态。'))
+        self.bridge.ipc.owner=Mock(side_effect=IPCError('데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。'))
         self.bridge.ipc.follow=Mock(side_effect=AssertionError('unclaimed thread must not be followed'))
         session=self.bridge.activate(self.thread_id)
         self.assertEqual(session.runtime, 'cli')
@@ -770,7 +770,7 @@ class CliBridgeTests(CliBridgeFixture):
 
     def test_passive_cli_catalog_does_not_join_native_runtime(self):
         self.bridge.catalog_reader.get_kind = Mock(return_value={'models': [], 'fastMode': {'allowed': False}})
-        with self.assertRaisesRegex(ValueError, '继续此会话'):
+        with self.assertRaisesRegex(ValueError, "모델이나\\ 스킬을\\ 로드하기\\ 전에\\ 이\\ 채팅을\\ 계속하세요"):
             self.bridge.catalog(self.thread_id, kind='models')
         self.cli.attach.assert_not_called()
         self.cli.get_kind.assert_not_called()
@@ -807,7 +807,7 @@ class CliBridgeTests(CliBridgeFixture):
         self.cli.permission_options.return_value = (facts, options)
         self.assertEqual(self.bridge.linux_permission_options(self.thread_id), options)
         self.cli.permission_options.assert_called_with(self.thread_id)
-        with self.assertRaisesRegex(ValueError, '确认完全访问权限'):
+        with self.assertRaisesRegex(ValueError, '전체 액세스 확인'):
             self.bridge.permissions(self.thread_id, 'full-access')
         self.cli.call.side_effect = lambda thread_id, method, params, **kwargs: (
             self.bridge._cli_state(thread_id, {**self.native_state, 'currentPermissions': {
@@ -824,19 +824,19 @@ class CliBridgeTests(CliBridgeFixture):
 
     def test_permission_runtime_mismatch_rejects_before_any_setting_write(self):
         session = self.bridge.activate(self.thread_id)
-        with self.assertRaisesRegex(ValueError, '会话运行时已变化'):
+        with self.assertRaisesRegex(ValueError, "채팅\\ 런타임이\\ 변경되었습니다\\.\\ 권한\\ 패널을\\ 다시\\ 엽니다\\."):
             self.bridge.permissions(self.thread_id, 'ask', expected_runtime='desktop')
         self.cli.permission_options.assert_not_called()
         self.cli.call.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '会话运行时无效'):
+        with self.assertRaisesRegex(ValueError, "잘못된\\ 채팅\\ 런타임"):
             self.bridge.permissions(self.thread_id, 'ask', expected_runtime='other')
-        with self.assertRaisesRegex(ValueError, '确认完全访问权限'):
+        with self.assertRaisesRegex(ValueError, '전체 액세스 확인'):
             self.bridge.permissions(self.thread_id, 'full-access', expected_runtime='cli')
         with session.condition:
             session.runtime = 'desktop'
             session.owner = 'desktop-owner'
         self.bridge.ipc.request = Mock(side_effect=AssertionError('desktop setting write'))
-        with self.assertRaisesRegex(ValueError, '会话运行时已变化'):
+        with self.assertRaisesRegex(ValueError, "채팅\\ 런타임이\\ 변경되었습니다\\.\\ 권한\\ 패널을\\ 다시\\ 엽니다\\."):
             self.bridge.permissions(self.thread_id, 'ask', expected_runtime='cli')
         self.bridge.ipc.request.assert_not_called()
         with session.condition:
@@ -867,7 +867,7 @@ class CliBridgeTests(CliBridgeFixture):
         self.assertFalse(view['access']['canUseGoal'])
         self.assertFalse(view['goalRuntimeAvailable'])
         self.bridge.goal.get_goal = Mock(side_effect=AssertionError('sidecar goal read'))
-        with self.assertRaisesRegex(ValueError, '目标模式'):
+        with self.assertRaisesRegex(ValueError, "목표\\ 모드"):
             self.bridge.send(self.thread_id, 'objective', str(uuid.uuid4()), work_mode='goal')
         self.cli.set_goal.assert_not_called()
 
@@ -1036,7 +1036,7 @@ class RemoteCliGoalTests(CliBridgeFixture):
         view = self.bridge.view(self.thread_id, attach=False)
         self.assertFalse(view['goalRuntimeAvailable'])
         self.assertFalse(view['access']['canUseGoal'])
-        with self.assertRaisesRegex(ValueError, '目标模式'):
+        with self.assertRaisesRegex(ValueError, "목표\\ 모드"):
             self.bridge.send(self.thread_id, 'Remote objective', str(uuid.uuid4()), work_mode='goal')
         self.bridge.goal.set_goal.assert_not_called()
         self.cli.set_goal.assert_not_called()

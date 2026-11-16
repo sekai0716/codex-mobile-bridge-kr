@@ -19,7 +19,7 @@ class FastModeControl {
     const fast=['fast','priority',this.model.fastTier].includes(tier),other=tier!=null&&!['default','standard'].includes(tier)&&!fast;
     if(!this.dirty){this.input.checked=fast;this.input.indeterminate=other;}
     else this.input.indeterminate=false;
-    this.status.textContent=BridgeI18n.t(!this.view?.connected?'连接桌面后可更改':this.dirty?'保存后从下一轮生效':other?'当前使用其他速度档位；切换将替换该设置。':fast?'Fast 已开启':'标准速度');
+    this.status.textContent=BridgeI18n.t(!this.view?.connected?"이 설정을 변경하려면 데스크톱에 연결하세요.":this.dirty?"저장 후 다음 턴부터 적용":other?"다른 속도 등급이 활성화되었습니다. 이를 전환하면 해당 설정이 대체됩니다.":fast?"빠른 속도가 켜져 있습니다":'표준 속도');
   }
 }
 if(typeof module!=='undefined')module.exports={FastModeControl};

@@ -1,21 +1,21 @@
-# Agent Note: 复制原生会话身份
+# Agent Note: 기본 세션 ID 복사
 
 Status: implemented
 
-## 问题
+## 문제
 
-分享聊天需要原客户端身份，不应激活或克隆会话。
+채팅을 공유하려면 원래 클라이언트의 ID가 필요하며 세션을 활성화하거나 복제해서는 안 됩니다.。
 
-## 决策
+## 결정
 
-无副作用的 BridgeSessionLinks.text 辅助函数返回带原生 SSH hostId 的 Codex 线程 URL，或原始 Harness Session ID。对不支持的 provider、无效 Codex ID 和 WSL 端点摘要返回 null。详情操作使用 BridgeClipboard，包括 HTTP 和手动复制回退。Codex 标题详情将复制操作放在执行主机旁，与消息管理和重命名分开。Harness 详情暴露原始原生 Session ID。
+부작용 없음 BridgeSessionLinks.text 보조 함수는 네이티브로 반환됩니다. SSH hostId 의 Codex 실 URL，또는 원본 Harness Session ID。지원되지 않음 provider、유효하지 않은 Codex ID 및 WSL 엔드포인트 요약이 반환됨 null。세부 작업 사용법 BridgeClipboard，포함하다 HTTP 및 수동 복사 대체。Codex 제목 세부 정보는 메시지 관리 및 이름 바꾸기와 별도로 실행 호스트 옆에 복사 작업을 배치합니다.。Harness 세부정보 노출 원본 네이티브 Session ID。
 
-已知复制控件保留旧 `message-copy` 类：已发布 iOS/Android 注入脚本只接受 `message-copy` 或 `code-copy` 上的可信点击，且每次点击只消费一次。它们覆盖 `BridgeClipboard.copy`，因此只改新手机包无法修复既有 App。共享 `copyWithFeedback` 适配器调用该覆盖实现，只有浏览器确认，或旧原生钩子已请求文本、未报告失败并设置其确认成功标签后才提示。绝不把旧成功标签或静默拒绝的点击视为新确认。浏览器手动复制回退只在后续重试成功后提示。原生拒绝仍使用现有可见错误事件；令牌、frame、origin、前台和可信点击检查不变。
+복사 컨트롤은 이전 버전을 유지하는 것으로 알려져 있습니다. `message-copy` 수업: 게시됨 iOS/Android 주입 스크립트는 다음만 허용합니다. `message-copy` 또는 `code-copy` 웹사이트에서 신뢰할 수 있는 클릭이 발생하며, 각 클릭은 한 번만 소비됩니다. 그들은 덮는다 `BridgeClipboard.copy`，따라서 새 휴대폰 패키지만 바꾸는 것만으로는 기존 휴대폰을 수리할 수 없습니다. App。공유됨 `copyWithFeedback` 어댑터는 이 재정의 구현을 호출하고 브라우저가 확인하는 경우 또는 이전 기본 후크가 텍스트를 요청하고 실패 보고에 실패한 경우에만 메시지를 표시하고 확인 성공 태그를 설정합니다. 오래된 성공 태그나 자동으로 거부된 클릭을 새로운 확인으로 처리하지 마십시오. 브라우저의 수동 복사 대체는 후속 재시도가 성공한 후에만 메시지를 표시합니다. 기본 거부는 여전히 기존에 표시되는 오류 이벤트를 사용합니다. 토큰、frame、origin、전경 및 신뢰할 수 있는 클릭 확인은 변경되지 않았습니다.。
 
-## 备选方案
+## 대안
 
-把每个 Bridge host 都作为 Desktop hostId，会让 WSL 链接看似有效，实际端点却是内部注册表摘要，因此辅助函数拒绝该身份。启动 Desktop URL 会打开会话，而非复制。
+각각 넣어 Bridge host 모두 Desktop hostId，허락할 것이다 WSL 링크는 유효한 것으로 보이지만 실제 끝점은 내부 레지스트리 다이제스트이므로 도우미 함수가 ID를 거부합니다. 시작하다 Desktop URL 복사하는 대신 세션을 엽니다.。
 
-## 影响
+## 영향
 
-复制不激活或修改会话。原生 WSL Desktop 映射仍不支持。tests/session-links.test.cjs 验证原生身份和不支持情况；既有剪贴板测试覆盖复制回退。`tests/mobile-copy-compat.test.cjs` 在真实链接、文件/目录和 Harness 操作上，对 iOS/Android 执行不可变的 v2.1.5 共享注入夹具（与 v2.1.4 字节一致），包括原生拒绝和过期标签。按剪贴板、深度链接和会话身份检索活跃笔记，未发现既有链接决定；WSL 统一架构在身份边界上部分重叠，保持不变。
+복제는 세션을 활성화하거나 수정하지 않습니다. 토종의 WSL Desktop 매핑은 아직 지원되지 않습니다.。tests/session-links.test.cjs 기본 ID 및 지원되지 않는 조건을 확인합니다. 기존 클립보드 테스트는 복사 대체를 다룹니다.。`tests/mobile-copy-compat.test.cjs` 실제 링크에서는 파일/디렉토리와 Harness 운영상 그렇습니다 iOS/Android 불변 실행 v2.1.5 공유 주입 장치（ v2.1.4 바이트 일관성）, 기본 거부 및 만료 태그 포함. 클립보드, 딥 링크 및 세션 ID로 활성 노트를 검색합니다. 기존 링크 결정을 찾을 수 없습니다.；WSL 통합 아키텍처는 ID 경계에서 부분적으로 겹치며 변경되지 않습니다.。

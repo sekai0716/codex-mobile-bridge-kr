@@ -71,7 +71,7 @@ class PtyTests(unittest.TestCase):
         self.send(s,'hello input\r'); self.wait_output(s,'ANSWER:hello input')
 
     def test_completion_uses_live_shell_cwd_after_cd(self):
-        s=self.session(); (self.root/'nested').mkdir(); (self.root/'nested'/'目标 文件').write_text('')
+        s=self.session(); (self.root/'nested').mkdir(); (self.root/'nested'/"\u76ee\u6807 \u6587\u4ef6").write_text('')
         self.wait_output(s, 'fixture')
         self.send(s,'cd nested\r'); self.wait_output(s,'cd nested')
         deadline=time.monotonic()+5
@@ -81,9 +81,9 @@ class PtyTests(unittest.TestCase):
             except ValueError: pass
             time.sleep(.02)
         self.assertEqual(s.current_cwd(),str(self.root/'nested'))
-        result=complete_path(s,'ls 目',4)
+        result=complete_path(s,"ls \u76ee",4)
         self.assertEqual(result['cwd'],str(self.root/'nested'))
-        self.assertEqual(result['candidates'][0]['insertText'],"'目标 文件'")
+        self.assertEqual(result['candidates'][0]['insertText'],"'\u76ee\u6807 \u6587\u4ef6'")
 
     @unittest.skipUnless(sys.platform == 'darwin', 'macOS ls color defaults')
     def test_ll_colors_file_types_without_coloring_piped_output(self):
@@ -120,22 +120,22 @@ class PtyTests(unittest.TestCase):
         while 'UTF-8' not in output and time.monotonic() < deadline:
             time.sleep(.02); output = s.read()['output']
         self.assertIn('UTF-8', output)
-        self.send(s,"printf '中文输出\\n'\r")
-        self.wait_output(s, '中文输出\r\n')
+        self.send(s,"printf '\u4e2d\u6587\u8f93\u51fa\\n'\r")
+        self.wait_output(s, "\u4e2d\u6587\u8f93\u51fa\r\n")
 
     def test_terminal_preserves_existing_utf8_locale(self):
-        with patch.dict(os.environ, {'LANG':'zh_CN.UTF-8', 'LC_ALL':'zh_CN.UTF-8', 'LC_CTYPE':'zh_CN.UTF-8'}):
+        with patch.dict(os.environ, {'LANG':'ko_KR.UTF-8', 'LC_ALL':'ko_KR.UTF-8', 'LC_CTYPE':'ko_KR.UTF-8'}):
             s = self.session()
         self.send(s,"printf 'LOCALE:%s:%s:%s\\n' \"$LANG\" \"$LC_ALL\" \"$LC_CTYPE\"\r")
-        self.wait_output(s, 'LOCALE:zh_CN.UTF-8:zh_CN.UTF-8:zh_CN.UTF-8')
+        self.wait_output(s, 'LOCALE:ko_KR.UTF-8:ko_KR.UTF-8:ko_KR.UTF-8')
 
     def test_terminal_uses_any_installed_utf8_locale_as_fallback(self):
         env = {'LANG':'C', 'LC_ALL':'C'}
         with patch('bridge.platforms.posix.terminal.subprocess.run') as run:
-            run.return_value.stdout = 'C\nPOSIX\nzh_CN.UTF-8\n'
+            run.return_value.stdout = 'C\nPOSIX\nko_KR.UTF-8\n'
             self.assertIs(utf8_terminal_environment(env), env)
         run.assert_called_once_with(['locale', '-a'], capture_output=True, text=True, check=True, timeout=2)
-        self.assertEqual(env, {'LANG':'C', 'LC_CTYPE':'zh_CN.UTF-8'})
+        self.assertEqual(env, {'LANG':'C', 'LC_CTYPE':'ko_KR.UTF-8'})
 
     def test_long_poll_wakes_on_output_and_is_bounded(self):
         s=self.session(); self.wait_output(s,'fixture'); time.sleep(.1)
@@ -205,7 +205,7 @@ class PtyTests(unittest.TestCase):
         self.sessions.append(s)
         self.assertEqual(len(received), 1)
         self.send(s, "printf '\\344\\275\\240\\345\\245\\275\\n'\r")
-        self.wait_output(s, '你好')
+        self.wait_output(s, "\u4f60\u597d")
         s.resize(95, 27)
         self.send(s, 'stty size\r')
         self.wait_output(s, '27 95')

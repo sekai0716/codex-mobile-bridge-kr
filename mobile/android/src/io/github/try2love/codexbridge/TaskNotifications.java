@@ -83,7 +83,7 @@ final class TaskNotifications {
   NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
   // Existing channels belong to the user; preserve their mute and sound settings.
   if (manager.getNotificationChannel(id) != null) return;
-  NotificationChannel channel = new NotificationChannel(id, MobileStrings.text(context, "任务提醒"),
+  NotificationChannel channel = new NotificationChannel(id, MobileStrings.text(context, "작업 알림"),
       NotificationManager.IMPORTANCE_HIGH);
   channel.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
       new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)

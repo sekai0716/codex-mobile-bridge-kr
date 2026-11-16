@@ -9,9 +9,9 @@ class CliConnectionsPanel {
   node(tag,text,cls){const node=document.createElement(tag);node.textContent=text===undefined?'':this.t(text);if(cls)node.className=cls;return node;}
   open(target=null){
     this.close();this.target=target;this.provider=target?.provider||this.currentClient();this.clientContext=this.currentClient();this.scope=this.identity();this.selected=new Set();this.error='';this.confirmation=null;this.revision=0;this.historyOpen=false;this.selectTarget=!!target?.sessionId;this.data={connections:[],operations:[]};this.rows=[];this.groups=[];
-    const dialog=this.dialog=this.node('dialog',undefined,'picker cli-connections-panel');dialog.setAttribute('aria-label',this.t('CLI 连接管理'));
+    const dialog=this.dialog=this.node('dialog',undefined,'picker cli-connections-panel');dialog.setAttribute('aria-label',this.t('CLI 연결'));
     dialog.addEventListener('close',()=>{clearTimeout(this.timer);dialog.remove();if(this.dialog===dialog)this.dialog=null;});
-    this.header(dialog);dialog.append(this.node('p','正在读取 CLI 连接…','appearance-note'));document.body.append(dialog);dialog.showModal();this.refresh();
+    this.header(dialog);dialog.append(this.node('p','CLI 연결 로드 중…','appearance-note'));document.body.append(dialog);dialog.showModal();this.refresh();
   }
   valid(dialog){return dialog===this.dialog&&dialog.open&&this.scope===this.identity()&&this.clientContext===this.currentClient();}
   matches(row){
@@ -29,8 +29,8 @@ class CliConnectionsPanel {
     }catch(error){if(this.valid(dialog)&&version===this.readVersion){this.error=error.message;this.render();}}
   }
   button(parent,label,run,{disabled=false}={}){const button=this.node('button',label,'plain');button.type='button';button.disabled=disabled;button.onclick=run;parent.append(button);return button;}
-  closeButton(parent){const button=this.button(parent,'关闭',()=>this.close());button.dataset.cliClose='true';return button;}
-  header(dialog){const head=this.node('div',undefined,'picker-head');head.append(this.node('h2',this.target?.sessionId?'释放 CLI 连接':'CLI 连接管理'));this.closeButton(head);dialog.append(head);if(this.confirmation)this.button(dialog,'返回连接列表',()=>this.back());}
+  closeButton(parent){const button=this.button(parent,'닫기',()=>this.close());button.dataset.cliClose='true';return button;}
+  header(dialog){const head=this.node('div',undefined,'picker-head');head.append(this.node('h2',this.target?.sessionId?'CLI 연결 해제':'CLI 연결'));this.closeButton(head);dialog.append(head);if(this.confirmation)this.button(dialog,'사이',()=>this.back());}
   back(){this.confirmation=null;this.revision++;this.render();}
   snapshot(){
     const latest=new Map(),checks=new Map(),history=[];
@@ -56,15 +56,15 @@ class CliConnectionsPanel {
       const runtime=row.host==='local'||row.host?.startsWith('codex:')?'local':row.host?.startsWith('wsl:')||row.host?.startsWith('wsl-claude:')?'wsl':row.host?'ssh':'unknown';
       const kind=row.scopeKey&&row.scopeLabel&&row.sharedHome===true?'shared':row.configurationKey&&row.configurationLabel?'configuration':'connection';
       const key=JSON.stringify([runtime,row.host,kind,kind==='shared'?row.scopeKey:kind==='configuration'?row.configurationKey:row.key]);
-      if(!groups.has(key))groups.set(key,{key,runtime,kind,scopeKey:kind==='shared'?row.scopeKey:null,label:kind==='shared'?row.scopeLabel:kind==='configuration'?row.configurationLabel:'配置范围待核验',rows:[]});groups.get(key).rows.push(row);
+      if(!groups.has(key))groups.set(key,{key,runtime,kind,scopeKey:kind==='shared'?row.scopeKey:null,label:kind==='shared'?row.scopeLabel:kind==='configuration'?row.configurationLabel:'구성 범위가 확인되지 않았습니다.',rows:[]});groups.get(key).rows.push(row);
     }
     return {rows:[...rows.values()],groups:[...groups.values()].sort((a,b)=>['local','ssh','wsl','unknown'].indexOf(a.runtime)-['local','ssh','wsl','unknown'].indexOf(b.runtime)),history};
   }
   selectable(row,group){return row.current&&!['unknown','releasing','released'].includes(row.status)&&(row.status!=='waiting'||group.kind!=='shared');}
   status(row){
-    if(row.checking||(row.last?.job||row.job)?.mode==='check'&&['waiting','releasing'].includes(row.status))return '正在核对结果';
-    if((row.last?.job||row.job)?.mode==='check'&&row.status==='failed')return '核验未完成';
-    return ({connected:'网关持有连接',waiting:'等待任务完成',releasing:'正在释放',released:'连接已释放',detached:'网关连接已释放，原生占用待核对',unknown:'结果待核对',failed:'尚未释放，可重试',superseded:'已由新的明确操作替代',cancelled:'已取消等待'})[row.status]||row.status;
+    if(row.checking||(row.last?.job||row.job)?.mode==='check'&&['waiting','releasing'].includes(row.status))return '결과 확인 중';
+    if((row.last?.job||row.job)?.mode==='check'&&row.status==='failed')return '확인이 완료되지 않았습니다.';
+    return ({connected:'게이트웨이는 이 연결을 유지합니다.',waiting:'작업이 완료되기를 기다리는 중',releasing:'출시',released:'연결이 해제되었습니다.',detached:'게이트웨이 연결이 끊어졌습니다. 네이티브 소유권 확인이 필요합니다.',unknown:'작업 결과 미확인',failed:'출시되지 않았습니다. 재시도 가능',superseded:'명시적으로 확인된 새로운 작업으로 대체됨',cancelled:'대기 취소됨'})[row.status]||row.status;
   }
   render(){
     const dialog=this.dialog;if(!dialog)return;this.historyOpen=dialog.querySelector('details.cli-release-history')?.open??this.historyOpen;const top=dialog.scrollTop;
@@ -72,40 +72,40 @@ class CliConnectionsPanel {
     const eligible=new Set(groups.flatMap(group=>group.rows.filter(row=>this.selectable(row,group)).map(row=>row.key)));this.selected=new Set([...this.selected].filter(key=>eligible.has(key)));
     if(this.selectTarget){for(const row of rows)if(eligible.has(row.key))this.selected.add(row.key);this.selectTarget=false;}
     dialog.replaceChildren();this.header(dialog);
-    dialog.append(this.node('p','仅管理当前 Agent 的 CLI 连接。每个主机与配置独立释放，聊天历史保留。','appearance-note'));
+    dialog.append(this.node('p','현재 에이전트에 대한 CLI 연결을 관리합니다. 각 호스트와 구성은 별도로 릴리스됩니다. 채팅 기록은 보존됩니다.','appearance-note'));
     if(this.error){const error=this.node('p',this.error,'error');error.setAttribute('role','alert');dialog.append(error);}
     if(this.pending){const status=this.node('p',this.pending.label,'appearance-note');status.setAttribute('role','status');dialog.append(status);}
     if(this.confirmation){this.renderConfirmation();dialog.scrollTop=top;return;}
-    if(!rows.length)dialog.append(this.node('p','当前 Agent 没有由网关持有或待核对的 CLI 连接'));
+    if(!rows.length)dialog.append(this.node('p','이 에이전트에 대해 보류되거나 확인되지 않은 CLI 연결이 없습니다.'));
     let runtime;
     for(const group of groups){
-      if(runtime!==group.runtime){runtime=group.runtime;dialog.append(this.node('h3',({local:'本机',ssh:'SSH',wsl:'WSL',unknown:'运行位置待核验'})[runtime]));}
+      if(runtime!==group.runtime){runtime=group.runtime;dialog.append(this.node('h3',({local:'이 컴퓨터',ssh:'SSH',wsl:'WSL',unknown:'확인되지 않은 위치'})[runtime]));}
       const section=this.node('section',undefined,'cli-release-group');section.dataset.cliGroup=group.key;section.append(this.node('h4',group.label));
-      if(group.kind==='connection')section.append(this.node('p','配置范围尚未核验，仅支持逐连接操作。','appearance-note'));
+      if(group.kind==='connection')section.append(this.node('p','구성 범위가 확인되지 않았습니다. 개별 연결 작업만 사용할 수 있습니다.','appearance-note'));
       for(const row of group.rows){
         const article=this.node('div',undefined,'cli-release-row');article.dataset.cliConnection=row.key;
-        const label=this.node('label',undefined,'display-option'),text=this.node('span');text.append(this.node('strong',row.title||row.sessionId),this.node('small',[!row.current?this.t('旧连接待核对'):'',row.location,row.sessionId].filter(Boolean).join(' · ')));
+        const label=this.node('label',undefined,'display-option'),text=this.node('span');text.append(this.node('strong',row.title||row.sessionId),this.node('small',[!row.current?this.t('이전 연결이 확인되지 않았습니다.'):'',row.location,row.sessionId].filter(Boolean).join(' · ')));
         const check=document.createElement('input');check.type='checkbox';check.disabled=!!this.pending||!this.selectable(row,group);check.checked=this.selected.has(row.key);check.onchange=()=>{if(check.checked)this.selected.add(row.key);else this.selected.delete(row.key);this.render();};label.append(text,check);article.append(label);
         const status=this.node('p',this.status(row),'appearance-note');status.setAttribute('role','status');if(row.error||row.notice)status.append(this.node('span',' · '+this.t(row.error||row.notice)));article.append(status);
-        if(['unknown','detached'].includes(row.status))this.button(article,'核对结果',()=>this.submitLegacy('check',[row.key]),{disabled:!!this.pending||!!row.checking});
-        else if(row.current&&row.canForce===true&&group.kind!=='shared'&&!['releasing','released'].includes(row.status))this.button(article,'强制释放此连接…',()=>this.previewForce(row),{disabled:!!this.pending});
-        if(row.status==='detached'&&row.canUnload===true)this.button(article,'释放原生占用…',()=>this.confirmLegacy('unload',[row.key],group),{disabled:!!this.pending});
+        if(['unknown','detached'].includes(row.status))this.button(article,'결과 확인',()=>this.submitLegacy('check',[row.key]),{disabled:!!this.pending||!!row.checking});
+        else if(row.current&&row.canForce===true&&group.kind!=='shared'&&!['releasing','released'].includes(row.status))this.button(article,'이 연결을 강제로 해제합니다...',()=>this.previewForce(row),{disabled:!!this.pending});
+        if(row.status==='detached'&&row.canUnload===true)this.button(article,'네이티브 소유권 해제…',()=>this.confirmLegacy('unload',[row.key],group),{disabled:!!this.pending});
         section.append(article);
       }
       const current=group.rows.filter(row=>row.current),selected=current.filter(row=>this.selected.has(row.key)),waiting=group.rows.filter(row=>['waiting','releasing'].includes(row.status)&&row.canCancel===true&&row.last?.job.mode==='scopeWait');
-      const cancels=new Map(waiting.map(row=>[row.last.job.id,row.last.job]));for(const [id] of cancels)this.button(section,'取消此范围等待',()=>this.perform({mode:'scopeCancel',id},'正在取消等待…'),{disabled:!!this.pending});
+      const cancels=new Map(waiting.map(row=>[row.last.job.id,row.last.job]));for(const [id] of cancels)this.button(section,'이 범위의 대기 취소',()=>this.perform({mode:'scopeCancel',id},'대기 취소 중…'),{disabled:!!this.pending});
       const blocked=group.rows.some(row=>['waiting','unknown','releasing'].includes(row.status)),normal=selected.length&&!selected.some(row=>['waiting','unknown','releasing'].includes(row.status))&&!(group.kind==='shared'&&blocked);
-      this.button(section,this.target?.sessionId?'释放连接…':'释放所选连接…',()=>this.previewRelease(group,selected.map(row=>row.key)),{disabled:!!this.pending||!normal});
+      this.button(section,this.target?.sessionId?'연결 해제…':'선택한 연결 해제…',()=>this.previewRelease(group,selected.map(row=>row.key)),{disabled:!!this.pending||!normal});
       if(group.kind!=='connection'&&current.length){
-        this.button(section,'释放此配置全部连接…',()=>this.previewRelease(group,current.map(row=>row.key),true),{disabled:!!this.pending||blocked||current.some(row=>!this.selectable(row,group)||row.status==='waiting')});
-        if(group.kind==='shared'&&current.some(row=>row.canForce===true&&row.status!=='released'))this.button(section,'强制释放此范围…',()=>this.previewRelease(group,current.map(row=>row.key),true,true),{disabled:!!this.pending});
+        this.button(section,'이 구성의 모든 연결을 해제합니다…',()=>this.previewRelease(group,current.map(row=>row.key),true),{disabled:!!this.pending||blocked||current.some(row=>!this.selectable(row,group)||row.status==='waiting')});
+        if(group.kind==='shared'&&current.some(row=>row.canForce===true&&row.status!=='released'))this.button(section,'이 범위를 강제 해제합니다…',()=>this.previewRelease(group,current.map(row=>row.key),true,true),{disabled:!!this.pending});
       }
-      if(group.kind!=='shared'&&selected.length)this.button(section,'停止任务并释放所选…',()=>this.confirmLegacy('stop',selected.map(row=>row.key),group),{disabled:!!this.pending});
+      if(group.kind!=='shared'&&selected.length)this.button(section,'작업 중지 및 릴리스 선택됨...',()=>this.confirmLegacy('stop',selected.map(row=>row.key),group),{disabled:!!this.pending});
       dialog.append(section);
     }
-    if(history.length){const details=this.node('details',undefined,'cli-release-history');details.open=this.historyOpen;details.append(this.node('summary',this.t('历史操作回执')+' · '+history.length));
+    if(history.length){const details=this.node('details',undefined,'cli-release-history');details.open=this.historyOpen;details.append(this.node('summary',this.t('운영 이력')+' · '+history.length));
       const load=()=>{if(!details.open||details.dataset.loaded)return;details.dataset.loaded='true';for(const row of [...history].reverse()){const line=this.node('p',undefined,'appearance-note');line.textContent=[row.title||row.sessionId,this.t(this.status(row)),row.job.id,row.error||row.notice?this.t(row.error||row.notice):''].filter(Boolean).join(' · ');details.append(line);}};details.addEventListener('toggle',load);load();dialog.append(details);}
-    this.button(dialog,'刷新',()=>this.refresh(),{disabled:!!this.pending});dialog.scrollTop=top;
+    this.button(dialog,'새로고침',()=>this.refresh(),{disabled:!!this.pending});dialog.scrollTop=top;
   }
   async perform(body,label,preview=null){
     const dialog=this.dialog;if(!this.valid(dialog)||this.pending)return;clearTimeout(this.timer);this.readVersion++;const revision=this.revision,token={label};this.pending=token;this.error='';this.render();
@@ -119,32 +119,32 @@ class CliConnectionsPanel {
   previewRelease(group,keys,all=false,force=false){
     if(!keys.length)return;
     if(group.kind!=='shared')return this.confirmLegacy('wait',keys,group);
-    return this.perform({mode:'scopePreview',scopeKey:group.scopeKey,...(all?{all:true}:{connections:keys})},'正在核对释放范围…',value=>{
-      if(value.scopeKey!==group.scopeKey||typeof value.generation!=='string'||!value.generation||!Array.isArray(value.connections)||!value.scopeLabel||!Array.isArray(value.impact))throw Error(value.message||'CLI 范围尚未核验，请重新检查');
+    return this.perform({mode:'scopePreview',scopeKey:group.scopeKey,...(all?{all:true}:{connections:keys})},'출시 범위를 확인하는 중…',value=>{
+      if(value.scopeKey!==group.scopeKey||typeof value.generation!=='string'||!value.generation||!Array.isArray(value.connections)||!value.scopeLabel||!Array.isArray(value.impact))throw Error(value.message||'CLI 범위가 확인되지 않았습니다. 다시 확인하세요.');
       return {mode:force?'scopeForce':'scopeWait',preview:value,group};
     });
   }
-  previewForce(row){return this.perform({mode:'forcePreview',connections:[row.key]},'正在核对释放范围…',value=>{
-    if(value.canForce!==true||typeof value.generation!=='string'||!value.generation||!value.scopeLabel||!Array.isArray(value.impact))throw Error(value.message||'当前无法核验此 CLI 连接及原生进程。');return {mode:'force',preview:value,keys:[row.key]};
+  previewForce(row){return this.perform({mode:'forcePreview',connections:[row.key]},'출시 범위를 확인하는 중…',value=>{
+    if(value.canForce!==true||typeof value.generation!=='string'||!value.generation||!value.scopeLabel||!Array.isArray(value.impact))throw Error(value.message||'이 CLI 연결 및 네이티브 프로세스는 현재 확인할 수 없습니다.');return {mode:'force',preview:value,keys:[row.key]};
   });}
   confirmLegacy(mode,keys,group){if(!this.valid(this.dialog)||this.pending)return;clearTimeout(this.timer);this.confirmation={mode,keys,group};this.revision++;this.render();}
   renderConfirmation(){
     const dialog=this.dialog,{mode,preview,keys,group}=this.confirmation,force=['scopeForce','force'].includes(mode),scope=mode.startsWith('scope');
-    dialog.append(this.node('h3',force?'确认强制释放？':mode==='stop'?'停止任务并释放连接？':mode==='unload'?'释放原生占用？':'确认释放 CLI 连接？'));
+    dialog.append(this.node('h3',force?'강제 석방?':mode==='stop'?'작업을 중지하고 연결을 해제하시겠습니까?':mode==='unload'?'네이티브 소유권을 해제하시겠습니까?':'CLI 연결을 해제하시겠습니까?'));
     dialog.append(this.node('p',preview?.scopeLabel||group?.label,'appearance-note'));
     if(preview?.message)dialog.append(this.node('p',preview.message,'appearance-note'));
-    dialog.append(this.node('p',force?'将中断运行中或状态未知的任务；范围可能包含未列出的会话。聊天历史保留。':scope||mode==='unload'?'此操作会退出此配置的整个共享 CLI 服务，包含其它连接。默认等待全部任务安全结束；期间请勿从其它客户端发起新任务。':mode==='stop'?'将停止所选连接的任务并逐条释放，聊天历史保留。':'逐条等待所选 CLI 任务安全结束后释放连接，不退出其它配置。','appearance-note'));
-    if(mode==='wait')dialog.append(this.node('p','此操作暂不支持取消等待；关闭面板不会取消已提交的释放。','appearance-note'));
+    dialog.append(this.node('p',force?'이로 인해 실행 중이거나 확인되지 않은 작업이 중단됩니다. 범위에는 나열되지 않은 세션이 포함될 수 있습니다. 채팅 기록은 보존됩니다.':scope||mode==='unload'?'그러면 다른 연결을 포함하여 이 구성에 대한 전체 공유 CLI 서비스가 종료됩니다. 모든 작업이 안전하게 완료될 때까지 기다립니다. 그동안 다른 클라이언트에서 새 작업을 시작하지 마십시오.':mode==='stop'?'선택한 연결에서 작업을 중지하고 각 연결을 해제합니다. 채팅 기록은 보존됩니다.':'선택한 CLI 작업이 안전하게 완료될 때까지 기다렸다가 각 연결을 해제합니다. 다른 구성은 종료되지 않습니다.','appearance-note'));
+    if(mode==='wait')dialog.append(this.node('p','현재 대기 취소는 지원되지 않습니다. 패널을 닫아도 제출된 릴리스는 취소되지 않습니다.','appearance-note'));
     const impact=this.node('ul');for(const item of preview?.impact||keys.map(key=>this.rows.find(row=>row.key===key)||{sessionId:key}))impact.append(this.node('li',item.title||item.sessionId));dialog.append(impact);
-    const allowed=!preview||(force?preview.canForce===true:preview.canRelease===true),actions=this.node('div',undefined,'sm-confirm-actions'),confirm=this.node('button',force?'确认强制释放':mode==='stop'?'确认停止并释放':'确认释放','primary');confirm.type='button';confirm.disabled=!!this.pending||!allowed;confirm.onclick=()=>this.confirm();actions.append(confirm);this.button(actions,'返回连接列表',()=>this.back()).className='primary';dialog.append(actions);
+    const allowed=!preview||(force?preview.canForce===true:preview.canRelease===true),actions=this.node('div',undefined,'sm-confirm-actions'),confirm=this.node('button',force?'강제해제':mode==='stop'?'중지 확인 및 해제':'풀어 주다','primary');confirm.type='button';confirm.disabled=!!this.pending||!allowed;confirm.onclick=()=>this.confirm();actions.append(confirm);this.button(actions,'사이',()=>this.back()).className='primary';dialog.append(actions);
   }
   confirm(){
     const value=this.confirmation;if(!value||this.pending||!this.valid(this.dialog))return;const {mode,preview,keys}=value;
     if(preview&&(mode==='scopeWait'?preview.canRelease!==true:preview.canForce!==true))return;
     const body=mode.startsWith('scope')?{mode,id:this.newId(),scopeKey:preview.scopeKey,connections:preview.connections,generation:preview.generation}:{mode,id:this.newId(),connections:keys,...(mode==='force'?{generation:preview.generation}:{})};
-    return this.perform(body,'正在提交释放请求…');
+    return this.perform(body,'출시 요청 제출 중…');
   }
-  submitLegacy(mode,keys){return this.perform({mode,id:this.newId(),connections:keys},mode==='check'?'正在核对结果':'正在提交释放请求…');}
+  submitLegacy(mode,keys){return this.perform({mode,id:this.newId(),connections:keys},mode==='check'?'결과 확인 중':'출시 요청 제출 중…');}
 }
 
 class SessionMenu {
@@ -196,7 +196,7 @@ class SessionMenu {
       const data=await state.context.cliNetwork(body);if(!this.networkCurrent(state))return;
       if(kind==='forcePreview'){
         if(data.canForce===true&&typeof data.generation==='string'&&data.scopeLabel&&Array.isArray(data.impact))state.confirmation={kind:'force',preview:data};
-        else state.error=data.message||'当前无法核验原 CLI 进程或配置；未强制退出。';
+        else state.error=data.message||'원본 확인 불가 CLI 프로세스 또는 구성 강제 종료 없음。';
       }else{state.data=data;state.uncertain=null;}
     }catch(error){
       if(!this.networkCurrent(state))return;state.error=error.message;
@@ -222,33 +222,33 @@ class SessionMenu {
   }
   renderCliNetwork(){
     const state=this.cliNetwork,box=this.box;if(!state)return;
-    const head=this.node('div','sm-head'),name=this.node('div','sm-name'),close=this.node('button','sm-icon');close.type='button';close.dataset.cliNetworkClose='true';close.setAttribute('aria-label',this.t('关闭'));close.append(this.icon('close'));close.onclick=()=>this.close();name.append(this.node('strong','',this.t('检查 CLI 网络')));head.append(name,this.node('small','',state.context.title),close);box.append(head);
+    const head=this.node('div','sm-head'),name=this.node('div','sm-name'),close=this.node('button','sm-icon');close.type='button';close.dataset.cliNetworkClose='true';close.setAttribute('aria-label',this.t('닫기'));close.append(this.icon('close'));close.onclick=()=>this.close();name.append(this.node('strong','',this.t('CLI 네트워크 확인')));head.append(name,this.node('small','',state.context.title),close);box.append(head);
     const explain=text=>box.append(this.node('p','sm-explanation',this.t(text)));
     if(state.error){const error=this.node('p','sm-error',this.t(state.error));error.setAttribute('role','alert');box.append(error);}
-    if(state.uncertain)explain('请求结果待核对；不会自动重试。请检查操作结果或重新检查网络。');
-    if(state.pending){const labels={check:'正在检查 CLI 网络…',status:'正在核对恢复状态…',cancel:'正在取消等待…',forcePreview:'正在核对强制恢复范围…',recover:'正在提交 CLI 恢复…',force:'正在提交强制恢复…',reconnect:'正在提交重新连接…'},status=this.node('p','sm-explanation',this.t(labels[state.pending]));status.setAttribute('role','status');box.append(status);}
+    if(state.uncertain)explain('요청 결과가 확인되지 않았습니다. 자동으로 재시도하지 않습니다. 작업 결과를 확인하거나 네트워크를 다시 확인하십시오.');
+    if(state.pending){const labels={check:'CLI 네트워크 확인 중…',status:'복구 상태 확인 중…',cancel:'대기 취소 중…',forcePreview:'강제 복구 범위 확인 중…',recover:'CLI 복구 제출 중…',force:'강제 복구 제출 중…',reconnect:'재연결 제출 중…'},status=this.node('p','sm-explanation',this.t(labels[state.pending]));status.setAttribute('role','status');box.append(status);}
     const data=state.data,confirmation=state.confirmation;
     if(confirmation){
       const {kind,preview}=confirmation;explain(preview.message||'');
       if(kind==='force'){
-        box.append(this.node('h3','sm-heading',this.t('确认强制恢复此配置？')));explain(preview.scopeLabel);
-        explain('将中断此配置中正在运行或状态未知的任务，影响范围可能包含未列出的会话。聊天历史会保留。');
+        box.append(this.node('h3','sm-heading',this.t('이 구성을 강제로 복구하시겠습니까?')));explain(preview.scopeLabel);
+        explain('이는 나열되지 않은 세션을 포함하여 이 구성에서 실행 중이거나 확인되지 않은 작업을 중단합니다. 저장된 채팅 기록은 보존됩니다.');
         const impact=this.node('ul','sm-explanation');for(const row of preview.impact)impact.append(this.node('li','',row.title||row.sessionId));box.append(impact);
-      }else if(kind==='reconnect'){box.append(this.node('h3','sm-heading',this.t('从当前保存状态重新连接？')));explain('以前的接续回执仍未知；此操作不重放旧提供商设置或消息。');}
-      else{box.append(this.node('h3','sm-heading',this.t('确认恢复共享服务？')));explain('将等待此配置的全部任务安全结束后恢复。恢复期间请勿从其他客户端发起新任务。');}
-      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t(kind==='force'?'确认强制恢复':kind==='reconnect'?'确认重新连接':'确认恢复')),cancel=this.node('button','primary',this.t('返回检查结果'));
+      }else if(kind==='reconnect'){box.append(this.node('h3','sm-heading',this.t('현재 저장된 상태에서 다시 연결하시겠습니까?')));explain('이전 이력서 접수는 미확인 상태로 남아있습니다. 이전 공급자 설정이나 메시지는 재생되지 않습니다.');}
+      else{box.append(this.node('h3','sm-heading',this.t('공유 서비스를 복구하시겠습니까?')));explain('복구는 이 구성의 모든 작업이 안전하게 완료될 때까지 기다립니다. 복구 중에는 다른 클라이언트에서 새 작업을 시작하지 마십시오.');}
+      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t(kind==='force'?'강제 회복':kind==='reconnect'?'다시 연결':'다시 덮다')),cancel=this.node('button','primary',this.t('결과로 돌아가기'));
       confirm.type=cancel.type='button';confirm.disabled=!!state.pending;confirm.onclick=()=>this.submitCliNetwork();cancel.onclick=()=>{state.confirmation=null;this.render('cli-network');};actions.append(confirm,cancel);box.append(actions);
     }else{
       if(data?.message||data?.notice)explain(data.message||data.notice);
-      else if(typeof data?.connected==='boolean')explain(data.connected?'CLI 连接已恢复':'CLI 连接尚未确认，请继续原会话或重新检查。');
-      if(data?.state){const labels={waiting:'等待任务安全结束',recovering:'正在恢复共享服务',cancelled:'已取消等待',complete:'恢复操作已结束',unknown:'操作结果待核对',failed:'恢复未完成',superseded:'此操作已被新的明确操作替代'};const status=this.node('p','sm-explanation',this.t(labels[data.state]||data.state));status.setAttribute('role','status');box.append(status);}
-      if(data?.canRecover===true&&typeof data.generation==='string'&&!state.uncertain)this.row(data.action==='reconnect'?'从当前保存状态重新连接…':data.willWait||data.state==='waiting'?'等待任务结束后恢复…':'恢复 CLI 连接…','link',()=>this.confirmCliNetwork(data.action==='reconnect'?'reconnect':'recover',data),{disabled:!!state.pending});
-      if(data?.canCancel===true&&data.operationId)this.row('取消等待','close',()=>this.requestCliNetwork({action:'cancel',operationId:data.operationId},'cancel'),{disabled:!!state.pending});
-      const operationId=state.uncertain?.operationId||data?.operationId;if(operationId)this.row('核对操作结果','info',()=>this.requestCliNetwork({action:'status',operationId},'status'),{disabled:!!state.pending});
-      this.row('重新检查网络','link',()=>this.requestCliNetwork(),{disabled:!!state.pending});
-      this.row('检查强制恢复范围…','info',()=>this.requestCliNetwork({action:'forcePreview'},'forcePreview'),{disabled:!!state.pending,danger:true});
+      else if(typeof data?.connected==='boolean')explain(data.connected?'CLI 연결이 복원되었습니다.':'CLI 연결이 확인되지 않았습니다. 원래 채팅을 계속하거나 다시 확인하세요.');
+      if(data?.state){const labels={waiting:'작업이 안전하게 완료되기를 기다리는 중',recovering:'공유 서비스 복구',cancelled:'대기 취소됨',complete:'복구 작업이 완료되었습니다',unknown:'작업 결과가 확인되지 않았습니다.',failed:'복구가 완료되지 않았습니다.',superseded:'명시적으로 확인된 새로운 작업으로 대체됨'};const status=this.node('p','sm-explanation',this.t(labels[data.state]||data.state));status.setAttribute('role','status');box.append(status);}
+      if(data?.canRecover===true&&typeof data.generation==='string'&&!state.uncertain)this.row(data.action==='reconnect'?'저장된 상태에서 다시 연결…':data.willWait||data.state==='waiting'?'작업 완료 후 복구…':'CLI 연결 복구…','link',()=>this.confirmCliNetwork(data.action==='reconnect'?'reconnect':'recover',data),{disabled:!!state.pending});
+      if(data?.canCancel===true&&data.operationId)this.row('취소 대기','close',()=>this.requestCliNetwork({action:'cancel',operationId:data.operationId},'cancel'),{disabled:!!state.pending});
+      const operationId=state.uncertain?.operationId||data?.operationId;if(operationId)this.row('작업 결과 확인','info',()=>this.requestCliNetwork({action:'status',operationId},'status'),{disabled:!!state.pending});
+      this.row('네트워크를 다시 확인하세요.','link',()=>this.requestCliNetwork(),{disabled:!!state.pending});
+      this.row('강제 복구 범위 검토…','info',()=>this.requestCliNetwork({action:'forcePreview'},'forcePreview'),{disabled:!!state.pending,danger:true});
     }
-    explain('关闭或返回只收起面板，不会取消已提交的恢复。');
+    explain('닫거나 뒤로 돌아가면 이 패널만 닫힙니다. 제출된 복구는 취소되지 않습니다.');
   }
   bindDrag(box){
     let drag=null,timer;
@@ -278,7 +278,7 @@ class SessionMenu {
   }
   show(context,anchor,view='main'){
     this.close({immediate:true});this.context=context;this.anchor=anchor;this.busy=false;
-    const box=this.node('dialog','session-menu');this.box=box;box.setAttribute('aria-label',this.t('会话菜单'));
+    const box=this.node('dialog','session-menu');this.box=box;box.setAttribute('aria-label',this.t('채팅 메뉴'));
     box.addEventListener('close',()=>{box.remove();if(this.box===box){this.box=null;if(anchor?.element?.isConnected)anchor.element.focus();}});
     box.addEventListener('cancel',event=>{event.preventDefault();this.back();});
     this.bindDrag(box);
@@ -305,7 +305,7 @@ class SessionMenu {
     button.onclick=()=>run(button);this.box.append(button);return button;
   }
   separator(){this.box.append(this.node('div','sm-divider'));}
-  valid(){if(this.context.isCurrent&&!this.context.isCurrent())throw Error(this.t('连接或账号已变化，请重新打开会话菜单'));}
+  valid(){if(this.context.isCurrent&&!this.context.isCurrent())throw Error(this.t('연결 또는 계정이 변경되었습니다. 채팅 메뉴를 다시 엽니다.'));}
   async execute(run,button,{close=true,pendingMessage=null}={}){
     if(this.busy)return;const box=this.box;this.busy=true;if(button)button.disabled=true;
     let pending;if(pendingMessage){pending=this.node('p','sm-explanation',this.t(pendingMessage));pending.setAttribute('role','status');box.append(pending);this.position();}
@@ -316,73 +316,73 @@ class SessionMenu {
   render(view='main'){
     if(view!=='cli-network')this.clearCliNetwork();
     const c=this.context,box=this.box;this.clearDrag?.();this.view=view;box.replaceChildren();box.append(this.node('div','sm-handle'));
-    if(view!=='main')this.row('返回会话菜单','back',()=>this.back());
+    if(view!=='main')this.row('채팅 메뉴로 돌아가기','back',()=>this.back());
     else{
       const head=this.node('div','sm-head'),line=this.node('div','sm-name'),title=this.node('strong','',c.title),close=this.node('button','sm-icon');
-      close.type='button';close.setAttribute('aria-label',this.t('关闭'));close.append(this.icon('close'));close.onclick=()=>this.close();
+      close.type='button';close.setAttribute('aria-label',this.t('닫기'));close.append(this.icon('close'));close.onclick=()=>this.close();
       line.append(title);
-      if(c.rename){const edit=this.node('button','sm-icon');edit.type='button';edit.setAttribute('aria-label',this.t('修改聊天名称'));edit.append(this.icon('pencil'));edit.onclick=()=>this.render('rename');line.append(edit);}
+      if(c.rename){const edit=this.node('button','sm-icon');edit.type='button';edit.setAttribute('aria-label',this.t('채팅 이름 바꾸기'));edit.append(this.icon('pencil'));edit.onclick=()=>this.render('rename');line.append(edit);}
       head.append(line,this.node('small','',c.subtitle||''),close);box.append(head);
     }
     if(view==='cli-network'){
       this.renderCliNetwork();
     }else if(view==='rename'){
-      if(c.renameScope==='bridge')box.append(this.node('p','sm-explanation',this.t('仅在 Bridge 中生效')));
-      const form=this.node('form','sm-form'),input=this.node('input');input.value=c.title;input.maxLength=120;input.required=true;input.setAttribute('aria-label',this.t('聊天名称'));
-      const save=this.node('button','primary',this.t('保存'));save.type='submit';form.append(input,save);box.append(form);
+      if(c.renameScope==='bridge')box.append(this.node('p','sm-explanation',this.t('Bridge에만 적용됩니다.')));
+      const form=this.node('form','sm-form'),input=this.node('input');input.value=c.title;input.maxLength=120;input.required=true;input.setAttribute('aria-label',this.t('채팅 이름'));
+      const save=this.node('button','primary',this.t('저장'));save.type='submit';form.append(input,save);box.append(form);
       form.onsubmit=event=>{event.preventDefault();const title=input.value.trim();if(title)this.execute(async()=>{await c.rename(title);c.title=title;},save,{close:false});};
       input.focus();input.select();
     }else if(view==='details'){
       const details=this.node('dl','sm-details');
       for(const [label,value,copy] of c.details||[]){if(value===undefined||value===null||value==='')continue;const line=this.node('div'),dd=this.node('dd','',String(value));line.append(this.node('dt','',this.t(label)),dd);
-        if(copy){const button=this.node('button','sm-icon message-copy');button.type='button';button.setAttribute('aria-label',this.t('复制')+' '+this.t(label));button.append(this.icon('copy'));button.onclick=()=>this.copy(String(value),button);line.append(button);}details.append(line);}
-      box.append(details);if(c.source)this.row('来源会话：'+c.source.title,'link',()=>{this.close();c.source.open();});
+        if(copy){const button=this.node('button','sm-icon message-copy');button.type='button';button.setAttribute('aria-label',this.t('복사')+' '+this.t(label));button.append(this.icon('copy'));button.onclick=()=>this.copy(String(value),button);line.append(button);}details.append(line);}
+      box.append(details);if(c.source)this.row('소스 채팅:'+c.source.title,'link',()=>{this.close();c.source.open();});
     }else if(view==='project'||view==='section'){
-      box.append(this.node('h3','sm-heading',this.t(view==='project'?'项目':'分区')));
+      box.append(this.node('h3','sm-heading',this.t(view==='project'?'프로젝트 목록':'부분')));
       this.loadOrganization(view,c,box);
     }else if(view==='delete'){
-      box.append(this.node('h3','sm-heading',this.t('永久删除聊天？')),this.node('p','sm-explanation',c.subtitle||''));
+      box.append(this.node('h3','sm-heading',this.t('이 채팅을 영구적으로 삭제하시겠습니까?')),this.node('p','sm-explanation',c.subtitle||''));
       this.loadDeletion(c,box);
     }else if(view==='archive'){
-      box.append(this.node('h3','sm-heading',this.t('停止任务并归档？')),this.node('p','sm-explanation',c.title),this.node('p','sm-explanation',c.subtitle||''),this.node('p','sm-explanation',this.t('将停止此聊天及其子任务，并在确认停止后归档。聊天记录会保留，未完成任务需要手动继续。')));
-      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t('确认归档')),cancel=this.node('button','primary',this.t('取消'));
+      box.append(this.node('h3','sm-heading',this.t('중지하고 보관하시겠습니까?')),this.node('p','sm-explanation',c.title),this.node('p','sm-explanation',c.subtitle||''),this.node('p','sm-explanation',this.t('이 채팅과 하위 작업을 중지한 후 중지되면 보관처리하세요. 기록은 유지됩니다. 완료되지 않은 작업은 수동으로 계속해야 합니다.')));
+      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t('아카이브 확인')),cancel=this.node('button','primary',this.t('취소'));
       confirm.type=cancel.type='button';confirm.onclick=()=>this.execute(c.archive,confirm);cancel.onclick=()=>this.render();
       actions.append(confirm,cancel);box.append(actions);
       queueMicrotask(()=>cancel.focus());
     }else{
-      this.row(c.pinned?'取消置顶':'置顶会话','pin',button=>this.execute(async()=>{await c.pin(!c.pinned);c.pinned=!c.pinned;},button,{close:false}));
-      if(c.nativeOrganization){this.row('项目','folder',()=>this.render('project'),{end:true});this.row('分区','section',()=>this.render('section'),{end:true});}
+      this.row(c.pinned?'채팅 고정 해제':'핀 채팅','pin',button=>this.execute(async()=>{await c.pin(!c.pinned);c.pinned=!c.pinned;},button,{close:false}));
+      if(c.nativeOrganization){this.row('프로젝트 목록','folder',()=>this.render('project'),{end:true});this.row('부분','section',()=>this.render('section'),{end:true});}
       this.separator();
       // Native shells authorize copying in the capture phase of the first click.
-      if(c.link)this.row(c.linkLabel||'复制深度链接','link',button=>this.copy(c.link,button)).classList.add('message-copy');
-      else if(c.sessionId)this.row('复制 Session ID','copy',button=>this.copy(c.sessionId,button)).classList.add('message-copy');
-      if(c.fork)this.row('创建聊天分支','fork',button=>this.execute(()=>{this.close();return c.fork();},button));
-      this.separator();if(c.manage)this.row('发送管理','list',()=>{this.close();c.manage();});
-      if(c.notifications)this.row('聊天通知设置','info',button=>this.execute(()=>{this.close();return c.notifications();},button));
-      if(c.cliNetwork)this.row('检查 CLI 网络','link',()=>this.openCliNetwork());
-      if(c.releaseCli)this.row('释放 CLI 连接','link',()=>{this.close();c.releaseCli();});
-      this.row('会话详情','info',()=>this.render('details'),{end:true});
-      if(c.archive){this.separator();this.row(c.archived?'恢复会话':'停止任务并归档…','archive',button=>c.archived?this.execute(c.archive,button):this.render('archive'),{danger:!c.archived});}
-      if(c.deletion)this.row('永久删除…','close',()=>this.render('delete'),{danger:true});
+      if(c.link)this.row(c.linkLabel||'딥링크 복사','link',button=>this.copy(c.link,button)).classList.add('message-copy');
+      else if(c.sessionId)this.row('세션 복사 ID','copy',button=>this.copy(c.sessionId,button)).classList.add('message-copy');
+      if(c.fork)this.row('채팅 브랜치 생성','fork',button=>this.execute(()=>{this.close();return c.fork();},button));
+      this.separator();if(c.manage)this.row('관리 보내기','list',()=>{this.close();c.manage();});
+      if(c.notifications)this.row('채팅 알림 설정','info',button=>this.execute(()=>{this.close();return c.notifications();},button));
+      if(c.cliNetwork)this.row('CLI 네트워크 확인','link',()=>this.openCliNetwork());
+      if(c.releaseCli)this.row('CLI 연결 해제','link',()=>{this.close();c.releaseCli();});
+      this.row('채팅 세부정보','info',()=>this.render('details'),{end:true});
+      if(c.archive){this.separator();this.row(c.archived?'채팅 복원':'중지하고 보관처리하세요…','archive',button=>c.archived?this.execute(c.archive,button):this.render('archive'),{danger:!c.archived});}
+      if(c.deletion)this.row('영구적으로 삭제…','close',()=>this.render('delete'),{danger:true});
     }
     this.position();
   }
   async loadDeletion(context,box){
-    const pending=this.node('p','sm-explanation',this.t('正在核对删除范围…'));box.append(pending);
+    const pending=this.node('p','sm-explanation',this.t('영향을 받은 채팅을 확인하는 중…'));box.append(pending);
     const active=()=>this.box===box&&this.context===context&&this.view==='delete'&&pending.isConnected;
     try{
       this.valid();const snapshot=await context.deletion();
       if(!active())return;this.valid();pending.remove();
-      box.append(this.node('p','sm-explanation',this.t('以下聊天及其子任务的历史与原生关联内容将永久删除，无法撤销。正在运行的任务须先停止。')));
+      box.append(this.node('p','sm-explanation',this.t('이러한 채팅, 해당 하위 작업, 기록 및 네이티브 관련 콘텐츠가 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다. 먼저 실행 중인 작업을 중지하세요.')));
       const list=this.node('ul','sm-explanation');for(const row of snapshot.sessions)list.append(this.node('li','',row.title));box.append(list);
-      if(snapshot.subagentCount)box.append(this.node('p','sm-explanation',this.t('包含子任务：')+snapshot.subagentCount));
+      if(snapshot.subagentCount)box.append(this.node('p','sm-explanation',this.t('포함된 하위 작업:')+snapshot.subagentCount));
       let verified;
       if(snapshot.retry?.length){
-        box.append(this.node('p','sm-explanation',this.t('此前删除未确认，以上为仍存在的聊天。不会自动重试；请先在原客户端核对，再决定是否重新删除。')));
+        box.append(this.node('p','sm-explanation',this.t('이전 삭제가 확인되지 않았습니다. 이런 채팅은 아직도 존재합니다. 다시 삭제할지 여부를 결정하기 전에 원래 클라이언트를 확인하십시오. 자동 재시도는 없습니다.')));
         const label=this.node('label','sm-explanation');verified=document.createElement('input');verified.type='checkbox';
-        label.append(verified,this.node('span','',this.t('已核对，重新删除以上仍存在的聊天')));box.append(label);
+        label.append(verified,this.node('span','',this.t('확인했습니다. 위에 나열된 나머지 채팅을 다시 삭제하세요.')));box.append(label);
       }
-      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t('确认永久删除')),cancel=this.node('button','primary',this.t('取消'));
+      const actions=this.node('div','sm-confirm-actions'),confirm=this.node('button','primary',this.t('영구 삭제')),cancel=this.node('button','primary',this.t('취소'));
       if(verified){confirm.disabled=true;verified.onchange=()=>{confirm.disabled=!verified.checked;};}
       confirm.type=cancel.type='button';confirm.onclick=async()=>{
         if(verified&&!verified.checked)return;
@@ -396,36 +396,36 @@ class SessionMenu {
     }
   }
   async loadOrganization(view,context,box){
-    const pending=this.node('p','sm-explanation',this.t('正在读取原生侧边栏…'));box.append(pending);
+    const pending=this.node('p','sm-explanation',this.t('네이티브 사이드바 로드 중…'));box.append(pending);
     const active=()=>this.box===box&&this.context===context&&this.view===view&&pending.isConnected;
     try{
       this.valid();const snapshot=await context.organization();
       if(!active())return;this.valid();pending.remove();
       const scope=snapshot[view+'Scope']||snapshot.scope||context.organizationScope||'native',local=scope==='bridge';
-      if(local)box.append(this.node('p','sm-explanation',this.t('仅在 Bridge 中生效')));
+      if(local)box.append(this.node('p','sm-explanation',this.t('Bridge에만 적용됩니다.')));
       const field=view==='project'?'projectId':'sectionId',selected=snapshot[field];
-      const choices=[{id:null,name:this.t(view==='project'?'移出项目':'移出分区')},...snapshot[view==='project'?'projects':'sections']];
+      const choices=[{id:null,name:this.t(view==='project'?'프로젝트에서 제거':'섹션에서 삭제')},...snapshot[view==='project'?'projects':'sections']];
       for(const choice of choices){
         const requestId=this.newId();
         const label=choice.title||choice.name;
         const button=this.row(label,view==='project'?'folder':'section',button=>this.execute(async()=>{
           const result=await context.organization({id:requestId,kind:view,targetId:choice.id,expectedId:selected});
-          if(result.status!=='confirmed')throw Error(this.t('分类结果待核对，请刷新会话列表'));
-          this.notify(this.t(local?'已更新 Bridge 分类':'已同步到原生侧边栏'));
+          if(result.status!=='confirmed')throw Error(this.t('분류에 대한 확인이 필요합니다. 채팅 목록을 새로 고칩니다.'));
+          this.notify(this.t(local?'Bridge 분류가 업데이트되었습니다.':'네이티브 사이드바에 동기화됨'));
         },button),{disabled:choice.id===selected});
         button.querySelector('span').textContent=label;
         button.setAttribute('aria-pressed',String(choice.id===selected));
         if(choice.id===selected)button.append(this.node('span','sm-selected','✓'));
       }
       if(local){
-        const form=this.node('form','sm-form'),input=this.node('input'),add=this.node('button','primary',this.t('添加'));
-        const label=this.t(view==='project'?'新项目名称':'新分区名称');input.maxLength=120;input.required=true;input.placeholder=label;input.setAttribute('aria-label',label);add.type='submit';form.append(input,add);box.append(form);
+        const form=this.node('form','sm-form'),input=this.node('input'),add=this.node('button','primary',this.t('다음에 추가'));
+        const label=this.t(view==='project'?'새 프로젝트 이름':'새 섹션 이름');input.maxLength=120;input.required=true;input.placeholder=label;input.setAttribute('aria-label',label);add.type='submit';form.append(input,add);box.append(form);
         let request=null;
         form.onsubmit=event=>{event.preventDefault();const title=input.value.trim();if(!title)return;
           if(!request||request.title!==title)request={id:this.newId(),kind:'create-'+view,title};
-          this.execute(async()=>{const result=await context.organization(request);if(result.status!=='confirmed')throw Error(this.t('分类结果待核对，请刷新会话列表'));this.notify(this.t('已更新 Bridge 分类'));},add);
+          this.execute(async()=>{const result=await context.organization(request);if(result.status!=='confirmed')throw Error(this.t('분류에 대한 확인이 필요합니다. 채팅 목록을 새로 고칩니다.'));this.notify(this.t('Bridge 분류가 업데이트되었습니다.'));},add);
         };
-      }else if(choices.length===1)box.append(this.node('p','sm-explanation',this.t(view==='project'?'暂无原生项目，请先在原客户端中创建':'暂无原生分区，请先在原客户端中创建')));
+      }else if(choices.length===1)box.append(this.node('p','sm-explanation',this.t(view==='project'?'네이티브 프로젝트가 없습니다. 먼저 원래 클라이언트에서 하나를 만듭니다.':'네이티브 섹션이 없습니다. 먼저 원래 클라이언트에서 하나를 만듭니다.')));
       this.position();
     }catch(error){
       if(!active())return;pending.remove();const message=this.node('p','sm-error',this.t(error.message));message.setAttribute('role','alert');box.append(message);this.position();

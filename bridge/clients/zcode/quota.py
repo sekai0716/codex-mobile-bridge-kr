@@ -23,7 +23,7 @@ def regular(path, directory=False):
     info = path.lstat()
     test = stat.S_ISDIR if directory else stat.S_ISREG
     if not test(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
-        raise ValueError('ZCode 额度数据路径不可用')
+        raise ValueError('ZCode 신용 데이터 경로를 사용할 수 없습니다.')
     return info
 
 
@@ -66,16 +66,16 @@ def integer(value):
 def native_snapshot(snapshot, family, now):
     """Accept only the explicitly selected original account's daily token buckets."""
     if not isinstance(snapshot, dict) or snapshot.get('authenticated') is not True:
-        raise ValueError('请在 ZCode 原 App 确认官方账号登录')
+        raise ValueError('제발 ZCode 기존 App 공식 계정 로그인 확인')
     provider = snapshot.get('provider') or {}
     if provider.get('id') != 'account:'+family+'-start-plan':
-        raise ValueError('原 App 额度响应与当前官方账号不符')
+        raise ValueError('기존 App 할당량 응답이 현재 공식 계정과 일치하지 않습니다')
     unavailable = snapshot.get('unavailableReason')
     if unavailable and unavailable != 'no_plan':
-        raise ValueError('原 App 暂时无法查询当前账号的额度')
+        raise ValueError('기존 App 일시적으로 현재 계좌 잔액을 조회할 수 없습니다.')
     timestamp = integer(snapshot.get('serverTime', snapshot.get('generatedAt')))
     if timestamp is None or timestamp/1000 > now+2:
-        raise ValueError('原 App 额度查询时间无效')
+        raise ValueError('기존 App 할당량 쿼리 시간이 잘못되었습니다.')
     checked = timestamp/1000
     limits = []
     for bucket in (snapshot.get('quota') or {}).get('limits') or []:

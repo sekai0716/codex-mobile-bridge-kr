@@ -155,7 +155,7 @@ class WslControlsTests(unittest.TestCase):
                 fallback = self.entry.catalog(self.identifier, refresh=True, kind='models')
             self.assertEqual(fallback['models'], second['models'])
             self.assertEqual(fallback['cache']['state'], 'stale')
-            self.assertIn('上次结果', fallback['modelError'])
+            self.assertIn('마지막 결과', fallback['modelError'])
 
     def test_native_plan_and_settings_survive_polling(self):
         self.entry.session(self.identifier)

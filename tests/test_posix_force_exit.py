@@ -51,14 +51,14 @@ class PosixForceExitTests(unittest.TestCase):
         for field, value in [('uid', os.getuid()+1), ('image', '/fixture/another-app')]:
             before = self.live[702][field]
             self.live[702][field] = value
-            with self.assertRaisesRegex(ValueError, '进程已变化'):
+            with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
                 force_stop(self.executable, self.commands)
             self.native.terminate.assert_not_called()
             self.live[702][field] = before
 
     def test_a_new_process_is_not_added_to_confirmed_target_set(self):
         self.live[703] = {**self.live[702], 'pid': 703}
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
 
@@ -69,14 +69,14 @@ class PosixForceExitTests(unittest.TestCase):
                 self.live[701]['birth'] = (900, 1)
             return handle
         self.native.open.side_effect = bind
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
         self.assertEqual(self.native.close.call_count, 2)
 
     def test_inventory_omission_cannot_hide_a_still_live_bound_process(self):
         self.desktop.processes.side_effect = [list(self.live), []]
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
             force_stop(self.executable, self.commands)
         self.assertEqual(self.native.terminate.call_count, 1)
         self.assertIn(702, self.live)
@@ -84,7 +84,7 @@ class PosixForceExitTests(unittest.TestCase):
     def test_first_inventory_omission_cannot_skip_a_known_live_target(self):
         self.desktop.processes.return_value = []
         self.desktop.processes.side_effect = None
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
         self.assertEqual(set(self.live), set(self.commands))
@@ -97,7 +97,7 @@ class PosixForceExitTests(unittest.TestCase):
             return handle
         self.native.open.side_effect = bind
         self.desktop.processes.side_effect = lambda predicate: [702]
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
 
@@ -119,7 +119,7 @@ class PosixForceExitTests(unittest.TestCase):
         self.native.terminate.assert_not_called()
 
     def test_gateway_and_ancestor_images_are_protected(self):
-        with self.assertRaisesRegex(ValueError, '网关'):
+        with self.assertRaisesRegex(ValueError, '게이트웨이'):
             force_stop('/fixture/gateway', {})
         self.native.terminate.assert_not_called()
 
@@ -142,7 +142,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                 force.assert_called_once_with(executable.resolve(), commands)
                 for dangerous in (' --eval dangerous', ' --user-data-dir=/other/profile'):
                     force.reset_mock(); commands[701] += dangerous
-                    with self.assertRaisesRegex(ValueError, '进程已变化'):
+                    with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
                         force_stop_client(descriptor, state=state)
                     force.assert_not_called()
 
@@ -159,7 +159,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                     patch('bridge.clients.lifecycle.inspect_client', return_value=state), \
                     patch('bridge.clients.lifecycle._commands', return_value={701: command}), \
                     patch('bridge.platforms.posix.force_exit.force_stop') as force:
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
                     force_stop_client(descriptor, state=state)
                 force.assert_not_called()
 
@@ -175,7 +175,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                     patch('bridge.clients.lifecycle.inspect_client', return_value=empty), \
                     patch('bridge.clients.lifecycle._commands', return_value={}), \
                     patch('bridge.platforms.posix.force_exit.force_stop') as force:
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
                     force_stop_client(descriptor, state=state)
                 force.assert_not_called()
 
@@ -221,7 +221,7 @@ class LinuxAncestorTests(unittest.TestCase):
         native.identity.side_effect = PermissionError(13, 'Target image unavailable')
         with patch('bridge.platforms.posix.force_exit.sys.platform', 'linux'), \
                 patch('bridge.platforms.linux.force_exit.Native', return_value=native):
-            with self.assertRaisesRegex(ValueError, '权限'):
+            with self.assertRaisesRegex(ValueError, '권한'):
                 force_stop('/fixture/client', {701: '/fixture/client'})
         native.ancestor.assert_called_once_with(os.getpid())
         native.identity.assert_called_once_with(701)

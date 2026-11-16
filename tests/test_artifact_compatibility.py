@@ -20,7 +20,7 @@ class ArtifactCompatibilityTests(unittest.TestCase):
             'type': 'agentMessage', 'text': '\n'.join('[file](<' + ref + '>)' for ref in references)}]}]}, None)
 
     def test_native_user_attachment_uses_exact_path_and_never_grants_outside_file(self):
-        inside = self.project / '志愿者信息统计.xlsx'
+        inside = self.project / '자원봉사정보 통계.xlsx'
         inside.write_bytes(b'synthetic sheet')
         outside = self.root / inside.name
         outside.write_bytes(b'outside project')

@@ -7,7 +7,7 @@ import signal
 class Native:
     def __init__(self):
         if not hasattr(os, 'pidfd_open') or not hasattr(signal, 'pidfd_send_signal'):
-            raise ValueError('当前 Linux 运行环境不支持安全强制关闭，请在电脑端退出应用')
+            raise ValueError("이 Linux 런타임은 앱을 안전하게 강제 종료할 수 없습니다. 컴퓨터에서 앱을 종료합니다.")
 
     def identity(self, pid):
         root = Path('/proc')/str(pid)

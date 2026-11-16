@@ -44,9 +44,9 @@ function controller({ready='valid',readyAt=0,pending=false,spawnError=false,exit
 }
 
 for(const platform of ['darwin','win32','linux'])for(const packaged of [true,false]){
-  test(`real updater setup respects ${platform} packaged=${packaged}`,()=>{
+  test(`fork updater remains disabled for ${platform} packaged=${packaged}`,()=>{
     const f=controller({platform,packaged});f.context.setupUpdater();
-    const updater=vm.runInContext('updater',f.context),supported=packaged&&platform!=='linux';
+    const updater=vm.runInContext('updater',f.context),supported=false;
     assert.ok(updater instanceof require('../desktop/features/updates/updater.cjs').Updater);
     assert.equal(updater.supported,supported);
     assert.equal(updater.status().state,supported?'idle':'unsupported');
@@ -85,7 +85,7 @@ test('verified helper does not rely on graceful quit or delayed forced exit',asy
 });
 
 for(const ready of ['missing','wrong-token','malformed'])test(`helper ${ready} never exits the controller`,async()=>{
-  const f=controller({ready});await assert.rejects(f.run(),/无法启动应用更新进程/);
+  const f=controller({ready});await assert.rejects(f.run(),/앱 업데이터를 시작할 수 없습니다\./);
   assert.deepEqual(f.calls.exit,[]);assert.equal(f.calls.quit,0);
   assert.equal(vm.runInContext('updateQuitting',f.context),false);
 });
@@ -98,7 +98,7 @@ test('slow helper is allowed to become ready after two seconds',async()=>{
 });
 
 for(const option of ['spawnError','exited'])test(`helper ${option} keeps controller alive`,async()=>{
-  const f=controller({[option]:true});await assert.rejects(f.run(),/helper spawn failed|无法启动应用更新进程/);
+  const f=controller({[option]:true});await assert.rejects(f.run(),option==='spawnError'?/helper spawn failed/:/앱 업데이터를 시작할 수 없습니다\./);
   assert.deepEqual(f.calls.exit,[]);assert.equal(f.calls.quit,0);
 });
 

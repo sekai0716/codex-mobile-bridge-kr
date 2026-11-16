@@ -18,7 +18,7 @@ const loginStartup=createLoginStartup(app);
 const {spawn}=require('node:child_process');
 const {randomUUID}=require('node:crypto');
 const {interfaces}=require('./features/connections/network.cjs');
-let language='zh-CN';
+let language='ko-KR';
 const t=text=>translate(text,language);
 const root=path.resolve(__dirname,'..');
 // An explicit data directory also keeps test caches inside the project.
@@ -43,7 +43,7 @@ function restoreOfficialService(){
   // Saved pairings can be selected from the phone before the desktop panel is opened.
   if(!fs.existsSync(path.join(dataDir,'zcode-official-auth.enc')))return;
   const service=officialService();
-  service.start({standby:true}).catch(()=>{service.serviceAvailable=false;service.reason='官方远控连接服务不可用。';});
+  service.start({standby:true}).catch(()=>{service.serviceAvailable=false;service.reason='공식 원격접속 서비스를 이용하실 수 없습니다.';});
 }
 function updateTarget(){return process.platform==='darwin'?path.resolve(process.execPath,'../../..'):path.dirname(process.execPath);}
 let handoff=null;
@@ -62,7 +62,7 @@ function loadDataDir(){
   return app.isPackaged?path.join(app.getPath('userData'),'gateway'):path.join(root,'.local');
 }
 function authorize(event){
-  if(!window||event.sender!==window.webContents||event.senderFrame!==window.webContents.mainFrame||event.senderFrame.url!==entry)throw Error('不允许的界面来源');
+  if(!window||event.sender!==window.webContents||event.senderFrame!==window.webContents.mainFrame||event.senderFrame.url!==entry)throw Error('이 UI 소스는 허용되지 않습니다.');
 }
 function updateResult(){try{return JSON.parse(fs.readFileSync(path.join(dataDir,'desktop-update-result.json'),'utf8'));}catch{return null;}}
 function updateManaged(){
@@ -77,10 +77,10 @@ function updateManaged(){
 }
 function worker(action,payload){
   if(action==='snapshot'&&updateQuitting)return Promise.resolve({...lastSnapshot,update:updater.status()});
-  if(setupPending&&['save','start','stop'].includes(action))return Promise.reject(Error('请等待服务器操作完成。'));
+  if(setupPending&&['save','start','stop'].includes(action))return Promise.reject(Error('서버 작업이 완료될 때까지 기다려 주세요.。'));
   if(action==='start')payload={...payload,connectionSecrets};
   const writes=(action==='cli-access'&&payload?.action!=='list')||(action==='network-adaptation'&&payload?.action!=='status')||(['harness','desktop-sessions'].includes(action)&&!['status','clients','detect'].includes(payload?.action))||['server-setup','connection-credentials','save','start','stop','devices','notification-watches','webhook-endpoint', 'transfer-settings'].includes(action);
-  if(writes&&updater?.busy)return Promise.reject(Error('正在更新应用，请稍候。'));
+  if(writes&&updater?.busy)return Promise.reject(Error('앱이 업데이트 중입니다. 기다리세요.'));
   if(writes)workerWrites++;
   if(action==='snapshot'&&snapshotPending)return snapshotPending;
   const options=workerFor({packaged:app.isPackaged,resources:process.resourcesPath,root,dataDir});
@@ -108,7 +108,7 @@ async function installUpdate(candidate){
   const ready=path.join(path.dirname(prepared.plan),'ready.json'),end=Date.now()+15000;
   while(Date.now()<end){
     if(spawnError)throw spawnError;
-    if(child.exitCode!==null)throw Error('无法启动应用更新进程。');
+    if(child.exitCode!==null)throw Error('앱 업데이터를 시작할 수 없습니다.');
     let readyToken;
     try{readyToken=JSON.parse(fs.readFileSync(ready,'utf8')).token;}catch{}
     if(readyToken===token){
@@ -120,12 +120,13 @@ async function installUpdate(candidate){
     }
     await new Promise(resolve=>setTimeout(resolve,100));
   }
-  throw Error('无法启动应用更新进程。');
+  throw Error('앱 업데이터를 시작할 수 없습니다.');
 }
 function setupUpdater(){
   updater=new Updater({current:app.getVersion(),key:fs.readFileSync(path.join(__dirname,'features/updates/update-public-key.pem')),
     fetch:cloudflared.electronFetch(net,allowedMirrorUrl),directory:path.join(app.getPath('userData'),'updates'),
-    skipFile:path.join(app.getPath('userData'),'skipped-update.json'),supported:app.isPackaged&&require(path.join(root,'package.json')).name==='codex-mobile-bridge-desktop'&&['darwin','win32'].includes(process.platform),
+    // 한국어 포크 전용 서명 키와 배포 절차가 준비되기 전에는 원본 업데이트를 설치하지 않는다.
+    skipFile:path.join(app.getPath('userData'),'skipped-update.json'),supported:false,
     preflight:process.platform==='win32'?()=>worker('update-preflight',{target:updateTarget()}):undefined,install:installUpdate});
   setTimeout(()=>updater.check(),5000).unref();
   setInterval(()=>updater.check(),6*60*60*1000).unref();
@@ -140,30 +141,30 @@ function register(){
   ipcMain.handle('bridge:skip-update',event=>{authorize(event);return updater.skip();});
   ipcMain.handle('bridge:install-update',event=>{
     authorize(event);
-    if(installPending||workerWrites||setupPending||updateManaged())throw Error('请等待当前操作完成后再更新。');
+    if(installPending||workerWrites||setupPending||updateManaged())throw Error('업데이트하기 전에 현재 작업이 완료될 때까지 기다리십시오.');
     return updater.install();
   });
   ipcMain.handle('bridge:language',event=>{authorize(event);return language;});
   ipcMain.handle('bridge:set-language',(event,value)=>{
     authorize(event);
-    if(!['zh-CN','en'].includes(value))throw Error('Unsupported language');
+    if(!['ko-KR','en'].includes(value))throw Error('Unsupported language');
     const directory=app.getPath('userData');fs.mkdirSync(directory,{recursive:true});
     publishLanguage(dataDir,value);
     fs.writeFileSync(path.join(directory,'language.json'),JSON.stringify({language:value}));
-    language=value;const title=t('Codex 手机网关');if(window.getTitle()!==title)window.setTitle(title);tray?.relabel();return language;
+    language=value;const title=t('Codex 모바일 Bridge');if(window.getTitle()!==title)window.setTitle(title);tray?.relabel();return language;
   });
   for(const action of ['snapshot','save','start','stop','logs','test-notification','webhook-endpoint','network-adaptation','check-entry','tailscale-setup','devices','account', 'accounts', 'cli-access', 'harness', 'desktop-sessions','notification-watches', 'transfer-settings'])ipcMain.handle('bridge:'+action,async(event,payload)=>{
     authorize(event);
     if(action==='desktop-sessions'&&payload?.action?.startsWith('zcode-official-')){
-      if(updater?.busy)throw Error('正在更新应用，请稍候。');
+      if(updater?.busy)throw Error('앱이 업데이트 중입니다. 기다리세요.');
       const service=officialService();
       await service.start();
-      if(service!==officialRemote||service.disposed)throw Error('网关资料目录已变化，请重新打开管理页。');
+      if(service!==officialRemote||service.disposed)throw Error('게이트웨이 데이터 디렉토리가 변경되었습니다. 관리 페이지를 다시 열어주세요。');
       if(payload.action==='zcode-official-state')return service.status();
       if(payload.action==='zcode-official-save')return service.save(payload.link);
       if(payload.action==='zcode-official-login')return service.login(payload.link);
       if(payload.action==='zcode-official-connect'){
-        if(service.localLink(payload.link).url!==service.targetLink())throw Error('远控链接已变化，请先保存连接配置。');
+        if(service.localLink(payload.link).url!==service.targetLink())throw Error('원격 제어 링크가 변경되었습니다. 먼저 연결 구성을 저장하세요.。');
         await worker('desktop-sessions',{action:'toggle-client',provider:'zcode',enabled:true,connectionMode:'official-remote'});
       }else if(payload.action==='zcode-official-disconnect'){
         await service.disconnect();
@@ -172,14 +173,14 @@ function register(){
       }else if(payload.action==='zcode-official-local'){
         await service.disconnect();
         await worker('desktop-sessions',{action:'zcode-official',enabled:false});
-      }else throw Error('未知官方远控操作');
+      }else throw Error('공식 리모컨 작동 여부는 알 수 없음');
       return service.status();
     }
     if(action==='accounts'){
-      if(updater?.busy&&payload?.action!=='list')throw Error('正在更新应用，请稍候。');
+      if(updater?.busy&&payload?.action!=='list')throw Error('앱이 업데이트 중입니다. 기다리세요.');
       if(payload?.action==='openLogin'){
         const value=await worker('accounts',{action:'list',...(payload.entry?{entry:payload.entry}:{})}),url=new URL(value.enrollment?.authUrl||'');
-        if(value.enrollment?.phase!=='waiting'||url.protocol!=='https:'||!['auth.openai.com','chatgpt.com','auth0.openai.com'].includes(url.hostname))throw Error('登录已过期，请重新登录');
+        if(value.enrollment?.phase!=='waiting'||url.protocol!=='https:'||!['auth.openai.com','chatgpt.com','auth0.openai.com'].includes(url.hostname))throw Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
         await shell.openExternal(url.href);return value;
       }
     }
@@ -199,11 +200,11 @@ function register(){
   ipcMain.handle('bridge:tailscale-authorize',async(event,value)=>{
     authorize(event);
     const current=await worker('snapshot');
-    if(!current.preferences.connections.some(c=>c.id===value?.id&&c.accessMode==='tailscale'))throw Error('请选择 Tailscale 连接。');
+    if(!current.preferences.connections.some(c=>c.id===value?.id&&c.accessMode==='tailscale'))throw Error('Tailscale 연결을 선택합니다.');
     const address=current.externalStatus?.[value.id]?.authUrl||(await worker('tailscale-setup',{id:value.id})).authUrl;
-    let url;try{url=new URL(address);}catch{throw Error('请在 Tailscale 客户端完成登录；启动入口后如需额外授权，会在这里提示。');}
-    if(url.protocol!=='https:'||url.hostname!=='login.tailscale.com'||url.username||url.password||(url.port&&url.port!=='443'))throw Error('Tailscale 授权地址无效，请重新检测。');
-    await shell.openExternal(url.href);return {message:'已打开 Tailscale 授权页面。'};
+    let url;try{url=new URL(address);}catch{throw Error('Tailscale 클라이언트를 사용하여 로그인합니다. 항목을 시작한 후 추가 승인이 여기에 표시됩니다.');}
+    if(url.protocol!=='https:'||url.hostname!=='login.tailscale.com'||url.username||url.password||(url.port&&url.port!=='443'))throw Error('Tailscale 인증이 잘못되었습니다. URL. 다시 감지합니다.');
+    await shell.openExternal(url.href);return {message:'Tailscale 인증 페이지가 열렸습니다.'};
   });
   ipcMain.handle('bridge:read-credentials',async(event,value={})=>{
     authorize(event);
@@ -212,43 +213,43 @@ function register(){
   });
   ipcMain.handle('bridge:connection-credentials',async(event,value)=>{
     authorize(event);
-    if(updater?.busy)throw Error('正在更新应用，请稍候。');
+    if(updater?.busy)throw Error('앱이 업데이트 중입니다. 기다리세요.');
     const current=await worker('snapshot');
-    if(!current.preferences.connections.some(c=>c.id===value?.id))throw Error('请先保存连接配置。');
+    if(!current.preferences.connections.some(c=>c.id===value?.id))throw Error('먼저 연결 설정을 저장하세요.');
     const secret=value.secrets;
-    if(!secret||typeof secret!=='object'||Object.keys(secret).some(key=>!['password','passphrase','tunnelToken','clear'].includes(key)))throw Error('连接凭据格式不正确');
-    for(const [key,text] of Object.entries(secret))if(key!=='clear'&&(typeof text!=='string'||text.length>16384||text.includes('\0')))throw Error('连接凭据格式不正确');
+    if(!secret||typeof secret!=='object'||Object.keys(secret).some(key=>!['password','passphrase','tunnelToken','clear'].includes(key)))throw Error('연결 자격 증명 형식이 잘못되었습니다.');
+    for(const [key,text] of Object.entries(secret))if(key!=='clear'&&(typeof text!=='string'||text.length>16384||text.includes('\0')))throw Error('연결 자격 증명 형식이 잘못되었습니다.');
     if(secret.clear){await worker('connection-credentials',{id:value.id,secrets:{clear:true}});delete connectionSecrets[value.id];}
     else if(value.remember){await worker('connection-credentials',{id:value.id,secrets:secret});delete connectionSecrets[value.id];}
     else connectionSecrets[value.id]={...connectionSecrets[value.id],...secret};
-    return {message:value.remember?'连接凭据已保存到系统凭据存储。':'连接凭据仅保留在本次 App 运行内存中。'};
+    return {message:value.remember?'시스템 자격 증명 저장소에 저장된 연결 자격 증명입니다.':'연결 자격 증명은 이 앱 세션 동안에만 메모리에 보관됩니다.'};
   });
   ipcMain.handle('bridge:copy-server-diagnostics',async(event,value)=>{
     authorize(event);const result=await worker('server-setup',{id:value.id,action:'diagnostics',language:value.language});
-    clipboard.writeText(result.prompt);return {message:value.language==='en'?'Read-only server inspection prompt copied.':'服务器只读检查 Prompt 已复制。'};
+    clipboard.writeText(result.prompt);return {message:value.language==='en'?'Read-only server inspection prompt copied.':'읽기 전용 서버 검사 프롬프트가 복사되었습니다.'};
   });
   ipcMain.handle('bridge:server-setup',async(event,value)=>{
     authorize(event);
-    if(!['host','trust','inspect'].includes(value?.action))throw Error('App 仅支持 SSH 连接检查；服务器安装与权限配置请手动完成。');
-    if(updater?.busy)throw Error('正在更新应用，请稍候。');
-    if(setupPending)throw Error('请等待服务器操作完成。');
+    if(!['host','trust','inspect'].includes(value?.action))throw Error('이 앱은 SSH 연결 확인만 지원합니다. 서버 소프트웨어 및 권한을 수동으로 구성합니다.');
+    if(updater?.busy)throw Error('앱이 업데이트 중입니다. 기다리세요.');
+    if(setupPending)throw Error('서버 작업이 완료될 때까지 기다려 주세요.。');
     setupPending=true;
     try{
     if(value.action==='trust'){
       const current=await worker('server-setup',{id:value.id,action:'host'});
-      if(current.fingerprint!==value.fingerprint)throw Error('主机指纹已变化，请重新检查。');
-      const result=await dialog.showMessageBox(window,{type:'warning',buttons:[t('取消'),t('信任此服务器')],defaultId:0,cancelId:0,
-        message:t(current.changed?'服务器主机指纹已改变':'首次连接此服务器'),
-        detail:current.host+':'+current.port+'\n'+current.fingerprint+'\n'+t('请与服务器管理员或控制台中的主机指纹核对。')});
-      if(result.response!==1)return {cancelled:true,message:t('未保存主机指纹。')};
+      if(current.fingerprint!==value.fingerprint)throw Error('호스트 지문이 변경되었습니다. 다시 확인하세요.。');
+      const result=await dialog.showMessageBox(window,{type:'warning',buttons:[t('취소'),t('이 서버를 신뢰하세요')],defaultId:0,cancelId:0,
+        message:t(current.changed?'서버 호스트 지문이 변경되었습니다.':'이 서버에 대한 첫 번째 연결'),
+        detail:current.host+':'+current.port+'\n'+current.fingerprint+'\n'+t('서버 관리자나 서버 콘솔을 통해 이 지문을 확인하세요.')});
+      if(result.response!==1)return {cancelled:true,message:t('호스트 지문이 저장되지 않았습니다.')};
     }
     return await worker('server-setup',{id:value.id,action:value.action,fingerprint:value.fingerprint,secrets:connectionSecrets[value.id]});
     }finally{setupPending=false;}
   });
   ipcMain.handle('bridge:install-cloudflared',async event=>{
-    authorize(event);if(updater.busy)throw Error('正在更新应用，请稍候。');if(installPending)return installPending;
+    authorize(event);if(updater.busy)throw Error('앱이 업데이트 중입니다. 기다리세요.');if(installPending)return installPending;
     installPending=(async()=>{
-      if((await worker('snapshot')).runtime.running)throw Error('请先停止网关再安装 cloudflared。');
+      if((await worker('snapshot')).runtime.running)throw Error('cloudflared를 설치하기 전에 게이트웨이를 중지하십시오.');
       return cloudflared.install({dataDir,fetch:cloudflared.electronFetch(net),onProgress:value=>{installStatus=value;}});
     })().catch(error=>{installStatus={state:'error',message:error.message};throw error;}).finally(()=>{installPending=null;});
     return installPending;
@@ -256,7 +257,7 @@ function register(){
   ipcMain.handle('bridge:check-cloudflared',async(event,value)=>{
     authorize(event);const snapshot=await worker('snapshot');
     const executable=typeof value==='string'&&value.trim()?value.trim():snapshot.preferences.cloudflared;
-    if(!executable||!path.isAbsolute(executable))throw Error('未找到 cloudflared，请点击一键安装，或选择已下载的程序。');
+    if(!executable||!path.isAbsolute(executable))throw Error('cloudflared를 찾을 수 없습니다. 다운로드 및 설치를 클릭하거나 다운로드한 실행 파일을 선택합니다.');
     return {path:executable,version:await cloudflared.probe(executable)};
   });
   ipcMain.handle('bridge:pairing',async(event,payload)=>{
@@ -268,31 +269,31 @@ function register(){
   });
   ipcMain.handle('bridge:export-deployment',async(event,payload)=>{
     authorize(event);
-    const result=await dialog.showSaveDialog(window,{defaultPath:'Codex-deployment.zip',filters:[{name:payload?.language==='en'?'Deployment ZIP':'ZIP 部署包',extensions:['zip']}]});
+    const result=await dialog.showSaveDialog(window,{defaultPath:'Codex-deployment.zip',filters:[{name:payload?.language==='en'?'Deployment ZIP':'ZIP 배포 패키지',extensions:['zip']}]});
     if(result.canceled)return null;
     const bundle=await worker('export-deployment',payload);
     fs.copyFileSync(bundle.path,result.filePath);
-    return {message:payload?.language==='en'?'Deployment ZIP exported: '+result.filePath:'部署包已导出：'+result.filePath};
+    return {message:payload?.language==='en'?'Deployment ZIP exported: '+result.filePath:'배포 패키지를 내보냈습니다.：'+result.filePath};
   });
   ipcMain.handle('bridge:copy-deployment',async(event,payload)=>{
     authorize(event);const bundle=await worker('deployment',payload);
     const english=payload?.language==='en';
     const manual=bundle.accessMode==='server';
-    const intro=manual?(english?'Manual setup reference. Review the configuration; administrative commands must be run by the user.':'手动配置参考。请检查以下配置；涉及管理员权限的命令必须由用户自行执行。'):english?'Deploy Codex Mobile Bridge using the configuration below. Check existing services first; do not overwrite existing sites.':'请按以下配置帮我部署 Codex 手机网关的固定入口。先检查已有服务，不要覆盖已有站点。';
-    const text=intro+'\n\n'+Object.entries(bundle.files).filter(([name])=>name!==(english?'部署说明.md':'DEPLOYMENT_EN.md')).map(([name,content])=>'--- '+name+' ---\n'+content).join('\n');
-    clipboard.writeText(text);return {message:manual?(english?'Manual setup reference copied. Administrative steps must be performed by the user.':'手动配置参考已复制；管理员操作请由用户自行完成。'):english?'Deployment instructions and configuration copied. Paste them into your server or NAS Agent.':'部署说明与配置已复制，可粘贴给服务器或 NAS 上的 Agent。'};
+    const intro=manual?(english?'Manual setup reference. Review the configuration; administrative commands must be run by the user.':'수동 구성 참조. 다음 구성을 확인하십시오. 관리자 권한이 포함된 명령은 사용자가 직접 실행해야 합니다.。'):english?'Deploy Codex Mobile Bridge using the configuration below. Check existing services first; do not overwrite existing sites.':'다음 구성에 따라 배포하도록 도와주세요. Codex 휴대폰 게이트웨이의 고정된 입구입니다. 기존 서비스를 먼저 확인하고 기존 사이트를 덮어쓰지 마세요.。';
+    const text=intro+'\n\n'+Object.entries(bundle.files).filter(([name])=>name!==(english?'배포 지침.md':'DEPLOYMENT_EN.md')).map(([name,content])=>'--- '+name+' ---\n'+content).join('\n');
+    clipboard.writeText(text);return {message:manual?(english?'Manual setup reference copied. Administrative steps must be performed by the user.':'수동 구성 참조가 복사되었습니다. 관리자 작업은 사용자가 직접 완료해야 합니다.。'):english?'Deployment instructions and configuration copied. Paste them into your server or NAS Agent.':'배포 지침 및 구성이 복사되었습니다. 서버나 NAS 에이전트에 붙여넣으세요.'};
   });
   ipcMain.handle('bridge:choose',async(event,kind)=>{
     authorize(event);
-    if(!['folder','file','data','ssh-key'].includes(kind))throw Error('未知路径类型');
+    if(!['folder','file','data','ssh-key'].includes(kind))throw Error('알 수 없는 경로 유형');
     const result=await dialog.showOpenDialog(window,kind==='ssh-key'?{defaultPath:path.join(app.getPath('home'),'.ssh'),properties:['openFile','showHiddenFiles']}:{properties:[kind==='file'?'openFile':'openDirectory']});
     if(result.canceled)return null;
     const selected=result.filePaths[0];
     if(kind==='data'){
-      if(workerWrites)throw Error('请等待当前操作完成。');
-      if(updater.busy)throw Error('正在更新应用，请稍候。');
-      if(installPending)throw Error('正在安装 cloudflared，请完成后再切换数据目录。');
-      if(setupPending)throw Error('请等待服务器操作完成。');
+      if(workerWrites)throw Error('현재 작업이 완료될 때까지 기다립니다.');
+      if(updater.busy)throw Error('앱이 업데이트 중입니다. 기다리세요.');
+      if(installPending)throw Error('cloudflared를 설치하는 중입니다. 데이터 디렉터리를 변경하기 전에 기다리십시오.');
+      if(setupPending)throw Error('서버 작업이 완료될 때까지 기다려 주세요.。');
       installStatus={};connectionSecrets={};
       const changed=selected!==dataDir;
       if(changed){officialRemote?.dispose();officialRemote=null;}
@@ -304,15 +305,21 @@ function register(){
   });
   ipcMain.handle('bridge:open',async(event,target)=>{
     authorize(event);
-    if(target==='releases')return shell.openExternal('https://github.com/try2love/codex-mobile-bridge/releases');
-    if(target==='project-home')return shell.openExternal('https://github.com/try2love/codex-mobile-bridge');
-    if(target==='project-issues')return shell.openExternal('https://github.com/try2love/codex-mobile-bridge/issues');
-    if(target==='project-pulls')return shell.openExternal('https://github.com/try2love/codex-mobile-bridge/pulls');
-    if(target==='credentials')return shell.openPath(path.join(dataDir,'首次登录.txt'));
+    if(target==='releases')return shell.openExternal('https://github.com/sekai0716/codex-mobile-bridge-kr/releases');
+    if(target==='project-home')return shell.openExternal('https://github.com/sekai0716/codex-mobile-bridge-kr');
+    if(target==='project-issues')return shell.openExternal('https://github.com/sekai0716/codex-mobile-bridge-kr/issues');
+    if(target==='project-pulls')return shell.openExternal('https://github.com/sekai0716/codex-mobile-bridge-kr/pulls');
+    if(target==='credentials'){
+      // 기존 데이터 디렉터리의 파일명은 표시 문구와 달리 그대로 읽을 수 있어야 한다.
+      const candidates=['첫 로그인.txt','\u9996\u6b21\u767b\u5f55.txt'].map(name=>path.join(dataDir,name));
+      const initial=candidates.find(file=>{try{return fs.statSync(file).isFile();}catch{return false;}});
+      return shell.openPath(initial||candidates[0]);
+    }
     if(target==='data')return shell.openPath(dataDir);
     if(target==='tailscale-help'||target==='setup-tailscale')return shell.openExternal('https://tailscale.com/docs/how-to/quickstart');
     if(target==='cloudflare-dashboard')return shell.openExternal('https://one.dash.cloudflare.com/');
-    if(['setup-lan','setup-quick','setup-cloudflare','setup-server','setup-nas','setup-external'].includes(target))return shell.openExternal('https://try2love.github.io/codex-mobile-bridge/setup.html?lang='+(language==='en'?'en':'zh')+'#'+target.slice(6));
+    // 업스트림 안내서는 한국어가 없어 지원되는 영문판을 연다.
+    if(['setup-lan','setup-quick','setup-cloudflare','setup-server','setup-nas','setup-external'].includes(target))return shell.openExternal('https://try2love.github.io/codex-mobile-bridge/setup.html?lang=en#'+target.slice(6));
     if(target==='cloudflare-domain-help')return shell.openExternal('https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/');
     if(target==='server-https-help')return shell.openExternal('https://caddyserver.com/docs/running');
     if(target==='server-ssh-help')return shell.openExternal('https://man.openbsd.org/sshd_config#AllowTcpForwarding');
@@ -325,17 +332,17 @@ function register(){
     const snapshot=await worker('snapshot');
     if(target==='harness'){
       const state=await worker('harness',{action:'status'});
-      if(!state.running||!snapshot.urls.length)throw Error('请先启动网关和 Harness');
+      if(!state.running||!snapshot.urls.length)throw Error('게이트웨이 및 Harness를 먼저 시작하십시오.');
       return shell.openExternal(new URL('/harness/',snapshot.urls[0]).href);
     }
-    if(!snapshot.urls.includes(target)||!/^https?:\/\//.test(target))throw Error('地址不可用');
+    if(!snapshot.urls.includes(target)||!/^https?:\/\//.test(target))throw Error('사용할 수 없는 주소입니다');
     await shell.openExternal(target);
   });
   ipcMain.handle('bridge:copy',async(event,target)=>{
     authorize(event);const snapshot=await worker('snapshot');
     const localPort=typeof target==='string'?/^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})$/.exec(target):null;
     const localTarget=localPort&&Number(localPort[1])<=65535;
-    if(!snapshot.urls.includes(target)&&!localTarget)throw Error('地址不可用');
+    if(!snapshot.urls.includes(target)&&!localTarget)throw Error('사용할 수 없는 주소입니다');
     clipboard.writeText(target);
   });
 }
@@ -349,7 +356,7 @@ async function acknowledgeUpdate(){
   }catch{} // Missing acknowledgement makes the independent helper restore the old app.
 }
 function createWindow(hidden=false){
-  window=new BrowserWindow({show:!hidden,width:1100,height:850,minWidth:820,minHeight:640,title:t('Codex 手机网关'),icon:path.join(__dirname,'assets/icon.png'),backgroundColor:'#f6f7f9',webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  window=new BrowserWindow({show:!hidden,width:1100,height:850,minWidth:820,minHeight:640,title:t('Codex 모바일 Bridge'),icon:path.join(__dirname,'assets/icon.png'),backgroundColor:'#f6f7f9',webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   // The native title is owned by the main process, including locale changes.
   window.on('page-title-updated',event=>event.preventDefault());
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
@@ -364,7 +371,7 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',(_event,argv)=>{if(!loginStartup.hidden(argv))showWindow();});
   app.whenReady().then(async()=>{
-    language=normalize(app.getLocale());
+    language='ko-KR';
     try{language=normalize(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'),'language.json'),'utf8')).language);}catch{}
     dataDir=loadDataDir();publishLanguage(dataDir,language);
     setupUpdater();register();
@@ -374,7 +381,7 @@ else{
       if(process.platform==='darwin')icon.setTemplateImage(true);
       tray=createTray({Tray,Menu,icon,show:showWindow,worker,t,
         open:url=>shell.openExternal(url),copy:url=>clipboard.writeText(url),quit:()=>app.quit(),
-        onError:error=>{showWindow();dialog.showErrorBox(t('网关操作未完成'),t(error.message));}});
+        onError:error=>{showWindow();dialog.showErrorBox(t('게이트웨이 작업 실패'),t(error.message));}});
     }
     createWindow(!!tray&&loginStartup.hidden(process.argv,true));
     restoreOfficialService();

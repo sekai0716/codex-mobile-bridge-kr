@@ -2,8 +2,8 @@
 // One foreground transfer, independent of the selected chat and workbench tabs.
 const BridgeDownload = (() => {
   const CHUNK = 1024 * 1024, LIMIT = Number.MAX_SAFE_INTEGER, MEMORY_LIMIT = 50 * 1024 * 1024;
-  const changed = '源文件已变化，请重新下载。';
-  const invalid = '下载响应不完整或格式不正确，请重试。';
+  const changed = '소스 파일이 변경되었습니다. 다운로드를 다시 시작하세요.';
+  const invalid = '다운로드 응답이 불완전하거나 유효하지 않습니다. 다시 시도해 주세요.';
   function eligible(value, base) {
     try {
       const url = new URL(value, base);
@@ -31,13 +31,13 @@ const BridgeDownload = (() => {
     constructor(){
       this.name='bridge-transfer-'+Date.now()+'-'+Math.random().toString(36).slice(2);this.closed=false;
       this.ready=new Promise((resolve,reject)=>{const request=indexedDB.open(this.name,1);
-        request.onupgradeneeded=()=>request.result.createObjectStore('chunks');request.onerror=()=>reject(Error('无法暂存下载文件，请检查浏览器存储空间。'));
+        request.onupgradeneeded=()=>request.result.createObjectStore('chunks');request.onerror=()=>reject(Error('다운로드를 저장할 수 없습니다. 브라우저 저장 공간을 확인하세요.'));
         request.onsuccess=()=>{this.db=request.result;if(this.closed){this.db.close();indexedDB.deleteDatabase(this.name);reject(Error('Cancelled'));}else resolve(this.db);};});
       this.ready.catch(()=>{});
     }
     async append(value,key){const db=await this.ready;if(this.closed)throw Error('Cancelled');
-      return new Promise((resolve,reject)=>{const tx=db.transaction('chunks','readwrite');tx.objectStore('chunks').put(new Blob([value]),key);tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(Error('无法暂存下载文件，请检查浏览器存储空间。'));});}
-    async blob(){const db=await this.ready;return new Promise((resolve,reject)=>{const tx=db.transaction('chunks','readonly'),request=tx.objectStore('chunks').getAll();tx.oncomplete=()=>resolve(new Blob(request.result,{type:'application/octet-stream'}));tx.onerror=tx.onabort=()=>reject(Error('无法暂存下载文件，请检查浏览器存储空间。'));});}
+      return new Promise((resolve,reject)=>{const tx=db.transaction('chunks','readwrite');tx.objectStore('chunks').put(new Blob([value]),key);tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(Error('다운로드를 저장할 수 없습니다. 브라우저 저장 공간을 확인하세요.'));});}
+    async blob(){const db=await this.ready;return new Promise((resolve,reject)=>{const tx=db.transaction('chunks','readonly'),request=tx.objectStore('chunks').getAll();tx.oncomplete=()=>resolve(new Blob(request.result,{type:'application/octet-stream'}));tx.onerror=tx.onabort=()=>reject(Error('다운로드를 저장할 수 없습니다. 브라우저 저장 공간을 확인하세요.'));});}
     clear(){this.closed=true;if(this.db)this.db.close();indexedDB.deleteDatabase(this.name);}
   }
   class Task {
@@ -64,7 +64,7 @@ const BridgeDownload = (() => {
       this.version++; this.controller?.abort(); this.controller = null;
       this.status = 'paused'; this.speed = 0;
       this.restartRequired = Boolean(this.bytes && (!this.ranged || !this.etag));
-      if (this.restartRequired) this.error = '此连接不支持断点续传，请重新下载。';
+      if (this.restartRequired) this.error = '이 연결은 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.';
       this.emit();
     }
     restart() { return this.start(this.url, this.name); }
@@ -72,7 +72,7 @@ const BridgeDownload = (() => {
       if (this.status === 'downloading' || this.status === 'complete' || this.status === 'exported') return;
       if (this.bytes && (!this.ranged || !this.etag || this.restartRequired)) {
         this.status = 'error'; this.restartRequired = true;
-        this.error = '此连接不支持断点续传，请重新下载。'; this.emit(); return;
+        this.error = '이 연결은 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.'; this.emit(); return;
       }
       const version = ++this.version;
       const controller = this.controller = new AbortController();
@@ -96,9 +96,9 @@ const BridgeDownload = (() => {
             }
             throw Error(changed);
           }
-          if (response.status === 401 || response.status === 403) throw Error('登录已失效，请重新登录后继续下载。');
+          if (response.status === 401 || response.status === 403) throw Error('세션이 만료되었습니다. 재개하려면 다시 로그인하세요.');
           if (response.status === 409 && (await response.json()).code === 'download_changed') throw Error(changed);
-          if (response.status !== 200 && response.status !== 206) throw Error('下载失败，请检查连接后重试。');
+          if (response.status !== 200 && response.status !== 206) throw Error('다운로드에 실패했습니다. 연결을 확인하고 다시 시도하세요.');
           if (offset && (response.status !== 206 || !etag || etag !== this.etag)) throw Error(changed);
           let expected = null;
           const length = response.headers.get('Content-Length');
@@ -118,11 +118,11 @@ const BridgeDownload = (() => {
             expected = this.total; this.ranged = false;
           }
           if (this.total!==null&&(!Number.isSafeInteger(this.total)||this.total<0))throw Error(invalid);
-          if(!this.storage&&this.total>MEMORY_LIMIT)throw Error('浏览器存储不可用，无法暂存大文件；请使用手机 App 下载。');
+          if(!this.storage&&this.total>MEMORY_LIMIT)throw Error('대용량 파일에는 브라우저 저장 공간을 사용할 수 없습니다. 모바일 앱을 사용하여 다운로드하세요.');
           this.etag = etag;
           this.name = filename(response.headers.get('Content-Disposition'), this.name);
           // Partial data can only be retained across requests with a strong validator.
-          if (this.ranged && !etag && (this.total === null || this.total > expected)) throw Error('此连接不支持断点续传，请重新下载。');
+          if (this.ranged && !etag && (this.total === null || this.total > expected)) throw Error('이 연결은 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.');
           this.emit();
           if (!response.body) throw Error(invalid);
           const reader = response.body.getReader();
@@ -133,7 +133,7 @@ const BridgeDownload = (() => {
             if (done) break;
             received += value.byteLength;
             if(this.bytes+value.byteLength>LIMIT)throw Error(invalid);
-            if(!this.storage&&this.bytes+value.byteLength>MEMORY_LIMIT)throw Error('浏览器存储不可用，无法暂存大文件；请使用手机 App 下载。');
+            if(!this.storage&&this.bytes+value.byteLength>MEMORY_LIMIT)throw Error('대용량 파일에는 브라우저 저장 공간을 사용할 수 없습니다. 모바일 앱을 사용하여 다운로드하세요.');
             if (expected !== null && received > expected) throw Error(invalid);
             if(this.storage)await this.storage.append(value,this.bytes);else this.parts.push(value);
             if(version!==this.version){await reader.cancel();return;}this.bytes += value.byteLength;
@@ -144,7 +144,7 @@ const BridgeDownload = (() => {
               sampleTime = now; sampleBytes = this.bytes; this.emit();
             }
           }
-          if (expected !== null && received !== expected) throw Error('下载中断，请继续下载。');
+          if (expected !== null && received !== expected) throw Error('다운로드가 중단되었습니다. 계속하려면 재개하세요.');
           if (!this.ranged || this.bytes === this.total) { this.total = this.bytes; break; }
         }
         if (version !== this.version) return;
@@ -152,15 +152,15 @@ const BridgeDownload = (() => {
       } catch (error) {
         if (version !== this.version) return;
         controller.abort(); this.controller = null; this.status = 'error'; this.speed = 0;
-        this.error = error.message === 'Failed to fetch' ? '下载中断，请继续下载。' : error.message;
-        if (![changed, invalid, '登录已失效，请重新登录后继续下载。', '下载中断，请继续下载。',
-          '下载失败，请检查连接后重试。', '浏览器存储不可用，无法暂存大文件；请使用手机 App 下载。', '无法暂存下载文件，请检查浏览器存储空间。', '此连接不支持断点续传，请重新下载。'].includes(this.error)) this.error = '下载中断，请继续下载。';
-        this.restartRequired = [changed, invalid, '浏览器存储不可用，无法暂存大文件；请使用手机 App 下载。', '无法暂存下载文件，请检查浏览器存储空间。'].includes(this.error) || Boolean(this.bytes && (!this.ranged || !this.etag));
+        this.error = error.message === 'Failed to fetch' ? '다운로드가 중단되었습니다. 계속하려면 재개하세요.' : error.message;
+        if (![changed, invalid, '세션이 만료되었습니다. 재개하려면 다시 로그인하세요.', '다운로드가 중단되었습니다. 계속하려면 재개하세요.',
+          '다운로드에 실패했습니다. 연결을 확인하고 다시 시도하세요.', '대용량 파일에는 브라우저 저장 공간을 사용할 수 없습니다. 모바일 앱을 사용하여 다운로드하세요.', '다운로드를 저장할 수 없습니다. 브라우저 저장 공간을 확인하세요.', '이 연결은 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.'].includes(this.error)) this.error = '다운로드가 중단되었습니다. 계속하려면 재개하세요.';
+        this.restartRequired = [changed, invalid, '대용량 파일에는 브라우저 저장 공간을 사용할 수 없습니다. 모바일 앱을 사용하여 다운로드하세요.', '다운로드를 저장할 수 없습니다. 브라우저 저장 공간을 확인하세요.'].includes(this.error) || Boolean(this.bytes && (!this.ranged || !this.etag));
         this.emit();
       }
     }
     blob() {
-      if (!['complete', 'exported'].includes(this.status)) throw Error('下载尚未完成。');
+      if (!['complete', 'exported'].includes(this.status)) throw Error('아직 다운로드가 완료되지 않았습니다.');
       return this.storage?this.storage.blob():new Blob(this.parts, {type:'application/octet-stream'});
     }
   }
@@ -192,7 +192,7 @@ if (typeof document !== 'undefined') (() => {
   }
   function create() {
     panel = element('section', 'download-panel', document.body); panel.id = 'download-panel';
-    panel.setAttribute('aria-label', t('文件下载'));
+    panel.setAttribute('aria-label', t('파일 다운로드'));
     const header = element('div', 'download-head', panel);
     summary = element('button', 'download-summary', header); summary.type = 'button';
     summary.onclick = () => { if (!drag?.moved) { collapsed = !collapsed; render(); } };
@@ -257,7 +257,7 @@ if (typeof document !== 'undefined') (() => {
     const cramped = narrow && bottom - top < 215;
     details.hidden = collapsed || cramped; panel.classList.toggle('download-compact', details.hidden);
     summary.setAttribute('aria-expanded', String(!details.hidden));
-    toggle.textContent = details.hidden ? '+' : '−'; toggle.setAttribute('aria-label', t(details.hidden ? '展开下载浮窗' : '收起下载浮窗'));
+    toggle.textContent = details.hidden ? '+' : '−'; toggle.setAttribute('aria-label', t(details.hidden ? '다운로드 패널 펼치기' : '다운로드 패널 접기'));
     const h = panel.offsetHeight, w = panel.offsetWidth;
     const x = !narrow && dragged ? dragged.x : left + width - w - 12;
     const y = !narrow && dragged ? dragged.y : bottom - h;
@@ -268,24 +268,24 @@ if (typeof document !== 'undefined') (() => {
     if (!panel && task.status === 'idle') return;
     if (!panel) create();
     panel.hidden = task.status === 'idle'; if (panel.hidden) return;
-    const labels = {downloading:'正在下载', paused:'已暂停', error:'下载未完成', complete:'下载完成，可以保存', exported:'已交给浏览器保存'};
+    const labels = {downloading:'다운로드 중', paused:'일시중지됨', error:'다운로드가 완료되지 않았습니다', complete:'다운로드 완료 · 저장 준비 완료', exported:'저장을 위해 브라우저로 전송됨'};
     const percent = task.total ? Math.min(100, Math.floor(task.bytes / task.total * 100)) : null;
-    panel.setAttribute('aria-label', t('文件下载'));
+    panel.setAttribute('aria-label', t('파일 다운로드'));
     summary.textContent = '↓  ' + t(labels[task.status]) + (percent === null ? '' : ' · ' + percent + '%');
-    summary.title = t('拖动以移动下载浮窗');
-    toggle.textContent = collapsed ? '+' : '−'; toggle.setAttribute('aria-label', t(collapsed ? '展开下载浮窗' : '收起下载浮窗'));
+    summary.title = t('드래그하여 다운로드 패널 이동');
+    toggle.textContent = collapsed ? '+' : '−'; toggle.setAttribute('aria-label', t(collapsed ? '다운로드 패널 펼치기' : '다운로드 패널 접기'));
     name.textContent = task.name; name.title = task.name;
     state.textContent = t(labels[task.status]);
     if (percent === null && task.status === 'downloading') progress.removeAttribute('value');
     else progress.value = percent ?? (['complete','exported'].includes(task.status) ? 100 : 0);
-    progress.setAttribute('aria-label', t('下载进度'));
+    progress.setAttribute('aria-label', t('다운로드 진행 상황'));
     amount.textContent = units(task.bytes) + (task.total === null ? '' : ' / ' + units(task.total));
     speed.textContent = task.status === 'downloading' ? units(task.speed || 0) + '/s' : '';
     note.textContent = t(task.error || ''); note.hidden = !task.error;
     const finished = ['complete', 'exported'].includes(task.status);
-    pause.hidden = finished; pause.textContent = t(task.status === 'downloading' ? '暂停下载' : task.restartRequired ? '重新下载' : '继续下载');
-    save.hidden = !finished; save.textContent = t('保存文件');
-    cancel.textContent = t(finished ? '关闭' : '取消下载');
+    pause.hidden = finished; pause.textContent = t(task.status === 'downloading' ? '다운로드 일시중지' : task.restartRequired ? '다운로드 다시 시작' : '다운로드 재개');
+    save.hidden = !finished; save.textContent = t('파일 저장');
+    cancel.textContent = t(finished ? '닫기' : '다운로드 취소');
     place();
   }
   document.addEventListener('click', event => {
@@ -296,7 +296,7 @@ if (typeof document !== 'undefined') (() => {
     collapsed = false;
     if (task.status !== 'idle') {
       render();
-      if (task.url !== anchor.href) { note.hidden = false; note.textContent = t('请先保存或取消当前下载，再下载其他文件。'); }
+      if (task.url !== anchor.href) { note.hidden = false; note.textContent = t('다른 파일을 다운로드하기 전에 이 다운로드를 저장하거나 취소하십시오.'); }
       summary.focus({preventScroll:true}); return;
     }
     task.start(anchor.href, anchor.download || anchor.textContent.trim());

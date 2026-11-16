@@ -57,9 +57,9 @@ class ArchiveFeedback(unittest.TestCase):
                 return call
             commands = ArchiveCommands(folder)
             request_id = str(uuid.uuid4())
-            with self.assertRaisesRegex(ValueError, '待核对'): commands.perform(self.sid, True, request_id, read, prepare)
+            with self.assertRaisesRegex(ValueError, "아카이브\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 채팅을\\ 확인하세요\\.\\ 이\\ 작업은\\ 반복되지\\ 않습니다\\."): commands.perform(self.sid, True, request_id, read, prepare)
             dispatch = Mock()
-            with self.assertRaisesRegex(ValueError, '待核对'): commands.perform(self.sid, True, str(uuid.uuid4()), read, dispatch)
+            with self.assertRaisesRegex(ValueError, "이전\\ 아카이브\\ 작업이\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 해당\\ 기록은\\ 자동으로\\ 삭제되거나\\ 재생되지\\ 않습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."): commands.perform(self.sid, True, str(uuid.uuid4()), read, dispatch)
             dispatch.assert_not_called()
             self.assertEqual(json.loads(commands.path.read_text())[request_id]['status'], 'unknown')
 
@@ -141,7 +141,7 @@ class ProviderArchive(unittest.TestCase):
             self.assertEqual(calls, []); native.clear(); native.update(prior)
         self.manager.db.execute('INSERT INTO requests VALUES(?,?,?)', ('old', 'fixture', json.dumps({'status': 'unknown'})))
         self.manager.db.commit()
-        with self.assertRaisesRegex(ValueError, '待核对'):
+        with self.assertRaisesRegex(ValueError, "이\\ 연결에는\\ 대기\\ 중이거나\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."):
             self.manager.call('deepseek', 'archive', native['id'], {'id': str(uuid.uuid4()), 'archived': True})
         self.assertEqual(calls, [])
 
@@ -183,9 +183,9 @@ class ProviderArchive(unittest.TestCase):
                 raise TimeoutError('lost response')
             return read(action, sid, body)
         adapter.call.side_effect = timeout
-        with self.assertRaisesRegex(ValueError, '待核对'):
+        with self.assertRaisesRegex(ValueError, "아카이브\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 채팅을\\ 확인하세요\\.\\ 이\\ 작업은\\ 반복되지\\ 않습니다\\."):
             self.manager.call('deepseek', 'archive', native['id'], {'id': str(uuid.uuid4()), 'archived': True})
-        with self.assertRaisesRegex(ValueError, '待核对'):
+        with self.assertRaisesRegex(ValueError, "이전\\ 아카이브\\ 작업이\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 해당\\ 기록은\\ 자동으로\\ 삭제되거나\\ 재생되지\\ 않습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."):
             self.manager.call('deepseek', 'archive', native['id'], {'id': str(uuid.uuid4()), 'archived': True})
         self.assertEqual(calls, ['archive'])
 

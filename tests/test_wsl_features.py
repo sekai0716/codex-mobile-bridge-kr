@@ -89,7 +89,7 @@ class WslFeaturesTests(unittest.TestCase):
         params = next(p for m, p in self.entry.server.calls if m == 'thread/goal/set')
         self.assertEqual(params['tokenBudget'], 1234)
         self.assertEqual(params['origin'], 'user')
-        with self.assertRaisesRegex(ValueError, '变化'):
+        with self.assertRaisesRegex(ValueError, "목표가\\ 변경되었습니다\\.\\ 새로고침하고\\ 다시\\ 시도하세요\\."):
             self.entry.cancel_goal(self.identifier, str(uuid.uuid4()), expected={'objective': 'old', 'status': 'paused'})
         self.assertFalse(any(m == 'turn/start' for m, _ in self.entry.server.calls))
 

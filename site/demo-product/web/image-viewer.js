@@ -131,14 +131,14 @@
   function open(target, event) {
     const value = source(target); if (!value) return;
     event.preventDefault(); if (!dialog) create(); cleanup(); opener = target;
-    close.textContent = '× ' + t('关闭'); close.setAttribute('aria-label', t('关闭图片预览'));
-    zoomIn.setAttribute('aria-label', t('放大图片')); zoomOut.setAttribute('aria-label', t('缩小图片')); fit.textContent = t('适应屏幕');
-    percentage.setAttribute('aria-label', t('图片缩放比例')); percentage.textContent = '100%'; zoomIn.disabled = zoomOut.disabled = fit.disabled = true;
-    title.textContent = value.name || target.querySelector('img')?.alt || target.alt || t('图片附件');
-    status.textContent = t('正在加载图片…'); content.classList.remove('is-zoomed');
+    close.textContent = '× ' + t('닫기'); close.setAttribute('aria-label', t('이미지 미리보기 닫기'));
+    zoomIn.setAttribute('aria-label', t("확대")); zoomOut.setAttribute('aria-label', t("축소")); fit.textContent = t("화면에 맞추기");
+    percentage.setAttribute('aria-label', t("이미지 확대/축소 수준")); percentage.textContent = '100%'; zoomIn.disabled = zoomOut.disabled = fit.disabled = true;
+    title.textContent = value.name || target.querySelector('img')?.alt || target.alt || t("이미지 첨부");
+    status.textContent = t('이미지 로드 중…'); content.classList.remove('is-zoomed');
     const current = image = document.createElement('img'); current.alt = title.textContent; current.draggable = false;
     current.onload = () => { if (image === current && current.isConnected && dialog.open) { status.textContent = ''; measure(); } };
-    current.onerror = () => { if (image === current && current.isConnected) { current.hidden = true; status.textContent = t('图片加载失败，请关闭后重试。'); } };
+    current.onerror = () => { if (image === current && current.isConnected) { current.hidden = true; status.textContent = t("이미지를 로드할 수 없습니다. 닫고 다시 시도하세요."); } };
     content.replaceChildren(current); if (!dialog.open) dialog.showModal(); observer.observe(content); current.src = value.url;
   }
   window.BridgeImageViewer = {
@@ -148,7 +148,7 @@
       // This explicit renderer call is the trust boundary. A copied DOM attribute
       // cannot opt arbitrary data/blob/remote URLs into the delegated viewer.
       registered.set(target, {url,name:result.name}); target.classList.add('image-preview-source'); target.tabIndex = 0; target.setAttribute('role', 'button');
-      target.setAttribute('aria-label', t('查看图片') + ' ' + (result.name || target.alt)); return true;
+      target.setAttribute('aria-label', t("이미지 보기") + ' ' + (result.name || target.alt)); return true;
     }
   };
   document.addEventListener('click', event => {

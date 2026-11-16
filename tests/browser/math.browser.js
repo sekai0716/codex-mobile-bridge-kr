@@ -11,7 +11,7 @@
     renderMarkdown(node, text);
     return node;
   }
-  const formulas = String.raw`视图 \(V\)，答案 \(p_v(A)\)。
+  const formulas = String.raw`보다 \(V\)，답변 \(p_v(A)\)。
 
 \[
 U(q)=H\!\left(\sum_v w_v p_v(A)\right)
@@ -22,7 +22,7 @@ U(q)=H\!\left(\sum_v w_v p_v(A)\right)
 \max I(Z;Y\mid Q)-\beta I(Z;D\mid Q)
 \]
 
-行内 $x^2$ 与
+업계 내부 $x^2$ 및
 
 $$\frac{a}{b}$$`;
   const node = render(formulas);
@@ -30,16 +30,16 @@ $$\frac{a}{b}$$`;
   check('display and inline modes', node.querySelectorAll('.katex-display').length === 3);
   check('TeX survives Markdown escapes', node.querySelectorAll('annotation')[2]?.textContent.includes(String.raw`\sum_v w_v p_v(A)`));
   check('fractions have MathML', node.querySelector('mfrac'));
-  const adjacent = render(String.raw`要证明存在正数，先令
+  const adjacent = render(String.raw`양수가 존재함을 증명하려면 실링
 \[
 S=\{x>0:x^2\le b\},\qquad a=\sup S.
 \]
-后续正文`);
+후속 텍스트`);
   check('display math interrupts a paragraph without a blank line', adjacent.querySelectorAll('.katex-display').length === 1);
   check('adjacent display math preserves TeX', adjacent.querySelector('annotation')?.textContent.trim() === String.raw`S=\{x>0:x^2\le b\},\qquad a=\sup S.`);
   check('code and escaped dollars stay literal', !render('`\\(x\\)`\n\n```tex\n\\[x^2\\]\n```\n\n\\$x\\$').querySelector('.katex'));
-  check('currency stays text', !render('价格 $20 和 $30，合计 $50。').querySelector('.katex'));
-  check('plain brackets stay text', render('[这是说明]').textContent === '[这是说明]');
+  check('currency stays text', !render('가격 $20 및 $30，총 $50。').querySelector('.katex'));
+  check('plain brackets stay text', render('[이것은 설명입니다]').textContent === '[이것은 설명입니다]');
   const unsafe = render(String.raw`\(\href{javascript:alert(1)}{click}\) \(\includegraphics{https://example.com/track.png}\) \(\htmlStyle{background:url(https://example.com)}{x}\)`);
   check('TeX cannot create links, images or user styles', !unsafe.querySelector('a,img,[style*="example.com"]'));
   const broken = render(String.raw`\[\frac{a}\]`);

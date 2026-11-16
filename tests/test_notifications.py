@@ -189,9 +189,9 @@ class NotificationTests(unittest.TestCase):
         legacy_url = 'https://receiver.example/legacy'
         save_settings(self.directory, {'enabled': False, 'webhookEnabled': True, 'webhookUrl': legacy_url})
         legacy_target = channels(settings(self.directory))['webhook']
-        first, first_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '飞书甲',
+        first, first_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '페이슈지아',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/one'})
-        second, second_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '飞书乙',
+        second, second_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '페이슈이',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/one'})
         third, third_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': 'Telegram',
             'webhookEnabled': True, 'webhookUrl': 'https://api.telegram.org/botprivate/sendMessage',
@@ -216,7 +216,7 @@ class NotificationTests(unittest.TestCase):
             self.manager.scan()
             self.assertEqual(send.call_count, 1)
             old_target = channels(settings(self.directory))['webhook']
-            save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '新增',
+            save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '새로운',
                 'webhookEnabled': True, 'webhookUrl': 'https://receiver.example/new'})
             self.manager.scan()
         self.assertEqual(send.call_count, 2)
@@ -225,7 +225,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_rotating_named_webhook_cancels_old_retry(self):
         save_settings(self.directory, {'enabled': False})
-        _, webhook_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '轮换',
+        _, webhook_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '회전',
             'webhookEnabled': True, 'webhookUrl': 'https://receiver.example/old'})
         with patch('bridge.features.notifications.channels.publish_webhook', side_effect=OSError('offline')) as send:
             self.manager.scan()
@@ -244,9 +244,9 @@ class NotificationTests(unittest.TestCase):
 
     def test_multiple_webhook_failure_retry_and_deletion_are_isolated(self):
         save_settings(self.directory, {'enabled': False})
-        first, first_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '坏机器人',
+        first, first_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '나쁜 로봇',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/fail'})
-        second, second_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '好机器人',
+        second, second_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '좋은 로봇',
             'webhookEnabled': True, 'webhookUrl': 'https://api.telegram.org/botprivate/sendMessage',
             'webhookBodyTemplate': '{"chat_id":"123","text":"{{body}}"}'})
         sent = []
@@ -272,7 +272,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_multiple_webhook_masking_rotation_and_legacy_delete(self):
         save_settings(self.directory, {'webhookEnabled': True, 'webhookUrl': 'https://receiver.example/legacy-private'})
-        config, webhook_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '私有飞书',
+        config, webhook_id = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '페이슈 이병',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/private',
             'webhookSignEnabled': True, 'webhookSignSecret': 'private-sign'})
         visible = visible_webhook(config)
@@ -282,7 +282,7 @@ class NotificationTests(unittest.TestCase):
         self.assertNotIn('/private', json.dumps(visible))
         old_target = channels(config)['webhook:' + webhook_id]
         config, selected = save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookId': webhook_id,
-            'webhookName': '改名', 'webhookUrl': '', 'webhookSignSecret': ''})
+            'webhookName': '이름 변경', 'webhookUrl': '', 'webhookSignSecret': ''})
         self.assertEqual(selected, webhook_id)
         self.assertEqual(channels(config)['webhook:' + webhook_id], old_target)
         self.assertEqual(config['webhookEndpoints'][0]['webhookSignSecret'], 'private-sign')
@@ -297,7 +297,7 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual([row['webhookId'] for row in visible_webhook(config)['webhookEndpoints']], [webhook_id])
 
     def test_concurrent_webhook_upserts_preserve_both_targets(self):
-        names = ['并发甲', '并发乙']
+        names = ['동시A', '동시B']
         threads = [threading.Thread(target=lambda name=name: save_webhook_endpoint(self.directory, {
             'action': 'upsert', 'webhookName': name, 'webhookEnabled': True,
             'webhookUrl': 'https://receiver.example/' + name})) for name in names]
@@ -308,10 +308,10 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual({row['webhookName'] for row in settings(self.directory)['webhookEndpoints']}, set(names))
 
     def test_separate_processes_preserve_named_webhook_updates(self):
-        self._assert_separate_process_updates('甲', '乙')
+        self._assert_separate_process_updates('첫번째', '두번째')
 
     def test_separate_processes_preserve_legacy_and_named_webhooks(self):
-        self._assert_separate_process_updates('legacy', '乙')
+        self._assert_separate_process_updates('legacy', '두번째')
 
     def _assert_separate_process_updates(self, first_operation, second_operation):
         context = multiprocessing.get_context('fork' if 'fork' in multiprocessing.get_all_start_methods() else 'spawn')
@@ -329,7 +329,7 @@ class NotificationTests(unittest.TestCase):
             self.assertEqual((first.exitcode, second.exitcode), (0, 0))
             current = settings(self.directory)
             self.assertEqual({row['webhookName'] for row in current['webhookEndpoints']},
-                             {'乙'} if first_operation == 'legacy' else {'甲', '乙'})
+                             {'두번째'} if first_operation == 'legacy' else {'첫번째', '두번째'})
             if first_operation == 'legacy':
                 self.assertEqual(current['webhookUrl'], 'https://receiver.example/legacy')
         finally:
@@ -348,11 +348,11 @@ class NotificationTests(unittest.TestCase):
         save_settings(self.directory, {'webhookEnabled': True, 'webhookUrl': 'https://receiver.example/hook'})
         with patch('bridge.features.accounts.monitor.publish') as ntfy, \
                 patch('bridge.features.accounts.monitor.publish_webhook') as webhook:
-            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '额度提醒', '请查看')))
+            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '할당량 알림', '확인해주세요')))
             ntfy.assert_called_once()
             webhook.assert_called_once()
             self.assertEqual(webhook.call_args.kwargs['event'], 'account.lowQuota')
-            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '额度提醒', '请查看')))
+            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '할당량 알림', '확인해주세요')))
             webhook.assert_called_once()
 
     def test_account_reminder_fans_out_to_named_webhooks(self):
@@ -364,13 +364,13 @@ class NotificationTests(unittest.TestCase):
         monitor.preferences['lowQuota'] = True
         save_settings(self.directory, {'enabled': False, 'webhookEnabled': True,
                                        'webhookUrl': 'https://receiver.example/legacy'})
-        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '飞书',
+        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': 'Feishu',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/one'})
         with patch('bridge.features.accounts.monitor.publish_webhook') as webhook:
-            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '额度提醒', '请查看')))
+            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '할당량 알림', '확인해주세요')))
             self.assertEqual(webhook.call_count, 2)
             self.assertEqual(webhook.call_args.kwargs['event'], 'account.lowQuota')
-            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '额度提醒', '请查看')))
+            self.assertTrue(monitor.deliver('account-1', ('lowQuota', 'window-1', '할당량 알림', '확인해주세요')))
             self.assertEqual(webhook.call_count, 2)
 
     def test_webhook_post_template_escaping_and_redirect_rejection(self):
@@ -395,10 +395,10 @@ class NotificationTests(unittest.TestCase):
             config = save_settings(self.directory, {'webhookEnabled': True, 'webhookUrl': url,
                 'webhookHeaders': {'Authorization': 'Bearer secret'},
                 'webhookBodyTemplate': '{"event":"{{event}}","event_id":"{{event_id}}","nested":["{{body}}","{{session_name}}"],"count":"{{count}}"}'})
-            publish_webhook(config, '标题', '中文 "引号"\n换行', event='task.completed', session_name='私密聊天', count=2)
+            publish_webhook(config, '제목', '중국어 "따옴표"\n개행', event='task.completed', session_name='비공개 채팅', count=2)
             self.assertEqual(captured[0][0:2], ('/receiver/private?signature=abc', 'Bearer secret'))
             self.assertEqual({key: value for key, value in captured[0][2].items() if key != 'event_id'},
-                {'event': 'task.completed', 'nested': ['中文 "引号"\n换行', '私密聊天'], 'count': '2'})
+                {'event': 'task.completed', 'nested': ['중국어 "따옴표"\n개행', '비공개 채팅'], 'count': '2'})
             self.assertTrue(captured[0][2]['event_id'])
             with self.assertRaises(RuntimeError) as error:
                 publish_webhook(config, 'again', 'again')
@@ -413,9 +413,9 @@ class NotificationTests(unittest.TestCase):
             response = opener.return_value.open.return_value.__enter__.return_value
             response.status = 200
             response.read.return_value = b'{"code":0,"msg":"success"}'
-            publish_webhook(config, '标题', '内容', click='https://example.com')
+            publish_webhook(config, '제목', '콘텐츠', click='https://example.com')
             payload = json.loads(opener.return_value.open.call_args.args[0].data)
-        self.assertEqual(payload, {'msg_type': 'text', 'content': {'text': '标题\n内容\nhttps://example.com'}})
+        self.assertEqual(payload, {'msg_type': 'text', 'content': {'text': '제목\n콘텐츠\nhttps://example.com'}})
 
     def test_feishu_http_200_error_is_not_success(self):
         config = save_settings(self.directory, {'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/private'})
@@ -508,7 +508,7 @@ class NotificationTests(unittest.TestCase):
             response = opener.return_value.open.return_value.__enter__.return_value
             response.status = 204
             response.read.return_value = b''
-            with self.assertRaisesRegex(RuntimeError, '响应格式不正确'):
+            with self.assertRaisesRegex(RuntimeError, "응답\\ 형식이\\ 잘못되었습니다\\."):
                 publish_webhook(discord, 'title', 'body')
         telegram = save_settings(self.directory, {'webhookUrl': 'https://api.telegram.org/botprivate/sendMessage',
             'webhookProvider': 'telegram'})
@@ -522,7 +522,7 @@ class NotificationTests(unittest.TestCase):
             publish_webhook(telegram, 'title', 'body')
             self.assertEqual(json.loads(opener.return_value.open.call_args.args[0].data)['chat_id'], '123')
             response.read.return_value = b'{"ok":false,"description":"private token"}'
-            with self.assertRaisesRegex(RuntimeError, 'Telegram 未接受') as error:
+            with self.assertRaisesRegex(RuntimeError, "Telegram가\\ 알림을\\ 수락하지\\ 않았습니다\\.\\ chat_id와\\ 봇\\ 권한을\\ 확인하세요\\.") as error:
                 publish_webhook(telegram, 'title', 'body')
             self.assertNotIn('private token', str(error.exception))
 
@@ -536,15 +536,15 @@ class NotificationTests(unittest.TestCase):
             publish_webhook(discord, 'title', 'embed body')
             self.assertEqual(json.loads(opener.return_value.open.call_args.args[0].data)['embeds'][0]['description'], 'embed body')
         discord = save_settings(self.directory, {'webhookBodyTemplate': '{"content":"{{body}}"}'})
-        with self.assertRaisesRegex(RuntimeError, '2000'):
+        with self.assertRaisesRegex(RuntimeError, '2,000'):
             publish_webhook(discord, 'title', 'x' * 2001)
         telegram = save_settings(self.directory, {'webhookUrl': 'https://api.telegram.org/botprivate/sendMessage',
             'webhookProvider': 'telegram', 'webhookBodyTemplate': '{"chat_id":123,"text":"{{body}}"}'})
-        with self.assertRaisesRegex(RuntimeError, '4096'):
+        with self.assertRaisesRegex(RuntimeError, '4,096'):
             publish_webhook(telegram, 'title', 'x' * 4097)
         feishu = save_settings(self.directory, {'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/private',
             'webhookProvider': 'feishu'})
-        with self.assertRaisesRegex(RuntimeError, '过长'):
+        with self.assertRaisesRegex(RuntimeError, 'Feishu 메시지가 너무 깁니다'):
             publish_webhook(feishu, 'title', 'x' * (20 * 1024))
 
     def test_provider_http_errors_do_not_echo_urls_or_response_bodies(self):
@@ -592,7 +592,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_shared_webhook_sign_secret_validation_label(self):
         for provider in ('feishu', 'dingtalk'):
-            with self.subTest(provider=provider), self.assertRaisesRegex(ValueError, 'Webhook 签名密钥格式不正确'):
+            with self.subTest(provider=provider), self.assertRaisesRegex(ValueError, "웹훅\\ 서명\\ 비밀번호가\\ 잘못되었습니다\\."):
                 save_settings(self.directory, {'webhookProvider': provider, 'webhookSignSecret': 'invalid secret'})
 
     def test_feishu_signing_and_safe_response_errors(self):
@@ -625,7 +625,7 @@ class NotificationTests(unittest.TestCase):
                 response = opener.return_value.open.return_value.__enter__.return_value
                 response.status = 200
                 response.read.return_value = raw
-                with self.assertRaisesRegex(RuntimeError, '响应格式不正确'):
+                with self.assertRaisesRegex(RuntimeError, r'Feishu.*응답.*잘못'):
                     publish_webhook(config, 'title', 'body')
         with patch('bridge.features.notifications.channels.time') as webhook_clock, \
                 patch('bridge.features.notifications.channels.build_opener') as opener:
@@ -707,7 +707,7 @@ class NotificationTests(unittest.TestCase):
         self.session.state['requests'].append({'id': 2, 'method': 'item/permissions/requestApproval', 'params': {}})
         with patch('bridge.features.notifications.channels.publish') as send:
             self.manager.scan();self.assertEqual(send.call_count, 1)
-            self.assertIn('2 项', send.call_args.args[2])
+            self.assertIn('처리를 기다리는 요청이 2개', send.call_args.args[2])
             self.manager.watch(self.thread, 'remote', False)
             self.manager.scan();self.assertFalse(self.session.watched)
 
@@ -752,7 +752,7 @@ class NotificationTests(unittest.TestCase):
             self.turns(('run', 'completed'))
             other.scan()
             self.assertEqual(send.call_count, 1)
-            self.assertEqual(send.call_args.args[1], 'Codex 运行已完成')
+            self.assertEqual(send.call_args.args[1], 'Codex 실행 완료')
         other.close()
         self.assertFalse(self.manager.watch(self.thread, 'remote', False)['watching'])
         self.assertFalse(self.manager.watch(self.thread, 'remote', True)['notifyOnCompletion'])
@@ -769,7 +769,7 @@ class NotificationTests(unittest.TestCase):
             self.manager.scan();self.manager.scan()
             self.assertEqual(send.call_count, 1)
             self.assertNotIn('Private project', send.call_args.args[2])
-            self.assertIn('1 次运行', send.call_args.args[2])
+            self.assertIn('완료된 실행이 1건', send.call_args.args[2])
             self.assertTrue(send.call_args.args[3].endswith('~remote'))
             other = Notifications(self.source, self.directory)
             other.scan();self.assertEqual(send.call_count, 1)
@@ -789,7 +789,7 @@ class NotificationTests(unittest.TestCase):
                 'entitiesByKey': {t['turnId']: t for t in rows},
                 'islands': [{'entries': [{'value': t['turnId']} for t in rows]}]}}
             self.manager.scan();self.assertEqual(send.call_count, 1)
-            self.assertIn('1 次运行', send.call_args.args[2])
+            self.assertIn('완료된 실행이 1건', send.call_args.args[2])
 
     def test_empty_chat_can_notify_first_fast_run_and_ignores_failed_or_stopped(self):
         self.turns()
@@ -799,7 +799,7 @@ class NotificationTests(unittest.TestCase):
             self.manager.scan();self.assertFalse(send.called)
             self.session.state['turns'].append({'turnId': 'ok', 'status': 'completed'})
             self.manager.scan();self.assertEqual(send.call_count, 1)
-            self.assertIn('1 次运行', send.call_args.args[2])
+            self.assertIn('완료된 실행이 1건', send.call_args.args[2])
 
     def test_completion_retries_after_followup_and_restart_but_opt_out_cancels(self):
         self.turns(('run', 'inProgress'))
@@ -852,7 +852,7 @@ class NotificationTests(unittest.TestCase):
         self.session.state['requests'] = [{'id': 'approval', 'method': 'item/tool/requestUserInput', 'params': {}}]
         with patch('bridge.features.notifications.channels.publish') as send:
             self.manager.scan()
-            self.assertEqual([c.args[1] for c in send.call_args_list], ['Codex 需要你的确认', 'Codex 运行已完成'])
+            self.assertEqual([c.args[1] for c in send.call_args_list], ['Codex 당신의 확인이 필요합니다', 'Codex 실행 완료'])
             save_settings(self.directory, {'enabled': False})
             self.manager.scan()
             self.turns(('approval', 'completed'), ('while-off', 'completed'))
@@ -879,7 +879,7 @@ class NotificationTests(unittest.TestCase):
             self.session.state['requests'] = [{'id': 'question', 'method': 'item/tool/requestUserInput', 'params': {}}]
             self.manager.scan();self.manager.scan()
             self.assertFalse(ntfy.called)
-            self.assertEqual([c.args[1] for c in bark.call_args_list], ['Codex 需要你的确认', 'Codex 运行已完成'])
+            self.assertEqual([c.args[1] for c in bark.call_args_list], ['Codex 당신의 확인이 필요합니다', 'Codex 실행 완료'])
             self.assertNotIn('Private project', bark.call_args.args[2])
             self.assertTrue(bark.call_args.args[3].endswith('~remote'))
 
@@ -894,7 +894,7 @@ class NotificationTests(unittest.TestCase):
             self.session.state['requests'] = [{'id': 'question', 'method': 'item/tool/requestUserInput', 'params': {}}]
             self.manager.scan();self.manager.scan()
             self.assertFalse(ntfy.called)
-            self.assertEqual([c.args[1] for c in bark.call_args_list], ['Codex 需要你的确认', 'Codex 运行已完成'])
+            self.assertEqual([c.args[1] for c in bark.call_args_list], ['Codex 당신의 확인이 필요합니다', 'Codex 실행 완료'])
             self.assertNotIn('Private project', bark.call_args.args[2])
             self.assertTrue(bark.call_args.args[3].endswith('~remote'))
 
@@ -980,9 +980,9 @@ class NotificationTests(unittest.TestCase):
         with patch('bridge.features.notifications.channels.publish') as ntfy, patch('bridge.features.notifications.channels.publish_bark') as bark:
             self.manager.scan()
             self.assertEqual(ntfy.call_count, 1)
-            self.assertEqual(ntfy.call_args.args[1], 'Codex 运行已完成')
+            self.assertEqual(ntfy.call_args.args[1], 'Codex 실행 완료')
             self.assertEqual(bark.call_count, 1)
-            self.assertEqual(bark.call_args.args[1], 'Codex 需要你的确认')
+            self.assertEqual(bark.call_args.args[1], 'Codex 당신의 확인이 필요합니다')
             self.manager.close()
             self.manager = Notifications(self.source, self.directory)
             self.manager.scan()
@@ -1020,9 +1020,9 @@ class NotificationTests(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         config = {'barkServer': 'http://127.0.0.1:'+str(server.server_port)+'/bark/', 'barkKey': 'private-key'}
         try:
-            publish_bark(config, '待确认', '请查看聊天', 'https://example.com/#thread~remote')
-            self.assertEqual(captured[0], ('/bark/push', {'device_key': 'private-key', 'title': '待确认',
-                'body': '请查看聊天', 'group': 'Codex Mobile Bridge', 'url': 'https://example.com/#thread~remote'}))
+            publish_bark(config, "확인 필요", '채팅을 확인해주세요', 'https://example.com/#thread~remote')
+            self.assertEqual(captured[0], ('/bark/push', {'device_key': 'private-key', 'title': "확인 필요",
+                'body': '채팅을 확인해주세요', 'group': 'Codex Mobile Bridge', 'url': 'https://example.com/#thread~remote'}))
             for _ in range(6):
                 with self.assertRaises(RuntimeError) as error: publish_bark(config, 'test', 'test')
                 self.assertNotIn('private-key', str(error.exception))
@@ -1043,7 +1043,7 @@ class NotificationTests(unittest.TestCase):
         server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
-            publish({'server': 'http://127.0.0.1:'+str(server.server_port), 'topic': 'topic', 'token': 'test-token'}, '待确认', 'Open chat', 'https://example.com/#thread')
+            publish({'server': 'http://127.0.0.1:'+str(server.server_port), 'topic': 'topic', 'token': 'test-token'}, "확인 필요", 'Open chat', 'https://example.com/#thread')
             self.assertEqual(captured[0][1], 'Bearer test-token')
             self.assertEqual(captured[0][0]['click'], 'https://example.com/#thread')
             self.assertNotIn('token', captured[0][0])

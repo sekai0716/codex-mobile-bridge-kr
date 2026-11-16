@@ -13,7 +13,7 @@ const permissionCode=extract("$('permissions-button').onclick=",'const fileTrans
 const newChatTypeCode=extract("let newChatRequest=0,", "$('new-chat-project').onchange=");
 test('CLI creation picker offers existing and custom folders with an accurate action',async()=>{
   const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',disabled:false,open:true,children:[],addEventListener(){},get options(){return this.children;},replaceChildren(...parts){this.children=parts;this.value=parts[0]?.value||'';},append(option){this.children.push(option);if(!this.value)this.value=option.value;},onchange(){}});return nodes.get(id);};
-  const ctx={$,listRows:[],currentId:null,currentHost:'local',newChatProjects:[],newChatEnvironments:[],newChatCanBrowse:false,newChatPreferredHost:'local',newChatEntry:'desktop',preferredWslEntry:'',codexEntries:()=>[],wslEntries:()=>[],newChatUrl:value=>value,independentProject:()=> 'local|independent',api:async()=>({projects:ctx.projects||[],environments:[{key:'cli|local',host:'local',type:'cli',name:'Local CLI'},{key:'desktop|local',host:'local',type:'desktop',name:'Local App'}]}),Option:class{constructor(text,value){this.text=text;this.value=value;}},t:key=>({'创建聊天':'Create chat','创建并打开':'Create and open'}[key]||key)};
+  const ctx={$,listRows:[],currentId:null,currentHost:'local',newChatProjects:[],newChatEnvironments:[],newChatCanBrowse:false,newChatPreferredHost:'local',newChatEntry:'desktop',preferredWslEntry:'',codexEntries:()=>[],wslEntries:()=>[],newChatUrl:value=>value,independentProject:()=> 'local|independent',api:async()=>({projects:ctx.projects||[],environments:[{key:'cli|local',host:'local',type:'cli',name:'Local CLI'},{key:'desktop|local',host:'local',type:'desktop',name:'Local App'}]}),Option:class{constructor(text,value){this.text=text;this.value=value;}},t:key=>({'채팅 만들기':'Create chat','생성 및 열기':'Create and open'}[key]||key)};
   $('new-chat-project').onchange=()=>{$('new-chat-submit').disabled=!$('new-chat-project').value||$('new-chat-project').value==='__directory__';};
   vm.createContext(ctx);require('./fixtures/codex-entry-predicates.cjs')(ctx);vm.runInContext(newChatTypeCode,ctx);
   $('new-chat-type').value='cli';await $('new-chat-type').onchange();
@@ -31,7 +31,7 @@ test('CLI creation picker offers existing and custom folders with an accurate ac
 function node(){return {dataset:{},setAttribute(){},addEventListener(){},hidden:false,disabled:false,value:'',textContent:'',title:'',children:[],scrollTop:0,classList:{toggle(){}},append(...parts){this.children.push(...parts);},replaceChildren(...parts){this.children=parts;},querySelector(){return node();}};}
 function fixture(){
   const nodes=new Map();const $=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};
-  const ctx={CliConnectionsPanel:class{},api:async()=>{},contextCompacting:new Set(),uuid:()=>"fixture-id",toast(){},window:{},SessionMenu:class{bind(){}},pinRow:row=>row,$ ,state:null,reconnectFailure:null,listRows:[],availableSources:[],listRenderStamp:'',listComplete:false,listReadFinished:false,listHasMore:false,currentId:'a',currentHost:'local',sending:false,catalogStarted:false,catalogLoads:0,startCatalog(){ctx.catalogLoads++;},selectedSkills:new Set(),invalidSkills:new Set(),renderSkillPills(){},BridgeI18n:{locale:()=> 'en-US'},t:key=>({'此电脑':'This computer','其他来源':'Other source','历史记录':'History','重新连接':'Reconnect','继续会话':'Continue chat'}[key]||key),localStorage:{getItem:()=>null,setItem(){}},dateText:()=> 'today',el:(tag,cls='',value='')=>Object.assign(node(),{tag,cls,textContent:value,dataset:{}}),renderActivity(){},contextUsageControl:{update(){}},fastModeControl:{sync(){}},visibleChat:()=>false,sessionActivity:{read(){}},attachments:{ready:()=>true},workModes:{render(view){ctx.modesView=view;}},workbench:{current:{},setAttachedParent(){}},chatTimeline:{refreshActions(){}},renderApprovals(rows){ctx.approvals=rows;},renderQueue(){},approvalStamp:'',chatKey:()=> 'local|a'};
+  const ctx={CliConnectionsPanel:class{},api:async()=>{},contextCompacting:new Set(),uuid:()=>"fixture-id",toast(){},window:{},SessionMenu:class{bind(){}},pinRow:row=>row,$ ,state:null,reconnectFailure:null,listRows:[],availableSources:[],listRenderStamp:'',listComplete:false,listReadFinished:false,listHasMore:false,currentId:'a',currentHost:'local',sending:false,catalogStarted:false,catalogLoads:0,startCatalog(){ctx.catalogLoads++;},selectedSkills:new Set(),invalidSkills:new Set(),renderSkillPills(){},BridgeI18n:{locale:()=> 'en-US'},t:key=>({'이 컴퓨터':'This computer','기타 소스':'Other source','저장된 기록':'History','다시 연결':'Reconnect','계속 채팅':'Continue chat'}[key]||key),localStorage:{getItem:()=>null,setItem(){}},dateText:()=> 'today',el:(tag,cls='',value='')=>Object.assign(node(),{tag,cls,textContent:value,dataset:{}}),renderActivity(){},contextUsageControl:{update(){}},fastModeControl:{sync(){}},visibleChat:()=>false,sessionActivity:{read(){}},attachments:{ready:()=>true},workModes:{render(view){ctx.modesView=view;}},workbench:{current:{},setAttachedParent(){}},chatTimeline:{refreshActions(){}},renderApprovals(rows){ctx.approvals=rows;},renderQueue(){},approvalStamp:'',chatKey:()=> 'local|a'};
   ctx.chatOpenGeneration=0;ctx.modelCatalogGeneration=0;ctx.setTimeout=fn=>fn();ctx.chatTimeline.abort={signal:{aborted:false}};
   ctx.document={createElement:()=>node(),querySelectorAll:()=>[]};ctx.BridgeI18n.language=()=> 'en-US';ctx.BridgeI18n.t=ctx.t;
   vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/features/chat/activity.js'),'utf8'),ctx);
@@ -41,7 +41,7 @@ function fixture(){
 const cli={source:'cli',runtime:null,readOnly:true,canSend:false,canInterrupt:false,canApprove:false,canReconnect:false};
 test('source selector uses full inventory and preserves its open options across unchanged refreshes',()=>{
   const nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,value:'',rebuilds:0,replaceChildren(...children){this.children=children;this.rebuilds++;}});return nodes.get(id);};
-  const saved=[];let locale='zh-CN';
+  const saved=[];let locale='ko-KR';
   const ctx={$ ,clientNavigation:{wslSupported:true},availableSources:['desktop','cli'],listSource:'all',sourceFilterStamp:'',localStorage:{setItem(...args){saved.push(args);}},BridgeI18n:{locale:()=>locale},t:key=>key,el:(tag,cls,label)=>({tag,cls,textContent:label,value:''})};
   vm.createContext(ctx);vm.runInContext(sourceFilterCode,ctx);
   assert.equal(ctx.renderSourceFilter(),true);assert.equal($('source-filter-label').hidden,false);
@@ -74,7 +74,7 @@ test('history-only CLI hides join and write controls but keeps history and copy 
 test('joinable CLI presents an explicit join without enabling unsupported controls',()=>{
   const {ctx,$}=fixture();const joinable={...cli,canReconnect:true};ctx.renderState({host:'local',title:'CLI thread',cwd:'/work',access:joinable,connected:false,status:'idle',requests:[],submissions:[],historyComplete:true});
   assert.equal($('reconnect').hidden,false);assert.equal($('reconnect').textContent,'Continue chat');assert.equal($('send').disabled,true);
-  assert.match($('notice-text').textContent,/可先阅读聊天历史/);
+  assert.match($('notice-text').textContent,/먼저 채팅 기록을 읽어보세요\. 원래 CLI 세션에 계속 연결하거나 재개합니다\./);
 });
 test('joined CLI enables send, steer and approvals while keeping collaboration modes unavailable',()=>{
   const {ctx,$}=fixture(),access={...cli,readOnly:false,canSend:true,canInterrupt:true,canApprove:true,canReconnect:true};
@@ -129,8 +129,8 @@ test('a failed CLI join remains visible through later history renders and clears
 });
 test('connection diagnostics is secondary to settings and keeps the original export route',()=>{
   assert.doesNotMatch(html,/<a id="session-diagnostics"/);
-  assert.match(html,/<button id="open-session-diagnostics"[^>]*data-i18n="SSH 连接诊断"/);
-  assert.match(html,/<h2 id="session-diagnostics-heading" data-i18n="SSH 连接诊断"/);
+  assert.match(html,/<button id="open-session-diagnostics"[^>]*data-i18n="SSH 연결 진단"/);
+  assert.match(html,/<h2 id="session-diagnostics-heading" data-i18n="SSH 연결 진단"/);
   assert.match(html,/<dialog id="session-diagnostics-dialog"/);
   assert.match(app,/openingAccess\.source==='desktop'&&openingAccess\.canReconnect/);
   assert.match(app,/const diagnosticsPath='\/api\/sessions\/diagnostics'/);
@@ -155,7 +155,7 @@ test('diagnostics summary uses only aggregate fields and old native apps cannot 
   vm.runInContext(extract("let sessionDiagnosticsText='';","$('archived').onchange"),ctx);
   $('open-session-diagnostics').onclick();await new Promise(setImmediate);
   assert.match($('session-diagnostics-summary').textContent,/CLI: 2/);
-  assert.match($('session-diagnostics-summary').textContent,/remote-1|远端电脑 1/);
+  assert.match($('session-diagnostics-summary').textContent,/remote-1|원격 컴퓨터 1/);
   assert.doesNotMatch($('session-diagnostics-summary').textContent,/secret|\/secret/);
   assert.equal($('session-diagnostics-export').hidden,true);
   assert.equal($('session-diagnostics-export-note').hidden,false);
@@ -179,11 +179,11 @@ test('switching from a restricted WSL chat restores APP controls and queue avail
 test('desktop router failure offers explicit rebuild and keeps failure plus draft visible',async()=>{
   const {ctx,$}=fixture(),view={host:'local',connected:false,status:'idle',requests:[],submissions:[],historyComplete:true,rebuildRecommended:true,access:{source:'desktop',canReconnect:true}};
   $('message').value='unsent draft';ctx.renderState(view);
-  assert.equal($('reconnect').textContent,'重建连接');assert.match($('notice-text').textContent,/建议重建连接/);
-  const calls=[];ctx.sessionUrl=(id,action,host)=>`${host}/${id}/${action}`;ctx.api=async(url,body)=>{calls.push({url,body});throw Error('桌面执行连接尚未恢复');};
+  assert.equal($('reconnect').textContent,'연결 재구축');assert.match($('notice-text').textContent,/데스크톱 연결을 더 이상 사용할 수 없습니다\. 연결을 다시 구축하십시오\. 채팅 기록과 초안은 보관됩니다\./);
+  const calls=[];ctx.sessionUrl=(id,action,host)=>`${host}/${id}/${action}`;ctx.api=async(url,body)=>{calls.push({url,body});throw Error('데스크톱 실행 연결이 복원되지 않았습니다.');};
   vm.runInContext(reconnectCode,ctx);await $('reconnect').onclick();ctx.renderState(view);
   assert.equal(JSON.stringify(calls),JSON.stringify([{url:'local/a/reconnect',body:{activate:true,rebuild:true}}]));
-  assert.equal($('reconnect').disabled,false);assert.match($('notice-text').textContent,/尚未恢复/);assert.equal($('message').value,'unsent draft');
+  assert.equal($('reconnect').disabled,false);assert.match($('notice-text').textContent,/데스크톱 실행 연결이 복원되지 않았습니다\./);assert.equal($('message').value,'unsent draft');
 });
 
 test('a failed rebuild keeps retry and app management independently available',async()=>{
@@ -194,7 +194,7 @@ test('a failed rebuild keeps retry and app management independently available',a
   ctx.sessionUrl=(id,action,host)=>`${host}/${id}/${action}`;
   ctx.api=async(url,body)=>{calls.push({url,body});return {connected:true};};
   vm.runInContext(reconnectCode,ctx);
-  assert.equal($('reconnect').textContent,'重建连接');assert.equal($('reconnect-manager').hidden,false);
+  assert.equal($('reconnect').textContent,'연결 재구축');assert.equal($('reconnect-manager').hidden,false);
   await $('reconnect').onclick();
   assert.equal(JSON.stringify(calls),JSON.stringify([{url:'local/a/reconnect',body:{activate:true,rebuild:true}}]));
   $('reconnect-manager').onclick();assert.equal(calls[1],'manager');assert.equal($('message').value,'unsent draft');

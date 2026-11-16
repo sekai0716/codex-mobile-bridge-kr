@@ -34,7 +34,7 @@ def close_main_window(pid):
 
 def native_action(action, *, helper, pid=None, executable=None, script=None, cancel_path=None, cancelled=None):
     if action not in ('check', 'request-permission', 'connect', 'connect-background', 'close-devtools', 'close-background-devtools', 'enable-devtools', 'inspect-error', 'quit'):
-        raise ValueError('不支持的 Claude 本机操作')
+        raise ValueError('지원되지 않음 Claude 현지 운영')
     background = action == 'connect-background'
     def connection_result(reason, dispatched=False, state='needs-retry'):
         return {'setupState': state, 'submission': 'uncertain' if dispatched else 'none',
@@ -72,14 +72,14 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
     def quit_interrupted(reason, dispatched):
         if dispatched:
             return {'quitState': 'submitted', 'pid': pid,
-                    'reason': 'Claude 退出命令回执中断，正在等待保存和退出完成'}
+                    'reason': 'Claude 종료 명령 수신이 중단되었습니다. 저장 및 종료가 완료되기를 기다리는 중입니다.'}
         return quit_failed(reason)
     if cancelled and cancelled.is_set():
         if action == 'quit':
-            return quit_failed('已取消 Claude 退出')
+            return quit_failed("Claude 종료 요청이 취소되었습니다.")
         if background:
-            return connection_result('已取消 Claude 连接', state='cancelled')
-        return {'setupState': 'cancelled', 'reason': '已取消 Claude 连接'}
+            return connection_result("Claude 연결이 취소되었습니다.", state='cancelled')
+        return {'setupState': 'cancelled', 'reason': "Claude 연결이 취소되었습니다."}
     def desktop_blocked():
         if action not in ('quit', 'connect-background', 'close-background-devtools'):
             try:
@@ -93,10 +93,10 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
     helper = Path(helper)
     if not helper.is_file():
         if action == 'quit':
-            return quit_failed('缺少 Claude 原生退出组件，请重新构建或安装网关 App')
+            return quit_failed("Claude 네이티브 종료 구성요소가 누락되었습니다. 게이트웨이 앱을 다시 빌드하거나 다시 설치하세요.")
         if background:
-            return connection_result('缺少 Claude 后台连接组件，请重新构建或安装网关 App', state='failed')
-        return {'setupState': 'failed', 'reason': '缺少 Claude 自动连接组件，请重新构建或安装网关 App'}
+            return connection_result('부족 Claude 백그라운드 연결 구성요소입니다. 게이트웨이를 다시 빌드하거나 설치하세요. App', state='failed')
+        return {'setupState': 'failed', 'reason': "Claude 커넥터 구성요소가 누락되었습니다. 게이트웨이 앱을 다시 빌드하거나 다시 설치하세요."}
     if action in ('check', 'request-permission'):
         return {'setupState': 'ready'}
     argument = '--connect-background='+str(script) if background else str(script) if action == 'connect' else '--'+action
@@ -110,9 +110,9 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
         process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', **options)
     except OSError:
         if action == 'quit':
-            return quit_failed('无法启动 Claude 原生退出组件，请检查网关安装')
+            return quit_failed("Claude 네이티브 종료 구성요소를 시작할 수 없습니다. 게이트웨이 설치를 확인하세요.")
         if background:
-            return connection_result('无法启动 Claude 后台连接组件，请检查网关安装', state='failed')
+            return connection_result('시작할 수 없습니다 Claude 백그라운드 연결 구성요소입니다. 게이트웨이 설치를 확인하세요.', state='failed')
         raise
     timeout = 30 if action in ('connect', 'connect-background', 'quit') else 20
     if action in ('inspect-error', 'close-devtools'):
@@ -142,18 +142,18 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
                         dispatched = dispatched or connect_dispatched(expired.output)
                     process.kill(); stdout, _ = process.communicate()
                 if action == 'quit':
-                    return quit_interrupted('已取消 Claude 退出' if cancelled and cancelled.is_set()
-                                            else 'Claude 原生退出请求超时，请在电脑端检查退出状态',
+                    return quit_interrupted("Claude 종료 요청이 취소되었습니다." if cancelled and cancelled.is_set()
+                                            else "Claude 네이티브 종료 요청 시간이 초과되었습니다. 컴퓨터에서 종료 상태를 확인하세요.",
                                             dispatched or quit_dispatched(stdout))
                 if background:
-                    return connection_result('已取消 Claude 连接' if cancelled and cancelled.is_set()
-                                             else 'Claude 后台初始化回执超时，请等待连接状态或重试',
+                    return connection_result("Claude 연결이 취소되었습니다." if cancelled and cancelled.is_set()
+                                             else 'Claude 백그라운드 초기화 수신 시간이 초과되었습니다. 연결 상태를 기다리거나 다시 시도하세요.',
                                              dispatched or connect_dispatched(stdout),
                                              'cancelled' if cancelled and cancelled.is_set() else 'needs-retry')
                 if blocked and not (cancelled and cancelled.is_set()):
                     return blocked
                 return {'setupState': 'cancelled' if cancelled and cancelled.is_set() else 'needs-retry',
-                        'reason': '已取消 Claude 连接' if cancelled and cancelled.is_set() else 'Claude 自动连接超时，请重试'}
+                        'reason': "Claude 연결이 취소되었습니다." if cancelled and cancelled.is_set() else "Claude 연결 시간이 초과되었습니다. 다시 시도해 보세요."}
     if background:
         dispatched = dispatched or connect_dispatched(stdout)
         try:
@@ -173,7 +173,7 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
             return {key: value[key] for key in ('setupState', 'submission', 'pid')} | {'reason': value['reason'][:300]}
         except (ValueError, IndexError, AttributeError):
             # A malformed receipt cannot establish that no input was dispatched.
-            return connection_result('Claude 后台初始化未返回有效回执，请等待实际连接状态', True)
+            return connection_result('Claude 백그라운드 초기화가 유효한 영수증을 반환하지 않았습니다. 실제 연결 상태를 기다려 주세요.', True)
     if action == 'quit':
         dispatched = dispatched or quit_dispatched(stdout)
         try:
@@ -186,27 +186,30 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
                 return quit_interrupted(value['reason'], dispatched)
             return {'quitState': value['quitState'], 'pid': pid, 'reason': value['reason'][:300]}
         except (ValueError, IndexError, AttributeError):
-            return quit_interrupted('Claude 原生退出组件未返回有效状态，请在电脑端检查退出状态', dispatched)
+            return quit_interrupted("Claude 네이티브 종료 구성 요소가 유효한 상태를 반환하지 않았습니다. 컴퓨터에서 종료 상태를 확인하세요.", dispatched)
     if process.returncode:
-        message = stdout.strip().splitlines()[-1] if stdout.strip() else 'Claude 自动连接失败'
-        state = ('cancelled' if '已取消' in message else 'needs-unlock' if '锁定' in message
-                 else 'needs-desktop' if '桌面不可用' in message else 'needs-retry')
+        message = stdout.strip().splitlines()[-1] if stdout.strip() else "자동 Claude 연결 실패"
+        # 기존 네이티브 도우미의 오류 문구도 분류하므로 원래 계약값은 번역하지 않습니다.
+        state = ('cancelled' if '취소' in message or '\u5df2\u53d6\u6d88' in message
+                 else 'needs-unlock' if '잠금' in message or '\u9501\u5b9a' in message
+                 else 'needs-desktop' if '데스크톱을 사용할 수 없습니다.' in message or '\u684c\u9762\u4e0d\u53ef\u7528' in message
+                 else 'needs-retry')
         return {'setupState': state, 'reason': message[:300]}
     if action == 'inspect-error':
         owner_issue = stdout.strip().splitlines()[-1] if stdout.strip() else ''
         owner_reasons = {
-            'OWNER_BUSY': 'Claude 桥接仍有请求进行中，请稍后重试连接',
-            'OWNER_UNCONFIRMED': '旧网关仍有未确认请求或未完成接替，请在旧网关检查结果后重试',
-            'OWNER_LEGACY': '旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）',
-            'OWNER_CONFLICT': '旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）',
+            'OWNER_BUSY': 'Claude 아직 브릿지 요청이 진행 중입니다. 나중에 다시 연결해 보세요.',
+            'OWNER_UNCONFIRMED': '이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요.',
+            'OWNER_LEGACY': '이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）',
+            'OWNER_CONFLICT': '이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）',
         }
         if owner_issue in owner_reasons:
             return {'setupState': 'owner-conflict', 'reason': owner_reasons[owner_issue]}
         return {'setupState': 'needs-trust' if 'NEEDS_TRUST' in stdout else 'failed',
-                'reason': '请在 Claude Code 中确认连接目录信任，然后重新连接'}
+                'reason': "Claude Code의 연결 디렉터리를 신뢰한 다음 다시 연결하세요."}
     return {'setupState': 'needs-developer-mode' if action == 'enable-devtools' else 'submitted',
-            'reason': '请确认 Claude 的开发者模式提示，完成后会继续连接' if action == 'enable-devtools'
-                      else '连接脚本已输入，正在等待 Claude 确认'}
+            'reason': "계속 연결하려면 Claude의 개발자 모드 프롬프트를 확인하세요." if action == 'enable-devtools'
+                      else "커넥터가 입력되었습니다. Claude가 확인되기를 기다리는 중"}
 
 
 

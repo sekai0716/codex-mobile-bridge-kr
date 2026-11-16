@@ -193,12 +193,12 @@ class DeepSeekSetupTests(unittest.TestCase):
         self.assertEqual(self.profile.read_bytes(), original)
         self.assertEqual(other.directory, self.adapter.directory)
         self.assertFalse((self.root/'other-gateway').exists())
-        with self.assertRaisesRegex(ValueError, '未移除原接入'):
+        with self.assertRaisesRegex(ValueError, "기존\\ Harness\\ 연결을\\ 사용합니다\\.\\ 원래\\ 구성은\\ 제거되지\\ 않았습니다\\."):
             other.uninstall()
 
     def test_missing_desktop_profile_does_not_initialize_separate_harness(self):
         adapter = DeepSeek(self.root/'new-gateway', self.root/'uninitialized')
-        with self.assertRaisesRegex(ValueError, '先启动一次'):
+        with self.assertRaisesRegex(ValueError, "찾을\\ 수\\ 없음\\ Harness\\ 데스크톱\\ 구성을\\ 먼저\\ 시작하세요\\.\\ DeepSeek\\ Harness，또는\\ 올바른\\ 데이터\\ 디렉토리를\\ 선택하십시오"):
             adapter.ensure_installed()
         self.assertFalse(adapter.home.exists())
         self.assertFalse(adapter.directory.exists())
@@ -206,7 +206,7 @@ class DeepSeekSetupTests(unittest.TestCase):
     def test_conflicting_plugin_without_our_comment_is_not_duplicated(self):
         self.profile.write_text('- insert:\n    - id: codex-mobile-desktop\n      name: file:///another/connector.mjs\n')
         self.assertTrue(self.adapter.installation_status()['conflict'])
-        with self.assertRaisesRegex(ValueError, '无法验证'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.adapter.ensure_installed()
         self.assertFalse(self.adapter.directory.exists())
 
@@ -249,9 +249,9 @@ class DeepSeekSetupTests(unittest.TestCase):
         (self.adapter.directory/'mobile-host.mjs').write_text('// older adapter')
         before = {path: path.read_bytes() for path in self.adapter.directory.iterdir()}
         before[self.profile] = self.profile.read_bytes()
-        with self.assertRaisesRegex(ValueError, '无法验证'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.adapter.ensure_installed()
-        with self.assertRaisesRegex(ValueError, '无法验证'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.adapter.update_existing()
         self.assertEqual(before, {path: path.read_bytes() for path in before})
 

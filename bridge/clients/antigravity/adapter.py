@@ -73,17 +73,17 @@ class Antigravity:
         live = any(self.cli.available(surface) for surface in SURFACE_LABELS)
         return {'installed': bool(surfaces) or live, 'configured': bool(surfaces) or live, 'connected': live,
                 'historyAvailable': bool(surfaces),
-                'reason': '原生服务已连接' if live else ('可读取本机历史；实时操作需要电脑上相应的 Antigravity 原生服务' if surfaces else '原生服务尚未连接；请在电脑打开原客户端'),
+                'reason': '기본 서비스가 연결되었습니다' if live else ('기계의 역사를 읽을 수 있습니다. 실시간 작업에는 해당 컴퓨터가 필요합니다. Antigravity 네이티브 서비스' if surfaces else "네이티브 서비스가 연결되지 않았습니다. 컴퓨터에서 원래 클라이언트를 엽니다"),
                 'pluginEnabled': bool(self.hooks)}
 
     def account_scope(self, surface=None):
         if surface is not None:
             if surface not in SURFACE_LABELS:
-                raise ValueError('Antigravity 来源无效')
+                raise ValueError('Antigravity 잘못된 소스')
             status = self.cli.user_status(surface)
             identity = status.get('email') or status.get('userId')
             if not isinstance(identity, str) or not identity:
-                raise BridgeUnavailable('请先在对应 Antigravity 原客户端登录')
+                raise BridgeUnavailable('먼저 답변 부탁드립니다 Antigravity 원래 클라이언트 로그인')
             return hashlib.sha256(identity.encode()).hexdigest()
         accounts = []
         for surface in SURFACE_LABELS:
@@ -101,16 +101,16 @@ class Antigravity:
         accounts, notices = [], []
         for surface, label in SURFACE_LABELS.items():
             if not self.cli.available(surface):
-                notices.append(label+'：原生服务未连接')
+                notices.append(label+'：기본 서비스가 연결되지 않았습니다')
                 continue
             try:
                 user = self.cli.user_status(surface)
             except (OSError, ValueError, BridgeUnavailable):
-                notices.append(label+'：账号状态暂不可用')
+                notices.append(label+'：계정 상태를 일시적으로 사용할 수 없습니다.')
                 continue
             identity = user.get('email') or user.get('userId')
             if not isinstance(identity, str) or not identity:
-                notices.append(label+'：尚未登录')
+                notices.append(label+'：아직 로그인하지 않았습니다.')
                 continue
             identifier = surface+':'+hashlib.sha256(identity.encode()).hexdigest()
             accounts.append({'id': identifier, 'surface': surface,
@@ -123,10 +123,10 @@ class Antigravity:
                 'readOnly': True, 'canImport': False, 'canSwitch': False,
                 'capabilities': {'addApi': False, 'quota': False},
                 'message': '；'.join(notices),
-                'enrollmentHint': 'APP、CLI、IDE 的登录状态分别读取。请在对应原客户端登录或切换账号，再刷新此页。'}
+                'enrollmentHint': 'APP、CLI、IDE 로그인 상태는 별도로 읽혀집니다. 해당 원래 클라이언트에 로그인하거나 계정을 전환한 후 이 페이지를 새로 고치십시오.。'}
 
     def project_environments(self):
-        return [{'surface': row['key'], 'host': 'local', 'hostLabel': '此电脑', 'name': row['name'],
+        return [{'surface': row['key'], 'host': 'local', 'hostLabel': '이 컴퓨터', 'name': row['name'],
                  'scope': str(row['root']), 'createRequiresMessage': True, 'createTitle': False} for row in self.store.surfaces()]
 
     def _waiting_state(self, surface, *, live=True, fresh=False):
@@ -182,7 +182,7 @@ class Antigravity:
         from bridge.features.workspace.workspace import Workspace
         row = self.store.resolve_session(sid)
         if row is None:
-            raise ValueError('找不到 Antigravity 聊天')
+            raise ValueError('찾을 수 없음 Antigravity 채팅')
         workspace = Workspace(row['surfaceRoot'])
         logs = 'brain/' + row['nativeId'] + '/.system_generated/logs/'
         for relative in (logs+'transcript.jsonl', logs+'transcript_full.jsonl', 'conversation_summaries.db'):
@@ -228,10 +228,10 @@ class Antigravity:
             if body.get('surface'):
                 surface = body['surface']
                 if surface not in SURFACE_LABELS:
-                    raise ValueError('Antigravity 来源无效')
+                    raise ValueError('Antigravity 잘못된 소스')
                 if self.cli.available(surface):
                     return self._account(surface, body.get('refresh') is True)
-                return {'models': [], 'notice': '电脑原生服务尚未连接', 'capabilities': {'models': False, 'effort': False}}
+                return {'models': [], 'notice': '컴퓨터 네이티브 서비스가 아직 연결되지 않았습니다.', 'capabilities': {'models': False, 'effort': False}}
             groups, errors = [], []
             for surface, label in SURFACE_LABELS.items():
                 if not self.cli.available(surface):
@@ -239,18 +239,18 @@ class Antigravity:
                 try:
                     value = self._account(surface, body.get('refresh') is True)
                 except (OSError, ValueError, BridgeUnavailable):
-                    value = {'models': [], 'notice': '原客户端模型暂不可用'}
+                    value = {'models': [], 'notice': '원래 클라이언트 모델을 일시적으로 사용할 수 없습니다.'}
                     errors.append(label+'：'+value['notice'])
                 groups.append({'surface': surface, 'label': label, **value})
             return {'groups': groups, 'models': [], 'modelError': '；'.join(errors),
-                    'notice': '' if groups else '电脑原生服务尚未连接',
+                    'notice': '' if groups else '컴퓨터 네이티브 서비스가 아직 연결되지 않았습니다.',
                     'capabilities': {'models': bool(groups), 'effort': False}}
         if action == 'create':
             prompt = self._prompt(body)
             project = body.get('directoryProject') or next((p for p in self.store.discover_projects()
                                                            if p['key'] == body.get('projectKey')), None)
             if not prompt or not project:
-                raise ValueError('请选择 Antigravity 项目并输入首条消息')
+                raise ValueError('선택해주세요 Antigravity 프로젝트를 시작하고 첫 번째 메시지를 입력하세요.')
             surface = project.get('surface') or 'app'
             cwd = project.get('cwd')
             cid = self.cli.start_cascade(surface=surface, model=body.get('model'), cwd=cwd)
@@ -259,7 +259,7 @@ class Antigravity:
             return {'status': 'accepted', 'id': key, 'sessionId': key, 'result': {'id': key, 'sessionId': key}}
         row = self.store.resolve_session(sid)
         if row is None:
-            raise ValueError('找不到此 Antigravity 会话')
+            raise ValueError('이것을 찾지 못했습니다 Antigravity 대화')
         key, cid, surface = row['id'], row['nativeId'], row['surfaceDirKey']
         session = self._session(row, waiting_state=None if action == 'detail' else ({}, set()))
         if action == 'detail':
@@ -270,7 +270,7 @@ class Antigravity:
             queued = self.hooks.get_queued_items(key) if self.hooks else []
             return {'connected': True, 'session': session, **{k: page[k] for k in ('messages', 'turns', 'history')},
                     'readOnly': session['readOnly'],
-                    'notice': '原生服务未连接，可继续阅读历史和编辑草稿；发送及模型设置暂不可用。' if session['readOnly'] else '',
+                    'notice': '기본 서비스가 연결되어 있지 않습니다. 계속해서 기록을 읽고 초안을 편집할 수 있습니다. 전송 및 모델 설정을 일시적으로 사용할 수 없습니다.。' if session['readOnly'] else '',
                     'requests': session['requests'], 'queued': queued, 'capabilities': session['capabilities'],
                     'submissions': queued, 'draftAccountIdentity': self.account_scope()}
         if action == 'catalog':
@@ -281,27 +281,27 @@ class Antigravity:
             return self.store.read_image(row['surfaceRoot'], cid, body.get('source'))
         if action == 'resume':
             if not self.cli.available(surface):
-                raise BridgeUnavailable('请先在电脑打开原会话所属的 Antigravity 应用')
+                raise BridgeUnavailable('먼저 컴퓨터에서 원래 세션을 열어주세요. Antigravity 애플리케이션')
             return {'status': 'ready'}
         if action == 'access':
             if 'mode' in body and not self.hooks:
-                raise ValueError('请在电脑网关启用 Antigravity 接入')
+                raise ValueError('컴퓨터 게이트웨이에서 활성화하십시오. Antigravity 연결')
             mode = self.hooks.set_permission_mode(key, body['mode']) if 'mode' in body else session['permissionMode']
             return {'status': 'accepted', 'mode': mode, 'options': PERMISSION_OPTIONS}
         if action == 'respond':
             request_id = body.get('requestId')
             if not isinstance(request_id, str) or not request_id.strip():
-                raise ValueError('缺少请求 ID')
+                raise ValueError('요청 누락 ID')
             if request_id.startswith('agy-wait:'):
                 self.cli.respond_interaction(cid, request_id, body.get('decision'), answers=body.get('answers'), surface=surface)
                 return {'status': 'accepted'}
             if not self.hooks:
-                raise ValueError('审批连接不可用')
+                raise ValueError('승인 연결을 사용할 수 없습니다.')
             self.hooks.resolve_approval(key, request_id, body.get('decision'))
             return {'status': 'accepted'}
         if action == 'settings':
             if body.get('effort'):
-                raise ValueError('请使用原客户端提供的完整模型条目选择思考强度')
+                raise ValueError('사고 강도를 선택하려면 원래 고객이 제공한 전체 모델 항목을 사용하십시오.')
             model = body.get('model')
             self.cli._model(model, surface)
             with self._lock:
@@ -319,33 +319,33 @@ class Antigravity:
             return {'status': 'accepted'}
         if action == 'queue-action':
             if not self.hooks:
-                raise ValueError('排队连接不可用')
+                raise ValueError('대기 중인 연결을 사용할 수 없습니다.')
             operation, queue_id = body.get('operation'), body.get('queueId')
             if operation in ('cancel', 'edit'):
                 item = self.hooks.remove_queued_item(key, queue_id)
             elif operation in ('queue', 'steer'):
                 item = self.hooks.update_queue_mode(key, queue_id, operation)
             else:
-                raise ValueError('排队操作无效')
+                raise ValueError('대기열 작업이 잘못되었습니다.')
             if item is None:
-                raise ValueError('排队消息已发送或移除')
+                raise ValueError('대기 중인 메시지가 전송되거나 제거되었습니다.')
             return {'status': 'accepted', **({'text': item['text']} if operation == 'edit' else {})}
         if action == 'send':
             native_busy = self.store.is_native_busy(row['surfaceRoot'], cid)
             prompt, mode = self._prompt(body), body.get('mode') or 'send'
             if not prompt or mode not in ('send', 'queue', 'steer'):
-                raise ValueError('Antigravity 消息或发送方式无效')
+                raise ValueError('Antigravity 잘못된 메시지 또는 전달 방법')
             waiting_by_cid, active_cids = self._waiting_state(surface, live=True, fresh=True)
             if (waiting_by_cid.get(cid) or (self.hooks and self.hooks.has_pending_approvals(key))) and mode == 'send':
-                raise BridgeUnavailable('原会话正在等待交互确认，请先回应后再发送')
+                raise BridgeUnavailable('원본 대화가 상호작용 확인을 기다리고 있습니다. 보내기 전에 먼저 응답해 주세요.')
             if native_busy or cid in active_cids:
                 if mode not in ('queue', 'steer') or not self.hooks or not self.hooks.has_recent_heartbeat(key):
-                    raise BridgeUnavailable('原会话正在运行；请等待结束，或在原会话重新载入网关 Hook 后排队')
+                    raise BridgeUnavailable('원래 세션이 실행 중입니다. 끝날 때까지 기다리거나 원래 세션에서 게이트웨이를 다시 로드하십시오. Hook 뒤에 줄을 서다')
                 item = self.hooks.enqueue_follow_up(key, prompt, mode=mode)
                 return {'status': 'queued', 'id': item['id'], 'delivery': 'hook-' + mode}
             self.cli.send_user_message(cid, prompt, model=session['model'], surface=surface)
             return {'status': 'accepted', 'delivery': 'native'}
-        raise ValueError('此 Antigravity 操作尚不支持')
+        raise ValueError('이 Antigravity 작업은 아직 지원되지 않습니다.')
 
     def close(self):
         with self._lock:

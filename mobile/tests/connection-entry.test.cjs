@@ -46,7 +46,7 @@ test('iOS bounds document entry, ignores stale views, and cannot load late bindi
 
 test('both native failure screens offer retry, manage and return without relying on a hidden menu',()=>{
  for(const screen of [method(android,'void showConnectionError('),method(ios,'private func showConnectionError(')]){
-  for(const text of ['重试','管理这台电脑','返回电脑列表'])assert.ok(screen.includes(text),text);
+  for(const text of ["다시 시도",'이 컴퓨터 관리',"컴퓨터 목록으로 돌아가기"])assert.ok(screen.includes(text),text);
   assert.ok(screen.includes('openComputer('));
  }
 });

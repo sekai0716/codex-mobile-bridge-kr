@@ -67,7 +67,7 @@ test('a stalled gateway pin write is aborted so later intent can retry safely',a
 test('failed durable save does not paint success and a later retry persists the device identity',()=>{
  const ui=fixture({offline:true});ui.pins.bind('gateway');const write=ui.pins.storage.setItem;let fail=true;
  ui.pins.storage.setItem=(key,value)=>{if(fail){fail=false;throw Error('quota');}write(key,value);};
- assert.throws(()=>ui.pins.set(identity,true),/无法保存/);assert.equal(ui.pins.value(identity,false),false);assert.equal(ui.pins.pending(identity),false);
+ assert.throws(()=>ui.pins.set(identity,true),/저장할 수 없습니다./);assert.equal(ui.pins.value(identity,false),false);assert.equal(ui.pins.pending(identity),false);
  ui.pins.set(identity,true);assert.equal(ui.storage.get('bridge-session-pins-client'),ui.pins.clientId);
  const reloaded=fixture({storage:ui.storage,offline:true});reloaded.pins.bind('gateway');assert.equal(reloaded.pins.pending(identity),true);
 });

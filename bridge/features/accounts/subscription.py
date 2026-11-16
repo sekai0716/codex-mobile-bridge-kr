@@ -111,4 +111,4 @@ def subscription_period(home, email=None):
         return {**unknown, 'periodEndsAt': end}
     except Exception:
         # Billing reads must not hide usable quota/cards or leak tokens/response bodies.
-        return {**unknown, 'error': '订阅信息暂不可用，请稍后刷新'}
+        return {**unknown, 'error': "구독 세부정보를 확인할 수 없습니다. 나중에 다시 새로고침하세요."}

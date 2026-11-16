@@ -17,7 +17,7 @@ def require_update_ready(worker):
                 continue
             argv = process_args(pid)
             if identity(pid) != before:
-                raise ValueError('网关运行实例已变化，请重试更新。')
+                raise ValueError('인스턴스를 실행하는 게이트웨이가 변경되었습니다. 업데이트를 다시 시도해 주세요.。')
             if (len(argv) != 6 or os.path.normcase(argv[0]) != expected or
                     argv[1:3] != ['zcode-pipe-host', '--data-dir'] or argv[4] != '--application'):
                 continue
@@ -27,4 +27,4 @@ def require_update_ready(worker):
             if getattr(error, 'winerror', None) == 87:
                 continue
             raise
-        raise ValueError('请先结束任务并正常退出 ZCode，再更新网关。')
+        raise ValueError('먼저 작업을 종료하고 정상적으로 종료해주세요. ZCode，게이트웨이를 다시 업데이트하세요.。')

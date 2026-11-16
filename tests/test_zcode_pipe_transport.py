@@ -81,7 +81,7 @@ class PipeTests(unittest.TestCase):
             self.assertEqual(transport.call({'action':'application'}), {'ready': False, 'stage': 'window'})
             target = {'type':'page','url':transport.window_url,'targetId':'x'}
             rpc.return_value = {'targetInfos': [target, {**target, 'targetId':'other'}]}
-            with self.assertRaisesRegex(ValueError, '唯一定位'):
+            with self.assertRaisesRegex(ValueError, "기존\\ ZCode\\ 창이\\ 준비되지\\ 않았거나\\ 고유하게\\ 위치를\\ 지정할\\ 수\\ 없습니다\\."):
                 transport.call({'action':'application'})
             rpc.side_effect = TimeoutError('slow')
             self.assertEqual(transport.call({'action':'application'}), {'ready': False, 'stage': 'waiting'})

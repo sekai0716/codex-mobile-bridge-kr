@@ -77,7 +77,7 @@ test('an entirely failed refresh keeps its visible host error and remains retrya
   assert.equal(ui.context.errors[0].error,'local unavailable');
   assert.equal(ui.context.listLoading,0);assert.equal(ui.context.toasts.length,0);
   assert.equal(ui.nodes['host-errors'].hidden,false);
-  const retry=ui.nodes['host-errors'].children[0].children.find(node=>node.tag==='button'&&node.textContent==='重试');
+  const retry=ui.nodes['host-errors'].children[0].children.find(node=>node.tag==='button'&&node.textContent==='다시 시도');
   assert.ok(retry,'the visible host error must offer a retry button');
   ui.context.api=async()=>reply([row('recovered')]);
   assert.equal(await retry.onclick(),true);assert.equal(ui.context.errors.length,0);

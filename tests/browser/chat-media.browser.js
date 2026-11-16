@@ -2,11 +2,11 @@
 window.runChatMediaChecks = () => {
   const checks=[],host=document.createElement('div');host.style.width='300px';document.body.append(host);
   const thread='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-  const file={id:'a'.repeat(64),name:'你好.wav',reference:'/project/你好.wav',image:false};
+  const file={id:'a'.repeat(64),name:'안녕하세요.wav',reference:'/project/안녕하세요.wav',image:false};
   const route='/api/sessions/'+thread+'/files/'+file.id+'?host=remote%3Assh';
   const check=(name,ok)=>{if(!ok)throw Error(name);checks.push(name);};
   try{
-    renderMarkdown(host,'![audio](</project/你好.wav>)\n\n[声音](</project/你好.wav>)',[file],()=>route);
+    renderMarkdown(host,'![audio](</project/안녕하세요.wav>)\n\n[소리](</project/안녕하세요.wav>)',[file],()=>route);
     const players=[...host.querySelectorAll('audio')];
     check('both native image syntax and ordinary links have a player',players.length===2);
     check('playback waits for user interaction',players.every(p=>p.controls&&p.preload==='none'&&!p.autoplay));
@@ -23,10 +23,10 @@ window.runChatMediaChecks = () => {
     check('shared helper rejects external routes',!BridgeChatMedia.create('sound.wav','https://example.invalid'+route));
     check('shared helper rejects active content',!BridgeChatMedia.create('page.html',route));
     const attachments=document.createElement('div');host.append(attachments);
-    renderChatAttachments(attachments,[{type:'file',path:'/project/clip.mp4',name:'片段.mp4'}],{fileUrl:()=>'/api/desktop-sessions/claude/workspace/download?sessionId=fixture&path=clip.mp4'});
+    renderChatAttachments(attachments,[{type:'file',path:'/project/clip.mp4',name:'파편.mp4'}],{fileUrl:()=>'/api/desktop-sessions/claude/workspace/download?sessionId=fixture&path=clip.mp4'});
     const video=attachments.querySelector('video');
     check('desktop file attachments share inline video',video?.playsInline&&video.controls&&video.preload==='none');
-    check('desktop file actions remain available',attachments.querySelector('a')?.textContent==='片段.mp4');
+    check('desktop file actions remain available',attachments.querySelector('a')?.textContent==='파편.mp4');
     return {passed:checks.length,checks};
   }finally{host.remove();}
 };

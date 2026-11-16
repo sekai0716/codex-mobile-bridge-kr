@@ -77,7 +77,7 @@ class Registry:
             self.db.execute('BEGIN IMMEDIATE')
             row = self.db.execute('SELECT hash FROM admin_credentials WHERE id=1').fetchone()
             if row is None or not hmac.compare_digest(row['hash'], digest(key)):
-                raise PermissionError('管理密钥无效或尚未设置')
+                raise PermissionError('관리 키가 유효하지 않거나 설정되지 않았습니다.')
             secret, csrf, expires = token(), token(), time.time() + 8 * 3600
             self.db.execute('DELETE FROM admin_sessions WHERE expires<=?', (time.time(),))
             self.db.execute('INSERT INTO admin_sessions VALUES(?,?,?)', (digest(secret), csrf, expires))
@@ -87,7 +87,7 @@ class Registry:
         row = self.db.execute('SELECT csrf,expires FROM admin_sessions WHERE hash=? AND expires>?',
                               (digest(secret), time.time())).fetchone()
         if row is None:
-            raise PermissionError('管理登录已失效，请重新登录')
+            raise PermissionError('관리 로그인이 만료되었습니다. 다시 로그인해 주세요.')
         return dict(row)
 
     def admin_logout(self, secret):

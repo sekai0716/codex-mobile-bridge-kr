@@ -1,25 +1,25 @@
 'use strict';
 const timelineText=source=>typeof BridgeI18n==='undefined'?source:BridgeI18n.t(source);
-const fileChangeLabel=row=>timelineText('已编辑 {count} 个文件').replace('{count}',row.fileSummary?.count||0);
+const fileChangeLabel=row=>timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
 const recentTimelinePages=new Map();
 function timelineFilePath(path,cwd){
-  if(typeof path!=='string'||!path||typeof cwd!=='string'||!cwd||/[\0\r\n]/.test(path))throw Error(timelineText('文件路径无法定位'));
+  if(typeof path!=='string'||!path||typeof cwd!=='string'||!cwd||/[\0\r\n]/.test(path))throw Error(timelineText('이 파일 경로를 찾을 수 없습니다.'));
   const windows=/^(?:[A-Za-z]:[\\/]|\\\\|\/\/)/.test(cwd);
   const normalize=value=>windows?value.replace(/\\/g,'/'):value;
   path=normalize(path);cwd=normalize(cwd).replace(/\/+$/,'');
   const absolute=/^(?:\/|[A-Za-z]:\/)/.test(path);
   if(absolute){
     const prefix=cwd+'/',match=windows?path.toLowerCase().startsWith(prefix.toLowerCase()):path.startsWith(prefix);
-    if(!match)throw Error(timelineText('此文件位于聊天项目之外，无法在当前文件标签页中定位。'));
+    if(!match)throw Error(timelineText('이 파일은 작업 공간 채팅 외부에 있으며 이 파일 탭에서 찾을 수 없습니다.'));
     path=path.slice(prefix.length);
   }
   const parts=[];
   for(const part of path.split('/')){
     if(!part||part==='.')continue;
-    if(part==='..'){if(!parts.length)throw Error(timelineText('文件路径无法定位'));parts.pop();}
+    if(part==='..'){if(!parts.length)throw Error(timelineText('이 파일 경로를 찾을 수 없습니다.'));parts.pop();}
     else parts.push(part);
   }
-  if(!parts.length||parts.some(part=>part.includes('\\')||part.includes(':')))throw Error(timelineText('文件路径无法定位'));
+  if(!parts.length||parts.some(part=>part.includes('\\')||part.includes(':')))throw Error(timelineText('이 파일 경로를 찾을 수 없습니다.'));
   return parts.join('/');
 }
 
@@ -109,15 +109,15 @@ class ChatTimeline {
     if(this.sequence<0&&this.cacheKey&&recentTimelinePages.has(this.cacheKey)){
       this.apply(recentTimelinePages.get(this.cacheKey),true,false,true);
     }
-    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText('正在读取最近内容…');
+    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText('최근 콘텐츠 로드 중…');
     try{
       const page=await this.read('timeline',{limit:20});
       if(this.abort.signal.aborted)return;
       this.apply(page,true);this.updates();
-    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText('读取失败，点击重试');this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
+    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText('로드할 수 없습니다. 다시 시도하려면 클릭하세요.');this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
     finally{this.starting=false;}
   }
-  historyStatus(){this.older.hidden=!this.hasMore;this.older.disabled=this.busy;this.older.textContent=this.busy?timelineText('正在读取更早内容…'):this.retryCount?timelineText('历史加载失败，点击重试'):timelineText('查看更早内容');}
+  historyStatus(){this.older.hidden=!this.hasMore;this.older.disabled=this.busy;this.older.textContent=this.busy?timelineText('이전 콘텐츠 로드 중…'):this.retryCount?timelineText('기록을 로드할 수 없습니다. 다시 시도하려면 클릭하세요.'):timelineText('오래된 콘텐츠 로드');}
   async loadOlder(count){
     if(this.cached||this.busy||!this.hasMore||this.abort.signal.aborted)return;
     this.busy=true;this.retryCount=0;this.historyStatus();
@@ -177,7 +177,7 @@ class ChatTimeline {
     syncChatMessageNodes(this.container,ordered.map(row=>this.nodes.get(row.key).node));
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
-    if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('有待确认请求 ↓'):timelineText('有新内容 ↓');this.newer.hidden=false;}
+    if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
     if(!cached&&!history&&this.cacheKey){
       const rows=ordered.slice(-20);
       // Memory-only, bounded and gateway/auth/host/thread scoped by the caller.
@@ -196,7 +196,7 @@ class ChatTimeline {
     const content=toolImages?document.createElement('details'):node;
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
-    heading.textContent=activity?(row.title||row.kind)+(row.status==='inProgress'?timelineText(' · 进行中'):''):row.role==='user'?timelineText('你'):row.role==='error'?timelineText('执行错误'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
+    heading.textContent=activity?(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
       heading.replaceChildren();
@@ -206,7 +206,7 @@ class ChatTimeline {
       const removed=document.createElement('span');removed.className='edited-files-removed';removed.textContent='−'+row.fileSummary.removed;
       stats.append(added,removed);heading.append(label);
       if(row.fileSummary.basis==='recorded'){
-        const basis=document.createElement('small');basis.className='edited-files-basis';basis.textContent=timelineText('累计修改');heading.append(basis);
+        const basis=document.createElement('small');basis.className='edited-files-basis';basis.textContent=timelineText('기록된 편집 내용');heading.append(basis);
       }
       heading.append(stats);
       const list=document.createElement('ul');list.className='edited-files-list';
@@ -235,26 +235,26 @@ class ChatTimeline {
       body.replaceChildren();if(activity)body.textContent=text;else this.renderText(body,text,[...this.files.values()],()=>this.fullText(row));
       if(activity)body.hidden=!text;
       more.hidden=detail?detail.next===null:!row.truncated;
-      more.textContent=detail?timelineText('继续加载正文'):timelineText('展开完整内容');
+      more.textContent=detail?timelineText('더 많은 텍스트 로드'):timelineText('전체 콘텐츠 표시');
       restoreChatActivityState(node,reading);
     };
     const load=async()=>{
       if(more.disabled||this.abort.signal.aborted)return;
       const prior=this.details.get(row.key);if(prior?.next===null)return;
-      more.disabled=true;more.textContent=timelineText('正在读取…');
+      more.disabled=true;more.textContent=timelineText('로드 중…');
       try{
         const detail=await this.read('detail',{key:this.epoch+'.'+row.key,offset:prior?.next||0,version:prior?.version||row.version});
         if(this.abort.signal.aborted||!node.isConnected||this.rows.get(row.key)?.row.version!==detail.version)return;
         for(const file of detail.files||[])this.files.set(file.id,file);
         this.details.set(row.key,{version:detail.version,text:(detail.offset?prior?.text||'':'')+detail.text,next:detail.next});paint();
-      }catch(e){if(!this.abort.signal.aborted){more.hidden=false;more.textContent=timelineText('读取失败，点击重试');}}
+      }catch(e){if(!this.abort.signal.aborted){more.hidden=false;more.textContent=timelineText('로드할 수 없습니다. 다시 시도하려면 클릭하세요.');}}
       finally{more.disabled=false;}
     };
     more.onclick=load;content.append(body,more);paint();
     if(row.role==='user'||row.role==='assistant'){
       const actions=document.createElement('div');actions.className='message-actions';
-      const copy=document.createElement('button');copy.type='button';copy.className='plain message-copy';copy.textContent=timelineText('复制');copy.onclick=()=>window.BridgeClipboard?.copy(()=>this.fullText(row),copy);actions.append(copy);node.append(actions);
-      const quote=document.createElement('button');quote.type='button';quote.className='plain message-quote';quote.textContent=timelineText('引用');quote.onclick=()=>node.dispatchEvent(new CustomEvent('bridge-compose-quote',{bubbles:true,detail:{getText:()=>this.fullText(row),source:row.key}}));actions.append(quote);
+      const copy=document.createElement('button');copy.type='button';copy.className='plain message-copy';copy.textContent=timelineText('복사');copy.onclick=()=>window.BridgeClipboard?.copy(()=>this.fullText(row),copy);actions.append(copy);node.append(actions);
+      const quote=document.createElement('button');quote.type='button';quote.className='plain message-quote';quote.textContent=timelineText('인용');quote.onclick=()=>node.dispatchEvent(new CustomEvent('bridge-compose-quote',{bubbles:true,detail:{getText:()=>this.fullText(row),source:row.key}}));actions.append(quote);
       renderChatMessageTime(actions,row.timestamp);
     }
     renderChatAttachments(node,row.attachments,{showToolImages:this.showToolImages,fileUrl:item=>{
@@ -273,16 +273,16 @@ class ChatTimeline {
   }
   fullText(row){
     const valid=()=>!this.abort.signal.aborted&&this.rows.get(row.key)?.row.version===row.version;
-    if(!valid())return Promise.reject(Error(timelineText('消息内容已变化，请重新打开编辑')));
+    if(!valid())return Promise.reject(Error(timelineText('메시지가 변경되었습니다. 다시 열어보세요.')));
     if(!row.truncated)return row.text;
     return (async()=>{
       let text='',offset=0;
       do{
         const detail=await this.read('detail',{key:this.epoch+'.'+row.key,offset,version:row.version});
-        if(!valid()||detail.version!==row.version||detail.offset!==offset||detail.key!==row.key)throw Error(timelineText('消息内容已变化，请重新打开编辑'));
+        if(!valid()||detail.version!==row.version||detail.offset!==offset||detail.key!==row.key)throw Error(timelineText('메시지가 변경되었습니다. 다시 열어보세요.'));
         text+=detail.text;
         if(detail.next===null)return text;
-        if(detail.next<=offset)throw Error(timelineText('读取完整正文失败，请重试'));
+        if(detail.next<=offset)throw Error(timelineText('전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요.'));
         offset=detail.next;
       }while(true);
     })();
@@ -293,27 +293,27 @@ class ChatTimeline {
       if(!this.onAction)continue;
       const add=(action,label,disabled)=>{const cls=action==='fork'?'message-fork':'message-edit';let b=bar.querySelector('.'+cls);if(!b){b=document.createElement('button');b.type='button';b.className='plain '+cls;bar.insertBefore(b,bar.querySelector('.message-time'));}b.textContent=timelineText(label);b.disabled=disabled;b.onclick=()=>this.onAction(action,row,this);};
       for(const action of bar.querySelectorAll('.message-edit,.message-fork'))action.hidden=!this.canEdit();
-      if(row.editable&&this.canEdit()){const latest=this.meta?.latestUserTurnId===row.turnId;add(latest?'edit':'edit-fork',latest?'编辑并重新发送':'编辑并新建分支',row.turnStatus==='inProgress'||latest&&this.meta?.status==='active');}
-      if(row.forkable&&this.canEdit())add('fork','从这里分支',false);
+      if(row.editable&&this.canEdit()){const latest=this.meta?.latestUserTurnId===row.turnId;add(latest?'edit':'edit-fork',latest?'수정하고 다시 보내기':'새 지점에서 편집',row.turnStatus==='inProgress'||latest&&this.meta?.status==='active');}
+      if(row.forkable&&this.canEdit())add('fork','여기에서 분기',false);
     }
   }
   relabel(){
     this.refreshActions();
-    this.container.querySelectorAll('.message-copy').forEach(n=>n.textContent=timelineText('复制'));
-    this.container.querySelectorAll('.message-quote').forEach(n=>n.textContent=timelineText('引用'));
-    this.container.querySelectorAll('.code-copy').forEach(n=>n.textContent=timelineText('复制代码'));
+    this.container.querySelectorAll('.message-copy').forEach(n=>n.textContent=timelineText('복사'));
+    this.container.querySelectorAll('.message-quote').forEach(n=>n.textContent=timelineText('인용'));
+    this.container.querySelectorAll('.code-copy').forEach(n=>n.textContent=timelineText('코드 복사'));
     this.historyStatus();
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key)?.row;if(!row)continue;
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
-      if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('累计修改');}
-      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?(row.title||row.kind)+(row.status==='inProgress'?timelineText(' · 进行中'):''):row.role==='user'?timelineText('你'):row.role==='error'?timelineText('执行错误'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');}
+      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       const more=node.querySelector('.detail-more');
-      if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'继续加载正文':'展开完整内容');
+      if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'더 많은 텍스트 로드':'전체 콘텐츠 표시');
       const attachment=node.querySelector('.timeline-attachments small.muted');
-      if(attachment)attachment.textContent=timelineText('附件：')+row.attachments.map(a=>a.name||a.type).join('、');
+      if(attachment)attachment.textContent=timelineText('부착:')+row.attachments.map(a=>a.name||a.type).join('、');
     }
-    this.newer.textContent=timelineText(this.pendingRequests?'有待确认请求 ↓':'有新内容 ↓');
+    this.newer.textContent=timelineText(this.pendingRequests?'확인 필요 ↓':'새로운 콘텐츠 ↓');
   }
   async updates(){
     while(!this.abort.signal.aborted){
@@ -327,7 +327,7 @@ class ChatTimeline {
         // Polls never replace the oldest loaded cursor.
         this.apply(page,!!page.reset);
         await this.pause(200);
-      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('重新连接中'));await this.pause(3000);}
+      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('다시 연결하는 중'));await this.pause(3000);}
     }
   }
   pause(ms){return new Promise(resolve=>{const done=()=>{clearTimeout(timer);this.abort.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,ms);this.abort.signal.addEventListener('abort',done,{once:true});});}

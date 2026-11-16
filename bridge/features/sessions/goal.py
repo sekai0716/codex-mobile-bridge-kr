@@ -114,7 +114,7 @@ def plan_goal_command(action, objective, current, *, status=None):
     next legal transition; ``invalid`` must never be sent to the writer.
     """
     if action not in GOAL_ACTIONS:
-        return "invalid", "目标操作无效", None
+        return "invalid", "잘못된 대상 작업", None
     objective = (objective or "").strip()
     current = normalize_goal(current)
     current_objective = (current or {}).get("objective", "")
@@ -125,41 +125,41 @@ def plan_goal_command(action, objective, current, *, status=None):
             return "execute", "", "active"
         if same_objective and current_status == "active":
             return "duplicate", "", "active"
-        return "invalid", "此聊天已有未完成目标，请先处理当前目标", None
+        return "invalid", "이 채팅에는 이미 완료되지 않은 목표가 있습니다.", None
     if action == "cancel":
         if current is None:
             return "duplicate", "", "cancelled"
         if not same_objective:
-            return "invalid", "目标已发生变化，请刷新后重试", None
+            return "invalid", "목표가 변경되었습니다. 새로고침하고 다시 시도하세요.", None
         return "execute", "", "cancelled"
     if action == "edit":
         if current is None or current_status != "paused":
-            return "invalid", "请先暂停目标，再修改目标内容", None
+            return "invalid", "목표를 편집하기 전에 목표를 일시중지하세요.", None
         return ("duplicate" if same_objective else "execute"), "", "paused"
     expected = "paused" if action == "pause" else "active"
     predecessor = "active" if action == "pause" else "paused"
     if current is None:
-        return "invalid", "当前聊天没有可操作的目标", None
+        return "invalid", "현재 채팅에 실행 가능한 대상이 없습니다.", None
     if not same_objective:
-        return "invalid", "目标已发生变化，请刷新后重试", None
+        return "invalid", "목표가 변경되었습니다. 새로고침하고 다시 시도하세요.", None
     if current_status == expected:
         return "duplicate", "", expected
     if current_status == predecessor or (action == "pause" and current_status in ("blocked", "usageLimited", "budgetLimited")):
         return "execute", "", expected
-    return "invalid", "目标当前状态不支持暂停" if action == "pause" else "目标当前状态不支持恢复", None
+    return "invalid", "대상의 현재 상태는 정지를 지원하지 않습니다." if action == "pause" else "대상의 현재 상태는 복구를 지원하지 않습니다.", None
 
 
 GOAL_ACTIVATION_TEXTS = {
-    "zh-CN": {
-        "create": "目标已创建。请立即开始执行当前目标，不要重复创建目标。",
-        "resume": "目标已恢复。请继续执行当前目标。",
+    "ko-KR": {
+        "create": "타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。",
+        "resume": "대상이 복원되었습니다. 현재 목표를 계속 유지하세요.。",
     },
     "en-US": {
         "create": "Goal created. Start working on it now. Do not create it again.",
         "resume": "Goal resumed. Continue working on it.",
     },
 }
-DEFAULT_UI_LOCALE = "zh-CN"
+DEFAULT_UI_LOCALE = "ko-KR"
 def normalize_ui_locale(value):
     """Map web UI locales and legacy clients to an activation language."""
     if value in GOAL_ACTIVATION_TEXTS:
@@ -180,7 +180,7 @@ def normalize_goal_result(result):
 def goal_activation(thread_id, goal, action, ui_locale=DEFAULT_UI_LOCALE, transition_id=None):
     """Return a stable id and text for the turn that starts a goal."""
     if action not in GOAL_ACTIONS:
-        raise ValueError("目标启动操作无效")
+        raise ValueError("잘못된 대상 실행 작업")
     goal = normalize_goal(goal) or {}
     identity = goal.get("goalId") or goal.get("goal_id")
     if not identity:
@@ -251,7 +251,7 @@ class GoalRPC:
                 return self
             executable = self.executable
             if not executable or not executable.is_file():
-                raise GoalUnavailable('找不到桌面 App 的 Codex 运行时')
+                raise GoalUnavailable("데스크톱 Codex 런타임을 찾을 수 없습니다.")
             options = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
             try:
                 messages = queue.Queue()
@@ -270,7 +270,7 @@ class GoalRPC:
                 return self
             except Exception as exc:
                 self.close()
-                raise GoalUnavailable('无法连接 Codex 原生目标服务，请检查电脑端 Codex') from exc
+                raise GoalUnavailable('연결할 수 없습니다 Codex 기본 대상 서비스입니다. 컴퓨터 버전을 확인하세요. Codex') from exc
 
     def _read(self, messages, stdout):
         try:
@@ -289,12 +289,12 @@ class GoalRPC:
             self.process.stdin.write(json.dumps({'id': request_id, 'method': method, 'params': params}) + '\n')
             self.process.stdin.flush()
         except (OSError, AttributeError) as exc:
-            raise GoalUnavailable('Codex 原生目标服务已断开') from exc
+            raise GoalUnavailable('Codex 기본 대상 서비스의 연결이 끊어졌습니다.') from exc
         return request_id
 
     def request(self, method, params=None):
         if method not in self.METHODS:
-            raise ValueError('目标接口只允许读取、设置或取消目标')
+            raise ValueError('대상 인터페이스에서는 대상 읽기, 설정 또는 취소만 허용됩니다.')
         with self.lock:
             self.start()
             request_id = self._send(method, params)
@@ -307,21 +307,21 @@ class GoalRPC:
                 value = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
             except queue.Empty as exc:
                 self.close()
-                raise GoalError('Codex 原生目标操作超时') from exc
+                raise GoalError('Codex 기본 대상 작업 시간이 초과되었습니다.') from exc
             if value is None:
                 self.close()
-                raise GoalUnavailable('Codex 原生目标服务已断开')
+                raise GoalUnavailable('Codex 기본 대상 서비스의 연결이 끊어졌습니다.')
             if value.get('id') != request_id:
                 if time.monotonic() >= deadline:
                     self.close()
-                    raise GoalError('Codex 原生目标操作超时')
+                    raise GoalError('Codex 기본 대상 작업 시간이 초과되었습니다.')
                 continue
             if 'error' in value:
                 error = value['error'] or {}
-                message = str(error.get('message') or 'Codex 原生目标操作未完成')
+                message = str(error.get('message') or 'Codex 기본 대상 작업이 완료되지 않았습니다.')
                 if error.get('code') in (-32601, 'method_not_found') or 'method not found' in message.lower():
-                    raise GoalUnsupported('桌面 Codex 版本不支持原生目标模式')
-                raise GoalError('Codex 原生目标操作未完成，请检查电脑端 Codex')
+                    raise GoalUnsupported("데스크톱 Codex 버전은 네이티브 목표를 지원하지 않습니다.")
+                raise GoalError('Codex 기본 대상 작업이 완료되지 않았습니다. 컴퓨터 측을 확인하십시오. Codex')
             return value.get('result') or {}
 
     def get_goal(self, thread_id):
@@ -333,7 +333,7 @@ class GoalRPC:
 
     def set_goal_status(self, thread_id, status):
         if status not in ('active', 'paused'):
-            raise ValueError('目标状态无效')
+            raise ValueError('대상 상태가 잘못되었습니다.')
         params = {'threadId': str(thread_id), 'status': status}
         return normalize_goal_result(self.request('thread/goal/set', params))
 

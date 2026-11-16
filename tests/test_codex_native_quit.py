@@ -164,7 +164,7 @@ function open(){
   render();
 }
 function render(){
-  content.innerHTML='<div role="menuitem" tabindex="0">退出登录</div><div role="menuitem" tabindex="0" class="quit"><span>'+label+'</span> <span>'+accelerator+'</span></div>';
+  content.innerHTML='<div role="menuitem" tabindex="0">\u9000\u51fa\u767b\u5f55</div><div role="menuitem" tabindex="0" class="quit"><span>'+label+'</span> <span>'+accelerator+'</span></div>';
   if(mode==='duplicate')content.innerHTML+='<div role="menuitem" tabindex="0" class="quit">'+label+' '+accelerator+'</div>';
   for(const item of document.querySelectorAll('.quit'))item.addEventListener('click',()=>window.fixture.quit());
 }
@@ -225,7 +225,7 @@ class CodexNativeQuit(unittest.TestCase):
                 for name in ('stop', 'ready.json', 'dispatches.log', 'reopens.log', 'expands.log'):
                     (state/name).unlink(missing_ok=True)
                 (state/'scenario.json').write_text(json.dumps({'mode': mode}), encoding='utf-8')
-                label = 'Quit Codex' if mode == 'normal' else '退出 ChatGPT'
+                label = 'Quit Codex' if mode == 'normal' else '\u9000\u51fa ChatGPT'
                 (app/'index.html').write_text(HTML.replace('MODE', json.dumps(mode)).replace('LABEL', json.dumps(label)), encoding='utf-8')
                 desktop = InactiveDesktop()
                 app_process = None
@@ -268,7 +268,7 @@ class CodexNativeQuit(unittest.TestCase):
                     reopens = (state/'reopens.log').read_text().splitlines() if (state/'reopens.log').exists() else []
                     self.assertEqual(len(reopens), 0, output)
                     if mode == 'wrong-creation':
-                        self.assertIn('启动身份', reply['reason'])
+                        self.assertIn('아이덴티티 시작', reply['reason'])
                     self.assertFalse((state/'expands.log').exists(), 'helper opened a visible application menu')
                     if mode == 'hidden':
                         self.assertFalse(desktop.user.IsWindowVisible(int(ready['handle'])), 'helper exposed the hidden window')

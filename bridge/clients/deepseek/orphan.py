@@ -20,23 +20,23 @@ def _plain_path(path):
         except FileNotFoundError:
             continue
         if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
-            raise ValueError('接入路径包含链接，请在电脑端检查，尚未修改配置')
+            raise ValueError('액세스 경로에는 링크가 포함되어 있습니다. 컴퓨터에서 확인해주세요. 구성은 아직 수정되지 않았습니다.')
 
 
 def inspect(adapter, home):
     """A matching shape permits a repair preview, not a trusted connection."""
     if adapter.home != Path(home) or adapter.directory == adapter.home:
-        raise ValueError('Harness 配置目录已变化，请重新检查')
+        raise ValueError('Harness 구성 디렉터리가 변경되었습니다. 다시 확인하세요.')
     patch = adapter.home/'profiles/desktop/cordis.patch.yml'
     _plain_path(patch)
     _plain_path(adapter.directory)
     raw = patch.read_bytes()
     if len(raw) > 1024*1024:
-        raise ValueError('Harness 配置过大，请在电脑端检查')
+        raise ValueError('Harness 구성이 너무 큽니다. 컴퓨터에서 확인하세요.')
     text = raw.decode('utf-8')
     block = insertion(text)
     if not block or len(PLUGIN_ID.findall(text)) != 1:
-        raise ValueError('无法唯一识别旧接入，尚未修改配置')
+        raise ValueError('이전 액세스를 고유하게 식별할 수 없으며 구성이 수정되지 않았습니다.')
     entry = block[0]
     try:
         if set(entry) != {'insert'} or not isinstance(entry['insert'], list) or len(entry['insert']) != 1:
@@ -56,20 +56,20 @@ def inspect(adapter, home):
                 or old.name != 'deepseek' or old.parent.name != 'desktop-sessions'):
             raise ValueError()
     except (ValueError, KeyError, TypeError):
-        raise ValueError('旧接入形态无法安全恢复，尚未修改配置') from None
+        raise ValueError('이전 액세스 양식은 안전하게 복원할 수 없으며 구성이 수정되지 않았습니다.') from None
     _plain_path(old)
     try:
         old.lstat()
     except FileNotFoundError:
         pass
     else:
-        raise ValueError('旧接入目录仍存在，请在电脑端检查，尚未修改配置')
+        raise ValueError('이전 액세스 디렉터리가 여전히 존재합니다. 컴퓨터에서 확인하세요. 구성은 아직 수정되지 않았습니다.')
     target_generation = None
     if adapter.directory.exists():
         # A previous confirmed attempt may have prepared all files but failed
         # before replacing the patch. Reuse only its complete native record.
         if not verified_directory(json.loads(adapter._line()[2:]), adapter.home):
-            raise ValueError('恢复目标已有无法验证的文件，请在电脑端检查')
+            raise ValueError('복구 대상에 확인할 수 없는 파일이 있습니다. 컴퓨터에서 확인해주세요.')
         target_generation = [hashlib.sha256((adapter.directory/name).read_bytes()).hexdigest()
                              for name in ('mobile-host.mjs', 'connection.json', 'installation.json')]
     return {'patch': patch, 'raw': raw, 'block': block, 'old': old,
@@ -80,7 +80,7 @@ def inspect(adapter, home):
 def repair(adapter, expected, check_stopped, write_json):
     current = inspect(adapter, adapter.home)
     if any(current[key] != expected[key] for key in ('generation', 'directory', 'old', 'targetGeneration')):
-        raise ValueError('Harness 接入配置已变化，请重新预览')
+        raise ValueError('Harness 액세스 구성이 변경되었습니다. 다시 미리보세요.')
     check_stopped()
     adapter.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     backup = adapter.directory/('cordis.patch.before-repair-'+secrets.token_hex(8)+'.yml')
@@ -102,7 +102,7 @@ def repair(adapter, expected, check_stopped, write_json):
     check_stopped()
     _plain_path(current['patch'])
     if current['patch'].read_bytes() != current['raw']:
-        raise ValueError('Harness 配置在恢复期间变化；原配置备份已保留，尚未替换')
+        raise ValueError('Harness 복구 중에 구성이 변경되었습니다. 원래 구성 백업이 유지되었으며 교체되지 않았습니다.')
     text = current['raw'].decode('utf-8')
     newline = '\r\n' if '\r\n' in text[current['block'][1]:current['block'][2]] else '\n'
     replacement = MARKER+newline+adapter._line()+newline
@@ -117,7 +117,7 @@ def repair(adapter, expected, check_stopped, write_json):
         check_stopped()
         latest = inspect(adapter, adapter.home)
         if latest['raw'] != current['raw']:
-            raise ValueError('Harness 配置在恢复期间变化，尚未替换')
+            raise ValueError('Harness 복구 중에 구성이 변경되었으며 교체되지 않았습니다.')
         os.replace(temporary, current['patch'])
     finally:
         Path(temporary).unlink(missing_ok=True)

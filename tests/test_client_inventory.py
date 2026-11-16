@@ -77,7 +77,7 @@ class ClientInventoryTests(unittest.TestCase):
             with patch('bridge.clients.lifecycle.process_inventory', side_effect=AssertionError('Safety must not use display snapshots')):
                 self.assertEqual(inspect_client(self.descriptors[0])['pids'], [99])
                 with patch('bridge.clients.desktop_app.DesktopApp.stop') as stop:
-                    with self.assertRaisesRegex(ValueError, '进程已变化'):
+                    with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되어\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 닫기\\ 전에\\ 다시\\ 확인하세요\\."):
                         stop_client(self.descriptors[0], state=first['codex'])
                     stop.assert_not_called()
             self.assertEqual(run.call_count, 8)

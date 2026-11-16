@@ -1,46 +1,46 @@
-# Windows / Linux 验证分支整合（2026-10-10 归档）
+# Windows / Linux 지점 통합 확인（2026-10-10 보관소）
 
-本页保留目录重组阶段的来源与当时验证范围。v2.1.0 后续的真实 Windows、Linux SSH 和 Test 安装包验收已完成列明项目，当前状态见[平台验收总览](../../VERIFICATION.md#v210-platform-status)；不要将本页末尾的阶段限制作为当前状态。
+이 페이지에는 당시 디렉토리 재구성 단계의 소스 및 검증 범위가 유지됩니다.。v2.1.0 이어지는 현실 Windows、Linux SSH 및 Test 나열된 항목에 대한 설치 패키지 승인이 완료되었습니다. 현재 상태는 다음을 참조하세요.[플랫폼 수용 개요](../../VERIFICATION.md#v210-platform-status)；이 페이지 끝에 있는 단계 제한을 귀하의 현재 상태로 간주하지 마십시오.。
 
-## 来源与本地回退点
+## 소스 및 로컬 대체 지점
 
-- 整合前：`refactor/platform-feature-layout`，`9830cd208ad3c18b875ad7ccc34c3c4d596cce3c`，工作区干净。
-- 本地备份：`backup/pre-platform-integration-20261010-9830cd2`。
-- Linux：`github/refactor/platform-feature-layout`，`7d390f4c5e73e3cdd0286ee77a3ea79dcca2439a`，1 个提交。
-- Windows：`github/codex/windows-platform-validation`，`aab5844216e7c146419237d3c3b664a85b410082`，4 个提交。
+- 통합 전：`refactor/platform-feature-layout`，`9830cd208ad3c18b875ad7ccc34c3c4d596cce3c`，깨끗한 작업 공간。
+- 로컬 백업：`backup/pre-platform-integration-20261010-9830cd2`。
+- Linux：`github/refactor/platform-feature-layout`，`7d390f4c5e73e3cdd0286ee77a3ea79dcca2439a`，1 제출물。
+- Windows：`github/codex/windows-platform-validation`，`aab5844216e7c146419237d3c3b664a85b410082`，4 제출물。
 
-两个来源均从整合前提交继续开发。Linux 先快进，Windows 再保留原提交历史合并；来源共修改 25 个文件，没有重叠文件或文本冲突。未改动 Tailscale、自有服务器 HTTPS/IP 配置、认证配对、通知、原生客户端启停和移动端原生源码。
+두 소스 모두 사전 통합 커밋을 통해 계속 개발됩니다.。Linux 빨리 감기 먼저，Windows 그런 다음 원래 제출 기록을 유지하고 병합합니다. 소스는 함께 수정됩니다 25 파일이 겹치거나 텍스트가 충돌하지 않습니다. 수정되지 않은 Tailscale、자체 서버 HTTPS/IP 구성, 인증 페어링, 알림, 네이티브 클라이언트 시작 및 중지, 모바일 네이티브 소스 코드。
 
-## 修改入口与边界
+## 입구 및 경계 수정
 
-| 功能 | 维护位置与行为 |
+| 기능 | 위치와 행동을 유지하라 |
 | --- | --- |
-| Windows 工作区访问 | `bridge/features/workspace/workspace.py` 拒绝 junction/reparse point，并阻止大小写和尾随点/空格形式的 `.git` 上传；普通文件与 Unicode 路径仍走既有流程。该模块也通过 SSH 独立执行，保留自包含实现。 |
-| 本机 Linux 权限 | `bridge/features/sessions/linux_permissions.py` 读取运行时能力、工作区策略和桌面偏好；读取不到时禁用相关选项，提交前重新校验，不通过修改线程来试探权限。 |
-| Linux 侧边聊天 | `bridge/features/sessions/linux_side_chat.py` 等待对应线程的权限变更通知；空 RPC 回执不视为已应用，不更新其他线程。 |
-| 共享接口与 Web | `bridge/app/service.py`、`bridge/api/httpd.py` 和 `web/features/chat/permissions.js` 接入权限选项。只有本机 Linux 启用新流程；macOS、Windows 与 SSH 保留原有行为。认证、同源和 CSRF 边界保留。 |
-| Linux 构建下载 | `scripts/bundle-cloudflared.py` 在读取许可文件遇到网络错误时，使用同仓库、同版本的 GitHub API；保留 HTTPS 校验及缺少 NOTICE 的既有处理。未在本轮执行构建或下载。 |
-| 测试兼容性 | 更新跨系统路径夹具、网页脚本顺序与 reparse 模拟；Windows 启动测试使用独立命名管道及不存在的运行时路径，避免连接真实桌面。 |
+| Windows 작업공간 액세스 | `bridge/features/workspace/workspace.py` 거부 junction/reparse point，블록 케이스와 후행 점/공간의 형태로 `.git` 업로드; 일반 파일과 Unicode 경로는 여전히 기존 프로세스를 따릅니다. 이 모듈도 통과합니다. SSH 독립적으로 실행하고 독립적인 구현을 유지합니다.。 |
+| 로컬 머신 Linux 권한 | `bridge/features/sessions/linux_permissions.py` 런타임 기능, 작업 공간 정책 및 데스크탑 기본 설정을 읽습니다. 읽을 수 없는 경우 관련 옵션을 비활성화하고, 제출하기 전에 다시 확인하고, 스레드를 수정하여 권한을 테스트하지 마세요.。 |
+| Linux 보조 채팅 | `bridge/features/sessions/linux_side_chat.py` 해당 스레드의 권한 변경 알림을 기다립니다. 비어 있는 RPC 영수증은 적용된 것으로 간주되지 않으며 다른 스레드는 업데이트되지 않습니다.。 |
+| 공유 인터페이스 Web | `bridge/app/service.py`、`bridge/api/httpd.py` 및 `web/features/chat/permissions.js` 액세스 권한 옵션. 이 기계만 Linux 새 프로세스 활성화；macOS、Windows 및 SSH 원래 동작을 유지하십시오. 인증, 동일한 출처 및 CSRF 국경 보존。 |
+| Linux 빌드 다운로드 | `scripts/bundle-cloudflared.py` 라이선스 파일을 읽는 중 네트워크 오류가 발생하는 경우 동일한 리포지토리와 버전을 사용하십시오. GitHub API；예약하다 HTTPS 체크섬 누락 NOTICE 기존 처리. 이번 라운드에는 빌드나 다운로드가 수행되지 않았습니다.。 |
+| 테스트 호환성 | 시스템 간 경로 고정 장치, 웹 스크립트 시퀀스 및 reparse 시뮬레이션；Windows 실제 데스크톱에 연결되지 않도록 별도의 명명된 파이프와 존재하지 않는 런타임 경로를 사용하여 테스트를 시작합니다.。 |
 
-平台策略仍归功能层，原生实现仍归 `bridge/platforms/`；没有复制三套公共业务或恢复旧的平铺目录。
+플랫폼 전략은 여전히 ​​기능 계층에 속하며 기본 구현은 여전히 ​​기능 계층에 속합니다. `bridge/platforms/`；공공 서비스 3세트를 복사하거나 기존 타일 디렉터리를 복원할 수 없습니다.。
 
-## 验证
+## 검증
 
-本地使用 macOS、Python 3.9.6 和 Node v25.9.0 运行源码测试，复用现有依赖环境：
+현지 사용 macOS、Python 3.9.6 및 Node v25.9.0 소스 코드 테스트를 실행하고 기존 종속성 환경을 재사용합니다.：
 
-| 检查 | 结果 |
+| 조사하다 | 결과 |
 | --- | --- |
-| `python -B scripts/test-backend.py --source-only` | 1,453 项：1,428 通过，25 跳过，0 失败/错误 |
-| `npm run test:desktop` | 482 项：481 通过，1 跳过，0 失败 |
-| 整合修复定向回归 | 18 项全部通过 |
+| `python -B scripts/test-backend.py --source-only` | 1,453 개：1,428 통해，25 뛰어넘다，0 실패하다/실수 |
+| `npm run test:desktop` | 482 개：481 통해，1 뛰어넘다，0 실패하다 |
+| 통합 수리 지향 회귀 | 18 모든 항목 통과 |
 
-Python 跳过项包括 11 项原生编译/执行夹具、13 项 Windows 专属检查及 1 项需显式启用的 POSIX 进程退出检查；Node 跳过项为 Windows 专属检查。最初沙箱阻止本地监听，改用允许隔离回环端口的环境后完成上述回归。
+Python 건너뛰기 항목에는 다음이 포함됩니다. 11 아이템 네이티브 컴파일/실행 설비、13 개 Windows 단독검사 및 1 명시적으로 활성화해야 하는 항목 POSIX 프로세스 종료 확인；Node 건너뛴 항목은 다음과 같습니다. Windows 단독검사. 위의 회귀는 샌드박스가 처음에 로컬 모니터링을 차단하고 격리된 루프백 포트를 허용하는 환경으로 전환한 후에 완료되었습니다.。
 
-复核发现并修正两处衔接问题：
+두 가지 연결 문제를 검토하고 발견하여 수정했습니다.：
 
-- Linux 来源仅在普通会话接口加入权限标记，实际聊天页的渐进时间线接口未携带。新增回归先复现失败，再补齐首屏、翻页与增量元数据；macOS、Windows 和 SSH 的权限语义不变，被动读取不会探测能力或激活会话。
-- 原有中继测试仍要求已移除的桌面 `shared-relay` 注册入口可用。确认该测试在整合前即已过时，调整为验证入口被拒绝且不创建配置，同时保留独立中继 CLI 的测试。没有恢复邀请码界面或注册入口。
+- Linux 소스는 일반 대화 인터페이스에만 권한 표시를 추가할 뿐 실제 채팅 페이지의 프로그레시브 타임라인 인터페이스에는 이를 전달하지 않습니다. 새로운 회귀는 먼저 실패를 재현한 다음 첫 번째 화면, 페이지 넘김 및 증분 메타데이터를 완료합니다.；macOS、Windows 및 SSH 권한 의미는 변경되지 않고, 수동 읽기는 기능을 감지하거나 세션을 활성화하지 않습니다.。
+- 원래 릴레이 테스트에는 여전히 제거된 데스크탑이 필요합니다. `shared-relay` 등록 포털을 사용할 수 있습니다. 이 테스트는 통합 전에 더 이상 사용되지 않음을 확인했으며, 독립 실행형 릴레이를 유지하면서 항목이 거부되고 구성을 생성하지 않는지 확인하도록 조정되었습니다. CLI 시험. 복구 초대 코드 인터페이스나 등록 입구가 없습니다.。
 
-额外 10 项 Windows 边界模拟通过，覆盖 reparse 属性识别、无法读取属性时拒绝操作、新文件及 `.git` 名称变体。这些模拟不替代 NTFS 实际 junction 测试。
+추가의 10 개 Windows 경계 시뮬레이션 패스, 커버 reparse 속성 인식, 속성을 읽을 수 없을 때 작업 거부, 새 파일 및 `.git` 이름 변형. 이러한 시뮬레이션은 대체되지 않습니다. NTFS 실제 junction 시험。
 
-本轮不构建 App/APK/IPA/DMG，不执行原生编译夹具，不替换运行网关、不启动或关闭真实客户端，不推送、不更新版本号、不打标签或发布。用户提供的 Windows/Linux 实测结果作为来源背景；整合后的两套系统与 iOS/Android 真机运行仍需另外验证。
+이번 라운드에는 건설이 없습니다. App/APK/IPA/DMG，기본 컴파일 픽스처를 실행하지 말고, 실행 중인 게이트웨이를 교체하지 말고, 실제 클라이언트를 시작하거나 닫지 말고, 푸시하지 말고, 버전 번호를 업데이트하지 말고, 레이블을 지정하거나 게시하지 마세요. 사용자 제공 Windows/Linux 실제 측정 결과는 소스 배경으로 사용됩니다. 통합 후 두 시스템은 다음과 같습니다. iOS/Android 실제 기계 작동은 여전히 ​​별도로 검증해야 합니다.。

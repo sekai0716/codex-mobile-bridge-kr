@@ -21,7 +21,7 @@ from bridge.resources import source_text
 
 def ssh_command(alias):
     if not isinstance(alias, str) or not alias or alias.startswith('-') or any(c.isspace() for c in alias):
-        raise RemoteUnavailable('SSH 别名无效')
+        raise RemoteUnavailable('SSH 잘못된 별칭')
     return ['ssh', '-T', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes',
                '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=yes',
                '-o', 'UpdateHostKeys=no', alias,
@@ -38,14 +38,14 @@ def _ssh_read(alias, source, timeout=18):
     try:
         result = run_with_input(command, source, text=True, encoding='utf-8', capture_output=True, timeout=timeout)
         if result.returncode == 255:
-            raise SshTransportUnavailable('SSH 主机暂不可用，请检查电脑上的连接')
+            raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.')
         if result.returncode:
-            raise RemoteUnavailable('SSH 读取失败，请检查电脑上该主机的 SSH 连接')
+            raise RemoteUnavailable('SSH 읽지 못했습니다. 컴퓨터의 호스트를 확인하세요. SSH 연결')
         return json.loads(result.stdout)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise SshTransportUnavailable('SSH 主机暂不可用，请检查电脑上的连接') from exc
+        raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.') from exc
     except ValueError as exc:
-        raise RemoteUnavailable('SSH 主机暂不可用，请检查电脑上的连接') from exc
+        raise RemoteUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.') from exc
 
 
 def retry_ssh(alias, *, manual=True):
@@ -81,9 +81,9 @@ def ssh_download(alias, source):
             result = run_with_input(command, source, stdout=stream,
                                     stderr=subprocess.DEVNULL, timeout=60)
             if result.returncode == 255:
-                raise SshTransportUnavailable('SSH 主机暂不可用，请检查电脑上的连接')
+                raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.')
             if result.returncode:
-                raise RemoteUnavailable('SSH 下载失败，请检查电脑上该主机的 SSH 连接')
+                raise RemoteUnavailable('SSH 다운로드에 실패했습니다. 컴퓨터의 호스트를 확인하세요. SSH 연결')
             length = stream.tell()
             stream.seek(0)
             header = stream.readline(8193)
@@ -95,11 +95,11 @@ def ssh_download(alias, source):
                 raise ValueError(metadata['error'])
             if (type(metadata.get('length')) is not int or not 0 <= metadata['length'] <= 2**53 - 1
                     or length - len(header) != metadata['length']):
-                raise ValueError('SSH 下载中断，请重试')
+                raise ValueError('SSH 다운로드가 중단되었습니다. 다시 시도해 주세요.')
         except PermissionError:
             raise
         except (OSError, subprocess.TimeoutExpired) as exc:
-            raise SshTransportUnavailable('SSH 主机暂不可用，请检查电脑上的连接') from exc
+            raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.') from exc
         yield metadata, stream
 
 
@@ -162,7 +162,7 @@ class RemoteStore:
                 threading.Thread(target=update, daemon=True, name='ssh-passive-read').start()
             if matches and not previous[3]:
                 return copy.deepcopy(previous[2])
-        raise RemoteUnavailable('正在后台读取 SSH 主机；本机会话可正常使用。')
+        raise RemoteUnavailable('백그라운드에서 읽기 SSH 주인; 로컬 세션은 정상적으로 사용할 수 있습니다。')
 
     def call(self, method, args, *, home=None):
         source = source_text('features/sessions/store.py')
@@ -311,7 +311,7 @@ class RemoteCatalog:
 
     def get_kind(self, kind, cwd, refresh=False, provider=None, query='', offset=0, limit=200, ids=None):
         if kind not in ('models', 'skills'):
-            raise CatalogError('未知目录类型')
+            raise CatalogError("알 수 없는 카탈로그 유형")
         identifiers = tuple(ids or [])
         key = ((kind, cwd, query, offset, limit, identifiers) if kind == 'skills'
                else (kind, cwd, provider))
@@ -339,7 +339,7 @@ class RemoteCatalog:
             except RemoteUnavailable as exc:
                 raise CatalogError(str(exc)) from exc
             if result.get('code') == 'model_identity_changed':
-                raise CatalogIdentityChanged(result.get('error') or '模型接入已变化，请重试')
+                raise CatalogIdentityChanged(result.get('error') or '모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
             with self.lock:
                 cache[key] = (time.monotonic(), result)
                 if kind == 'models':
@@ -422,12 +422,12 @@ class RemoteCliModels:
         except RemoteUnavailable as exc:
             raise CatalogError(str(exc)) from exc
         if not isinstance(result, dict):
-            raise CatalogError('SSH 模型目录格式无效')
+            raise CatalogError('SSH 모델 디렉터리 형식이 잘못되었습니다.')
         if result.get('error'):
             raise CatalogError(result['error'])
         identity = result.get('identity')
         if not isinstance(identity, str) or len(identity) != 64 or any(char not in '0123456789abcdef' for char in identity):
-            raise CatalogError('SSH 模型目录身份无效')
+            raise CatalogError('SSH 잘못된 모델 디렉터리 ID')
         return result
 
     def identity(self, home, cwd, provider, config, account=None):
@@ -513,10 +513,10 @@ class AppHosts:
         """
         host = self.hosts().get(project['host'])
         if not host or host['alias'] != project.get('hostIdentity'):
-            raise ValueError('原 SSH 主机配置已变化，请重新选择项目')
+            raise ValueError('기존 SSH 호스트 구성이 변경되었습니다. 프로젝트를 다시 선택하세요.')
         path = self.home / 'codex-app' / 'config.json'
         if path.is_symlink() or path.parent.is_symlink():
-            raise ValueError('Codex App 项目配置路径不可用，请在电脑 App 添加项目')
+            raise ValueError('Codex App 프로젝트 구성 경로를 사용할 수 없습니다. 컴퓨터에서 시도해 보세요. App 항목 추가')
         original = path.read_bytes() if path.exists() else None
         try:
             config = json.loads(original) if original is not None else {'version': 1}
@@ -555,13 +555,13 @@ class AppHosts:
             if not any(item['remotePath'] == project['cwd'] for item in projects):
                 projects.append({'remotePath': project['cwd'], 'label': project['name']})
         except (TypeError, KeyError, ValueError) as exc:
-            raise ValueError('Codex App 存在其他待应用的远程配置，请先在电脑 App 添加此 SSH 项目，避免影响其他连接') from exc
+            raise ValueError('Codex App 적용할 다른 원격 구성이 있습니다. 먼저 구성해 주세요. App 이것을 추가하세요 SSH 다른 연결에 영향을 미치지 않도록 프로젝트') from exc
         return path, original, config
 
     def write_project_import(self, prepared, write):
         path, original, config = prepared
         if path.is_symlink() or path.parent.is_symlink() or (path.read_bytes() if path.exists() else None) != original:
-            raise ValueError('Codex App 配置已变化，请重新选择项目')
+            raise ValueError('Codex App 구성이 변경되었습니다. 프로젝트를 다시 선택하세요.')
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         write(path, config)
 
@@ -571,7 +571,7 @@ class AppHosts:
         for project in state.get('local-projects', {}).values():
             roots = project.get('rootPaths') or []
             if roots:
-                rows.append({'key': 'local|' + project['id'], 'host': 'local', 'hostLabel': '此电脑',
+                rows.append({'key': 'local|' + project['id'], 'host': 'local', 'hostLabel': '이 컴퓨터',
                              'name': project['name'], 'cwd': roots[0]})
         hosts = self.hosts()
         for project in state.get('remote-projects', []):
@@ -611,7 +611,7 @@ class AppHosts:
                     project = next((p for p in projects if p['cwd'] and p['cwd'] == row.get('cwd')), None)
             row.update(host=host, hostLabel=label,
                        projectKey=host + '|' + (legacy_ids.get(project['id'], project['id']) if project else 'unassigned'),
-                       projectName=project['name'] if project else '未归类',
+                       projectName=project['name'] if project else '분류되지 않음',
                        recency=row.get('recency_at_ms') or (row.get('recency_at') or 0) * 1000 or row.get('updated_at_ms') or (row.get('updated_at') or 0) * 1000)
         return rows
 

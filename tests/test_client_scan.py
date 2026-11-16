@@ -90,8 +90,8 @@ class ClientScanTests(unittest.TestCase):
             for key in ('codex', 'claude', 'deepseek')}
         self.deepseek = FakeDeepSeek(self.root/'desktop-sessions/deepseek', self.root/'deepseek-home')
         self.claude = Mock()
-        self.claude.configure.return_value = {'setupState': 'ready-to-connect', 'reason': '可以连接 Claude'}
-        self.claude.connect.return_value = {'setupState': 'needs-permission', 'reason': '请授权辅助功能以连接 Claude'}
+        self.claude.configure.return_value = {'setupState': 'ready-to-connect', 'reason': '연결 가능 Claude'}
+        self.claude.connect.return_value = {'setupState': 'needs-permission', 'reason': '연결하려면 접근성 기능을 승인하세요. Claude'}
         self.claude.status.return_value = {'connected': False}
         self.running = False
         self.connect_on_launch = False

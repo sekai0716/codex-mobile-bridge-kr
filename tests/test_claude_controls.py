@@ -19,7 +19,7 @@ class ClaudeControls(unittest.TestCase):
         (self.claude.directory/'connection.json').write_text('{"token":"fixture"}')
         self.claude.discovery = {'installed': True, 'automaticConnection': 'native-console'}
         self.claude.status.return_value = {'connected': False, 'setupState': 'needs-screen-saver',
-                                         'reason': '请先退出屏幕保护程序，再继续连接 Claude'}
+                                         'reason': '계속 연결하려면 화면 보호기를 종료하세요. Claude'}
         self.state = {'running': True, 'pids': [11], 'mainPids': [11], 'runtimePids': [], 'unknown': False}
         previous = fixture.inspect.side_effect
         fixture.inspect.side_effect = lambda descriptor: copy.deepcopy(self.state) if descriptor['id'] == 'claude' else previous(descriptor)
@@ -39,7 +39,7 @@ class ClaudeControls(unittest.TestCase):
                                      'confirmed': True, **extra})
 
     def test_disconnected_toggle_stays_protected_and_keeps_enabled(self):
-        with self.assertRaisesRegex(ValueError, '无法确认'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.manager.toggle_client({'provider': 'claude', 'enabled': False})
         self.fixture.stop.assert_not_called()
         self.assertTrue(self.manager.enabled('claude'))
@@ -65,15 +65,15 @@ class ClaudeControls(unittest.TestCase):
 
     def test_reconnect_rejects_disabled_stopped_ambiguous_and_unprepared_clients(self):
         self.manager.config['enabled']['claude'] = False
-        with self.assertRaisesRegex(ValueError, '应用已关闭'): self.manager.reconnect_claude()
+        with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ 비활성화되었습니다\\.\\ 앱\\ 관리에서\\ 활성화하세요\\."): self.manager.reconnect_claude()
         self.manager.config['enabled']['claude'] = True
         self.state.update(running=False, pids=[], mainPids=[])
-        with self.assertRaisesRegex(ValueError, '打开 Claude'): self.manager.reconnect_claude()
+        with self.assertRaisesRegex(ValueError, "다시\\ 연결하기\\ 전에\\ 컴퓨터에서\\ Claude를\\ 엽니다\\."): self.manager.reconnect_claude()
         self.state.update(running=True, pids=[11], mainPids=[11], unknown=True)
-        with self.assertRaisesRegex(ValueError, '进程'): self.manager.reconnect_claude()
+        with self.assertRaisesRegex(ValueError, '프로세스'): self.manager.reconnect_claude()
         self.state['unknown'] = False
         (self.claude.directory/'connection.json').unlink()
-        with self.assertRaisesRegex(ValueError, '电脑端'): self.manager.reconnect_claude()
+        with self.assertRaisesRegex(ValueError, '컴퓨터에서 Claude 액세스를 설정'): self.manager.reconnect_claude()
         self.claude.connect.assert_not_called(); self.fixture.launch.assert_not_called()
 
     def test_reconnect_can_retry_after_a_reported_other_gateway_conflict(self):
@@ -91,7 +91,7 @@ class ClaudeControls(unittest.TestCase):
 
     def test_heartbeat_without_rpc_retries_signed_recovery_without_initialization(self):
         self.claude.status.return_value = {'connected': True}
-        self.claude.check_connection.side_effect = BridgeUnavailable('Claude 桌面连接暂未响应')
+        self.claude.check_connection.side_effect = BridgeUnavailable('Claude 데스크톱 연결이 아직 응답하지 않습니다')
         self.manager.reconnect_claude()
         self.claude.reconnect.assert_called_once_with()
         self.claude.connect.assert_not_called()
@@ -99,9 +99,9 @@ class ClaudeControls(unittest.TestCase):
 
     def test_failed_heartbeat_never_bypasses_unconfirmed_mutation_guard(self):
         self.claude.status.return_value = {'connected': True}
-        self.claude.check_connection.side_effect = BridgeUnavailable('Claude 桌面连接暂未响应')
-        self.claude.reconnect.side_effect = BridgeUnavailable('已有请求结果尚未确认')
-        with self.assertRaisesRegex(BridgeUnavailable, '尚未确认'):
+        self.claude.check_connection.side_effect = BridgeUnavailable('Claude 데스크톱 연결이 아직 응답하지 않습니다')
+        self.claude.reconnect.side_effect = BridgeUnavailable('기존 요청 결과는 아직 확인되지 않았습니다.')
+        with self.assertRaisesRegex(BridgeUnavailable, "기존 요청 결과는 아직 확인되지 않았습니다"):
             self.manager.reconnect_claude()
         self.claude.reconnect.assert_called_once_with()
         self.claude.connect.assert_not_called()
@@ -109,14 +109,14 @@ class ClaudeControls(unittest.TestCase):
 
     def test_gateway_stopped_cannot_accept_web_reconnect(self):
         self.manager.gateway_running = False
-        with self.assertRaisesRegex(ValueError, '启动网关'): self.manager.reconnect_claude()
+        with self.assertRaisesRegex(ValueError, "Claude를\\ 다시\\ 연결하기\\ 전에\\ 게이트웨이를\\ 시작하십시오\\."): self.manager.reconnect_claude()
         self.claude.connect.assert_not_called()
 
     def test_disconnected_quit_requires_fresh_explicit_unknown_confirmation(self):
         preview = self.preview()
         self.assertTrue(preview['canQuit']); self.assertTrue(preview['requiresUnknownConfirmation'])
         self.fixture.stop.assert_not_called(); self.claude.cancel.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '可能中断任务'): self.confirm(preview)
+        with self.assertRaisesRegex(ValueError, "Claude\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 확인하고\\ 종료하면\\ 작업이\\ 중단될\\ 수\\ 있음을\\ 명시적으로\\ 인정합니다\\."): self.confirm(preview)
         self.fixture.stop.assert_not_called()
         result = self.confirm(preview, acknowledgeUnknown=True)
         self.fixture.stop.assert_called_once()
@@ -125,14 +125,14 @@ class ClaudeControls(unittest.TestCase):
         self.assertFalse(next(row for row in result['clients'] if row['id'] == 'claude')['enabled'])
         self.assertFalse(json.loads(self.manager.config_path.read_text())['enabled']['claude'])
         self.fixture.launch.assert_not_called(); self.claude.connect.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '过期'): self.confirm(preview, acknowledgeUnknown=True)
+        with self.assertRaisesRegex(ValueError, "Claude\\ 종료\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."): self.confirm(preview, acknowledgeUnknown=True)
 
     def test_busy_tasks_still_block_explicit_quit_even_with_confirmation(self):
         preview = self.preview()
         self.claude.status.return_value = {'connected': True}
         self.claude.desktop_listing.return_value = {'complete': False, 'sessions': [
             {'id': 'running', 'status': 'active', 'runtimeKnown': True}]}
-        with self.assertRaisesRegex(ValueError, '任务运行或等待'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.fixture.stop.assert_not_called(); self.claude.cancel.assert_not_called()
 
@@ -153,10 +153,10 @@ class ClaudeControls(unittest.TestCase):
     def test_process_identity_change_or_expiry_cannot_use_old_quit_confirmation(self):
         preview = self.preview()
         self.snapshot['identities'][11]['start'] = 'replacement'
-        with self.assertRaisesRegex(ValueError, '进程已变化'): self.confirm(preview, acknowledgeUnknown=True)
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'): self.confirm(preview, acknowledgeUnknown=True)
         preview = self.preview()
         with patch('bridge.clients.manager.time.monotonic', return_value=10**12):
-            with self.assertRaisesRegex(ValueError, '过期'): self.confirm(preview, acknowledgeUnknown=True)
+            with self.assertRaisesRegex(ValueError, "Claude\\ 종료\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."): self.confirm(preview, acknowledgeUnknown=True)
         self.fixture.stop.assert_not_called()
 
     def test_new_unknown_task_state_needs_a_new_warning_preview(self):
@@ -164,7 +164,7 @@ class ClaudeControls(unittest.TestCase):
         preview = self.preview()
         self.assertFalse(preview['requiresUnknownConfirmation'])
         self.claude.status.return_value = {'connected': False}
-        with self.assertRaisesRegex(ValueError, '重新检查并明确确认'):
+        with self.assertRaisesRegex(ValueError, "Claude\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 확인하고\\ 종료하면\\ 작업이\\ 중단될\\ 수\\ 있음을\\ 명시적으로\\ 인정합니다\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.fixture.stop.assert_not_called(); self.claude.cancel.assert_not_called()
 
@@ -172,7 +172,7 @@ class ClaudeControls(unittest.TestCase):
         preview = self.preview()
         def cancel(**_): self.snapshot['identities'][11]['start'] = 'replacement'
         self.claude.cancel.side_effect = cancel
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.confirm(preview, acknowledgeUnknown=True)
         self.fixture.stop.assert_not_called()
         self.assertTrue(self.manager.enabled('claude'))
@@ -188,11 +188,11 @@ class ClaudeControls(unittest.TestCase):
     def test_unknown_processes_and_linux_never_offer_override_quit(self):
         self.state['unknown'] = True
         self.assertFalse(self.preview()['canQuit'])
-        with self.assertRaisesRegex(ValueError, '进程'): self.confirm(self.preview(), acknowledgeUnknown=True)
+        with self.assertRaisesRegex(ValueError, '프로세스'): self.confirm(self.preview(), acknowledgeUnknown=True)
         self.state['unknown'] = False
         with patch('bridge.clients.manager.sys.platform', 'linux'):
             self.assertFalse(self.preview()['canQuit'])
-            with self.assertRaisesRegex(ValueError, '电脑端退出'):
+            with self.assertRaisesRegex(ValueError, "컴퓨터에서\\ Claude를\\ 종료합니다\\.\\ 확인된\\ 정상\\ 종료는\\ 이\\ 시스템에서\\ 지원되지\\ 않습니다\\."):
                 self.confirm(self.preview(), acknowledgeUnknown=True)
         self.fixture.stop.assert_not_called(); self.claude.cancel.assert_not_called()
 

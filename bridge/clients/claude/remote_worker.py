@@ -88,7 +88,7 @@ def auth_fingerprint(binary, directory, environment=None):
         status = (auth_status(binary, directory) if environment is None
                   else auth_status(binary, directory, environment))
         if type(status.get('loggedIn')) is not bool:
-            raise ValueError('WSL Claude Code 登录状态暂无法核验，请稍后重试')
+            raise ValueError('WSL Claude Code 지금은 로그인 상태를 확인할 수 없습니다. 나중에 다시 시도해 주세요.')
     stable = {key: status[key] for key in ('authMethod', 'apiProvider', 'email', 'accountId',
               'accountUuid', 'organizationId', 'organizationUuid', 'orgId', 'workspaceId')
               if isinstance(status.get(key), str) and status[key]}
@@ -175,7 +175,7 @@ def auth_ready(found):
 
 def events(path):
     if path.stat().st_size > 20_000_000:
-        raise ValueError('Claude 会话记录过大')
+        raise ValueError('Claude 세션 기록이 너무 큽니다.')
     result = []
     with path.open(encoding='utf-8', errors='replace') as source:
         for line in source:
@@ -203,36 +203,36 @@ def file_stamp(path):
 def history_page(path, identity, before=None, limit=40):
     """Standalone bounded reverse reader; this source runs without bridge installed."""
     if type(limit) is not int or not 1 <= limit <= 100:
-        raise ValueError('Claude 历史分页大小无效')
+        raise ValueError('Claude 기록 페이징 크기가 잘못되었습니다.')
     with path.open('rb') as stream:
         stamp = _file_stamp(stream.fileno())
         end = stamp[2]
         if before is not None:
             if not isinstance(before, str) or len(before) > 1024:
-                raise ValueError('Claude 历史游标无效')
+                raise ValueError('Claude 기록 커서가 잘못되었습니다.')
             try:
                 source, version, end = json.loads(base64.urlsafe_b64decode(
                     before + '=' * (-len(before) % 4)))
             except (ValueError, TypeError, UnicodeError) as exc:
-                raise ValueError('Claude 历史游标无效') from exc
+                raise ValueError('Claude 기록 커서가 잘못되었습니다.') from exc
             if source != identity or version != stamp or type(end) is not int or not 0 <= end <= stamp[2]:
-                raise ValueError('Claude 历史已变化，请重新加载最近记录')
+                raise ValueError('Claude 기록이 변경되었습니다. 최근 기록을 다시 로드하세요.')
             if end:
                 stream.seek(end - 1)
                 if stream.read(1) != b'\n':
-                    raise ValueError('Claude 历史游标无效')
+                    raise ValueError('Claude 기록 커서가 잘못되었습니다.')
         pos, pending, consumed, selected, boundary, visible = end, b'', 0, [], end, 0
         has_more = False
         while pos or pending:
             if pos:
                 size = min(65536, pos, 4 * 1024 * 1024 - consumed)
                 if size <= 0:
-                    raise ValueError('Claude 历史单页扫描超过限制，请缩小分页范围')
+                    raise ValueError('Claude 기록 단일 페이지 스캔이 한도를 초과했습니다. 페이징 범위를 좁혀주세요.')
                 pos -= size
                 stream.seek(pos)
                 block = stream.read(size)
                 if len(block) != size:
-                    raise ValueError('Claude 历史读取期间发生变化')
+                    raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
                 consumed += size
                 pending = block + pending
             lines = pending.splitlines(keepends=True)
@@ -262,13 +262,13 @@ def history_page(path, identity, before=None, limit=40):
             if has_more:
                 break
         if _file_stamp(stream.fileno()) != stamp:
-            raise ValueError('Claude 历史读取期间发生变化')
+            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
         try:
             current = file_stamp(path)
         except OSError as exc:
-            raise ValueError('Claude 历史读取期间发生变化') from exc
+            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.') from exc
         if current != stamp:
-            raise ValueError('Claude 历史读取期间发生变化')
+            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
         cursor = None
         if has_more:
             data = json.dumps([identity, stamp, boundary], separators=(',', ':')).encode()
@@ -315,7 +315,7 @@ def saved(path, found, *, include_events=False):
                         if isinstance(content, list):
                             content = '\n'.join(item.get('text', '') for item in content
                                                 if isinstance(item, dict) and item.get('type') == 'text')
-                        title = str(content).strip().splitlines()[0][:120] if str(content).strip() else 'Claude Code 会话'
+                        title = str(content).strip().splitlines()[0][:120] if str(content).strip() else "Claude Code 채팅"
                     if event.get('permissionMode') in MODES:
                         user_permission = event['permissionMode']
                 if kind in ('user', 'assistant') and isinstance(event.get('cwd'), str) and event['cwd']:
@@ -406,7 +406,7 @@ def sessions(found, errors=None):
                            'capabilities': {'archive': capable, 'unarchive': capable}})
     for error in errors:
         result.append({'nativeId': error['nativeId'], 'origin': found['origin'],
-                       'title': 'Claude Code 归档待核对', 'cwd': '', 'model': '',
+                       'title': 'Claude Code 검토를 위해 보관됨', 'cwd': '', 'model': '',
                        'permissionMode': 'default', 'permissionKnown': False, 'updatedAt': 0,
                        'stamp': None, 'contextEvents': [], 'archived': True, 'archiveIncomplete': True,
                        'runtimeKnown': False, 'status': 'unknown',
@@ -418,7 +418,7 @@ def session_path(found, native):
     native = str(uuid.UUID(native))
     matches = [path for path in session_paths(found) if path.stem == native and path.is_file()]
     if len(matches) != 1:
-        raise ValueError('原 Claude Code 会话路径不可用或存在冲突')
+        raise ValueError('기존 Claude Code 세션 경로를 사용할 수 없거나 충돌이 있습니다.')
     return matches[0]
 
 
@@ -429,7 +429,7 @@ def session(found, native):
         capable = archive_supported(found['binary'], os.environ.copy())
         return {**row, **archive_file_state(found['directory'], path, native),
                 'capabilities': {'archive': capable, 'unarchive': capable}}
-    raise ValueError('原 Claude Code 会话不可用')
+    raise ValueError('기존 Claude Code 세션을 사용할 수 없습니다.')
 
 
 def pid_domain():
@@ -437,11 +437,11 @@ def pid_domain():
         machine = Path('/etc/machine-id').read_text().strip()
         namespace = os.readlink('/proc/self/ns/pid')
         if not machine or not re.fullmatch(r'pid:\[\d+\]', namespace):
-            raise ValueError('Linux 进程身份不可验证')
+            raise ValueError('Linux 프로세스 ID를 확인할 수 없습니다.')
         return 'linux:' + machine + ':' + namespace
     if sys.platform == 'darwin':
         return 'darwin'
-    raise ValueError('当前系统的 Claude 进程身份不可验证')
+    raise ValueError('현재 시스템 Claude 프로세스 ID를 확인할 수 없습니다.')
 
 
 def linux_process_start(pid):
@@ -453,7 +453,7 @@ def linux_process_start(pid):
     fields = stat.rpartition(')')[2].split()
     if (not stat.startswith(f'{pid} (') or len(fields) < 20 or
             not re.fullmatch(r'[0-9]+', fields[19])):
-        raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+        raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
     return fields[19]
 
 
@@ -462,42 +462,42 @@ def assert_session_closed(found, native=None):
     if native is None and not directory.exists() and not directory.is_symlink():
         return
     if not directory.is_dir() or directory.is_symlink():
-        raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+        raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
     domain = pid_domain()
     for path in directory.iterdir():
         if path.suffix != '.json':
             continue
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 65536:
-            raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+            raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
         entry = json.loads(path.read_text(encoding='utf-8'))
         if not isinstance(entry, dict):
-            raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+            raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
         if native is not None and entry.get('sessionId') != native:
             continue
         pid = entry.get('pid')
         start = entry.get('procStart')
         if (type(pid) is not int or pid <= 0 or path.stem != str(pid) or
                 not isinstance(start, str) or not start or entry.get('pidDomain') != domain):
-            raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+            raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
         if sys.platform == 'linux':
             if not re.fullmatch(r'[0-9]+', start):
-                raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+                raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
             if linux_process_start(pid) == start:
-                raise ValueError('原 Claude Code 会话仍在其他终端运行')
+                raise ValueError('기존 Claude Code 세션이 여전히 다른 터미널에서 실행 중입니다.')
             continue
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
             continue
         except (PermissionError, OSError):
-            raise ValueError('无法核验 Claude Code 原会话是否仍在运行') from None
+            raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？') from None
         result = subprocess.run(['ps', '-p', str(pid), '-o', 'lstart='],
                                 env={**os.environ, 'LC_ALL': 'C', 'TZ': 'UTC'},
                                 capture_output=True, text=True, timeout=3)
         if result.returncode != 0 or not result.stdout.strip():
-            raise ValueError('无法核验 Claude Code 原会话是否仍在运行')
+            raise ValueError('확인할 수 없습니다 Claude Code 원래 세션이 아직 실행 중인가요？')
         if result.stdout.split() == start.split():
-            raise ValueError('原 Claude Code 会话仍在其他终端运行')
+            raise ValueError('기존 Claude Code 세션이 여전히 다른 터미널에서 실행 중입니다.')
 
 
 def upload_root(found, scope):
@@ -506,7 +506,7 @@ def upload_root(found, scope):
     path = root/scope
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
     if any(part.is_symlink() for part in (root.parent, root, path)):
-        raise ValueError('附件目录无效')
+        raise ValueError('첨부파일 디렉터리가 잘못되었습니다.')
     return path.resolve()
 
 
@@ -514,23 +514,23 @@ def upload(found, request):
     identifier = str(uuid.UUID(request['id']))
     name = request['name']
     if not isinstance(name, str) or not name or len(name.encode()) > 200 or re.search(r'[\\/\x00-\x1f\x7f]', name):
-        raise ValueError('附件文件名无效')
+        raise ValueError('첨부파일 이름이 잘못되었습니다.')
     data = base64.b64decode(request['data'], validate=True)
     if not 0 < len(data) <= 20*1024*1024 or hashlib.sha256(data).hexdigest() != request['sha256']:
-        raise ValueError('附件内容不匹配')
+        raise ValueError('첨부파일 내용이 일치하지 않습니다')
     folder = upload_root(found, request['scope'])/identifier
     folder.mkdir(mode=0o700, exist_ok=True)
     if folder.is_symlink():
-        raise ValueError('附件路径无效')
+        raise ValueError("잘못된 첨부 파일 경로")
     suffix = Path(name).suffix.lower()
     if not re.fullmatch(r'\.[a-z0-9]{1,16}', suffix):
         suffix = '.bin'
     path = folder/('original'+suffix)
     if path.is_symlink():
-        raise ValueError('附件路径无效')
+        raise ValueError("잘못된 첨부 파일 경로")
     if path.exists():
         if hashlib.sha256(path.read_bytes()).hexdigest() != request['sha256']:
-            raise ValueError('附件标识已被其他文件使用')
+            raise ValueError('첨부파일 ID가 이미 다른 파일에서 사용되었습니다.')
     else:
         part = folder/'original.part'
         with part.open('xb') as stream:
@@ -545,7 +545,7 @@ def continuation_identity(directory):
     for name in ('settings.json', '.credentials.json'):
         path = Path(directory)/name
         if path.is_symlink():
-            raise ValueError('WSL 账号配置不可重定向')
+            raise ValueError('WSL 계정 구성을 리디렉션할 수 없습니다.')
         try:
             files[name] = base64.b64encode(path.read_bytes()).decode()
         except FileNotFoundError:
@@ -557,15 +557,15 @@ def resume_directory(cwd):
     try:
         directory = Path(cwd).resolve(strict=True)
     except FileNotFoundError:
-        raise ValueError('原项目目录不存在：'+cwd+'，请在远端恢复该目录后重试') from None
+        raise ValueError('원래 프로젝트 디렉터리가 존재하지 않습니다.：'+cwd+'，원격으로 디렉터리를 복원한 후 다시 시도해 주세요.') from None
     except PermissionError:
-        raise ValueError('原项目目录无访问权限：'+cwd) from None
+        raise ValueError('원본 프로젝트 디렉터리에 대한 액세스 권한이 없습니다.：'+cwd) from None
     except OSError:
-        raise ValueError('原项目目录不可用：'+cwd) from None
+        raise ValueError('원래 프로젝트 디렉터리를 사용할 수 없습니다.：'+cwd) from None
     if not directory.is_dir():
-        raise ValueError('原项目路径不是目录：'+cwd)
+        raise ValueError('원래 프로젝트 경로가 디렉터리가 아닙니다.：'+cwd)
     if not os.access(directory, os.R_OK | os.X_OK):
-        raise ValueError('原项目目录无访问权限：'+cwd)
+        raise ValueError('원본 프로젝트 디렉터리에 대한 액세스 권한이 없습니다.：'+cwd)
     return directory
 
 
@@ -574,11 +574,11 @@ def command(request):
     operation = request.get('operation')
     if operation == 'account-continuation':
         if os.environ.get('MOBILE_BRIDGE_WSL_NATIVE') != '1' or not found:
-            raise ValueError('WSL 账号续接核验不可用')
+            raise ValueError('WSL 계정 갱신 확인을 사용할 수 없습니다.')
         identity = continuation_identity(found['directory'])
         rows = sessions(found)
         if found != profile() or identity != continuation_identity(found['directory']):
-            raise ValueError('WSL 账号配置在续接核验期间变化')
+            raise ValueError('WSL 갱신 확인 중 계정 구성 변경')
         return {'identity': identity, 'profile': found, 'sessions': rows}
     if operation == 'list':
         errors = []
@@ -588,25 +588,25 @@ def command(request):
         return {'profile': found, 'sessions': sessions(found) if found else [],
                 'authReady': auth_ready(found) if found else False}
     if not found or found['origin'] != request.get('origin'):
-        raise ValueError('原 Claude Code 配置已变化或不可用')
+        raise ValueError('기존 Claude Code 구성이 변경되었거나 사용할 수 없습니다.')
     if operation == 'resume-preflight':
         row = session(found, request['native'])
         if any(row[key] != request.get(key) for key in ('cwd', 'model', 'permissionMode')):
-            raise ValueError('原 Claude Code 会话设置已变化，请刷新后重试')
+            raise ValueError('기존 Claude Code 세션 설정이 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
         if not row['permissionKnown']:
-            return {'ready': False, 'notice': '无法确认原会话权限模式，请在远端终端继续'}
+            return {'ready': False, 'notice': '원래 세션 권한 모드를 확인할 수 없습니다. 원격 터미널에서 계속하세요.'}
         try:
             resume_directory(row['cwd'])
         except ValueError as exc:
             return {'ready': False, 'notice': str(exc)}
         ready = not row.get('archived') and auth_ready(found)
-        return {'ready': ready, 'notice': '' if ready else '原 Claude Code 账号不可用，请在远端终端核对登录状态'}
+        return {'ready': ready, 'notice': '' if ready else '기존 Claude Code 계정을 사용할 수 없습니다. 원격 단말기에서 로그인 상태를 확인해주세요.'}
     if operation in ('archive-state', 'archive'):
         native = str(uuid.UUID(request['native']))
         row = session(found, native)
         row.update(archive_file_state(found['directory'], session_path(found, native), native, verify=True))
         if not row['capabilities']['archive']:
-            raise ValueError('原 Claude Code 归档能力或停止状态尚未确认')
+            raise ValueError('기존 Claude Code 아직 아카이빙 가능 여부나 정지 상태가 확인되지 않았습니다.')
         safe = False
         try:
             assert_session_closed(found)
@@ -616,12 +616,12 @@ def command(request):
             if operation == 'archive':
                 raise
         if found != profile():
-            raise ValueError('原 Claude Code 配置已变化或不可用')
+            raise ValueError('기존 Claude Code 구성이 변경되었거나 사용할 수 없습니다.')
         if operation == 'archive':
             assert_session_closed(found)
             archive_assert_no_cli(found['binary'])
             if not archive_supported(found['binary'], os.environ.copy()):
-                raise ValueError('原 Claude Code 二进制归档能力已变化，请重新核对')
+                raise ValueError('기존 Claude Code 바이너리 보관 기능이 변경되었습니다. 다시 확인하세요.')
             archive_file_change(found['directory'], session_path(found, native), native, request.get('archived'))
             row = session(found, native)
         return {**row, 'archiveSafe': safe, 'runtimeKnown': True, 'status': 'idle', 'requests': []}
@@ -633,32 +633,32 @@ def command(request):
         path = session_path(found, request['native'])
         scope = request.get('scope')
         if not isinstance(scope, str) or not scope:
-            raise ValueError('Claude 历史来源无效')
+            raise ValueError('Claude 과거 출처가 잘못되었습니다.')
         return history_page(path, found['origin'] + ':' + str(uuid.UUID(request['native'])) + ':' + scope,
                             request.get('historyBefore'), request.get('historyLimit', 40))
     if operation == 'auth':
         return {'ready': auth_ready(found)}
     if operation == 'upload':
         return upload(found, request)
-    raise ValueError('不支持的 Claude Code 远端操作')
+    raise ValueError('지원되지 않음 Claude Code 원격 작동')
 
 
 def resume(request):
     found = profile()
     if not found or found['origin'] != request.get('origin'):
-        raise ValueError('原 Claude Code 配置已变化或不可用')
+        raise ValueError('기존 Claude Code 구성이 변경되었거나 사용할 수 없습니다.')
     row = session(found, request['native'])
     if row.get('archived'):
-        raise ValueError('请先恢复归档的 Claude Code 会话')
+        raise ValueError('먼저 아카이브를 복원하세요. Claude Code 대화')
     if row['cwd'] != request.get('cwd') or row['model'] != request.get('model') or row['permissionMode'] != request.get('permissionMode'):
-        raise ValueError('原 Claude Code 会话设置已变化')
+        raise ValueError('기존 Claude Code 세션 설정이 변경됨')
     if not row['permissionKnown'] or not auth_ready(found):
-        raise ValueError('原 Claude Code 账号或权限模式不可用')
+        raise ValueError('기존 Claude Code 계정 또는 권한 모드를 사용할 수 없습니다')
     cwd = resume_directory(row['cwd'])
     assert_session_closed(found, row['nativeId'])
     directory = upload_root(found, request['scope'])
     if profile() != found:
-        raise ValueError('原 Claude Code 配置已变化或不可用')
+        raise ValueError('기존 Claude Code 구성이 변경되었거나 사용할 수 없습니다.')
     arguments = [found['binary'], '-p', '--resume', row['nativeId'], '--input-format', 'stream-json',
                  '--output-format', 'stream-json', '--verbose', '--replay-user-messages',
                  '--setting-sources', 'user,project,local', '--permission-mode', row['permissionMode'],
@@ -676,18 +676,18 @@ def resume(request):
 def create(request):
     found = profile()
     if not found or found['origin'] != request.get('origin') or not auth_ready(found):
-        raise ValueError('原 Claude Code 账号配置已变化或不可用')
+        raise ValueError("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
     native = str(uuid.UUID(request['native']))
     cwd = Path(request['cwd']).resolve(strict=True)
     if not cwd.is_dir():
-        raise ValueError('原项目目录不可用')
+        raise ValueError('원래 프로젝트 디렉터리를 사용할 수 없습니다.')
     if request.get('directoryIdentity') is not None:
         stat = cwd.stat()
         if request['directoryIdentity'] != {'cwd': str(cwd), 'device': stat.st_dev, 'inode': stat.st_ino}:
-            raise ValueError('项目目录已变化，请重新选择目录')
+            raise ValueError('프로젝트 디렉터리가 변경되었습니다. 디렉터리를 다시 선택하세요.')
     directory = upload_root(found, request['scope'])
     if profile() != found:
-        raise ValueError('原 Claude Code 配置已变化或不可用')
+        raise ValueError('기존 Claude Code 구성이 변경되었거나 사용할 수 없습니다.')
     arguments = [found['binary'], '-p', '--session-id', native, '--input-format', 'stream-json',
                  '--output-format', 'stream-json', '--verbose', '--replay-user-messages',
                  '--setting-sources', 'user,project,local', '--permission-prompt-tool', 'stdio',

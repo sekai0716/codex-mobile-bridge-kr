@@ -43,22 +43,22 @@ def account_guard(bridge, provider, row, *, read_only=False, release_idle=False)
     with scope, registry.lock, remote.lock:
         releasable = []
         if remote.refreshing:
-            raise ValueError('WSL Claude Code 列表正在刷新，请稍后重试')
+            raise ValueError("WSL Claude Code 목록이 새로 고쳐졌습니다. 잠시 후 다시 시도하세요.")
         current = registry.selected(row['id'])
         if any(current.get(key) != row.get(key) for key in ('distribution', 'user', 'configDir')):
-            raise ValueError('WSL 登记身份已变化，请刷新')
+            raise ValueError("WSL 등록이 변경되었습니다. 계속하기 전에 새로고침하세요.")
         for sid, owned in remote.owned.items():
             metadata = remote.index.get(sid)
             if metadata is None:
                 # No process attribution means it cannot authorize this switch.
                 if owned.process.poll() is None:
-                    raise ValueError('WSL Claude Code 运行会话归属尚未核验')
+                    raise ValueError("실행 중인 WSL Claude Code 세션의 소유권이 확인되지 않았습니다.")
                 continue
             if metadata.get('host') != row['id']:
                 continue
             with owned.condition:
                 if owned.active or owned.pending:
-                    raise ValueError('此 WSL Claude Code 有任务或待处理请求')
+                    raise ValueError("이 WSL Claude Code 환경에는 활성 작업 또는 보류 중인 요청이 있습니다.")
                 if owned.process.poll() is None:
                     if (not release_idle or getattr(owned, 'error', None) or
                             getattr(owned, 'native', None) != metadata.get('nativeId') or
@@ -67,7 +67,7 @@ def account_guard(bridge, provider, row, *, read_only=False, release_idle=False)
                             not metadata.get('nativeId') or not metadata.get('origin') or not metadata.get('cwd') or
                             (getattr(owned, 'preflight', None) or {}).get('status') != 'ready' or
                             owned.preflight.get('cwd') != metadata['cwd']):
-                        raise ValueError('此 WSL Claude Code 仍运行，无法保证重新载入认证')
+                        raise ValueError("WSL Claude Code가 아직 실행 중이므로 인증을 안전하게 다시 로드할 수 없습니다.")
                     releasable.append((sid, owned, dict(metadata)))
         with manager.db_lock:
             db = manager._receipts(manager.adapters['claude'])
@@ -82,10 +82,10 @@ def account_guard(bridge, provider, row, *, read_only=False, release_idle=False)
                 for (raw,) in records:
                     result = json.loads(raw)
                     if result.get('status') in ('unknown', 'pending', 'queued'):
-                        raise ValueError('此 WSL 接入存在排队或结果待核对的操作')
+                        raise ValueError("이 WSL 프로필에는 대기 중인 작업이나 확인되지 않은 결과가 있습니다.")
         def release():
             if read_only:
-                raise ValueError('只读检查不能释放 WSL Claude Code 执行器')
+                raise ValueError("읽기 전용 검사로는 WSL Claude Code 실행기를 해제할 수 없습니다.")
             # Called only after the account worker's fresh identity preflight.
             # No signals or process-name matching: EOF affects only the pipe
             # created for this exact gateway-owned stream-json executor.
@@ -93,7 +93,7 @@ def account_guard(bridge, provider, row, *, read_only=False, release_idle=False)
                 with owned.condition:
                     if (remote.owned.get(sid) is not owned or remote.index.get(sid) != metadata or
                             owned.active or owned.pending or owned.error):
-                        raise ValueError('WSL Claude Code 状态已变化，账号尚未切换')
+                        raise ValueError("WSL Claude Code의 상태가 변경되었습니다. 계정이 전환되지 않았습니다.")
             if continuation:
                 remote.prepare_account_switch(row['id'], release.identity)
             for sid, owned, _ in releasable:
@@ -102,9 +102,9 @@ def account_guard(bridge, provider, row, *, read_only=False, release_idle=False)
                         owned.process.stdin.close()
                         owned.process.wait(timeout=5)
                     if owned.process.poll() is None:
-                        raise ValueError('WSL Claude Code 尚未退出，账号尚未切换')
+                        raise ValueError("WSL Claude Code가 종료되지 않았습니다. 계정이 전환되지 않았습니다.")
                 except (OSError, subprocess.TimeoutExpired) as exc:
-                    raise ValueError('WSL Claude Code 尚未退出，账号尚未切换；请检查原会话') from exc
+                    raise ValueError("WSL Claude Code가 종료되지 않았습니다. 계정이 전환되지 않았습니다. 원래 세션을 확인하십시오.") from exc
                 remote.owned.pop(sid, None)
         pending = remote.continuation_pending.get(row['id'])
         continuation = release_idle and (bool(pending) or any(

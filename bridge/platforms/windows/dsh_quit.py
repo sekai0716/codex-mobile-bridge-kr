@@ -7,8 +7,8 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
-UNSUPPORTED = '当前 Harness 未提供可验证的后台退出通道，请更新桌面端后重试'
-PROFILE_CHANGED = 'Harness 运行实例的数据目录无法核对，请重新扫描后重试'
+UNSUPPORTED = "이 Harness 버전에는 검증 가능한 백그라운드 종료 방법이 없습니다. 데스크톱 앱을 업데이트하고 다시 시도하세요."
+PROFILE_CHANGED = "실행 중인 Harness 인스턴스의 데이터 디렉터리를 확인할 수 없습니다. 다시 스캔하고 다시 시도하세요."
 FLAG = '--dsh-installer-quit'
 PRODUCTS = {'dsh-plugin-desktop': 'DSH Desktop', 'dsh-plugin-desktop-beta': 'DSH Desktop Beta'}
 
@@ -123,5 +123,5 @@ def send_installer_quit(command):
         result = child.wait(timeout=10)
     except subprocess.TimeoutExpired:
         # This helper is itself a desktop executable; never force-kill it.
-        raise ValueError('Harness 正常退出请求尚未完成，请稍后重试') from None
-    if result != 0: raise ValueError('Harness 拒绝了正常退出请求，请在电脑端检查后重试')
+        raise ValueError("일반적인 Harness 종료 요청이 완료되지 않았습니다. 잠시 후 다시 시도하세요.") from None
+    if result != 0: raise ValueError("Harness가 일반 종료 요청을 거부했습니다. 컴퓨터를 확인하고 다시 시도하세요.")

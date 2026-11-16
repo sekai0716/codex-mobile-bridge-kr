@@ -19,12 +19,12 @@ def confirm_native_title(read, identity, title):
             after = None
         if after is not None:
             if after['identity'] != identity:
-                raise ValueError('改名期间原会话身份已变化')
+                raise ValueError('이름 변경 중에 원래 세션 ID가 변경되었습니다.')
             if after['title'] == title:
                 return after
         remaining = deadline-time.monotonic()
         if remaining <= 0:
-            raise ValueError('改名读回尚未确认')
+            raise ValueError('이름 변경 다시 읽어보기 아직 확인되지 않음')
         time.sleep(min(delay, remaining))
         delay = min(delay*2, 0.25)
 
@@ -75,17 +75,17 @@ class DisplayMetadata:
 
     def change(self, scope, sid, change):
         if not isinstance(change, dict) or not isinstance(change.get('id'), str):
-            raise ValueError('会话显示设置无效')
+            raise ValueError('잘못된 세션 표시 설정')
         uuid.UUID(change['id'])
         kind = change.get('kind')
         if kind not in ('rename', 'project', 'section', 'create-project', 'create-section'):
-            raise ValueError('会话显示设置无效')
+            raise ValueError('잘못된 세션 표시 설정')
         fields = {'id', 'kind', 'title'} if kind == 'rename' or kind.startswith('create-') else {'id', 'kind', 'targetId', 'expectedId'}
         if set(change) != fields:
-            raise ValueError('会话显示设置无效')
+            raise ValueError('잘못된 세션 표시 설정')
         title = change.get('title')
         if 'title' in fields and (not isinstance(title, str) or not title.strip() or len(title.strip()) > 120):
-            raise ValueError('请输入 1–120 字的名称')
+            raise ValueError('입력해주세요 1–120 단어 이름')
         with self.lock:
             data = self._read()
             group = data.setdefault(scope, {})
@@ -93,7 +93,7 @@ class DisplayMetadata:
             old = receipts.get(change['id'])
             if old:
                 if old != {'sid': sid, 'change': change}:
-                    raise ValueError('相同请求标识不能用于不同操作')
+                    raise ValueError('동일한 요청 ID를 다른 작업에 사용할 수 없습니다.')
                 return {**self._snapshot(data, scope, sid), **group.get('sessions', {}).get(sid, {})}
             row = group.setdefault('sessions', {}).setdefault(sid, {})
             if kind == 'rename':
@@ -124,24 +124,24 @@ class RenameCommands:
 
     def perform(self, sid, body, read, dispatch):
         if set(body) != {'id', 'title'} or not isinstance(body['id'], str):
-            raise ValueError('聊天改名请求无效')
+            raise ValueError('채팅 이름 변경 요청이 잘못되었습니다.')
         uuid.UUID(body['id'])
         title = body['title']
         if (not isinstance(title, str) or not title.strip() or len(title.strip()) > 120
                 or re.search(r'[\x00-\x1f\x7f]', title)):
-            raise ValueError('标题为 1–120 字，不能包含控制字符')
+            raise ValueError('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.')
         title = title.strip()
         with self.lock:
             entries = json.loads(self.path.read_text(encoding='utf-8')) if self.path.exists() else {}
             old = entries.get(body['id'])
             if old and (old['sid'] != sid or old['title'] != title):
-                raise ValueError('相同请求标识不能用于不同操作')
+                raise ValueError('동일한 요청 ID를 다른 작업에 사용할 수 없습니다.')
             before = read()
             reconciled = False
             for entry in entries.values():
                 if entry['sid'] == sid and entry['status'] == 'unknown':
                     if before['identity'] != entry['identity'] or before['title'] != entry['title']:
-                        raise ValueError('此前改名结果待核对；不会重复提交，请先在原客户端核对')
+                        raise ValueError('이전 이름 ​​변경 결과를 확인해야 합니다. 다시 제출되지 않으므로 원본 클라이언트에서 먼저 확인하시기 바랍니다.')
                     entry['status'] = 'confirmed'
                     reconciled = True
             if old:
@@ -158,14 +158,14 @@ class RenameCommands:
             try:
                 result = dispatch(title)
                 if isinstance(result, dict) and result.get('notSent') is True:
-                    raise OrganizationNotSent(result.get('message') or '原会话状态已变化，请刷新后重试')
+                    raise OrganizationNotSent(result.get('message') or '원래 세션 상태가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
                 after = confirm_native_title(read, before['identity'], title)
             except OrganizationNotSent:
                 del entries[body['id']]
                 self.save(self.path, entries)
                 raise
             except Exception as exc:
-                raise ValueError('改名结果待核对；不会重复提交，请先在原客户端核对') from exc
+                raise ValueError("이름 바꾸기에는 확인이 필요합니다. 원래 클라이언트를 확인하십시오. 다시 제출되지 않습니다.") from exc
             entry['status'] = 'confirmed'
             self.save(self.path, entries)
             return {**after, 'status': 'confirmed', 'scope': 'native'}

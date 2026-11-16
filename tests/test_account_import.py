@@ -73,7 +73,7 @@ class ImportTests(unittest.TestCase):
         row = self.scan(self.config())['discovery']['candidates'][0]
         (self.home/'config.toml').write_text('# updated')
         for method in (self.manager.import_account,self.manager.models):
-            with self.assertRaisesRegex(ValueError,'重新扫描'):method({'candidateId':row['id']})
+            with self.assertRaisesRegex(ValueError,'다시 스캔'):method({'candidateId':row['id']})
 
     def test_models_use_saved_or_scanned_secret_but_return_only_model_ids(self):
         row = self.scan(self.config())['discovery']['candidates'][0]
@@ -94,7 +94,7 @@ class ImportTests(unittest.TestCase):
         config=self.config();config.pop('model');config.pop('profiles')
         row=self.scan(config)['discovery']['candidates'][0]
         self.assertTrue(row['canImport'])
-        with self.assertRaisesRegex(ValueError,'模型 ID'):self.manager.import_account({'candidateId':row['id']})
+        with self.assertRaisesRegex(ValueError,'모델 ID'):self.manager.import_account({'candidateId':row['id']})
         result=self.manager.import_account({'candidateId':row['id'],'model':'selected-model'})
         self.assertEqual(result['accounts'][0]['model'],'selected-model')
 
@@ -142,14 +142,14 @@ class ModelHTTPTests(unittest.TestCase):
 
     def test_redirect_is_not_followed_and_error_body_is_not_exposed(self):
         self.status=302;self.body={'error':'fixture-key'}
-        with self.assertRaisesRegex(ValueError,'跳转') as error:model_ids(self.url,'fixture-key')
+        with self.assertRaisesRegex(ValueError,"공급자에게\\ 리디렉션이\\ 필요합니다\\.\\ 마지막\\ API\\ URL를\\ 입력하고\\ 다시\\ 시도하세요\\.") as error:model_ids(self.url,'fixture-key')
         self.assertNotIn('fixture-key',str(error.exception));self.assertEqual(len(self.requests),1)
         self.status=401
-        with self.assertRaisesRegex(ValueError,'拒绝访问') as error:model_ids(self.url,'fixture-key')
+        with self.assertRaisesRegex(ValueError,"액세스가\\ 거부되었습니다\\.\\ API\\ 키\\ 및\\ 모델\\ 목록\\ 권한을\\ 확인하세요\\.") as error:model_ids(self.url,'fixture-key')
         self.assertNotIn('fixture-key',str(error.exception))
 
     def test_empty_and_incompatible_lists_remain_manual_entry_cases(self):
         self.status=200
         for body in ({'data':[]},{'models':[]},[]):
             self.body=body
-            with self.assertRaisesRegex(ValueError,'手动填写'):model_ids(self.url,'fixture-key')
+            with self.assertRaisesRegex(ValueError,'수동으로 입력'):model_ids(self.url,'fixture-key')

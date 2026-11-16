@@ -3,7 +3,7 @@
 // no official account or chat logic; anonymous stdio dispatches to this parent.
 const {spawn}=require('node:child_process');
 const MAX=64*1024*1024;
-const failure=()=>Error('本机控制接口暂不可用，请重试；其他网关功能不受影响。');
+const failure=()=>Error('로컬 제어 인터페이스를 일시적으로 사용할 수 없습니다. 다시 시도하십시오. 다른 게이트웨이 기능은 영향을 받지 않습니다.。');
 async function serveWindowsLocal(profile,name,handler,worker,{launch=spawn}={}){
   if(!worker?.executable)throw failure();
   const child=launch(worker.executable,[...(worker.prefix||[]),'local-service-host','--data-dir',profile,'--name',name,'--parent-pid',String(process.pid)],{stdio:['pipe','pipe','pipe'],windowsHide:true});
@@ -25,7 +25,7 @@ async function serveWindowsLocal(profile,name,handler,worker,{launch=spawn}={}){
           if(!ready){if(message.type!=='ready')throw failure();ready=true;clearTimeout(timer);resolve();continue;}
           if(message.type!=='request'||!message.request||typeof message.request!=='object'||Array.isArray(message.request)||!/^[a-f0-9]{32}$/.test(message.id)||pending>=16)throw failure();
           pending++;
-          Promise.resolve().then(()=>handler(message.request)).then(value=>({ok:true,value}),error=>({ok:false,error:error.publicMessage||'官方远控请求失败，请重新连接并核对原操作结果。'}))
+          Promise.resolve().then(()=>handler(message.request)).then(value=>({ok:true,value}),error=>({ok:false,error:error.publicMessage||'정식 원격제어 요청이 실패하였습니다. 다시 접속하여 원래의 동작 결과를 확인해 주시기 바랍니다.。'}))
             .then(reply=>send({id:message.id,reply})).catch(fail).finally(()=>pending--);
         }
       }catch{fail();}

@@ -55,7 +55,7 @@ class LocalCliSync:
         if (config.get('profile') or (config.get('model_provider') or 'openai') != provider
                 or config.get('cli_auth_credentials_store') != 'file'
                 or not self._file_auth(config, provider)):
-            raise ValueError('当前 CLI 的认证注入来源与已选择接入不同，请重新确认接入')
+            raise ValueError('현재 CLI 인증 주입 소스가 선택한 접근권한과 다릅니다. 접근권한을 재확인해주세요.')
         aliases = [provider]
         if row['kind'] == 'api':
             definition = (config.get('model_providers') or {}).get(provider) or {}
@@ -63,7 +63,7 @@ class LocalCliSync:
             key = json.loads((accounts.directory(row['id'])/'api.json').read_text(encoding='utf-8'))['key']
             if (not key or auth.get('OPENAI_API_KEY') != key or definition.get('base_url') != row['baseUrl']
                     or config.get('openai_base_url') != row['baseUrl'] or config.get('model') != row['model']):
-                raise ValueError('当前 CLI 的 API 接入与已选择账号不同')
+                raise ValueError('현재 CLI 의 API 액세스 권한이 선택한 계정과 다릅니다.')
             if not (config.get('model_providers') or {}).get('openai'):
                 aliases.append('openai')
         else:
@@ -71,7 +71,7 @@ class LocalCliSync:
             if (not row.get('tokenOwner') or token_owner(auth) != row['tokenOwner']
                     or config.get('openai_base_url')
                     or ((config.get('model_providers') or {}).get('openai') or {}).get('base_url')):
-                raise ValueError('当前 CLI 的登录账号与已选择账号不同')
+                raise ValueError('현재 CLI 로그인 계정이 선택한 계정과 다릅니다.')
             alias = (config.get('model_providers') or {}).get('bridge_api') or {}
             if self._file_auth(config, 'bridge_api') and not alias.get('base_url'):
                 aliases.append('bridge_api')
@@ -92,7 +92,7 @@ class LocalCliSync:
         else:
             valid = _matches_chatgpt_owner(status, row.get('tokenOwner'))
         if not valid:
-            raise ValueError('原生服务尚未使用所选账号，请明确确认同步或维护后再继续')
+            raise ValueError('선택한 계정은 기본 서비스에서 사용되지 않았습니다. 계속하기 전에 동기화 또는 유지 관리를 명확하게 확인하십시오.')
         return True
 
     def file_auth_identity(self, kind):
@@ -121,7 +121,7 @@ class LocalCliSync:
         try:
             current = probe.request('getAuthStatus', {'includeToken': True, 'refreshToken': False}, replay_safe=True)
         except (AppServerError, OSError) as error:
-            raise ValueError('无法核验此配置的原生认证缓存') from error
+            raise ValueError('이 구성에 대한 기본 인증 캐시를 확인할 수 없습니다.') from error
         if not isinstance(current, dict):
             return False
         if kind == 'api':
@@ -137,10 +137,10 @@ class LocalCliSync:
         info = client.connect()
         if (Path(info.get('codexHome', '')).resolve() != accounts.home.resolve()
                 or not graceful_restart_supported(info)):
-            raise ValueError('原生服务的配置目录或账号同步协议无法核验')
+            raise ValueError('기본 서비스의 구성 디렉터리 또는 계정 동기화 프로토콜을 확인할 수 없습니다.')
         executable = _managed_cli(accounts.home)
         if executable is None:
-            raise ValueError('找不到此配置的受管原生服务')
+            raise ValueError('이 구성에 대한 관리형 기본 서비스를 찾을 수 없습니다.')
         generation = read_daemon_environment(accounts.home, executable, ())[1]
         return client, json.loads(json.dumps(generation))
 
@@ -156,7 +156,7 @@ class LocalCliSync:
         if not reconcile:
             with cli.lock:
                 if cli.attaching or any(cli.requests.values()):
-                    raise ValueError('请先完成本机 CLI 连接或待处理请求后再同步账号')
+                    raise ValueError('먼저 이 단원을 완료하세요. CLI 요청을 연결하거나 대기 중인 후 계정을 동기화하세요.')
             accounts.idle()
         client, generation = self._api_runtime()
         config = client.request('config/read', {'includeLayers': False}, replay_safe=True)['config']
@@ -167,7 +167,7 @@ class LocalCliSync:
                 or definition.get('base_url') != row['baseUrl']
                 or config.get('openai_base_url') != row['baseUrl'] or config.get('model') != row['model']):
             if reconcile:
-                raise ValueError('接入定义已变化，账号写入结果仍待核验，请勿重复切换')
+                raise ValueError('액세스 정의가 변경되었으며 계정 작성 결과는 아직 확인 중입니다. 반복적으로 전환하지 마십시오.')
             return False
         config_hash = hashlib.sha256((accounts.home/'config.toml').read_bytes()).hexdigest()
         key = json.loads((accounts.directory(row['id'])/'api.json').read_text(encoding='utf-8'))['key']
@@ -176,7 +176,7 @@ class LocalCliSync:
         if reconcile:
             if (accounts.state.get('generation') != generation or accounts.state.get('configHash') != config_hash
                     or accounts.state.get('keyVersion') != key_version):
-                raise ValueError('原生服务或配置已变化，账号写入结果仍待核验，请勿重复切换')
+                raise ValueError('기본 서비스 또는 구성이 변경되었으며 계정 작성 결과는 아직 확인 중입니다. 반복적으로 전환하지 마십시오.')
         else:
             previous = accounts.index.get('activeId')
             if (not previous or accounts.row(previous)['kind'] != 'api'
@@ -188,11 +188,11 @@ class LocalCliSync:
             self.check_idle_daemon(client, accounts.home)
             accounts.idle()
             if self._api_runtime()[1] != generation or hashlib.sha256((accounts.home/'config.toml').read_bytes()).hexdigest() != config_hash:
-                raise ValueError('原生服务或配置已变化，请重新确认账号切换')
+                raise ValueError('기본 서비스 또는 구성이 변경되었습니다. 계정 전환을 다시 확인하세요.')
             # This receipt precedes the only write. Repeated requests only read.
             accounts.state = {'operation': 'cliAuth', 'requestId': request_id, 'targetId': row['id'],
                               'generation': generation, 'configHash': config_hash, 'keyVersion': key_version}
-            accounts.phase('authUnknown', error='账号同步结果待核验，请勿重复切换')
+            accounts.phase('authUnknown', error='계정 동기화 결과가 확인 대기 중입니다. 반복적으로 전환하지 마세요.')
             from bridge.features.notifications.channels import read_json
             ledger = read_json(accounts.root/'requests.json', {})
             ledger[request_id] = row['id']
@@ -202,14 +202,14 @@ class LocalCliSync:
             except Exception as error:
                 # An explicit native rejection is known; transport failures are not.
                 if getattr(error, 'rpc_error', None) is not None:
-                    accounts.phase('failed', error='原生服务拒绝账号同步，未确认恢复')
-                raise ValueError('账号同步尚未核验，请使用同一请求检查，勿重复提交') from None
+                    accounts.phase('failed', error='기본 서비스에서 계정 동기화를 거부했으며 복구가 확인되지 않았습니다.')
+                raise ValueError('계정 동기화가 아직 확인되지 않았습니다. 동일한 요청을 사용하여 확인하고 반복적으로 제출하지 마십시오.') from None
         self.verify_runtime_auth(client, {'accountId': row['id']})
         if self._api_runtime()[1] != generation or hashlib.sha256((accounts.home/'config.toml').read_bytes()).hexdigest() != config_hash:
-            raise ValueError('原生服务或配置已变化，账号同步尚未核验')
+            raise ValueError('기본 서비스 또는 구성이 변경되었으며 계정 동기화가 아직 확인되지 않았습니다.')
         verified_auth = (accounts.home/'auth.json').read_bytes()
         if json.loads(verified_auth).get('OPENAI_API_KEY') != json.loads((accounts.directory(row['id'])/'api.json').read_text(encoding='utf-8'))['key']:
-            raise ValueError('账号文件已变化，账号同步尚未核验')
+            raise ValueError('계정 파일이 변경되었으며 계정 동기화가 아직 확인되지 않았습니다.')
         accounts.mark_active(row['id'])
         # Do not absorb later, unverified file changes into this baseline.
         cli.configuration_stamp = {'config.toml': config_hash,
@@ -237,12 +237,12 @@ class LocalCliSync:
         if status == 'stopped':
             return
         if status != 'running':
-            raise ValueError('此配置的原生服务状态未知，未切换账号')
+            raise ValueError('이 구성의 기본 서비스 상태를 알 수 없으며 계정이 전환되지 않았습니다.')
         from bridge.clients.codex.cli_session import _managed_cli
         from bridge.platforms.codex_daemon_env import read_daemon_environment, stop_daemon_gracefully
         executable = _managed_cli(accounts.home)
         if executable is None:
-            raise ValueError('此配置的原生运行组件不可用，未切换账号')
+            raise ValueError('이 구성의 기본 실행 구성 요소를 사용할 수 없으며 계정이 전환되지 않았습니다.')
         identity = read_daemon_environment(accounts.home, executable, ())[1]
         self.check_idle_daemon(cli.client, accounts.home)
         accounts.idle()
@@ -250,7 +250,7 @@ class LocalCliSync:
         cli.close()
         # A native watchdog/restart must not be mistaken for a stopped runtime.
         if cli.daemon_status() != 'stopped':
-            raise ValueError('此配置的原生服务未确认退出，未切换账号')
+            raise ValueError('이 구성의 기본 서비스는 종료를 확인하지 않았으며 계정을 전환하지 않았습니다.')
 
     @staticmethod
     def check_idle_daemon(client, home, *, target_platform=None):
@@ -265,14 +265,14 @@ class LocalCliSync:
         else:
             same_home = Path(info['codexHome']).resolve() == home.resolve()
         if not same_home:
-            raise ValueError('原生服务不属于此配置，未切换账号')
+            raise ValueError('기본 서비스는 이 구성에 속하지 않으며 계정이 전환되지 않았습니다.')
         def request(method, params):
             return client.request(method, params, replay_safe=True)
         def loaded_threads():
             try:
                 return client.loaded_threads()
             except (AppServerError, OSError) as error:
-                raise CliTasksPending('无法核验此配置的原生任务') from error
+                raise CliTasksPending('이 구성에 대한 기본 작업을 확인할 수 없습니다.') from error
         identifiers = loaded_threads()
         def check(threads):
             blockers = []
@@ -281,22 +281,22 @@ class LocalCliSync:
                     check_archive_runtime(request, [identifier], allow_terminal_error=graceful_restart_supported(info, platform=target_platform))
                     tasks = request('thread/backgroundTerminals/list', {'threadId': identifier, 'limit': 1})
                     if not isinstance(tasks.get('data'), list) or tasks['data'] or tasks.get('nextCursor'):
-                        raise ValueError('有后台任务或状态未知')
+                        raise ValueError('백그라운드 작업이 있거나 상태를 알 수 없습니다.')
                     try:
                         goal = request('thread/goal/get', {'threadId': identifier})['goal']
                     except AppServerUnsupported:
                         goal = None
                     if goal is not None and (not isinstance(goal, dict) or goal.get('status') not in GOAL_STATUSES):
-                        raise ValueError('目标状态未知')
+                        raise ValueError('대상 상태를 알 수 없음')
                     if goal and goal.get('status') == 'active':
-                        raise ValueError('有运行中的目标')
+                        raise ValueError('실행중인 목표가 있습니다')
                 except (AppServerError, OSError, ValueError, KeyError, TypeError) as error:
                     blockers.append(f"{identifier}：{error}")
             if blockers:
                 raise CliTasksPending('；'.join(blockers))
         check(identifiers)
         if loaded_threads() != identifiers:
-            raise CliTasksPending('此配置的会话已变化，请重新检查')
+            raise CliTasksPending('이 구성의 세션이 변경되었습니다. 다시 확인하세요.')
         check(identifiers)
 
 
@@ -304,17 +304,17 @@ class LocalCliSync:
         cli = self.bridge.cli_sessions
         with cli.lock:
             if cli.joined or cli.attaching or cli.requests:
-                raise ValueError('请先结束或断开本机 Codex CLI 会话后再切换接入')
+                raise ValueError("액세스를 전환하기 전에 로컬 Codex CLI 채팅을 종료하거나 연결을 끊으세요.")
         if self._accounts().blockers():
-            raise ValueError('有任务或待发送消息，请先处理后再切换接入')
+            raise ValueError("액세스를 전환하기 전에 진행 중인 작업과 대기 중인 메시지를 완료하세요.")
         if cli.daemon_may_be_running():
-            raise ValueError('本机 Codex CLI 后台服务仍在运行或状态未知，请先正常结束后再切换')
+            raise ValueError('로컬 머신 Codex CLI 백그라운드 서비스가 아직 실행 중이거나 상태를 알 수 없습니다. 전환하기 전에 정상적으로 종료하시기 바랍니다.')
 
     def _claude_dir(self, row):
         candidate = Path(row['directory']).expanduser()
         path = candidate.resolve()
         if candidate.is_symlink():
-            raise ValueError('Claude Code 配置目录不可用')
+            raise ValueError('Claude Code 구성 디렉터리를 사용할 수 없습니다.')
         if not path.is_dir():
             from bridge.clients.claude.cli_session import _profile
             native = _profile()
@@ -322,17 +322,17 @@ class LocalCliSync:
             if (row['kind'] != 'api' or path != default or not native
                     or not native['origin'].startswith('default:')
                     or Path(native['directory']).resolve() != path or path.exists()):
-                raise ValueError('Claude Code 配置目录不可用')
+                raise ValueError('Claude Code 구성 디렉터리를 사용할 수 없습니다.')
         return path
 
     def _claude_key(self, row):
         path = Path(row['secretPath']).resolve(strict=True)
         base = (self.bridge.data_dir/'cli-access'/'claude').resolve()
         if path.parent.parent != base or path.parent.name != row['id'] or path.name != 'api.json':
-            raise ValueError('Claude API 密钥不属于本机接入管理器')
+            raise ValueError('Claude API 키가 기본 액세스 관리자에 속하지 않습니다.')
         key = json.loads(path.read_text(encoding='utf-8'))['key']
         if not isinstance(key, str) or not key:
-            raise ValueError('Claude Code API Key 不可用')
+            raise ValueError("Claude Code API 키를 사용할 수 없습니다.")
         return key
 
     def _claude_baseline(self, directory):
@@ -344,7 +344,7 @@ class LocalCliSync:
         path = directory/'settings.json'
         settings = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
         if not isinstance(settings, dict) or not isinstance(settings.get('env', {}), dict):
-            raise ValueError('Claude Code 设置无法安全合并')
+            raise ValueError('Claude Code 설정을 안전하게 병합할 수 없습니다.')
         return path, settings
 
     def _close_claude_idle(self):
@@ -357,7 +357,7 @@ class LocalCliSync:
                 if owned.process.poll() is None:
                     with owned.condition:
                         if owned.active or owned.pending:
-                            raise ValueError('请先结束已继续的本机 Claude Code 会话再切换接入')
+                            raise ValueError("액세스를 전환하기 전에 지속적인 로컬 Claude Code 채팅을 종료하세요.")
             for native, owned in list(cli.owned.items()):
                 if owned.process.poll() is None:
                     owned.close()
@@ -369,7 +369,7 @@ class LocalCliSync:
         from bridge.clients.claude.cli_session import _profile, managed_api_env
         profile = _profile()
         if not profile:
-            raise ValueError('找不到 Claude Code CLI')
+            raise ValueError("Claude Code CLI를 찾을 수 없습니다.")
         env = managed_api_env() if expected else None
         if env is None:
             import os
@@ -380,12 +380,12 @@ class LocalCliSync:
                                     env=env, capture_output=True, text=True, encoding='utf-8', timeout=10)
             status = json.loads(result.stdout)
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
-            raise ValueError('Claude Code CLI 认证状态无法核验') from exc
+            raise ValueError('Claude Code CLI 인증 상태를 확인할 수 없습니다.') from exc
         if not isinstance(status, dict):
-            raise ValueError('Claude Code CLI 认证状态无法核验')
+            raise ValueError('Claude Code CLI 인증 상태를 확인할 수 없습니다.')
         if (result.returncode or status.get('loggedIn') is not True
                 or expected and status.get('authMethod') != expected):
-            raise ValueError('Claude Code CLI 未识别所选认证方式')
+            raise ValueError("Claude Code CLI가 선택한 인증 방법을 인식하지 못했습니다.")
         if 'configDirectory' not in status:
             # Older Claude Code versions omit the directory in auth status.
             # Require a negative control to prove this invocation uses the
@@ -397,15 +397,15 @@ class LocalCliSync:
                                              env=control_env, capture_output=True, text=True, encoding='utf-8', timeout=10)
                     control_status = json.loads(control.stdout)
             except (OSError, subprocess.SubprocessError, ValueError) as exc:
-                raise ValueError('Claude Code CLI 认证状态无法核验') from exc
+                raise ValueError('Claude Code CLI 인증 상태를 확인할 수 없습니다.') from exc
             if (control.returncode != 1 or not isinstance(control_status, dict)
                     or control_status.get('loggedIn') is not False
                     or control_status.get('authMethod') != 'none'):
-                raise ValueError('Claude Code CLI 配置目录无法核验')
+                raise ValueError('Claude Code CLI 구성 디렉터리를 확인할 수 없습니다.')
         else:
             config_dir = status['configDirectory']
             if not isinstance(config_dir, str) or Path(config_dir).resolve() != directory.resolve():
-                raise ValueError('Claude Code CLI 配置目录无法核验')
+                raise ValueError('Claude Code CLI 구성 디렉터리를 확인할 수 없습니다.')
         return status
 
     def preflight(self, provider):
@@ -422,9 +422,9 @@ class LocalCliSync:
                         if owner.process.poll() is None:
                             with owner.condition:
                                 if owner.active or owner.pending:
-                                    raise ValueError('请先结束已继续的本机 Claude Code 会话再切换接入')
+                                    raise ValueError("액세스를 전환하기 전에 지속적인 로컬 Claude Code 채팅을 종료하세요.")
             return {'sharedWithDesktop': False, 'desktopRunning': False}
-        raise ValueError('不支持的本机 CLI 客户端')
+        raise ValueError('지원되지 않는 네이티브 CLI 고객')
 
     def snapshot(self, provider):
         if provider == 'codex':
@@ -432,7 +432,7 @@ class LocalCliSync:
             return {'files': accounts.snapshot_files(), 'activeId': accounts.index.get('activeId')}
         if provider == 'claude':
             return {}  # Profile selection is held by CliAccess; native profiles are read-only.
-        raise ValueError('不支持的本机 CLI 客户端')
+        raise ValueError('지원되지 않는 네이티브 CLI 고객')
 
     def apply(self, provider, row):
         if provider == 'codex':
@@ -442,7 +442,7 @@ class LocalCliSync:
                 return {'status': 'applied', 'sharedWithDesktop': True, 'mutated': False}
             running, _ = self._codex_runtime()
             if running:
-                raise ValueError('Codex Desktop 正在运行，请先通过桌面账号切换流程')
+                raise ValueError('Codex Desktop 실행하시면 먼저 데스크톱 계정 전환 과정을 진행해주세요.')
             self._codex_idle()
             with accounts.gate, accounts.lock:
                 accounts.check_ready()
@@ -494,7 +494,7 @@ class LocalCliSync:
                     self._claude_backup = (settings_path, original, baseline, None, baseline_content)
                 return {'status': 'selected', 'directory': str(directory)}
             if row['kind'] != 'api':
-                raise ValueError('不支持的 Claude Code 接入')
+                raise ValueError('지원되지 않음 Claude Code 연결')
             key = self._claude_key(row)
             created = None
             if not baseline.is_file():
@@ -510,7 +510,7 @@ class LocalCliSync:
             self._claude_backup = (settings_path, original, baseline, created, None)
             private_json(settings_path, settings)
             return {'status': 'applied', 'directory': str(directory)}
-        raise ValueError('不支持的本机 CLI 客户端')
+        raise ValueError('지원되지 않는 네이티브 CLI 고객')
 
     def verify(self, provider, row):
         if provider == 'codex':
@@ -520,12 +520,12 @@ class LocalCliSync:
                 auth = rpc.request('account/read', {'refreshToken': False}).get('account') or {}
             expected = 'openai' if row['kind'] == 'chatgpt' else 'bridge_api'
             if (config.get('model_provider') or 'openai') != expected:
-                raise ValueError('本机 Codex CLI 模型提供商未生效')
+                raise ValueError('로컬 머신 Codex CLI 모델 제공자가 유효하지 않습니다.')
             if row['kind'] == 'chatgpt':
                 tokens = json.loads((accounts.home/'auth.json').read_text(encoding='utf-8')).get('tokens') or {}
                 if (auth.get('type') != 'chatgpt' or auth.get('email') != row.get('email')
                         or token_owner({'tokens': tokens}) != row.get('tokenOwner')):
-                    raise ValueError('本机 Codex CLI 账号身份未生效')
+                    raise ValueError('로컬 머신 Codex CLI 계정 신원이 유효하지 않습니다.')
             else:
                 provider_config = (config.get('model_providers') or {}).get('bridge_api') or {}
                 secret = json.loads((accounts.directory(row['id'])/'api.json').read_text(encoding='utf-8'))['key']
@@ -533,7 +533,7 @@ class LocalCliSync:
                 if (auth.get('type') != 'apiKey' or provider_config.get('base_url') != row['baseUrl']
                         or config.get('openai_base_url') != row['baseUrl']
                         or config.get('model') != row['model'] or actual != secret):
-                    raise ValueError('本机 Codex CLI API 接入未生效')
+                    raise ValueError('로컬 머신 Codex CLI API 액세스가 효과적이지 않습니다.')
             return {'status': 'verified', 'sharedWithDesktop': True}
         if provider == 'claude':
             directory = self._claude_dir(row)
@@ -550,11 +550,11 @@ class LocalCliSync:
             if (env.get('ANTHROPIC_BASE_URL') != row['baseUrl'] or env.get(credential) != key
                     or env.get('ANTHROPIC_MODEL', '') != row.get('model', '')
                     or any(env.get(name) for name in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN') if name != credential)):
-                raise ValueError('Claude Code CLI API 配置未生效')
+                raise ValueError("Claude Code CLI API 구성이 적용되지 않았습니다.")
             self._claude_auth(directory, 'oauth_token' if row.get('authScheme') == 'bearer' else 'api_key')
             return {'status': 'configured', 'directory': str(directory),
                     'authentication': 'configured'}
-        raise ValueError('不支持的本机 CLI 客户端')
+        raise ValueError('지원되지 않는 네이티브 CLI 고객')
 
     def restore(self, provider, snapshot):
         if provider == 'codex':
@@ -588,27 +588,27 @@ class LocalCliSync:
                     pass  # Preserve files created by the native CLI or another writer.
                 self._claude_created_dir = None
             return {'status': 'restored'}
-        raise ValueError('不支持的本机 CLI 客户端')
+        raise ValueError('지원되지 않는 네이티브 CLI 고객')
 
     def import_desktop_claude(self, desktop_id, store=None):
         """Map a verified Desktop API profile; never transfer Desktop OAuth cookies."""
         if store is None:
             manager = getattr(self.bridge, 'desktop_sessions', None)
             if manager is None:
-                raise ValueError('Claude Desktop 账号管理器不可用')
+                raise ValueError('Claude Desktop 계정 관리자를 사용할 수 없습니다')
             store = manager._account_store('claude')
         current = store.public()
         if current.get('activeId') != desktop_id or current.get('current', {}).get('kind') != 'api':
-            raise ValueError('仅可导入已生效的 Claude Desktop API 接入；官方登录不能复制到 CLI')
+            raise ValueError('유효한 항목만 가져올 수 있습니다. Claude Desktop API 입장; 공식 로그인은 복사할 수 없습니다. CLI')
         saved, path = store._account(desktop_id)
         if saved['kind'] != 'api':
-            raise ValueError('Claude Desktop 官方登录不能复制到 CLI')
+            raise ValueError('Claude Desktop 공식 로그인은 복사할 수 없습니다. CLI')
         gateway = json.loads((path/'gateway.json').read_text(encoding='utf-8'))
         config = gateway['config']
         digest = hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         manifest = json.loads((path/'manifest.json').read_text(encoding='utf-8'))
         if digest != saved.get('fingerprint') or manifest.get('fingerprint') != digest:
-            raise ValueError('Claude Desktop API 快照与当前接入不一致')
+            raise ValueError('Claude Desktop API 스냅샷이 현재 액세스와 일치하지 않습니다.')
         auth = config.get('inferenceGatewayAuthScheme')
         key = config.get('inferenceGatewayApiKey')
         models = config.get('inferenceModels') or []
@@ -617,6 +617,6 @@ class LocalCliSync:
             model = model.get('name', '')
         if not (isinstance(key, str) and key and auth in ('bearer', 'x-api-key')
                 and isinstance(model, str) and isinstance(config.get('inferenceGatewayBaseUrl'), str)):
-            raise ValueError('Claude Desktop API 配置不能转换为本机 CLI 接入')
+            raise ValueError('Claude Desktop API 구성을 기본으로 변환할 수 없습니다. CLI 연결')
         return {'name': saved['name'], 'baseUrl': config['inferenceGatewayBaseUrl'],
                 'model': model, 'apiKey': key, 'authScheme': auth}

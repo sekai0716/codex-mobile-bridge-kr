@@ -39,37 +39,37 @@
   function create(value, {owner, resolve}) {
     const context = owner.__visualizeContext;
     const card = document.createElement('section'); card.className = 'visualize-card'; card.dataset.mode = value.mode || 'regular';
-    card.setAttribute('aria-label', value.title || t('交互图表'));
+    card.setAttribute('aria-label', value.title || t('대화형 시각화'));
     const toolbar = document.createElement('div'); toolbar.className = 'visualize-toolbar';
-    const label = document.createElement('span'); label.textContent = value.title || t('交互图表'); if (!value.title) label.dataset.i18n = '交互图表';
+    const label = document.createElement('span'); label.textContent = value.title || t('대화형 시각화'); if (!value.title) label.dataset.i18n = '대화형 시각화';
     const stage = document.createElement('div'); stage.className = 'visualize-stage';
     const status = document.createElement('p'); status.className = 'visualize-status'; status.setAttribute('role', 'status');
     const promptArea = document.createElement('div'); promptArea.className = 'visualize-followup'; promptArea.hidden = true;
     const promptText = document.createElement('p');
-    const promptButton = button('放入输入框', () => {
+    const promptButton = button('메시지에 추가', () => {
       if (!context?.canCompose() || !card.isConnected) return;
       owner.dispatchEvent(new CustomEvent('bridge-compose-prompt', {bubbles:true, detail:{text:promptText.textContent}}));
       promptArea.hidden = true; closeFullscreen();
     });
     promptArea.append(promptText, promptButton);
-    const retry = button('重试', () => load()); retry.hidden = true;
-    const full = button('全屏查看', () => openFullscreen()); full.disabled = true;
+    const retry = button('다시 시도', () => load()); retry.hidden = true;
+    const full = button('전체 화면', () => openFullscreen()); full.disabled = true;
     const surface = document.createElement('dialog'); surface.className = 'visualize-surface'; surface.setAttribute('role','region');
-    surface.setAttribute('aria-label', value.title || t('交互图表')); surface.dataset.mode = value.mode || 'regular';
+    surface.setAttribute('aria-label', value.title || t('대화형 시각화')); surface.dataset.mode = value.mode || 'regular';
     const closeBar = document.createElement('div'); closeBar.className = 'visualize-closebar';
-    const closeButton = button('关闭', () => closeFullscreen()); closeBar.append(closeButton);
+    const closeButton = button('닫기', () => closeFullscreen()); closeBar.append(closeButton);
     surface.append(closeBar, stage, promptArea);
     toolbar.append(label, retry, full); card.append(toolbar, surface, status);
     let frame, instance, revision, source, timer, controller, disposed = false;
     let started = false, stateKey, height = 300;
     const post = data => { if (frame?.contentWindow && instance) frame.contentWindow.postMessage({instance, ...data}, '*'); };
     const resetFrame = () => { clearTimeout(timer); frame?.remove(); frame = null; instance = null; full.disabled = true; };
-    function fail(message = '交互图表加载失败，请重试') {
+    function fail(message = '시각화를 로드하지 못했습니다. 다시 해 보다.') {
       closeFullscreen(); resetFrame(); status.textContent = t(message); retry.hidden = false;
     }
     function mount() {
       resetFrame();
-      frame = document.createElement('iframe'); frame.title = value.title || t('交互图表');
+      frame = document.createElement('iframe'); frame.title = value.title || t('대화형 시각화');
       frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('referrerpolicy', 'no-referrer');
       frame.style.height = height + 'px';
       frame.src = (window.BridgeRelayBase || '') + '/visualize-shell'; stage.replaceChildren(frame);
@@ -78,15 +78,15 @@
     async function load() {
       if (disposed || !context || context.signal?.aborted) return;
       started = true; controller?.abort(); controller = new AbortController(); resetFrame();
-      status.textContent = t('正在加载交互图表…'); retry.hidden = true; promptArea.hidden = true;
+      status.textContent = t('시각화 로드 중…'); retry.hidden = true; promptArea.hidden = true;
       const current = controller;
       try {
         const file = resolve(value.path);
-        if (!file?.visualization) throw Error('可视化文件未被此聊天引用');
+        if (!file?.visualization) throw Error('이 시각화는 이 채팅에서 참조되지 않습니다.');
         const url = new URL(context.url(file.id), location.href);
-        if (url.origin !== location.origin) throw Error('可视化地址无效');
+        if (url.origin !== location.origin) throw Error('잘못된 시각화 주소');
         const response = await fetch(url, {credentials:'same-origin', redirect:'error', cache:'no-store', signal:current.signal});
-        if (!response.ok) throw Error('交互图表加载失败，请重试');
+        if (!response.ok) throw Error('시각화를 로드하지 못했습니다. 다시 해 보다.');
         // Bound the wire response before JSON parsing, including chunked responses.
         const reader = response.body.getReader(), decoder = new TextDecoder();
         let wire = '', bytes = 0;
@@ -94,13 +94,13 @@
           while (true) {
             const {done, value:chunk} = await reader.read(); if (done) break;
             bytes += chunk.length;
-            if (bytes > maxBytes * 6 + 2048) { await reader.cancel(); throw Error('可视化内容超过 1 MB'); }
+            if (bytes > maxBytes * 6 + 2048) { await reader.cancel(); throw Error('시각화가 1MiB를 초과합니다.'); }
             wire += decoder.decode(chunk, {stream:true});
           }
         } finally { reader.releaseLock(); }
         const result = JSON.parse(wire + decoder.decode());
         if (disposed || current !== controller || current.signal.aborted) return;
-        if (typeof result.text !== 'string' || new TextEncoder().encode(result.text).length > maxBytes || !/^[a-f0-9]{64}$/.test(result.revision)) throw Error('可视化内容无效');
+        if (typeof result.text !== 'string' || new TextEncoder().encode(result.text).length > maxBytes || !/^[a-f0-9]{64}$/.test(result.revision)) throw Error('잘못된 시각화 콘텐츠');
         source = result.text; revision = result.revision;
         stateKey = 'bridge-visualize:' + JSON.stringify([location.pathname, context.key, file.id, revision]);
         mount();
@@ -121,7 +121,7 @@
       } else if (data.type === 'bridge-visualize-state' && Number.isSafeInteger(data.requestId)) {
         let ok = false; try { ok = persist(stateKey, data.state); } catch {}
         post({type:'bridge-visualize-state-result', requestId:data.requestId, ok});
-        if (!ok) status.textContent = t('交互状态保存失败');
+        if (!ok) status.textContent = t('상호작용 상태를 저장할 수 없습니다.');
       } else if (data.type === 'bridge-visualize-followup' && context.canCompose() && typeof data.prompt === 'string' && data.prompt.trim() && data.prompt.length <= 10000) {
         promptText.textContent = data.prompt; promptArea.hidden = false;
       } else if (data.type === 'bridge-visualize-escape') closeFullscreen();
@@ -147,7 +147,7 @@
       if (entries.some(entry => entry.isIntersecting) && !started) { observer.disconnect(); load(); }
     }, {rootMargin:'300px'});
     if (context) observer.observe(card);
-    else { status.textContent = t('此聊天暂时无法读取交互图表'); retry.hidden = true; }
+    else { status.textContent = t('이 채팅에서는 시각화를 사용할 수 없습니다.'); retry.hidden = true; }
     window.addEventListener('message', receive); context?.signal?.addEventListener('abort', dispose, {once:true});
     active.set(card, {dispose, updateTheme:() => post({type:'bridge-visualize-theme', theme:theme()})});
     return card;

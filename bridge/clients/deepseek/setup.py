@@ -113,11 +113,11 @@ def insertion(text):
     if not markers:
         return None
     if len(markers) != 1:
-        raise ValueError('Harness 接入配置包含重复标记，尚未修改配置')
+        raise ValueError('Harness 액세스 구성에 중복된 태그가 포함되어 있으며 구성이 수정되지 않았습니다.')
     marker = markers[0]
     prefix = re.match(r'\s*-\s*(?=\{)', text[marker.end():])
     if not prefix:
-        raise ValueError('Harness 接入配置格式无法识别，尚未修改配置')
+        raise ValueError('Harness 액세스 구성 형식을 인식할 수 없으며 구성이 수정되지 않았습니다.')
     start = marker.end()+prefix.end()
     chars, depth, quoted, escaped = [], 0, False, False
     index = start
@@ -156,7 +156,7 @@ def insertion(text):
                 try:
                     entry = json.loads(''.join(chars), object_pairs_hook=_unique)
                 except (ValueError, TypeError):
-                    raise ValueError('Harness 接入配置格式无法识别，尚未修改配置') from None
+                    raise ValueError('Harness 액세스 구성 형식을 인식할 수 없으며 구성이 수정되지 않았습니다.') from None
                 end = index+1
                 if text[end:end+2] == '\r\n':
                     end += 2
@@ -164,7 +164,7 @@ def insertion(text):
                     end += 1
                 return entry, marker.start(), end
         index += 1
-    raise ValueError('Harness 接入配置不完整，尚未修改配置')
+    raise ValueError('Harness 액세스 구성이 불완전하며 구성이 수정되지 않았습니다.')
 
 
 def _unique(pairs):

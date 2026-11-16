@@ -71,11 +71,11 @@ class ControlTests(unittest.TestCase):
 
     def test_busy_control_error_keeps_pairing_channel_alive(self):
         control = GatewayControl(self.directory)
-        handler = Mock(side_effect=ValueError('网络检测正在停止，请稍后重试'))
+        handler = Mock(side_effect=ValueError('네트워크 감지가 중지되고 있습니다. 나중에 다시 시도해 주세요.'))
         control.start(lambda: None, lambda payload: {'states': {}},
                       instance_id='test', network_adaptation=handler)
         try:
-            with self.assertRaisesRegex(ValueError, '正在停止'):
+            with self.assertRaisesRegex(ValueError, '네트워크 감지가 중지되고 있습니다'):
                 request_pairing(self.directory, {'action': 'network-adaptation',
                                                 'value': {'action': 'set', 'enabled': True}})
             self.assertEqual(request_pairing(self.directory, {'action': 'status', 'ids': []}), {'states': {}})

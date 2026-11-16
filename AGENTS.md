@@ -1,16 +1,16 @@
-# 项目开发导航
+# 프로젝트 개발 탐색
 
-先读 [docs/architecture/README.md](docs/architecture/README.md)，按功能、客户端和操作系统定位改动。运行与协议约束见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+먼저 [docs/architecture/README.md](docs/architecture/README.md)를 읽고 기능, 클라이언트, 운영체제에 따라 변경 위치를 찾는다. 실행 및 프로토콜 제약은 [ARCHITECTURE.md](ARCHITECTURE.md)를 따른다.
 
-开发与验收流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。新增依赖须通过模块边界检查；不要通过扩大例外清单掩盖无关跨层调用。
+개발 및 검증 절차는 [CONTRIBUTING.md](CONTRIBUTING.md)를 따른다. 새 의존성은 모듈 경계 검사를 통과해야 한다. 관련 없는 계층 간 호출을 숨기려고 예외 목록을 늘려서는 안 된다.
 
-- Web 的宿主适配归 `web/hosts/`，宽窄布局归 `web/layouts/`，两端共同注入脚本归 `mobile/shared/web/`。遵循各自 `AGENTS.md`；原生运行环境与窗口尺寸必须独立。
-- `bridge/features/` 放共享业务；`bridge/clients/` 放 Codex、Claude、DeepSeek 协议；`bridge/platforms/` 放原生系统操作。遵循目标平台子目录的 `AGENTS.md`。
-- 平台实现不能反向导入客户端或业务模块。共用规则不复制到各系统；操作系统指本机还是 SSH 目标，必须分清。
-- 保留原桌面会话的 owner/provider/auth/cwd；被动读取和通知不得启动或切换会话。发送/授权/停止不得加入只读请求合并。写入结果未知不得自动重放。
-- 停止应用、切换账号、恢复接入前即时核验进程身份和任务；展示缓存不能作为安全判断。认证、配对、CSRF、文件边界、重定向限制不能为了某系统适配而放宽。
-- 旧 Python 模块路径不再是入口；用明确的新 import，不要加全局模块别名。对照表：`docs/architecture/path-map.json`。
-- 迁移网页资源时保持公开 URL 与脚本顺序，同步 `web/assets.json`、固定资源白名单和桌面资源清单。SSH 注入的源模块必须保持远端独立可执行，同步 `scripts/gateway-resources.json`。
-- 验证入口见 [tests/README.md](tests/README.md)。`python -B scripts/test-backend.py --source-only` 不执行 Swift 或 Windows 原生编译/执行夹具；`npm run test:desktop` 自动发现真正的 Node 测试。浏览器夹具单独运行，不可将加载或空跑算作通过。
-- 真实客户端操作、构建、安装、推送、版本号及发布按本次用户授权范围执行。源码整理不隐含这些授权。
-- `.tmp/` 放临时测试文件；`.local/` 放本机运行数据与本地归档；二者均不提交。不要提交凭据、聊天数据、安装包或测试截图。
+- 웹의 호스트 환경별 처리는 `web/hosts/`, 넓고 좁은 화면의 배치는 `web/layouts/`, Android와 iOS가 함께 주입하는 스크립트는 `mobile/shared/web/`에 둔다. 각 디렉터리의 `AGENTS.md`를 따른다. 네이티브 실행 환경과 창 크기는 서로 독립적으로 판단해야 한다.
+- `bridge/features/`에는 공통 기능을, `bridge/clients/`에는 Codex·Claude·DeepSeek 프로토콜을, `bridge/platforms/`에는 운영체제별 네이티브 작업을 둔다. 대상 플랫폼 하위 디렉터리의 `AGENTS.md`를 따른다.
+- 플랫폼 구현에서 클라이언트나 상위 기능 모듈을 역으로 가져와서는 안 된다. 공통 규칙을 운영체제마다 복제하지 않는다. 운영체제에 관한 판단이 로컬 PC를 대상으로 하는지 SSH 원격 호스트를 대상으로 하는지 명확히 구분해야 한다.
+- 원본 데스크톱 세션의 owner/provider/auth/cwd를 유지한다. 상태를 관찰하는 조회와 알림 처리만으로 세션을 시작하거나 전환해서는 안 된다. 전송·권한 승인·중지 요청을 읽기 전용 요청 병합에 포함해서는 안 된다. 쓰기 결과를 알 수 없을 때 같은 쓰기를 자동으로 재전송해서는 안 된다.
+- 앱 중지, 계정 전환, 연결 복구 직전에 프로세스 식별 정보와 진행 중인 작업을 다시 확인한다. 화면 표시용 캐시를 보안 판단의 근거로 사용해서는 안 된다. 특정 운영체제에 맞추기 위해 인증, 페어링, CSRF, 파일 경계, 리디렉션 제한을 완화해서는 안 된다.
+- 이전 Python 모듈 경로는 더 이상 진입점이 아니다. 새 경로를 명시한 import를 사용하고 전역 모듈 별칭을 추가하지 않는다. 경로 대응표는 `docs/architecture/path-map.json`을 참고한다.
+- 웹 리소스를 옮길 때 공개 URL과 스크립트 로드 순서를 유지하고 `web/assets.json`, 고정 리소스 허용 목록, 데스크톱 리소스 목록을 함께 갱신한다. SSH로 주입하는 소스 모듈은 원격 호스트에서 독립적으로 실행할 수 있어야 하며 `scripts/gateway-resources.json`도 함께 갱신한다.
+- 검증 진입점은 [tests/README.md](tests/README.md)를 참고한다. `python -B scripts/test-backend.py --source-only`는 Swift나 Windows 네이티브 컴파일·실행 픽스처를 실행하지 않는다. `npm run test:desktop`은 실제 Node 테스트를 자동으로 찾는다. 브라우저 픽스처는 별도로 실행하며, 로드만 했거나 검사가 없는 실행을 통과로 기록해서는 안 된다.
+- 실제 클라이언트 조작, 빌드, 설치, 푸시, 버전 변경, 배포는 이번 사용자 승인 범위 안에서만 수행한다. 소스 코드 정리만으로 이러한 작업까지 승인된 것으로 보지 않는다.
+- `.tmp/`에는 임시 테스트 파일을, `.local/`에는 로컬 실행 데이터와 복구용 보관 파일을 둔다. 두 디렉터리는 커밋하지 않는다. 자격 증명, 채팅 데이터, 설치 파일, 테스트 스크린샷을 커밋해서는 안 된다.

@@ -82,19 +82,19 @@ class ClaudeHandoff(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.desktop.unconfirmed_mutations, {request['seq']})
 
     async def test_uncertain_mutation_blocks_handoff_and_keeps_request(self):
-        with self.assertRaisesRegex(BridgeUnavailable, '响应超时'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Desktop\\ 응답\\ 시간이\\ 초과되었습니다\\.\\ 원래\\ 세션을\\ 확인하고\\ 다시\\ 제출하지\\ 마십시오\\."):
             await self.desktop.call('code', 'sendMessage', 'session', 'text', timeout=.03)
         request = self.request()
         self.assertEqual(request['type'], 'request')
         self.assertEqual(self.desktop.unconfirmed_mutations, {request['seq']})
-        self.reply(seq=request['seq'], done=True, error='结果待核对', connected=False,
+        self.reply(seq=request['seq'], done=True, error="확인되지 않은 결과", connected=False,
                    handoffId='offer-2')
         await asyncio.sleep(.35)
         self.assertFalse(self.desktop.stopped)
         self.assertEqual(self.request(), request)
 
     async def test_late_success_acknowledges_only_the_matching_request(self):
-        with self.assertRaisesRegex(BridgeUnavailable, '响应超时'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Desktop\\ 응답\\ 시간이\\ 초과되었습니다\\.\\ 원래\\ 세션을\\ 확인하고\\ 다시\\ 제출하지\\ 마십시오\\."):
             await self.desktop.call('code', 'sendMessage', 'session', 'text', timeout=.03)
         request = self.request()
         self.reply(seq=request['seq'], done=True, result=True)

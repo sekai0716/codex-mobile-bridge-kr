@@ -1,44 +1,44 @@
-# 页面宿主适配
+# 페이지 호스트 적응
 
-此目录处理页面运行在普通浏览器、iOS App 或 Android App 时的差异。窗口尺寸与分屏由 `../layouts/` 管理；同一个宿主可以处于窄屏、横屏或宽屏。
+이 디렉토리 처리 페이지는 일반 브라우저에서 실행됩니다.、iOS App 또는 Android App 시차. 창 크기와 분할 화면은 다음과 같이 지정됩니다. `../layouts/` 관리; 동일한 호스트가 좁은 화면, 가로 화면 또는 와이드 화면에 있을 수 있습니다.。
 
-## 页面入口
+## 페이지 항목
 
-`environment.js` 通过固定公开入口 `/host.js` 在功能脚本前加载，提供 `BridgeHost`：
+`environment.js` 고정식을 통한 공개 액세스 `/host.js` 함수 스크립트 이전에 로드되어 다음을 제공합니다. `BridgeHost`：
 
-| 方法 | 用途 |
+| 방법 | 사용 |
 | --- | --- |
-| `kind(userAgent?)` | 返回 `browser`、`ios` 或 `android`，沿用现有 `BridgeMobile` 标识语法 |
-| `isNativeApp(userAgent?)` | 登录界面和附件下载选择原生壳已有行为 |
-| `hasNativeLayout()` | 查询原生脚本是否已注入布局；供返回电脑列表、终端输入行为使用 |
+| `kind(userAgent?)` | 뒤로 `browser`、`ios` 또는 `android`，기존 사용 `BridgeMobile` 태그 구문 |
+| `isNativeApp(userAgent?)` | 로그인 인터페이스 및 첨부 파일 다운로드 선택 기본 셸에는 이미 동작이 있습니다. |
+| `hasNativeLayout()` | 네이티브 스크립트가 레이아웃에 삽입되었는지 쿼리합니다. 컴퓨터 목록 및 터미널 입력 동작을 반환하는 데 사용됩니다. |
 
-身份与原生布局准备状态是两件事。Android/iOS 注入时机不同，`hasNativeLayout()` 每次读取当前标记，不在页面加载时永久缓存。普通 Safari/Chrome 即使在手机上运行，也属于浏览器宿主。
+ID와 기본 레이아웃 준비는 서로 다른 것입니다.。Android/iOS 주입 시기가 다릅니다.，`hasNativeLayout()` 현재 마크업은 매번 읽혀지며 페이지 로드 시 영구적으로 캐시되지 않습니다. 평범한 Safari/Chrome 휴대폰에서 실행되더라도 여전히 브라우저 호스트에 속합니다.。
 
-这些信息只用于呈现和行为选择，不能授予权限。任何页面都能伪造 UA/class；剪贴板、下载、导航等操作仍由原生桥核验当前连接、token、主框架和真实用户操作。
+이 정보는 프레젠테이션 및 행동 선택에만 사용되며 권한을 부여하지 않습니다. 모든 페이지는 위조될 수 있습니다 UA/class；클립보드, 다운로드, 탐색 및 기타 작업은 현재 연결을 확인하기 위해 기본 브리지에서 계속 수행됩니다.、token、메인 프레임워크 및 실제 사용자 작업。
 
-## 浏览器返回
+## 브라우저 반환
 
-`browser-navigation.js` 随 `/host.js` 加载。普通浏览器在列表首次打开会话时建立一个详情历史条目；文件和终端属于该详情。浏览器或手机浏览器的返回键直接回到聊天列表，前进恢复会话，并复用现有工作台和草稿。顶栏返回同样回列表；列表不拦截离站返回。刷新复用当前条目，不重复扩展历史。
+`browser-navigation.js` 따르다 `/host.js` 짐. 일반 브라우저는 목록에서 세션이 처음 열릴 때 세부 기록 항목을 생성합니다. 파일과 터미널이 이 세부사항에 속합니다. 브라우저 또는 모바일 브라우저의 뒤로 키를 사용하여 채팅 목록으로 직접 돌아가고, 앞으로 이동하여 대화를 재개하고, 기존 작업공간 및 초안을 재사용하세요. 상단 표시줄은 목록에 동일한 결과를 반환합니다. 목록은 외부 반품을 차단하지 않습니다. 확장 기록을 반복하지 않고 현재 항목을 새로 고치고 재사용합니다.。
 
-历史仅保存客户端、会话标识、主机及随机导航作用域，不保存认证、草稿或会话内容。恢复前仍检查当前登录，退出登录和账号切换会使旧导航作用域失效。原生 App 继续使用 `BridgeNavigation.back()` 的弹窗、工作台上一级、聊天列表顺序；不接管浏览器历史。原生身份与晚注入布局均动态检查，不依据窗口宽度判断。
+기록에는 인증, 초안 또는 세션 콘텐츠가 아닌 클라이언트, 세션 ID, 호스트 및 임의 탐색 범위만 저장됩니다. 현재 로그인은 복원 전에 계속 확인됩니다. 로그아웃하고 계정을 전환하면 이전 탐색 범위가 무효화됩니다. 토종의 App 계속 사용하다 `BridgeNavigation.back()` 팝업창, 워크벤치 레벨, 채팅 목록 순서; 브라우저 기록을 이어받지 않습니다. 기본 ID와 지연 주입 레이아웃은 모두 동적으로 확인되며 창 너비를 기준으로 판단되지 않습니다.。
 
-合成浏览器验证：`CMB_NAVIGATION_FIXTURE=1 CMB_FIXTURE_ONLY=1 node scripts/smoke-wsl-app-ui.cjs`，在输出的本机页面注入 `tests/browser/browser-navigation.browser.js` 并执行 `await checkBrowserNavigation()`；夹具不连接用户网关。
+합성 브라우저 확인：`CMB_NAVIGATION_FIXTURE=1 CMB_FIXTURE_ONLY=1 node scripts/smoke-wsl-app-ui.cjs`，출력 기본 페이지에 삽입 `tests/browser/browser-navigation.browser.js` 그리고 실행 `await checkBrowserNavigation()`；설비가 사용자 게이트웨이에 연결되지 않음。
 
-## 原生实现与共享脚本
+## 기본 구현 및 공유 스크립트
 
-| 修改目标 | 所在位置 |
+| 대상 수정 | 위치 |
 | --- | --- |
-| 两端共同的顶部菜单让位、返回入口和连接名称 | `mobile/shared/web/mobile-ui.js` |
-| 两端共同的原生剪贴板脚本 | `mobile/shared/web/mobile-clipboard.js` |
-| Android 生命周期通知与会话续期提示桥 | `mobile/android/assets/mobile-session.js` 及 Android 原生实现 |
-| Android JavaScript 资源读取 | `mobile/android/.../MobileWebScripts.java` |
-| iOS 资源读取、viewport 注入 | `mobile/ios/BridgePreview/WebScripts.swift` |
-| 原生导航、token/origin/frame 验证 | 各平台的 `MainActivity.java` / `App.swift` |
+| 공통 상단 메뉴 수율, 반환 항목 및 양쪽 끝의 연결 이름 | `mobile/shared/web/mobile-ui.js` |
+| 양쪽 끝에 공통된 기본 클립보드 스크립트 | `mobile/shared/web/mobile-clipboard.js` |
+| Android 수명 주기 알림 및 세션 갱신 프롬프트 브리지 | `mobile/android/assets/mobile-session.js` 그리고 Android 네이티브 구현 |
+| Android JavaScript 리소스 읽기 | `mobile/android/.../MobileWebScripts.java` |
+| iOS 리소스 읽기、viewport 주입 | `mobile/ios/BridgePreview/WebScripts.swift` |
+| 기본 탐색、token/origin/frame 검증 | 각 플랫폼의 `MainActivity.java` / `App.swift` |
 
-宿主 CSS 按原样式表中的优先级位置拆出，由 `web/assets.json` 的有序清单组合；不要通过插入更多覆盖规则来绕开已有布局。共享脚本随原生壳打包，网关不公开提供它们，也不通过网络动态加载原生桥脚本。
+주인 CSS 원본 스타일 시트의 우선 순위에 따라 분리합니다. `web/assets.json` 순서가 지정된 조합 목록입니다. 더 많은 재정의 규칙을 삽입하여 기존 레이아웃을 우회하지 마십시오. 공유 스크립트는 기본 셸과 함께 패키지되어 있으며 게이트웨이는 이를 공개적으로 제공하지 않으며 네트워크를 통해 기본 브리지 스크립트를 동적으로 로드하지도 않습니다.。
 
-## 验证
+## 검증
 
-`tests/host-environment.test.cjs` 检查宿主识别、晚注入和与尺寸独立的行为。`mobile/tests/resources.test.cjs` 检查两端实际资源引用；移动端现有剪贴板、名称、返回与会话测试仍从共同源码运行。
+`tests/host-environment.test.cjs` 호스트 인식, 지연 주입 및 크기 독립적 동작 확인。`mobile/tests/resources.test.cjs` 양쪽 끝에서 실제 리소스 참조를 확인하세요. 모바일의 기존 클립보드, 이름, 반환 및 세션 테스트는 여전히 공통 소스 코드에서 실행됩니다.。
 
-浏览器中设置 UA/class 只模拟页面选择分支，不能代表 Android WebView、iOS WKWebView 或原生系统权限已验证。
+브라우저의 설정 UA/class 페이지 선택 분기만 시뮬레이션하며 나타낼 수는 없습니다. Android WebView、iOS WKWebView 또는 기본 시스템 권한이 확인되었습니다.。

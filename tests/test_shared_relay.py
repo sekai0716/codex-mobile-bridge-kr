@@ -71,6 +71,8 @@ class RegistryTests(unittest.TestCase):
         self.r.revoke(a['deviceId'])
         with self.assertRaises(PermissionError): self.r.device(a['deviceToken'])
 
+
+
     def test_desktop_account_access_and_attachments_keep_relay_boundaries(self):
         for provider in ('claude', 'deepseek'):
             root = '/api/desktop-sessions/'+provider+'/'
@@ -582,6 +584,8 @@ class RelayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((await response.json())['authenticated'])
         self.assertNotIn('Set-Cookie', response.headers)
 
+
+
     async def test_discovery_capability_is_read_only_and_tracks_tunnel_replacement(self):
         import hashlib
         a = await self.device('A'); ws = await self.socket(a)
@@ -693,7 +697,7 @@ class RelayIntegrationTests(unittest.IsolatedAsyncioTestCase):
         # ranges and changed-file restart handling across the relay.
         response = await self.client.get(url, headers={**p, 'Range': 'bytes=0-1048575'})
         self.assertEqual(response.status, 400)
-        self.assertIn('下载限制', (await response.json())['error'])
+        self.assertIn('다운로드 제한', (await response.json())['error'])
         policy = {'clickDownloadMiB': MAX_BODY//(1024*1024)+1}
         response = await self.client.post('/api/file-transfer', json=policy, headers=p)
         self.assertEqual(response.status, 200)

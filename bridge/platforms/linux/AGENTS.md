@@ -1,9 +1,9 @@
-# Linux 平台维护
+# Linux 플랫폼 유지보수
 
-- 本目录负责安装路径、PATH、`.desktop` 入口、shell 启动器对应 GUI 的识别，以及同用户 `/proc` 进程与命令行读取。启动/信号、Unix socket 和 PTY 复用 `../posix/`。
-- Linux 专项问题优先在本目录修复。不得反向导入 `bridge.clients` 或 `bridge.features`；账号、客户端启用、任务状态、连接协议和重启决策留在共享业务层。
-- 扫描不得执行 `.desktop` 命令或 shell 启动器。保留可执行权限检查，以及同名 `codex`/`claude` CLI 与桌面包的区别；不能将任意可执行文件当成已认证的客户端。
-- `/proc` 只读取当前用户的候选进程。展示阶段无法读取命令时保持“未知”，不能推断为空闲；控制操作的身份核验仍由共享入口完成。
-- 当前 Claude 自动连接仅提供 macOS/Windows 原生助手。Linux 能发现安装，但 `inspect_installation` 报告 `automaticConnection=unavailable` 和 `setupState=unsupported`。不得把安装发现描述为 Claude 自动接入完成，也不能调用 macOS 助手作为 Linux 回退。
-- Codex、DSH 的安装包形式、运行时和桌面 profile 必须以当前发现结果为准；不要新增未验证的发行版、AppImage 或上游版本支持声明。
-- 路径测试先规范化临时目录，避免 macOS `/var` 与 `/private/var` 别名造成跨平台 fixture 误判。Linux 权限、符号链接及进程测试不能由其他系统的模拟检查替代。
+- 이 디렉터리는 설치 경로, PATH, `.desktop` 진입점, shell 실행기에 대응하는 GUI 식별, 같은 사용자의 `/proc` 프로세스·명령줄 읽기를 담당합니다. 프로세스 시작과 신호 전송, Unix 소켓, PTY는 `../posix/`의 구현을 재사용합니다.
+- Linux 고유 문제는 이 디렉터리에서 우선 수정합니다. `bridge.clients` 또는 `bridge.features`를 역방향으로 가져와서는 안 됩니다. 계정, 클라이언트 활성화, 작업 상태, 연결 프로토콜, 재시작 판단은 공통 기능 계층에서 처리합니다.
+- 검색 과정에서 `.desktop` 명령이나 shell 실행기를 실행해서는 안 됩니다. 실행 권한 검사를 유지하고, 같은 이름의 `codex`/`claude` CLI와 데스크톱 패키지를 구분합니다. 임의의 실행 파일을 검증된 클라이언트로 취급해서는 안 됩니다.
+- `/proc`에서는 현재 사용자의 후보 프로세스만 읽습니다. 상태 표시 중 명령을 읽을 수 없다면 ‘알 수 없음’을 유지하며, 유휴 상태라고 추정해서는 안 됩니다. 제어 작업의 신원 검증은 계속 공통 진입점에서 수행합니다.
+- 현재 Claude 자동 연결은 macOS/Windows 네이티브 도우미만 제공합니다. Linux에서도 설치 여부는 찾을 수 있지만, `inspect_installation`은 `automaticConnection=unavailable`과 `setupState=unsupported`를 반환합니다. 설치 발견을 Claude 자동 연결 완료로 설명하거나, Linux의 대체 경로로 macOS 도우미를 호출해서는 안 됩니다.
+- Codex와 DSH의 설치 패키지 형태, 런타임, 데스크톱 프로필은 현재 검색 결과를 기준으로 판단합니다. 검증하지 않은 배포판, AppImage, 업스트림 버전의 지원을 새로 명시하지 않습니다.
+- 경로 테스트에서는 먼저 임시 디렉터리를 정규화하여 macOS의 `/var`와 `/private/var` 별칭 때문에 플랫폼 간 테스트 픽스처를 잘못 판단하지 않도록 합니다. Linux 권한·심볼릭 링크·프로세스 테스트를 다른 시스템의 모의 검사로 대체해서는 안 됩니다.

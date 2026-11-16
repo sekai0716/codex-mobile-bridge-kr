@@ -37,7 +37,7 @@ class VisualizeSourceTests(unittest.TestCase):
     def tearDown(self): self.temp.cleanup()
 
     def test_only_complete_assistant_references_outside_code_grant_ids(self):
-        ref = reference(self.file, mode='wide', title='滑块')
+        ref = reference(self.file, mode='wide', title='슬라이더')
         paths = visualization_paths([ref])
         self.assertEqual(paths, {str(self.file)})
         rows = visualization_files(state(ref, self.project), [])
@@ -76,7 +76,7 @@ class VisualizeSourceTests(unittest.TestCase):
         self.assertEqual(Bridge.visualization(bridge, support.THREAD, identifier(str(self.file)))['text'], '<input type="range">')
         self.assertEqual(attached, [False])
         with self.assertRaises(PermissionError): Bridge.visualization(bridge, support.THREAD, 'a' * 64)
-        project_file = self.project / "远端 '图表'.html"; project_file.write_text('remote fixture')
+        project_file = self.project / "원격 '차트'.html"; project_file.write_text('remote fixture')
         with session.condition:
             session.state = state(reference(project_file), self.project)
             session.changed()

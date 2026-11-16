@@ -22,7 +22,7 @@ class PackagingArgumentsTests(unittest.TestCase):
             folder = Path(tmp);package = folder/'PyInstaller';package.mkdir()
             (package/'__init__.py').write_text('')
             (package/'__main__.py').write_text('import json\nfrom pathlib import Path\ndef run(args):\n Path("result.json").write_text(json.dumps(args),encoding="utf-8")\n')
-            args = ['--add-data', 'F:/中文 路径/资源/'+('x'*200)+':bridge/resources']*500 + ['desktop.py']
+            args = ['--add-data', 'F:/중국어 경로/의지/'+('x'*200)+':bridge/resources']*500 + ['desktop.py']
             self.assertGreater(len(subprocess.list2cmdline(args)), 32767)
             child = [sys.executable, '-c', program]
             self.assertLess(len(subprocess.list2cmdline(child)), 32767)

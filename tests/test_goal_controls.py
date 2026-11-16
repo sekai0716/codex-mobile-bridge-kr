@@ -120,7 +120,7 @@ class GoalControlTests(unittest.TestCase):
 
     def test_edit_requires_pause_preserves_budget_and_waits_for_explicit_resume(self):
         self.create();stub=self.bridge.goal
-        with self.assertRaisesRegex(ValueError,'先暂停'):
+        with self.assertRaisesRegex(ValueError,"목표를\\ 편집하기\\ 전에\\ 목표를\\ 일시중지하세요\\."):
             self.bridge.edit_goal(THREAD,'Revised',str(uuid.uuid4()))
         self.bridge.set_goal_status(THREAD,'paused',str(uuid.uuid4()))
         stub.goals[THREAD]['tokenBudget']=12345
@@ -136,14 +136,14 @@ class GoalControlTests(unittest.TestCase):
     def test_stale_phone_actions_cannot_modify_replacement_goal(self):
         self.create();old=copy.deepcopy(self.bridge.goal.get_goal(THREAD))
         self.bridge.goal.goals[THREAD]={'objective':'From desktop','status':'active'}
-        with self.assertRaisesRegex(ValueError,'发生变化'):
+        with self.assertRaisesRegex(ValueError,"목표가\\ 변경되었습니다\\.\\ 새로고침하고\\ 다시\\ 시도하세요\\."):
             self.bridge.cancel_goal(THREAD,str(uuid.uuid4()),expected=old)
         self.assertEqual(self.bridge.goal.clear_calls,[])
 
     def test_locale_change_during_retry_reuses_original_activation(self):
         request_id=str(uuid.uuid4());self.bridge.goal=GoalStub(self.bridge)
         self.bridge.send(THREAD,'Work',request_id,work_mode='goal',ui_locale='en-US')
-        self.bridge.send(THREAD,'Work',request_id,work_mode='goal',ui_locale='zh-CN')
+        self.bridge.send(THREAD,'Work',request_id,work_mode='goal',ui_locale='ko-KR')
         self.assertEqual(len(self.calls()),1)
 
     def test_read_failure_cannot_confirm_unknown_cancel(self):

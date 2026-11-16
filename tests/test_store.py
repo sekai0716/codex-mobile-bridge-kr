@@ -285,8 +285,8 @@ class RecentHistoryTests(unittest.TestCase):
         for index in range(120):
             self.records.extend([
                 {'type': 'event_msg', 'payload': {'type': 'task_started', 'turn_id': str(index)}},
-                {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user', 'content': [{'type': 'text', 'text': '问题'+str(index)}]}},
-                {'type': 'response_item', 'payload': {'type': 'message', 'role': 'assistant', 'content': [{'text': '答'*24000}]}},
+                {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user', 'content': [{'type': 'text', 'text': "질문"+str(index)}]}},
+                {'type': 'response_item', 'payload': {'type': 'message', 'role': 'assistant', 'content': [{'text': '답변'*24000}]}},
                 {'type': 'event_msg', 'payload': {'type': 'task_complete'}}])
         self.path.write_text(''.join(json.dumps(r, ensure_ascii=False)+'\n' for r in self.records), encoding='utf-8')
         self.store = SessionStore(self.home)

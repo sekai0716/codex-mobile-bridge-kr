@@ -51,7 +51,7 @@ class AddressNotificationTests(unittest.TestCase):
             self.manager.scan();self.assertEqual(send.call_count, 1)
             self.manager = AddressNotifications(self.directory, lambda: [self.url], 'instance-2')
             self.manager.scan();self.assertEqual(send.call_count, 2)
-            self.assertIn('网关已启动', send.call_args.args[1])
+            self.assertIn('게이트웨이 시작', send.call_args.args[1])
             self.url = B
             self.manager.scan();self.assertEqual(send.call_count, 3)
             self.assertEqual(send.call_args.args[3], B)
@@ -75,7 +75,7 @@ class AddressNotificationTests(unittest.TestCase):
     def test_address_notice_fans_out_to_named_webhooks(self):
         save_settings(self.directory, {'enabled': False, 'webhookEnabled': True,
                                        'webhookUrl': 'https://receiver.example/legacy'})
-        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '飞书',
+        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': 'Feishu',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/one'})
         save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': 'Telegram',
             'webhookEnabled': True, 'webhookUrl': 'https://api.telegram.org/botprivate/sendMessage',
@@ -233,7 +233,7 @@ class AddressNotificationTests(unittest.TestCase):
             manager.scan();manager.scan()
             self.assertEqual(send.call_count, 3)
             self.assertIn(A, send.call_args.args[2])
-            self.assertIn('访问入口已更新', send.call_args.args[1])
+            self.assertIn('접속 주소 변경', send.call_args.args[1])
 
     def test_old_ledger_does_not_suppress_new_start(self):
         self.manager.path.write_text(json.dumps({'url': A, 'deliveries': {}}))

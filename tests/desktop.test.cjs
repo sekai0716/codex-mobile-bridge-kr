@@ -6,11 +6,11 @@ const {createTray,primaryUrl}=require('../desktop/shell/tray.cjs');
 const i18n=require('../desktop/shared/i18n.js');
 
 test('language normalization and error translation preserve unknown details',()=>{
-  assert.equal(i18n.normalize('en-US'),'en');assert.equal(i18n.normalize('zh-TW'),'zh-CN');
-  assert.equal(i18n.normalize(null),'zh-CN');
-  assert.equal(i18n.translate('运行中','en'),'Running');
-  assert.equal(i18n.translate("Error invoking remote method 'bridge:save': Error: 新密码至少需要 12 个字符",'en'),i18n.english['新密码至少需要 12 个字符']);
-  assert.equal(i18n.translate('C:\\private\\未知.log','en'),'C:\\private\\未知.log');
+  assert.equal(i18n.normalize('en-US'),'en');assert.equal(i18n.normalize('ko-TW'),'ko-KR');
+  assert.equal(i18n.normalize(null),'ko-KR');
+  assert.equal(i18n.translate('실행 중','en'),'Running');
+  assert.equal(i18n.translate("Error invoking remote method 'bridge:save': Error: 새 비밀번호는 12자 이상이어야 합니다.",'en'),i18n.english['새 비밀번호는 12자 이상이어야 합니다.']);
+  assert.equal(i18n.translate('C:\\private\\알려지지 않은.log','en'),'C:\\private\\알려지지 않은.log');
 });
 
 test('tray prefers public HTTPS and rejects non-web addresses',()=>{
@@ -41,14 +41,14 @@ test('unchanged tray snapshots reuse the menu; URL and busy changes remain immed
   assert.equal(ui.result().renders,before);
   ui.state.urls=['https://new.example.com'];await ui.poll();
   assert.equal(ui.result().renders,before+1);
-  await ui.find('复制手机').click();
+  await ui.find('휴대폰 접속 주소 복사').click();
   assert.equal(ui.result().copied,'https://new.example.com');
   assert.equal(ui.result().renders,before+3);ui.tray.dispose();
 });
 
 test('tray can stop then quit and dispose without duplicate operations',async()=>{
-  const ui=await trayFixture();await ui.find('复制手机').click();assert.equal(ui.result().copied,'https://example.com');
-  await ui.find('停止网关').click();assert.deepEqual(ui.actions,['stop']);assert.equal(ui.result().quit,true);
+  const ui=await trayFixture();await ui.find('휴대폰 접속 주소 복사').click();assert.equal(ui.result().copied,'https://example.com');
+  await ui.find('게이트웨이 중지').click();assert.deepEqual(ui.actions,['stop']);assert.equal(ui.result().quit,true);
   ui.tray.dispose();assert.equal(ui.result().destroyed,true);assert.equal(ui.result().cleared,true);
 });
 
@@ -69,19 +69,19 @@ test('window observations defer tray reads and a late fallback cannot replace a 
 });
 
 test('tray can relabel without changing gateway state',async()=>{
-  let language='zh-CN';const ui=await trayFixture(text=>i18n.translate(text,language));
-  assert.ok(ui.find('打开控制面板'));language='en';ui.tray.relabel();
+  let language='ko-KR';const ui=await trayFixture(text=>i18n.translate(text,language));
+  assert.ok(ui.find('제어판 열기'));language='en';ui.tray.relabel();
   assert.ok(ui.find('Open control panel'));assert.ok(ui.find('Stop gateway and quit'));
   assert.deepEqual(ui.actions,[]);ui.tray.dispose();
 });
 
 test('tray never quits after a failed stop or stops an unmanaged port',async()=>{
-  const ui=await trayFixture();ui.fail();await ui.find('停止网关').click();assert.equal(ui.result().quit,false);assert.match(ui.result().error.message,/stop failed/);
-  ui.state.runtime={running:false,portOccupied:true};await ui.poll();assert.equal(ui.find('停止网关').enabled,false);assert.equal(ui.find('打开手机').enabled,false);ui.tray.dispose();
+  const ui=await trayFixture();ui.fail();await ui.find('게이트웨이 중지').click();assert.equal(ui.result().quit,false);assert.match(ui.result().error.message,/stop failed/);
+  ui.state.runtime={running:false,portOccupied:true};await ui.poll();assert.equal(ui.find('게이트웨이 중지').enabled,false);assert.equal(ui.find('휴대폰 접속 주소 열기').enabled,false);ui.tray.dispose();
 });
 
 test('quitting only the controller leaves the gateway untouched',async()=>{
-  const ui=await trayFixture();ui.find('保留网关').click();assert.equal(ui.result().quit,true);assert.deepEqual(ui.actions,[]);ui.tray.dispose();
+  const ui=await trayFixture();ui.find('게이트웨이 유지').click();assert.equal(ui.result().quit,true);assert.deepEqual(ui.actions,[]);ui.tray.dispose();
 });
 test('packaged launch uses bundled runtime and literal data directory',()=>{
   const result=workerFor({packaged:true,resources:'/app resources',root:'/source',dataDir:'/my data'});
@@ -98,14 +98,14 @@ test('named Webhook edits reach the worker through the IPC allowlist',async()=>{
   const result=await runWorker({executable:process.execPath,prefix:['-e',script],dataDir:'/fixture'},'webhook-endpoint',payload);
   assert.deepEqual(result,{action:'webhook-endpoint',payload});
 });
-test('unknown IPC action cannot become a command',async()=>{await assert.rejects(runWorker({executable:'unused',dataDir:'unused'},'shell'),/未知操作/);});
+test('unknown IPC action cannot become a command',async()=>{await assert.rejects(runWorker({executable:'unused',dataDir:'unused'},'shell'),/알 수 없는 작업입니다\./);});
 test('development launch keeps script as its own argument',()=>{
   const result=workerFor({packaged:false,root:'/source path',dataDir:'/data'});assert.deepEqual(result.prefix,['-B',path.join('/source path','desktop.py')]);
 });
 
 // Exercise the real renderer's start and polling handlers with a controlled
 // backend and clock. DOM layout and input editing are outside these checks.
-async function renderer(initialLanguage='zh-CN',{autoStart=false,hidden=false,loginStartup,AccountsPanel,DesktopConnectionsPanel,platform='darwin'}={}){
+async function renderer(initialLanguage='ko-KR',{autoStart=false,hidden=false,loginStartup,AccountsPanel,DesktopConnectionsPanel,platform='darwin'}={}){
   const fs=require('node:fs'),vm=require('node:vm');
   const nodes=new Map();
   function node(){return {parentNode:{insertBefore(){}},getAnimations(){return [];},animate(){},scrollIntoView(){},focus(){},addEventListener(){},closest(){return null;},value:'',checked:false,hidden:false,textContent:'',dataset:{},
@@ -119,7 +119,7 @@ async function renderer(initialLanguage='zh-CN',{autoStart=false,hidden=false,lo
     notificationStatus:{},watches:[],origins:[],urls:[],dataDir:'/test',credentialsAvailable:false};
   let now=1000,poll;
   const calls=[];
-  const api={platform,account:async()=>({visible:false}),language:async()=>initialLanguage,setLanguage:async value=>value,snapshot:async()=>{calls.push('snapshot');return structuredClone(value);},start:async()=>{calls.push('start');return {started:true,message:'正在启动网关'};},
+  const api={platform,account:async()=>({visible:false}),language:async()=>initialLanguage,setLanguage:async value=>value,snapshot:async()=>{calls.push('snapshot');return structuredClone(value);},start:async()=>{calls.push('start');return {started:true,message:'게이트웨이 시작 중'};},
     save:async payload=>{value.preferences={...value.preferences,...payload.preferences};return structuredClone(value);},logs:async()=>({text:''})};
   api.cliAccess=async payload=>{calls.push({cliAccess:structuredClone(payload)});return payload.operation==='environments'?{provider:payload.provider,environments:[]}:{provider:payload.provider,entry:payload.entry,identity:'fixture-identity',available:true,accounts:[],blockers:[],capabilities:{switch:true,models:true}};};
   const context=vm.createContext({window:{bridgeDesktop:api},AccountsPanel,DesktopConnectionsPanel,Option:function(text,value){return Object.assign(node(),{textContent:text,value});},
@@ -130,9 +130,17 @@ async function renderer(initialLanguage='zh-CN',{autoStart=false,hidden=false,lo
   return {nodes,value,context,api,calls,run:code=>vm.runInContext(code,context),poll:()=>poll(),advance:ms=>{now+=ms;},start:()=>nodes.get('start').onclick()};
 }
 
+test('phone cards offer LAN HTTP and HTTPS while loopback has no pairing QR',async()=>{
+  const ui=await renderer();
+  ui.value.urls=['http://127.0.0.1:8787/','http://192.168.1.20:8787/','https://bridge.example.com/'];
+  await ui.poll();
+  assert.equal(ui.nodes.get('addresses').children.length,3);
+  assert.deepEqual(Array.from(ui.run('[...qrEntries.keys()]')),['http://192.168.1.20:8787/','https://bridge.example.com/']);
+});
+
 test('desktop tab transitions update visibility before Codex account polling resumes',async()=>{
   const events=[],accounts={dataset:{panel:'accounts'},hidden:true},overview={dataset:{panel:'overview'},hidden:false};
-  const ui=await renderer('zh-CN',{AccountsPanel:class{
+  const ui=await renderer('ko-KR',{AccountsPanel:class{
     attachApiAccess(panel,details){this.apiAccess=panel;this.apiDetails=details;}
     visible(){return !accounts.hidden;}
     refresh(){events.push(['refresh',accounts.hidden]);}
@@ -221,7 +229,7 @@ test('Tailscale detection fills a read-only URL and preserves its unsaved identi
   const url=controls.find(node=>node.dataset.connectionField==='publicUrl');
   assert.equal(url.readOnly,true);assert.equal(url.onfocus,null);
   let requests=0;
-  ui.api.tailscaleSetup=async payload=>{requests++;assert.equal(payload.id,'ts');return {state:'ready',url:'https://mac.example.ts.net',nodeId:'n123',message:'已读取 Tailscale 固定地址。保存配置后启动网关，再检测固定入口。'};};
+  ui.api.tailscaleSetup=async payload=>{requests++;assert.equal(payload.id,'ts');return {state:'ready',url:'https://mac.example.ts.net',nodeId:'n123',message:'Tailscale URL가 감지되었습니다. 저장하고 게이트웨이를 시작한 다음 고정된 항목을 확인하십시오.'};};
   await controls.find(node=>node.dataset.connectionAction==='tailscaleInspect').click();
   assert.equal(requests,1);assert.equal(ui.run('dirty'),true);
   assert.equal(ui.run('connectionDraft[0].tailscaleNodeId'),'n123');
@@ -233,7 +241,7 @@ test('Tailscale detection fills a read-only URL and preserves its unsaved identi
 
 test('existing tunnel needs only an HTTPS address and keeps NAS upstream in the advanced location',async()=>{
   const descendants=node=>[node,...(node.children||[]).flatMap(descendants)];
-  for(const language of ['zh-CN','en']){
+  for(const language of ['ko-KR','en']){
     const ui=await renderer(language);
     ui.run(`connectionDraft=[{id:'entry',name:'Home',enabled:true,accessMode:'external',publicUrl:'',proxyUpstream:''}];renderConnections();`);
     let controls=descendants(ui.nodes.get('connections'));
@@ -253,7 +261,7 @@ test('existing tunnel needs only an HTTPS address and keeps NAS upstream in the 
     assert.equal(controls.some(node=>node.dataset.connectionField==='proxyUpstream'),true);
     assert.equal(controls.some(node=>node.dataset.connectionAction==='exportDeployment'),true);
     const copy=controls.map(node=>node.textContent).join(' ');
-    assert.match(copy,language==='en'?/Enable LAN access/:/需要开启局域网访问/);
+    assert.match(copy,language==='en'?/Enable LAN access/:/LAN 액세스를 활성화하고 게이트웨이 포트를 사용하여 다른 장치에서 연결할 수 있는 컴퓨터 HTTP 주소를 입력합니다\./);
     assert.doesNotMatch(copy,language==='en'?/[\u4e00-\u9fff]/:/Fixed domain · NAS/);
   }
 });
@@ -282,25 +290,25 @@ test('external status updates detail while summary reports saved enablement',asy
   ui.context.document.querySelectorAll=selector=>selector==='[data-connection-status]'?[status]:[];
   ui.context.document.activeElement={closest:selector=>selector==='#connections'?card:null};
   await ui.poll();
-  assert.match(status.textContent,/保存并启动网关后可检测入口/);
-  assert.doesNotMatch(status.textContent,/导出部署包/);
-  ui.value.externalStatus={entry:{message:'入口已连接'}};
+  assert.match(status.textContent,/게이트웨이를 저장하고 시작한 후 이 항목을 확인하십시오\./);
+  assert.doesNotMatch(status.textContent,/배포 패키지 내보내기/);
+  ui.value.externalStatus={entry:{message:'포털이 연결되었습니다'}};
   await ui.poll();
-  assert.match(summary.textContent,/Home · https:\/\/bridge.example.com · 已启用/);
-  assert.match(status.textContent,/入口已连接/);
+  assert.match(summary.textContent,/Home · https:\/\/bridge.example.com · 사용/);
+  assert.match(status.textContent,/포털이 연결되었습니다/);
   assert.equal(ui.nodes.get('connections').children[0],card);
 });
 
 test('disabled connection ignores stale online status',async()=>{
   const ui=await renderer();ui.value.preferences.connections=[{id:'entry',name:'Home',enabled:false,accessMode:'external',publicUrl:'https://bridge.example.com'}];
-  ui.value.externalStatus={entry:{message:'入口已连接'}};await ui.poll();
+  ui.value.externalStatus={entry:{message:'포털이 연결되었습니다'}};await ui.poll();
   const descendants=node=>[node,...(node.children||[]).flatMap(descendants)];
   const card=ui.nodes.get('connections').children[0],items=descendants(card);
-  assert.match(items.find(node=>node.className==='connection-summary').textContent,/已配置但未启用/);
+  assert.match(items.find(node=>node.className==='connection-summary').textContent,/구성되었지만 비활성화되었습니다\./);
   const status=items.find(node=>node.dataset.connectionStatus==='entry');
   ui.context.document.querySelectorAll=selector=>selector==='[data-connection-status]'?[status]:[];
-  ui.value.externalStatus={entry:{message:'入口仍显示已连接'}};
-  await ui.poll();assert.equal(status.textContent,'已配置但未启用');
+  ui.value.externalStatus={entry:{message:'포털은 여전히 ​​연결되어 있다고 표시됩니다.'}};
+  await ui.poll();assert.equal(status.textContent,'구성되었지만 비활성화되었습니다.');
 });
 
 test('fixed-entry retry replaces an earlier error in card and summary across polling',async()=>{
@@ -311,15 +319,15 @@ test('fixed-entry retry replaces an earlier error in card and summary across pol
   const items=()=>descendants(ui.nodes.get('connections'));
   const check=()=>items().find(node=>node.dataset.connectionAction==='checkEntry').click();
   const text=()=>items().filter(node=>node.dataset.connectionStatus==='entry'||node.className==='connection-summary').map(node=>node.textContent).join('\n');
-  ui.api.checkEntry=async()=>{throw Error("Error invoking remote method 'bridge:check-entry': Error: HTTPS 证书或 TLS 握手失败；请检查域名、证书和反代配置");};
+  ui.api.checkEntry=async()=>{throw Error("Error invoking remote method 'bridge:check-entry': Error: HTTPS 인증서 또는 TLS 핸드셰이크가 실패했습니다. 도메인 이름, 인증서 및 역방향 프록시 구성을 확인하세요.");};
   await check();assert.match(text(),/TLS/);
-  const message='固定 HTTPS 入口已连到当前网关。请再用手机蜂窝网络验证登录与聊天。';
+  const message='고정된 HTTPS 항목은 현재 게이트웨이에 도달합니다. 모바일 데이터를 사용하여 휴대폰에서 로그인 및 채팅을 확인하세요.';
   ui.api.checkEntry=async()=>({url:'https://bridge.example.com:8443',message});
   await check();assert.ok(text().includes(message));assert.doesNotMatch(text(),/TLS|Error invoking/);
   await ui.poll();assert.ok(text().includes(message));assert.doesNotMatch(text(),/TLS|Error invoking/);
   ui.run("applyLanguage('en')");assert.doesNotMatch(text(),/TLS|Error invoking/);
-  ui.api.checkEntry=async()=>{throw Error('入口没有连接到当前网关；请检查反代目标，旧版网关须先更新并重启');};
-  await check();assert.doesNotMatch(text(),/Please also verify|固定 HTTPS 入口已/);
+  ui.api.checkEntry=async()=>{throw Error('이 항목은 현재 게이트웨이에 도달하지 않습니다. 프록시 대상을 확인하십시오. 먼저 이전 게이트웨이를 업데이트하고 다시 시작하세요.');};
+  await check();assert.doesNotMatch(text(),/Please also verify|결정된 HTTPS 입구는/);
 });
 
 test('fixed-entry results belong to the checked target and gateway instance',async()=>{
@@ -358,13 +366,13 @@ test('opening the control panel and starting the gateway need no Documents permi
   assert.equal(ui.nodes.has('documents-access'),false);
   await ui.start();
   assert.deepEqual(ui.calls,['snapshot','start','snapshot']);
-  assert.equal(ui.nodes.get('status').textContent,'启动中');
+  assert.equal(ui.nodes.get('status').textContent,'시작');
 });
 
 test('automatic gateway startup works without a Documents permission API',async()=>{
-  const ui=await renderer('zh-CN',{autoStart:true});
+  const ui=await renderer('ko-KR',{autoStart:true});
   assert.deepEqual(ui.calls,['snapshot','start','snapshot']);
-  assert.equal(ui.nodes.get('status').textContent,'启动中');
+  assert.equal(ui.nodes.get('status').textContent,'시작');
 });
 
 test('overview and client-page gateway controls share pending state and reject duplicate operations',async()=>{
@@ -373,21 +381,21 @@ test('overview and client-page gateway controls share pending state and reject d
   const start=ui.nodes.get('clients-start').onclick();await new Promise(setImmediate);
   assert.equal(ui.nodes.get('start').disabled,true);assert.equal(ui.nodes.get('clients-start').disabled,true);
   await ui.nodes.get('start').onclick();assert.equal(starts,1);
-  started({started:true,message:'正在启动网关'});await start;
+  started({started:true,message:'게이트웨이 시작 중'});await start;
   ui.value.runtime.running=true;await ui.poll();
   assert.equal(ui.nodes.get('clients-stop').disabled,false);
   ui.api.stop=()=>{stops++;return new Promise(resolve=>stopped=resolve);};
   const stop=ui.nodes.get('clients-stop').onclick();
   assert.equal(ui.nodes.get('stop').disabled,true);assert.equal(ui.nodes.get('clients-stop').disabled,true);
   await ui.nodes.get('stop').onclick();assert.equal(stops,1);
-  ui.value.runtime.running=false;stopped({message:'网关已停止'});await stop;
+  ui.value.runtime.running=false;stopped({message:'게이트웨이 중지됨'});await stop;
   for(const id of ['start','clients-start'])assert.equal(ui.nodes.get(id).disabled,false);
   for(const id of ['stop','clients-stop'])assert.equal(ui.nodes.get(id).disabled,true);
 });
 
 test('client-page gateway controls retain save checks and recover both buttons on failure',async()=>{
   const ui=await renderer();ui.run('dirty=true');await ui.nodes.get('clients-start').onclick();
-  assert.equal(ui.calls.includes('start'),false);assert.match(ui.nodes.get('toast-message').textContent,/请先保存/);
+  assert.equal(ui.calls.includes('start'),false);assert.match(ui.nodes.get('toast-message').textContent,/(?:앱을 업데이트하기 전에 설정을 저장하세요\.|게이트웨이를 시작하기 전에 설정을 저장하십시오\.)/);
   ui.run('dirty=false');ui.api.start=async()=>{throw Error('start rejected');};
   await ui.nodes.get('clients-start').onclick();
   for(const id of ['start','clients-start'])assert.equal(ui.nodes.get(id).disabled,false);
@@ -399,17 +407,17 @@ test('client-page gateway controls retain save checks and recover both buttons o
 
 test('startup feedback follows readiness, page changes and later shutdown',async()=>{
   const ui=await renderer();await ui.start();
-  assert.match(ui.nodes.get('feedback').textContent,/正在启动/);
-  assert.equal(ui.nodes.get('status').textContent,'启动中');
+  assert.match(ui.nodes.get('feedback').textContent,/시작/);
+  assert.equal(ui.nodes.get('status').textContent,'시작');
   ui.value.runtime.running=true;await ui.poll();
-  assert.equal(ui.nodes.get('status').textContent,'运行中');
-  assert.match(ui.nodes.get('feedback').textContent,/已启动/);
+  assert.equal(ui.nodes.get('status').textContent,'실행 중');
+  assert.match(ui.nodes.get('feedback').textContent,/게이트웨이가 실행 중입니다\./);
   for(const page of ['network','notifications','logs']){
     ui.context.tab(page);await ui.poll();
-    assert.doesNotMatch(ui.nodes.get('feedback').textContent,/正在启动/);
+    assert.doesNotMatch(ui.nodes.get('feedback').textContent,/시작/);
   }
   ui.value.runtime.running=false;await ui.poll();
-  assert.equal(ui.nodes.get('feedback').textContent,'网关已停止');
+  assert.equal(ui.nodes.get('feedback').textContent,'게이트웨이 중지됨');
 });
 
 test('Bark-only readiness and delivery status remain independent of ntfy',async()=>{
@@ -432,7 +440,7 @@ test('notification test buttons select the channel and block unsaved drafts',asy
   await ui.nodes.get('test-bark').onclick();await ui.nodes.get('test-notification').onclick();
   assert.deepEqual(calls,['bark','ntfy']);
   ui.run('dirty=true');await ui.nodes.get('test-bark').onclick();
-  assert.equal(calls.length,2);assert.match(ui.nodes.get('toast-message').textContent,/请先保存通知配置/);
+  assert.equal(calls.length,2);assert.match(ui.nodes.get('toast-message').textContent,/테스트 알림을 보내기 전에 알림 설정을 저장하세요\./);
 });
 
 test('desktop Webhook edits save per endpoint and failed saves retain secrets',async()=>{
@@ -488,7 +496,7 @@ test('unrelated desktop snapshot does not hide a revealed Webhook URL',async()=>
 
 test('desktop language switch translates Webhook hints without losing drafts or revealed URL',async()=>{
   const ui=await renderer(),url=ui.nodes.get('webhook-url'),body=ui.nodes.get('webhook-body-template');
-  ui.value.notifications.webhookEndpoints=[{webhookId:'legacy',webhookName:'默认 Webhook',webhookProvider:'auto',webhookResolvedProvider:'feishu',hasWebhookUrl:true,webhookUrlDisplay:'https://example.test',hasWebhookHeaders:true,hasWebhookSignSecret:true,webhookBodyTemplate:'{"event":"{{event}}"}',webhookTemplates:ui.value.notifications.webhookTemplates}];
+  ui.value.notifications.webhookEndpoints=[{webhookId:'legacy',webhookName:'기본 웹훅',webhookProvider:'auto',webhookResolvedProvider:'feishu',hasWebhookUrl:true,webhookUrlDisplay:'https://example.test',hasWebhookHeaders:true,hasWebhookSignSecret:true,webhookBodyTemplate:'{"event":"{{event}}"}',webhookTemplates:ui.value.notifications.webhookTemplates}];
   await ui.poll();ui.run("activeTab='notifications'");ui.api.readCredentials=async()=>({webhookUrl:'https://example.test/hook?token=private'});
   await ui.nodes.get('webhook-url-eye').onclick();body.value='{"custom":"{{body}}"}';
   ui.context.applyLanguage('en');
@@ -511,7 +519,7 @@ test('remote deletion keeps a desktop Webhook draft tied to its original ID',asy
   await ui.poll();ui.run("selectWebhook('named-2')");ui.nodes.get('webhook-name').value='Unsaved second';
   ui.value.notifications.webhookEndpoints=ui.value.notifications.webhookEndpoints.slice(0,1);await ui.poll();
   assert.equal(ui.run('webhookSelectedId'),'named-2');assert.equal(ui.nodes.get('webhook-name').value,'Unsaved second');
-  let requested;ui.api.webhookEndpoint=async value=>{requested=value;throw Error('Webhook 不存在，请刷新列表');};
+  let requested;ui.api.webhookEndpoint=async value=>{requested=value;throw Error('웹훅을 찾을 수 없습니다. 목록을 새로 고칩니다.');};
   await ui.nodes.get('webhook-save').onclick();assert.equal(requested.webhookId,'named-2');assert.equal(ui.nodes.get('webhook-name').value,'Unsaved second');
 });
 
@@ -520,9 +528,9 @@ test('watch panel recognizes Webhook and PushPlus as enabled notification channe
   ui.value.runtime.running=true;
   ui.value.watches=[{id:'fixture-chat',host:'local',title:'Fixture'}];
   ui.value.notifications.webhookEnabled=true;await ui.poll();
-  assert.match(ui.nodes.get('watches').children[0].textContent,/正在监控/);
+  assert.match(ui.nodes.get('watches').children[0].textContent,/귀하의 확인이 필요한 요청이 있는지 채팅을 살펴보세요\./);
   ui.value.notifications.webhookEnabled=false;ui.value.notifications.pushplusEnabled=true;await ui.poll();
-  assert.match(ui.nodes.get('watches').children[0].textContent,/正在监控/);
+  assert.match(ui.nodes.get('watches').children[0].textContent,/귀하의 확인이 필요한 요청이 있는지 채팅을 살펴보세요\./);
 });
 
 test('Bark drafts survive polling and language changes and remain after saving',async()=>{
@@ -563,27 +571,27 @@ test('startup timeout replaces pending feedback and a late ready state recovers'
   const ui=await renderer();await ui.start();ui.advance(71000);await ui.poll();
   assert.equal(ui.nodes.get('feedback').hidden,true);
   assert.equal(ui.nodes.get('error').hidden,false);
-  assert.match(ui.nodes.get('error').textContent,/启动超时/);
-  await ui.poll();assert.match(ui.nodes.get('error').textContent,/启动超时/);
+  assert.match(ui.nodes.get('error').textContent,/게이트웨이 시작 시간이 초과되었습니다\. 런타임 로그를 확인하세요\./);
+  await ui.poll();assert.match(ui.nodes.get('error').textContent,/게이트웨이 시작 시간이 초과되었습니다\. 런타임 로그를 확인하세요\./);
   ui.value.runtime.running=true;await ui.poll();
   assert.equal(ui.nodes.get('error').hidden,true);
-  assert.match(ui.nodes.get('feedback').textContent,/已启动/);
+  assert.match(ui.nodes.get('feedback').textContent,/게이트웨이가 실행 중입니다\./);
 });
 
 test('an occupied port ends the pending startup indication',async()=>{
   const ui=await renderer();await ui.start();ui.value.runtime.portOccupied=true;await ui.poll();
-  assert.equal(ui.nodes.get('status').textContent,'端口已占用');
+  assert.equal(ui.nodes.get('status').textContent,'사용 중인 포트');
   assert.equal(ui.nodes.get('feedback').hidden,true);
-  assert.match(ui.nodes.get('error').textContent,/端口/);
+  assert.match(ui.nodes.get('error').textContent,/포트/);
 });
 
 test('runtime polling preserves a newer save notification',async()=>{
   const ui=await renderer();await ui.start();
   await ui.nodes.get('settings').onsubmit({preventDefault(){}});
   const saved=ui.nodes.get('toast-message').textContent;
-  assert.match(saved,/配置已保存/);
+  assert.match(saved,/설정이 저장되었습니다\./);
   ui.value.runtime.running=true;await ui.poll();
-  assert.equal(ui.nodes.get('status').textContent,'运行中');
+  assert.equal(ui.nodes.get('status').textContent,'실행 중');
   assert.equal(ui.nodes.get('toast-message').textContent,saved);
 });
 
@@ -591,9 +599,9 @@ test('language changes update runtime feedback and preserve entered values',asyn
   const ui=await renderer();await ui.start();
   ui.nodes.get('password').value='private draft';ui.context.applyLanguage('en');
   assert.equal(ui.nodes.get('status').textContent,'Starting');
-  assert.equal(ui.nodes.get('feedback').textContent,i18n.english['正在启动网关']);
+  assert.equal(ui.nodes.get('feedback').textContent,i18n.english['게이트웨이 시작 중']);
   assert.equal(ui.nodes.get('password').value,'private draft');
-  ui.context.applyLanguage('zh-CN');assert.equal(ui.nodes.get('status').textContent,'启动中');
+  ui.context.applyLanguage('ko-KR');assert.equal(ui.nodes.get('status').textContent,'시작');
 });
 
 test('saved Windows language initializes the shared UI and selector',async()=>{
@@ -614,8 +622,8 @@ test('connection additions and removals are unsaved, and language changes preser
   assert.equal(ui.nodes.get('dirty-dot').hidden,true);
   ui.run('connectionDraft=[];updateDirty();');
   assert.equal(ui.nodes.get('dirty-dot').hidden,false);
-  ui.nodes.get('language').value='zh';await ui.nodes.get('language').onchange();
-  assert.equal(ui.nodes.get('status').textContent,'未启动');
+  ui.nodes.get('language').value='ko';await ui.nodes.get('language').onchange();
+  assert.equal(ui.nodes.get('status').textContent,'중지됨');
 });
 
 test('opening logs starts at the newest records without changing their contents',async()=>{
@@ -733,11 +741,11 @@ test('Cloudflare installer selects official platform assets and rejects unsafe r
   assert.equal(cloudflared.assetName('win32','x64'),'cloudflared-windows-amd64.exe');
   assert.equal(cloudflared.assetName('linux','x64'),'cloudflared-linux-amd64');
   assert.equal(cloudflared.assetName('linux','arm64'),'cloudflared-linux-arm64');
-  assert.throws(()=>cloudflared.assetName('linux','arm'),/手动/);
-  assert.throws(()=>cloudflared.assetName('win32','arm64'),/手动/);
+  assert.throws(()=>cloudflared.assetName('linux','arm'),/(?:1\. 수동으로 서버 준비\(최초 설정\)|사용자 또는 서버 관리자는 터미널에서 서비스를 수동으로 설치하고 방화벽 및 SSH 권한을 구성해야 합니다\. 앱은 sudo 비밀번호를 허용하지 않거나 서버 설치 명령을 실행하지 않습니다\.|HTTPS 역방향 프록시를 수동으로 구성하거나 기존 사이트를 사용하십시오\. 아래 업스트림 주소를 사용하고 공개 호스트 헤더를 유지하세요\. 기존 사이트를 그대로 유지합니다\.|3\. 수동 설정 후 연결을 시작하고 고정 항목 확인을 선택합니다\. 마지막으로 로그인을 확인하고 전화 모바일 데이터를 통해 채팅하세요\.|수동 설정 참조 내보내기…|수동 설정 지침 복사|이 시스템에서는 원클릭 설치를 사용할 수 없습니다\. 공식 가이드를 따르세요\.)/);
+  assert.throws(()=>cloudflared.assetName('win32','arm64'),/이 시스템에서는 원클릭 설치를 사용할 수 없습니다\. 공식 가이드를 따르세요\./);
   let calls=0;
   const fetch=async()=>{calls++;return new Response(null,{status:302,headers:{location:'https://evil.example/cloudflared'}});};
-  await assert.rejects(cloudflared.download(fetch,'https://api.github.com/repos/cloudflare/cloudflared/releases/latest',1000,AbortSignal.timeout(1000)),/来源/);
+  await assert.rejects(cloudflared.download(fetch,'https://api.github.com/repos/cloudflare/cloudflared/releases/latest',1000,AbortSignal.timeout(1000)),/공식 소스 확인/);
   assert.equal(calls,1);
   for(const url of ['http://github.com/cloudflare/cloudflared/releases/download/x/y','https://github.com/other/project/releases/download/x/y','https://user:pass@github.com/cloudflare/cloudflared/releases/download/x/y'])assert.throws(()=>cloudflared.allowedUrl(url));
 });
@@ -762,7 +770,7 @@ test('Cloudflare install verifies before execution, preserves settings and never
     assert.deepEqual(await fs.readFile(result.path),bytes);
     assert.equal(await fs.readFile(path.join(dir,'desktop.json'),'utf8'),'original settings');
     await fs.writeFile(result.path,'existing customized program');
-    await assert.rejects(cloudflared.install(args),/已有不同程序/);
+    await assert.rejects(cloudflared.install(args),/설치 디렉터리에 다른 프로그램이 포함되어 있습니다\. 수동으로 선택하거나 충돌하는 디렉터리를 이동하세요\./);
     assert.equal(await fs.readFile(result.path,'utf8'),'existing customized program');
     assert.equal((await fs.readdir(path.join(dir,'bin'))).filter(name=>name.startsWith('.cloudflared-')).length,0);
   }finally{await fs.rm(dir,{recursive:true,force:true});}
@@ -772,9 +780,9 @@ test('Mac archive reader extracts only the regular executable and rejects symlin
   const {gzipSync}=require('node:zlib');
   function archive(name,type='0',length=4){const header=Buffer.alloc(512);header.write(name);header.write(length.toString(8).padStart(11,'0'),124);header.write(type,156);return gzipSync(Buffer.concat([header,Buffer.from('test'),Buffer.alloc(508)]));}
   assert.equal(cloudflared.executableFromArchive(archive('./cloudflared'),'mac.tgz').toString(),'test');
-  assert.throws(()=>cloudflared.executableFromArchive(archive('../cloudflared'),'mac.tgz'),/未找到/);
-  assert.throws(()=>cloudflared.executableFromArchive(archive('cloudflared','2'),'mac.tgz'),/格式/);
-  assert.throws(()=>cloudflared.executableFromArchive(archive('cloudflared','0',9999),'mac.tgz'),/不完整/);
+  assert.throws(()=>cloudflared.executableFromArchive(archive('../cloudflared'),'mac.tgz'),/cloudflared는 공식 아카이브에서 찾을 수 없습니다\./);
+  assert.throws(()=>cloudflared.executableFromArchive(archive('cloudflared','2'),'mac.tgz'),/공식 아카이브에 잘못된 실행 항목이 있습니다\./);
+  assert.throws(()=>cloudflared.executableFromArchive(archive('cloudflared','0',9999),'mac.tgz'),/불완전합니다/);
 });
 
 for(const arch of ['x64','arm64'])test('Linux '+arch+' installer verifies the raw executable before probing',async()=>{
@@ -801,7 +809,7 @@ for(const arch of ['x64','arm64'])test('Linux '+arch+' installer verifies the ra
 test('missing Cloudflare opens setup before start and installing preserves drafts',async()=>{
   const ui=await renderer();let started=0;
   ui.value.preferences.tunnel=true;await ui.poll();ui.api.start=async()=>{started++;};
-  ui.api.checkCloudflared=async()=>{throw Error('未找到 cloudflared，请点击一键安装，或选择已下载的程序。');};
+  ui.api.checkCloudflared=async()=>{throw Error('cloudflared를 찾을 수 없습니다. 다운로드 및 설치를 클릭하거나 다운로드한 실행 파일을 선택합니다.');};
   await ui.start();assert.equal(started,0);assert.equal(ui.run('activeTab'),'network');
   for(const id of ['cloudflared','password','ntfy-topic'])ui.nodes.get(id).closest=()=>({dataset:{panel:'advanced'}});
   ui.run("fields=()=>['cloudflared','password','ntfy-topic'].map($);savedFields=fieldValues()");
@@ -810,7 +818,7 @@ test('missing Cloudflare opens setup before start and installing preserves draft
   await ui.nodes.get('install-cloudflared').onclick();
   assert.equal(ui.nodes.get('cloudflared').value,'/data/bin/cloudflared');
   assert.equal(ui.nodes.get('password').value,'unsaved password');assert.equal(ui.nodes.get('ntfy-topic').value,'draft-topic');
-  assert.match(ui.nodes.get('toast-message').textContent,/保存配置/);
+  assert.match(ui.nodes.get('toast-message').textContent,/(?:설정 저장|게이트웨이를 시작하기 전에 설정을 저장하십시오\.|cloudflared가 설치되고 확인되었습니다\. 게이트웨이를 시작하기 전에 설정을 저장하십시오\.)/);
 });
 
 
@@ -819,7 +827,7 @@ test('update UI blocks installation while settings are unsaved and preserves dra
   ui.value.update={state:'available',current:'0.2.0-beta.5',version:'0.2.0-beta.6',notes:'<b>plain text</b>'};
   await ui.poll();ui.run("connectionDraft=[{id:'unsaved'}];updateDirty()");
   await ui.nodes.get('install-update').onclick();assert.equal(installs,0);
-  assert.match(ui.nodes.get('toast-message').textContent,/先保存/);
+  assert.match(ui.nodes.get('toast-message').textContent,/(?:앱을 업데이트하기 전에 설정을 저장하세요\.|게이트웨이를 시작하기 전에 설정을 저장하십시오\.)/);
   assert.equal(ui.nodes.get('update-notes').textContent,'<b>plain text</b>');
   ui.context.applyLanguage('en');assert.equal(ui.context.collect().preferences.connections[0].id,'unsaved');
 });
@@ -843,7 +851,7 @@ test('skipped update hides the automatic prompt while manual check offers instal
   ui.api.skipUpdate=async()=>{skips++;ui.value.update={state:'skipped',current:'2.0.0-preview.1',version:'2.0.0-preview.2'};};
   await ui.nodes.get('skip-update').onclick();assert.equal(skips,1);assert.equal(ui.nodes.get('update-banner').hidden,true);assert.equal(ui.nodes.get('skip-update').hidden,true);
   ui.api.checkUpdate=async()=>{ui.value.update={state:'available',current:'2.0.0-preview.1',version:'2.0.0-preview.2',skipped:true};};
-  await ui.nodes.get('check-update').onclick();assert.equal(ui.nodes.get('install-update').hidden,false);assert.match(ui.nodes.get('update-state').textContent,/已跳过/);
+  await ui.nodes.get('check-update').onclick();assert.equal(ui.nodes.get('install-update').hidden,false);assert.match(ui.nodes.get('update-state').textContent,/이 버전은 건너뛰었습니다\. 수동으로 확인한 후에도 업데이트할 수 있습니다\./);
   ui.run("applyLanguage('en')");assert.match(ui.nodes.get('update-state').textContent,/skipped/);
 });
 
@@ -859,7 +867,7 @@ test('unsupported updates explain manual downloads in both languages',async()=>{
   const ui=await renderer();ui.value.update={state:'unsupported',current:'1.2.2'};
   await ui.poll();assert.equal(ui.nodes.get('check-update').disabled,true);
   assert.equal(ui.nodes.get('install-update').hidden,true);
-  assert.match(ui.nodes.get('update-state').textContent,/发布页面/);
+  assert.match(ui.nodes.get('update-state').textContent,/이 시스템이나 이 실행 모드에서는 인앱 업데이트를 사용할 수 없습니다\. 릴리스 페이지에서 새 버전을 다운로드하세요\./);
   ui.run("applyLanguage('en')");assert.match(ui.nodes.get('update-state').textContent,/releases page/);
 });
 
@@ -989,16 +997,16 @@ test('entry notification preference, current-link test and update readiness stay
   const ui=await renderer();
   ui.value.preferences.tunnel=true;
   await ui.poll();
-  assert.match(ui.nodes.get('update-address-state').textContent,/未开启/);
+  assert.match(ui.nodes.get('update-address-state').textContent,/(?:입장 알림이 꺼져 있습니다\. 게이트웨이 시작 및 주소 변경 사항은 귀하에게 전송되지 않습니다\.|끄다)/);
   ui.value.notifications.addressEnabled=true;
   ui.value.notifications.addressName='Home computer';
   await ui.poll();
-  assert.match(ui.nodes.get('update-address-state').textContent,/至少一个/);
+  assert.match(ui.nodes.get('update-address-state').textContent,/하나 이상의 알림 채널/);
   ui.value.notifications.barkEnabled=true;
   await ui.poll();
   assert.equal(ui.nodes.get('address-enabled').checked,true);
   assert.equal(ui.nodes.get('address-name').value,'Home computer');
-  assert.match(ui.nodes.get('update-address-state').textContent,/已开启/);
+  assert.match(ui.nodes.get('update-address-state').textContent,/입장 알림이 켜져 있습니다/);
   const calls=[];ui.api.testNotification=async payload=>{calls.push(payload);return {message:'accepted'};};
   await ui.nodes.get('test-address').onclick();
   assert.equal(calls[0].channel,'address');
@@ -1046,26 +1054,26 @@ test('native window title and local target copy respect their fixed origins',asy
   }});
   vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../desktop/main.cjs'),'utf8'),context);
   context.createWindow();context.register();
-  assert.equal(instance.title,'Codex 手机网关');
+  assert.equal(instance.title,'Codex 모바일 Bridge');
   let prevented=0;events['page-title-updated']({preventDefault(){prevented++;}},'Different page title');
-  assert.equal(prevented,1);assert.equal(instance.title,'Codex 手机网关');
+  assert.equal(prevented,1);assert.equal(instance.title,'Codex 모바일 Bridge');
   const event={sender:instance.webContents,senderFrame:instance.webContents.mainFrame};
   const originalWorker=context.worker,networkCalls=[];
   context.worker=async(action,payload)=>{networkCalls.push({action,payload});return {enabled:payload.enabled===true};};
   assert.equal((await handlers['bridge:network-adaptation'](event,{action:'set',enabled:true})).enabled,true);
   assert.deepEqual(networkCalls,[{action:'network-adaptation',payload:{action:'set',enabled:true}}]);
-  await assert.rejects(handlers['bridge:network-adaptation']({...event,senderFrame:{}},{action:'set',enabled:false}),/不允许的界面来源/);
+  await assert.rejects(handlers['bridge:network-adaptation']({...event,senderFrame:{}},{action:'set',enabled:false}),/이 UI 소스는 허용되지 않습니다\./);
   assert.equal(networkCalls.length,1);context.worker=originalWorker;
-  handlers['bridge:set-language'](event,'zh-CN');assert.equal(changes,0);
+  handlers['bridge:set-language'](event,'ko-KR');assert.equal(changes,0);
   handlers['bridge:set-language'](event,'en');assert.equal(changes,1);
   handlers['bridge:set-language'](event,'en');assert.equal(changes,1);
   vm.runInContext("lastSnapshot={urls:[],preferences:{port:8787}};updateQuitting=true;updater={status(){return {}}}",context);
   await handlers['bridge:copy'](event,'http://127.0.0.1:8787');
   await handlers['bridge:copy'](event,'http://127.0.0.1:8788');
   assert.deepEqual(copied,['http://127.0.0.1:8787','http://127.0.0.1:8788']);
-  await assert.rejects(handlers['bridge:copy'](event,'http://127.0.0.1:65536'),/地址不可用/);
-  await assert.rejects(handlers['bridge:copy'](event,'http://127.0.0.1:8788/path'),/地址不可用/);
-  await assert.rejects(handlers['bridge:copy'](event,'http://192.168.1.2:8787'),/地址不可用/);
+  await assert.rejects(handlers['bridge:copy'](event,'http://127.0.0.1:65536'),/사용할 수 없는 주소입니다/);
+  await assert.rejects(handlers['bridge:copy'](event,'http://127.0.0.1:8788/path'),/사용할 수 없는 주소입니다/);
+  await assert.rejects(handlers['bridge:copy'](event,'http://192.168.1.2:8787'),/사용할 수 없는 주소입니다/);
   await handlers['bridge:open'](event,'setup-external');
   assert.match(opened[0],/#external$/);
 });
@@ -1073,14 +1081,14 @@ test('native window title and local target copy respect their fixed origins',asy
 
 test('English toast translates account failures and dynamic operation feedback',async()=>{
  const ui=await renderer('en');
- for(const message of ['请先保存连接配置。', '账号不存在，请刷新列表', '部分通道发送失败：ntfy；请在手机确认其他通道是否收到。']){
+ for(const message of ['먼저 연결 설정을 저장하세요.', '계정이 더 이상 존재하지 않습니다. 목록을 새로 고칩니다.', '일부 채널에서 전송하지 못했습니다.：ntfy；다른 채널에서 수신 여부를 휴대폰에서 확인해주세요.。']){
   ui.context.feedback(message,true);assert.doesNotMatch(ui.nodes.get('toast-message').textContent,/[\u4e00-\u9fff]/);
  }
 });
 
 test('SSH phone URL can stay blank and explains domain DNS and trusted IP HTTPS in both languages',async()=>{
   const descendants=node=>[node,...(node.children||[]).flatMap(descendants)];
-  for(const language of ['zh-CN','en']){
+  for(const language of ['ko-KR','en']){
     const ui=await renderer(language);
     ui.run(`connectionDraft=[{id:'server',name:'',enabled:true,accessMode:'server',publicUrl:'',sshAuth:'password',sshHost:'93.184.216.34',sshUser:'example',sshPort:22,sshRemotePort:18787}];renderConnections();`);
     const controls=descendants(ui.nodes.get('connections'));
@@ -1091,19 +1099,19 @@ test('SSH phone URL can stay blank and explains domain DNS and trusted IP HTTPS 
       assert.match(text,/Phone access URL \(optional\)/);assert.match(text,/DNS record.*public IP/);
       assert.match(text,/trusted HTTPS certificate matching that IP/);assert.doesNotMatch(text,/[\u4e00-\u9fff]/);
     }else{
-      assert.match(text,/手机访问地址（可选）/);assert.match(text,/域名解析到服务器公网 IP/);assert.match(text,/匹配该 IP 的受信任 HTTPS 证书/);
+      assert.match(text,/휴대폰 접속 주소\(선택 사항\)/);assert.match(text,/도메인의 경우 DNS 레코드가 공용 IP 서버를 가리키도록 하고 HTTPS 인증서와 역방향 프록시를 구성합니다\. https:\/\/bridge\.example\.com\.와 같이 전체 URL를 입력하세요\./);assert.match(text,/저장 시 https:\/\/server-public-IP를 입력하려면 공백으로 남겨두세요\. SSH 서버 주소 또는 별칭 HostName은 공개 IP여야 합니다\. 서버에는 여전히 IP 및 역방향 프록시와 일치하는 신뢰할 수 있는 HTTPS 인증서가 필요합니다\. SSH만으로는 충분하지 않습니다\./);
     }
   }
 });
 
 test('hidden login launch starts the gateway and keeps background polling paused',async()=>{
-  const ui=await renderer('zh-CN',{autoStart:true,hidden:true});
+  const ui=await renderer('ko-KR',{autoStart:true,hidden:true});
   assert.deepEqual(ui.calls,['snapshot','start']);
   await ui.poll();assert.deepEqual(ui.calls,['snapshot','start']);
 });
 
 test('Windows login startup enables gateway startup and preserves it when unchecked',async()=>{
-  const ui=await renderer('zh-CN',{loginStartup:{supported:true,enabled:false}});
+  const ui=await renderer('ko-KR',{loginStartup:{supported:true,enabled:false}});
   assert.equal(ui.nodes.get('login-startup-setting').hidden,false);
   ui.nodes.get('login-startup').checked=true;ui.nodes.get('login-startup').onchange();
   assert.equal(ui.nodes.get('auto-start').checked,true);
@@ -1162,7 +1170,7 @@ test('Windows startup lookup handles Electron quoted paths with spaces',()=>{
 });
 
 test('desktop WSL scope uses registered environment transport and restores native content',async()=>{
- let nativeReads=0;const ui=await renderer('zh-CN',{platform:'win32',AccountsPanel:class{attachApiAccess(panel,details){this.apiAccess=panel;this.apiDetails=details;}visible(){return true;}refresh(){nativeReads++;}resume(){}render(){}clear(){this.generation=(this.generation||0)+1;}}}),entry='wsl:'+'a'.repeat(32),requests=[];
+ let nativeReads=0;const ui=await renderer('ko-KR',{platform:'win32',AccountsPanel:class{attachApiAccess(panel,details){this.apiAccess=panel;this.apiDetails=details;}visible(){return true;}refresh(){nativeReads++;}resume(){}render(){}clear(){this.generation=(this.generation||0)+1;}}}),entry='wsl:'+'a'.repeat(32),requests=[];
  ui.api.cliAccess=async payload=>{requests.push(structuredClone(payload));return payload.operation==='environments'?{provider:'codex',environments:[{id:entry,label:'Ubuntu',distribution:'Ubuntu',user:'developer',configDir:'/home/developer/.codex'}]}:{provider:'codex',entry,identity:'wsl-digest',available:true,accounts:[],capabilities:{switch:true,models:true},blockers:[]};};
  await ui.run('wslAccountScopes[0].load()');const native=ui.nodes.get('accounts-content'),wrapper=native.beforeNode,select=wrapper.children[0].children[1];
  assert.equal(select.options.length,2);assert.equal(select.options[1].value,entry);select.value=entry;await select.onchange();await new Promise(setImmediate);
@@ -1171,13 +1179,13 @@ test('desktop WSL scope uses registered environment transport and restores nativ
 });
 
 for(const platform of ['darwin','linux'])test(platform+' desktop does not initialize WSL account scopes',async()=>{
- const ui=await renderer('zh-CN',{platform});assert.equal(ui.run('wslAccountScopes.length'),0);assert.equal(ui.calls.some(call=>call.cliAccess?.action==='wslAccounts'),false);
- await assert.rejects(ui.context.window.loadWslAccounts(),/不支持 WSL/);
+ const ui=await renderer('ko-KR',{platform});assert.equal(ui.run('wslAccountScopes.length'),0);assert.equal(ui.calls.some(call=>call.cliAccess?.action==='wslAccounts'),false);
+ await assert.rejects(ui.context.window.loadWslAccounts(),/현재 컴퓨터는 지원하지 않습니다\. WSL 애플리케이션/);
 });
 
 
 test('Codex quota remains visible in the client overview and pauses off the page',async()=>{
- const ui=await renderer('zh-CN',{DesktopConnectionsPanel:class{managementClients(){return this.rows||[];}},AccountsPanel:class{visible(){return false;}resume(){}render(){}refresh(){}}});
+ const ui=await renderer('ko-KR',{DesktopConnectionsPanel:class{managementClients(){return this.rows||[];}},AccountsPanel:class{visible(){return false;}resume(){}render(){}refresh(){}}});
  ui.nodes.get('clients-page').hidden=false;assert.equal(ui.run('accountsPanel.visible()'),false);
  ui.run("desktopConnections.rows=[{id:'codex',enabled:true}]");assert.equal(ui.run('accountsPanel.visible()'),true);
  ui.nodes.get('clients-page').hidden=true;assert.equal(ui.run('accountsPanel.visible()'),false);

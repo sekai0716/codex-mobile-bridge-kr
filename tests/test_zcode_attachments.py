@@ -64,7 +64,7 @@ class ZCodeAttachmentTests(unittest.TestCase):
         self.assertEqual(result['previewBytes'], self.png)
         with closing(sqlite3.connect(self.transcript)) as db:
             db.execute('DELETE FROM part'); db.commit()
-        with self.assertRaisesRegex(ValueError, '图片已不属于'):
+        with self.assertRaisesRegex(ValueError, "사진이\\ 더\\ 이상\\ 이\\ 채팅에\\ 속하지\\ 않습니다\\."):
             images.preview('zcode', self.sid, public['desktopId'], lambda value: read_image(self.home, self.sid, value))
 
     def test_native_image_cannot_open_cross_session_or_symlink(self):

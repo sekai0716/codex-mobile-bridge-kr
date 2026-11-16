@@ -57,7 +57,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
         generation = self.desktop.generation
         started = time.monotonic()
         with patch('bridge.clients.claude.adapter.native_action') as native, patch.object(self.adapter, 'prepare') as prepare:
-            with self.assertRaisesRegex(BridgeUnavailable, '暂未响应'):
+            with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ 데스크톱\\ 연결이\\ 응답하지\\ 않습니다\\.\\ 컴퓨터에서\\ 상태를\\ 확인하고\\ 다시\\ 시도하세요\\.\\ 클라이언트가\\ 다시\\ 시작되지\\ 않았습니다\\."):
                 self.adapter.check_connection()
         self.assertLess(time.monotonic() - started, 5.5)
         self.assertEqual(self.desktop.generation, generation)
@@ -252,7 +252,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
         request = (self.adapter.directory/'request.json').read_bytes()
         with patch('bridge.clients.claude.adapter.sys.platform', 'darwin'), \
              patch('bridge.clients.claude.adapter.native_action') as native:
-            with self.assertRaisesRegex(ValueError, '未确认的请求'):
+            with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
                 self.adapter.reconnect()
         self.assertEqual((self.adapter.directory/'request.json').read_bytes(), request)
         native.assert_not_called()
@@ -265,7 +265,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
                  patch('bridge.clients.claude.adapter.sys.platform', platform), \
                  patch('bridge.clients.claude.adapter.native_action') as native, \
                  patch.object(self.adapter, 'prepare') as prepare:
-                with self.assertRaisesRegex(ValueError, '未确认的请求'):
+                with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
                     self.adapter.connect()
                 self.assertEqual((self.adapter.directory/'request.json').read_bytes(), request)
                 native.assert_not_called(); prepare.assert_not_called()
@@ -274,7 +274,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
         self.desktop.unconfirmed_mutations.add(1)
         request = (self.adapter.directory/'request.json').read_bytes()
         generation = self.desktop.generation
-        with self.assertRaisesRegex(ValueError, '未确认的请求'):
+        with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
             self.adapter.prepare(reset=True)
         self.assertIs(self.adapter.desktop, self.desktop)
         self.assertEqual(self.desktop.generation, generation)
@@ -283,9 +283,9 @@ class ClaudeConnectionProbe(unittest.TestCase):
 
     def test_recovery_read_probe_does_not_bypass_normal_calls_or_accept_cancelled_owner(self):
         self.adapter.reconnecting = True
-        with self.assertRaisesRegex(BridgeUnavailable, '正在重新连接'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude가\\ 다시\\ 연결\\ 중입니다\\.\\ 잠시\\ 후\\ 다시\\ 시도해\\ 주세요\\."):
             self.adapter.call('send')
-        with self.assertRaisesRegex(BridgeUnavailable, '正在重新连接'):
+        with self.assertRaisesRegex(BridgeUnavailable, "Claude가\\ 다시\\ 연결\\ 중입니다\\.\\ 잠시\\ 후\\ 다시\\ 시도해\\ 주세요\\."):
             self.adapter.check_connection()
         self.assertEqual(self.desktop.seq, 0)
         for invalidate in ('cancel', 'owner'):
@@ -297,7 +297,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
                     else: self.adapter.desktop = None
                     return []
                 with patch.object(self.desktop, 'call', side_effect=invalidate_after_reply):
-                    with self.assertRaisesRegex(BridgeUnavailable, '暂未响应'):
+                    with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ 데스크톱\\ 연결이\\ 응답하지\\ 않습니다\\.\\ 컴퓨터에서\\ 상태를\\ 확인하고\\ 다시\\ 시도하세요\\.\\ 클라이언트가\\ 다시\\ 시작되지\\ 않았습니다\\."):
                         self.adapter.check_connection(_reconnect_probe=True)
                 self.assertTrue(self.adapter.connection_probe_failed)
         self.adapter.desktop = self.desktop
@@ -312,7 +312,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
                             'expires': time.time() + 30})
         original = (self.adapter.directory/'request.json').read_bytes()
         try:
-            with self.assertRaisesRegex(BridgeUnavailable, '暂未响应'):
+            with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ 데스크톱\\ 연결이\\ 응답하지\\ 않습니다\\.\\ 컴퓨터에서\\ 상태를\\ 확인하고\\ 다시\\ 시도하세요\\.\\ 클라이언트가\\ 다시\\ 시작되지\\ 않았습니다\\."):
                 self.adapter.check_connection()
             self.assertTrue(self.desktop.lock.locked())
             self.assertEqual((self.adapter.directory/'request.json').read_bytes(), original)
@@ -338,13 +338,13 @@ class ClaudeConnectionProbe(unittest.TestCase):
         with patch.object(self.desktop, 'write', side_effect=slow_write), \
              patch('bridge.clients.claude.adapter.asyncio.run_coroutine_threadsafe', side_effect=shortened):
             try:
-                with self.assertRaisesRegex(BridgeUnavailable, '暂未响应'):
+                with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ 데스크톱\\ 연결이\\ 응답하지\\ 않습니다\\.\\ 컴퓨터에서\\ 상태를\\ 확인하고\\ 다시\\ 시도하세요\\.\\ 클라이언트가\\ 다시\\ 시작되지\\ 않았습니다\\."):
                     self.adapter.check_connection()
                 self.assertTrue(entered.wait(1))
                 self.assertFalse(submitted[0].done())
                 self.assertIn(submitted[0], self.adapter.pending_calls)
                 self.assertTrue(self.desktop.lock.locked())
-                with self.assertRaisesRegex(ValueError, '未确认的请求'):
+                with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
                     self.adapter.connect(existing_only=True)
             finally:
                 release.set()
@@ -373,7 +373,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
             self.assertFalse(submitted[0].done())
             self.assertIn(submitted[0], self.adapter.pending_calls)
             with patch.object(self.adapter, 'prepare') as prepare, patch.object(self.desktop, 'close') as close:
-                with self.assertRaisesRegex(ValueError, '未确认的请求'):
+                with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
                     self.adapter.connect(existing_only=True)
             prepare.assert_not_called(); close.assert_not_called()
             self.assertFalse(submitted[0].cancelled())
@@ -387,7 +387,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
         try:
             with patch.object(self.adapter, 'prepare') as prepare, \
                  patch.object(self.desktop, 'close') as close, patch('bridge.clients.claude.adapter.native_action') as native:
-                with self.assertRaisesRegex(ValueError, '未确认的请求'):
+                with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
                     self.adapter.connect(existing_only=True)
             prepare.assert_not_called(); close.assert_not_called(); native.assert_not_called()
         finally: self.adapter.loop.call_soon_threadsafe(self.desktop.lock.release)
@@ -407,7 +407,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
                  patch.object(self.adapter, 'prepare') as prepare, \
                  patch.object(self.adapter.setup_cancel, 'wait', return_value=False):
                 self.adapter._connect_native(False, self.adapter.directory/'cancel', existing_only=True)
-            self.assertIn('未确认的请求', self.adapter.status()['reason'])
+            self.assertIn("Claude에는 아직 확인되지 않은 결과가 있는 요청이 있습니다. 컴퓨터에서 결과를 확인하고 새 연결이 필요한 경우 데스크탑 컨트롤을 사용하십시오.", self.adapter.status()['reason'])
             running.assert_not_called(); prepare.assert_not_called()
         finally: self.adapter.loop.call_soon_threadsafe(self.desktop.lock.release)
 
@@ -426,12 +426,12 @@ class ClaudeConnectionProbe(unittest.TestCase):
         with self.assertRaises(BridgeUnavailable): future.result(timeout=1)
         self.assertFalse(self.desktop.lock.locked())
         self.assertEqual(self.desktop.unconfirmed_mutations, {1})
-        with self.assertRaisesRegex(ValueError, '未确认的请求'):
+        with self.assertRaisesRegex(ValueError, "Claude에는\\ 아직\\ 확인되지\\ 않은\\ 결과가\\ 있는\\ 요청이\\ 있습니다\\.\\ 컴퓨터에서\\ 결과를\\ 확인하고\\ 새\\ 연결이\\ 필요한\\ 경우\\ 데스크탑\\ 컨트롤을\\ 사용하십시오\\."):
             self.adapter.connect(existing_only=True)
         # A later read success is not an acknowledgement of the timed-out send.
         self.reply({'seq': 2, 'done': True, 'result': []}); self.desktop.read()
         self.assertEqual(self.desktop.unconfirmed_mutations, {1})
-        with self.assertRaisesRegex(ValueError, '未确认的请求'):
+        with self.assertRaisesRegex(ValueError, 'Claude에는 아직 확인되지 않은 결과가 있는 요청'):
             self.adapter.connect(existing_only=True)
         self.reply({'seq': 1, 'done': True, 'result': True}); self.desktop.read()
         self.assertEqual(self.desktop.unconfirmed_mutations, set())
@@ -472,7 +472,7 @@ class ClaudeConnectionProbe(unittest.TestCase):
                     actions.append(name)
                     if name == 'connect':
                         self.assertTrue(self.adapter.reconnecting)
-                        with self.assertRaisesRegex(BridgeUnavailable, '正在重新连接'):
+                        with self.assertRaisesRegex(BridgeUnavailable, 'Claude가 다시 연결 중입니다'):
                             self.adapter.call('list')
                         self.assertIs(self.adapter.desktop, self.desktop)
                         self.assertEqual(self.desktop.generation, generation)

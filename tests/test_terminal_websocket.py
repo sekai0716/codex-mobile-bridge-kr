@@ -88,16 +88,16 @@ class TerminalSocketTests(unittest.TestCase):
             self.assertIn(b'Sec-WebSocket-Protocol: terminal.v1', response)
             resize_id, input_id = str(uuid.uuid4()), str(uuid.uuid4())
             self.send(connection, {'action': 'resize', 'requestId': resize_id, 'cols': 100, 'rows': 30})
-            self.send(connection, {'action': 'input', 'inputId': input_id, 'data': '你好😀\r'})
+            self.send(connection, {'action': 'input', 'inputId': input_id, 'data': "\u4f60\u597d😀\r"})
             self.assertEqual(self.receive(connection), (1, {'type': 'ack', 'action': 'resize', 'id': resize_id}))
             self.assertEqual(self.receive(connection), (1, {'type': 'ack', 'action': 'input', 'id': input_id}))
             self.assertEqual([call[2] for call in self.calls if call[2] != 'poll'], ['resize', 'input'])
-            self.assertEqual(next(call[3]['data'] for call in self.calls if call[2] == 'input'), '你好😀\r')
+            self.assertEqual(next(call[3]['data'] for call in self.calls if call[2] == 'input'), "\u4f60\u597d😀\r")
         finally:
             connection.close()
 
     def test_output_chunks_and_render_ack_use_bounded_frames(self):
-        output = '好' * 40000
+        output = "\u597d" * 40000
         self.server.bridge.terminal = lambda thread, owner, action, params: (
             {'output': output[params['after']:], 'cursor': len(output), 'reset': False,
              'running': True, 'shell': 'fixture', 'cwd': '/fixture'} if action == 'poll' else {'accepted': True})

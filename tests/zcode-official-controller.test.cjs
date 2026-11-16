@@ -13,9 +13,9 @@ fs.writeFileSync(path.join(p,'desktop-sessions/settings.json'),JSON.stringify({d
 return new OfficialRemote({electron:{safeStorage:storage()},profile:p,rendererPath:__filename});}
 test('official target must match existing native telemetry without generating a new identity',t=>{
  const c=fixture(t);assert.equal(c.localLink(link).mid,'this-machine');
- assert.throws(()=>c.localLink(link.replace('this-machine','another-machine')),/本机/);
- assert.throws(()=>c.localLink(link.replace('zcode.z.ai','evil.invalid')),/官方/);
- assert.throws(()=>c.localLink(link+'&mid=this-machine'),/官方/);
+ assert.throws(()=>c.localLink(link.replace('this-machine','another-machine')),/이 컴퓨터/);
+ assert.throws(()=>c.localLink(link.replace('zcode.z.ai','evil.invalid')),/(?:연결 구성을 수정하기 전에 공식 리모컨을 연결 해제하고 로그인 창을 닫으십시오\.。|공식 원격제어 연결이 변경되었습니다\. 세션에 다시 접속해주세요\.。|이용해주세요 ZCode 기존 App 공식 원격 제어 링크 제공。)/);
+ assert.throws(()=>c.localLink(link+'&mid=this-machine'),/이용해주세요 ZCode 기존 App 공식 원격 제어 링크 제공。/);
 });
 test('public state never contains authentication and preserves explicit local/official selection',t=>{
  const c=fixture(t);c.auth={jwt:'private-secret',link,provider:'zai',name:'Fixture'};
@@ -46,8 +46,8 @@ test('standby pairing waits for explicit access before reading the keychain and 
 });
 test('saving configuration cannot silently move a live connection to a different target',t=>{
  const c=fixture(t);c.save(link);c.runtime={};
- assert.throws(()=>c.save(link.replace('native-session','another-session')),/先断开/);
- assert.equal(c.status().link,link);assert.throws(()=>c.save(link.replace('this-machine','another-machine')),/本机/);
+ assert.throws(()=>c.save(link.replace('native-session','another-session')),/연결 구성을 수정하기 전에 공식 리모컨을 연결 해제하고 로그인 창을 닫으십시오\.。/);
+ assert.equal(c.status().link,link);assert.throws(()=>c.save(link.replace('this-machine','another-machine')),/이 컴퓨터/);
 });
 test('legacy encrypted login supplies the target and forget retains the saved link',async t=>{
  const c=fixture(t);c.electron.safeStorage=storage();
@@ -58,9 +58,9 @@ test('legacy encrypted login supplies the target and forget retains the saved li
 });
 test('requests cannot cross a relay epoch or bypass expiry and action validation',async t=>{
  const c=fixture(t);c.runtime={};c.owner={epoch:'current',device:'native-session'};
- await assert.rejects(c.handle({command:'call',request:{action:'send',expectedProcess:{epoch:'old',device:'native-session'},expiresAt:Date.now()+10000}}),/已变化/);
- await assert.rejects(c.handle({command:'call',request:{action:'send',expectedProcess:c.owner,expiresAt:Date.now()-1}}),/过期/);
- await assert.rejects(c.handle({command:'call',request:{action:'arbitrary-eval'}}),/不支持/);
+ await assert.rejects(c.handle({command:'call',request:{action:'send',expectedProcess:{epoch:'old',device:'native-session'},expiresAt:Date.now()+10000}}),/공식 원격제어 연결이 변경되었습니다\. 세션에 다시 접속해주세요\.。/);
+ await assert.rejects(c.handle({command:'call',request:{action:'send',expectedProcess:c.owner,expiresAt:Date.now()-1}}),/이 요청은 만료되었습니다\. 원래 작업 결과를 확인하세요\.。/);
+ await assert.rejects(c.handle({command:'call',request:{action:'arbitrary-eval'}}),/지원되지 않는 공식 원격 제어 작업。/);
 });
 test('forget closes pending login, drops relay and removes encrypted credentials only',async t=>{
  const c=fixture(t);let closed=0,disposed=0;c.loginWindow={destroy(){closed++;}};c.runtime={dispose(){disposed++;}};c.auth={jwt:'private-secret'};
@@ -88,7 +88,7 @@ function platformController(platform,serveLocal){
 }
 test('optional IPC startup failure remains isolated and never advertises a usable connection',async t=>{
  const Controller=platformController('win32',async()=>{throw Error('private-path-or-token');}),p=profile(t),c=new Controller({electron:{safeStorage:storage()},profile:p,rendererPath:__filename,localServiceWorker:{executable:'gateway.exe'}});
- assert.equal(await c.start(),false);assert.equal(c.status().available,false);assert.equal(c.status().connected,false);assert.match(c.status().reason,/其他网关功能不受影响/);assert.equal(JSON.stringify(c.status()).includes('private-path-or-token'),false);
+ assert.equal(await c.start(),false);assert.equal(c.status().available,false);assert.equal(c.status().connected,false);assert.match(c.status().reason,/다른 게이트웨이 기능은 영향을 받지 않습니다./);assert.equal(JSON.stringify(c.status()).includes('private-path-or-token'),false);
 });
 test('Linux credentials require a real keyring and never permit plaintext or pre-ready storage',async t=>{
  const Controller=platformController('linux',async()=>()=>{}),p=profile(t);
@@ -131,7 +131,7 @@ test('pending keyring cannot hold private service startup and timeout cannot res
  const c=platformFixture(t,'linux',storage({getSelectedStorageBackend:()=> 'gnome_libsecret',isAsyncEncryptionAvailable:()=>check.promise,
   decryptStringAsync:async()=>{decrypts++;return {result:JSON.stringify(auth)};}}));const auth=saved(c);c.storageTimeoutMs=8;
  assert.equal(await c.start(),true);assert.equal(c.status().available,true);assert.equal(c.status().restoring,true);assert.equal(c.status().secureStoragePending,true);
- const pending=c.restorePending;await pending;assert.equal(c.status().configured,false);assert.match(c.status().reason,/安全存储尚未就绪/);
+ const pending=c.restorePending;await pending;assert.equal(c.status().configured,false);assert.match(c.status().reason,/시스템 보안 저장소가 준비되지 않았습니다\. 시스템 키링을 잠금 해제하고 다시 시도하세요\./);
  check.resolve(true);await tick();assert.equal(c.auth,null);assert.equal(decrypts,0);assert.ok(fs.existsSync(c.authFile));c.dispose();
 });
 test('availability checks share one pending native call and explicit retries recover after failure',async t=>{
@@ -155,7 +155,7 @@ test('connect waits for restoration and an explicit link change cancels the old 
  const decrypt=deferred(),c=platformFixture(t,'linux',storage({getSelectedStorageBackend:()=> 'gnome_libsecret',decryptStringAsync:()=>decrypt.promise}));const auth=saved(c);
  const restoring=c.restore();await tick();let complete=false;const connecting=c.connect().finally(()=>{complete=true;});
  await tick();assert.equal(complete,false);c.save(link.replace('native-session','other-session'));
- const rejected=assert.rejects(connecting,/已取消/);decrypt.resolve({result:JSON.stringify(auth)});await restoring;await rejected;
+ const rejected=assert.rejects(connecting,/취소/);decrypt.resolve({result:JSON.stringify(auth)});await restoring;await rejected;
  assert.equal(c.auth,null);assert.match(c.targetLink(),/other-session/);c.dispose();
 });
 test('Linux rejects weak ciphertext on both restore and login without modifying saved credentials',async t=>{
@@ -184,14 +184,14 @@ test('Mac and Windows async restore preserve existing synchronous-format encrypt
 test('an existing login window can explicitly retry unavailable storage without invalidating capture',async t=>{
  let available=true;const c=platformFixture(t,'linux',storage({getSelectedStorageBackend:()=> 'gnome_libsecret',isAsyncEncryptionAvailable:async()=>available,encryptStringAsync:async()=>Buffer.from('v11encrypted-fixture')}));
  loginBrowser(c,{jwt:'fixture-token',provider:'zai',name:'Fixture'});await c.login(link);const win=c.loginWindow;
- available=false;await assert.rejects(c.login(link),/安全存储不可用/);assert.equal(c.loginWindow,win);
+ available=false;await assert.rejects(c.login(link),/보안 저장소를 사용할 수 없습니다./);assert.equal(c.loginWindow,win);
  available=true;await c.login(link);assert.equal(c.loginWindow,win);win.webContents.emit('did-finish-load');await tick();await tick();
  assert.equal(c.status().configured,true);assert.equal(fs.readFileSync(c.authFile,'utf8'),'v11encrypted-fixture');c.dispose();
 });
 test('encryption timeout reports promptly and its late result cannot write credentials',async t=>{
  const encrypt=deferred();let calls=0;const c=platformFixture(t,'linux',storage({getSelectedStorageBackend:()=> 'gnome_libsecret',encryptStringAsync:()=>{calls++;return encrypt.promise;}}));c.storageTimeoutMs=5;
  loginBrowser(c,{jwt:'fixture-token',provider:'zai',name:'Fixture'});await c.login(link);const win=c.loginWindow;
- win.webContents.emit('did-finish-load');await new Promise(resolve=>setTimeout(resolve,12));assert.match(c.status().reason,/安全存储尚未就绪/);
+ win.webContents.emit('did-finish-load');await new Promise(resolve=>setTimeout(resolve,12));assert.match(c.status().reason,/시스템 보안 저장소가 준비되지 않았습니다\. 시스템 키링을 잠금 해제하고 다시 시도하세요\./);
  win.webContents.emit('did-finish-load');await tick();assert.equal(calls,1);assert.equal(fs.existsSync(c.authFile),false);
  encrypt.resolve(Buffer.from('v11late-ciphertext'));await tick();await tick();assert.equal(fs.existsSync(c.authFile),false);assert.equal(c.auth,null);c.dispose();
 });
@@ -208,5 +208,5 @@ test('closing the controller during optional IPC startup closes its late listene
  const c=platformFixture(t,'linux',safe,()=>server.promise);saved(c);
  const starting=c.start();c.dispose();server.resolve(()=>{closed++;});
  assert.equal(await starting,false);assert.equal(closed,1);assert.equal(c.status().available,false);
- assert.equal(await c.restore(),false);await assert.rejects(c.login(link),/服务已关闭/);
+ assert.equal(await c.restore(),false);await assert.rejects(c.login(link),/공식 원격접속 서비스가 종료되었습니다\./);
 });

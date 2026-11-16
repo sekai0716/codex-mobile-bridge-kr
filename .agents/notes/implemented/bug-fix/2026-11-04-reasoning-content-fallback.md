@@ -1,31 +1,31 @@
-# Agent Note: 第三方 Responses 只回思考正文时补全思考摘要
+# Agent Note: 제3자 Responses 본문을 생각할 때만 생각 요약을 완성하세요.
 
 Status: implemented
 
-## 问题
+## 문제
 
-Codex 的 reasoning 条目有两个互不相干的字段：`summary` 是给界面显示的摘要，`content` 是原始思考正文。官方后端会按 `reasoning.summary` 参数返回摘要，第三方 Responses 兼容后端则经常只回 `content`，`summary` 始终为空。接入第三方 API 后，手机端仍会渲染“思考摘要”折叠行，展开后却没有任何文字；接入 DSH 时同样界面能显示思考，因为 DSH 适配器把 `thinking` 块直接映射成思考正文，不走 Codex 的 summary 字段。
+Codex 의 reasoning 항목에 관련되지 않은 두 개의 필드가 있습니다.：`summary` 인터페이스에 표시되는 요약입니다.，`content` 원문의 생각글입니다. 공식 백엔드는 다음을 누를 것입니다. `reasoning.summary` 매개변수 반환 요약, 제3자 Responses 호환되는 백엔드는 종종 반환만 반환합니다. `content`，`summary` 항상 비어 있습니다. 제3자 액세스 API 그 후에도 휴대폰은 계속 렌더링됩니다.“생각 요약”행을 축소하고 확장했지만 텍스트가 없습니다. 입장 DSH 동일한 인터페이스가 생각을 표시할 수 있는 경우 DSH 어댑터 핸들 `thinking` 블록은 떠나지 않고 생각하는 텍스트에 직접 매핑됩니다. Codex 의 summary 필드。
 
-网关此前只读 `summary`，且 app-server 的 `item/reasoning/textDelta`、`item/reasoning/summaryTextDelta` 通知落在 `_event` 的兜底 `return` 分支，思考既不能实时显示，也没有完整条目到达前的兜底。
+게이트웨이는 이전에 읽기 전용이었습니다. `summary`，그리고 app-server 의 `item/reasoning/textDelta`、`item/reasoning/summaryTextDelta` 알림이 떨어지다 `_event` 결론 `return` 가지와 반사는 실시간으로 표시할 수 없으며 도착하기 전에 완전한 요약이 없습니다.。
 
-## 决策
+## 결정
 
-`normalize_item` 的 reasoning 分支先过滤空白字符串，再按 `summary` 优先、`content` 兜底拼出展示文本，标题保持“思考摘要”。两者都为空时仍保留这一行：它表示本次推理发生过，隐藏会让行序跳变，也会让用户以为客户端漏渲染。
+`normalize_item` 의 reasoning 분기는 먼저 빈 문자열을 필터링한 다음 `summary` 우선 사항、`content` 표시 텍스트는 하단에 표시되며 제목은 그대로 유지됩니다.“생각 요약”。이 줄은 둘 다 비어 있을 때 유지됩니다. 이는 이 추론이 발생했음을 나타냅니다. 숨기면 라인 순서가 바뀌게 되고 사용자는 클라이언트가 렌더링을 놓쳤다고 생각하게 됩니다.。
 
-`CliSessions._event` 增加 `item/reasoning/textDelta` 与 `item/reasoning/summaryTextDelta` 处理：按 `turnId` 找轮次，按 `itemId` 找条目，缺失时按 reasoning 形状新建，增量写入 `summary[summaryIndex]` 或 `content[contentIndex]`。索引缺失按 0，只对小于 1024 的非负整数补齐空串，非法或巨大索引不分配数组。晚到的 `item/started` 不抹掉已收到的 reasoning 增量；`item/completed` 到达时仍按 id 整体替换，增量只影响完成前的中间态。
+`CliSessions._event` 증가하다 `item/reasoning/textDelta` 및 `item/reasoning/summaryTextDelta` 처리: 프레스 `turnId` 라운드를 찾으려면 다음을 누르세요. `itemId` 항목을 찾고, 누락된 경우 누르세요. reasoning 새 도형을 만들고 점진적으로 쓰기 `summary[summaryIndex]` 또는 `content[contentIndex]`。색인 누락: 0，미만인 경우에만 1024 음수가 아닌 정수는 빈 문자열을 보완하며, 불법이거나 거대한 인덱스는 배열을 할당하지 않습니다. 늦은 `item/started` 받은 것은 지우지 마세요 reasoning 증가；`item/completed` 도착할 때 계속 누르고 있음 id 전체 교체, 증분은 완료 전 중간 상태에만 영향을 미칩니다.。
 
-## 备选方案
+## 대안
 
-只改 `model.py` 的兜底即可让历史与完成后的条目有文字，但整轮期间折叠行一直是空的，与官方后端的实时体验不一致，因此同时补流式分支。
+변화만 `model.py` 페이지 하단에는 내역과 완료된 항목에 텍스트가 포함될 수 있지만 접힌 줄은 전체 라운드 동안 비어 있어 공식 백엔드의 실시간 경험과 일치하지 않으므로 스트리밍 분기가 동시에 보완됩니다.。
 
-把标题在兜底时改成“思考过程”能区分来源，但会让同一条目在不同后端下改名，也让既有文案与截图失效；用户明确要求保持“思考摘要”。
+제목을 다음으로 변경하세요.“사고 과정”소스를 구별할 수 있지만 동일한 항목이 다른 백엔드에서 이름이 바뀌고 기존 복사본과 스크린샷도 무효화됩니다. 사용자가 이를 유지하도록 명시적으로 요구합니다.“생각 요약”。
 
-两者都为空时丢弃该行可以避免空面板，但会改变既有行序与条目数量，且与“思考摘要代表一次推理”的语义冲突，因此保留空行。
+둘 다 비어 있을 때 행을 삭제하면 빈 패널을 피할 수 있지만 기존 행 순서와 항목 수가 변경되고 다음과 일치하지 않습니다.“생각 요약은 추론을 나타냅니다.”의미론이 충돌하므로 빈 줄을 남겨두세요.。
 
-## 影响
+## 영향
 
-第三方 Responses 后端接入后展开“思考摘要”能看到思考正文，并在整轮进行中随增量出现。官方后端行为不变：有 `summary` 时仍只显示摘要，不把原始思考暴露到界面。`content` 只在摘要缺失时补位，不改变 Codex 侧的字段语义。
+제3자 Responses 백엔드 액세스 후 확장“생각 요약”생각의 텍스트를 볼 수 있으며 라운드 전체에 걸쳐 증분 방식으로 나타납니다. 공식 백엔드 동작 변경 없음: 예 `summary` 요약된 내용만 표시되며, 원래의 생각은 인터페이스에 노출되지 않습니다.。`content` 초록이 누락된 경우에만 작성하고, 변경하지 마세요. Codex 사이드 필드 의미론。
 
-回归覆盖摘要优先、正文兜底、双空保留、空值与缺失字段容错，以及思考增量先于 `item/completed` 到达、增量早于 `item/started` 时自动建条目两种流式顺序。
+회귀 적용 범위: 먼저 추상화하고, 전체 텍스트를 다루고, 이중 공백을 유지하고, null 값과 누락된 필드를 허용하고, 이전에 증분을 고려합니다. `item/completed` 도착, 다음보다 빠른 증분 `item/started` 두 개의 스트리밍 시퀀스에 자동으로 항목 생성。
 
-本地整合 [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) 时保留原作者提交，另补以下边界：只接受列表形式的 summary/content，不把错误字符串拆成逐字展示；增量索引必须是非 bool 整数且小于 1024，拒绝巨大稀疏索引而不分配无界数组；晚到的 reasoning started 不抹掉已收到的增量，completed 仍是权威完整替换。53 项 modes 与 64 项 CLI 会话回归通过；其中 39 个临时 Unix socket 夹具初次被沙箱禁止，放行后只补跑这些失败项。没有连接真实模型或修改用户聊天。
+로컬 통합 [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) 제출 시 원저자를 유지하고 다음 경계를 추가합니다. 목록 형식의 제출만 허용합니다. summary/content，오류 문자열을 축어 표시로 분할하지 마십시오. 증분 인덱스는 비이어야 합니다. bool 정수 이하 1024，무한한 배열을 할당하지 않고 거대한 희소 인덱스를 거부합니다. 늦게 도착 reasoning started 수신된 증분을 지우지 마십시오.，completed 여전히 권위 있는 완전한 대체품。53 개 modes 및 64 개 CLI 세션 회귀 통과; 어디 39 임시 Unix socket 픽스처는 처음으로 샌드박스에 의해 금지되었으며, 실패한 항목만 릴리스된 후 실행됩니다. 실제 모델과의 연결이나 사용자 채팅 수정이 없습니다。

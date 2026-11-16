@@ -36,13 +36,13 @@ test('GET receipts recover old scoped session storage plus memory without dispat
 for(const field of ['gateway','provider','account','host','session'])test(`a late receipt after ${field} change cannot consume pending state`,async()=>{
  let finish;const ui=fixture({request:()=>new Promise(resolve=>finish=resolve)}),old={...ui.scope};ui.drafts.begin(old,body,'old-id');
  const loading=ui.binding.load(old);ui.target={...ui.target,scope:{...old,[field]:'changed'}};
- finish({...ui.response,receipts:[{id:'old-id',status:'accepted'}]});await assert.rejects(loading,/切换/);
+ finish({...ui.response,receipts:[{id:'old-id',status:'accepted'}]});await assert.rejects(loading,/채팅 또는 계정이 변경되었습니다\. 메시지 관리를 다시 엽니다\./);
  assert.equal(ui.drafts.pendingSend(old).id,'old-id');assert.equal(ui.changed,0);assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].value,undefined);
 });
 
 test('unverified server account and unknown/notFound/network responses keep the original blocker',async()=>{
  const ui=fixture();ui.drafts.begin(ui.scope,body,'id');ui.response.draftAccountIdentity='other';
- await assert.rejects(ui.binding.load(ui.scope),/账号状态尚未确认/);assert.equal(ui.drafts.pendingSend(ui.scope).id,'id');
+ await assert.rejects(ui.binding.load(ui.scope),/아직 계좌가 확인되지 않았습니다\. 잠시 후 다시 시도하세요\./);assert.equal(ui.drafts.pendingSend(ui.scope).id,'id');
  ui.response.draftAccountIdentity=ui.scope.account;
  for(const status of ['unknown','notFound']){ui.response.receipts=[{id:'id',status}];await ui.binding.load(ui.scope);assert.equal(ui.drafts.pendingSend(ui.scope).id,'id');}
  assert.ok(ui.calls.every(call=>call.value===undefined));
@@ -71,7 +71,7 @@ test('fresh page reload restores the unknown queue editor and querying never re-
 test('queue editor storage and explicit actions are scoped and do not borrow the composer draft',async()=>{
  const ui=fixture(),editor={id:'editor',status:'draft',body:{text:'manager only',skills:[],attachments:[]}};ui.drafts.save(ui.scope,{text:'composer only'});
  await ui.binding.saveEditor(ui.scope,editor);const original={...ui.scope};ui.target={...ui.target,scope:{...original,account:'new-account'}};
- assert.equal(ui.binding.loadEditor(ui.target.scope),null);await assert.rejects(ui.binding.saveEditor(original,null),/切换/);
+ assert.equal(ui.binding.loadEditor(ui.target.scope),null);await assert.rejects(ui.binding.saveEditor(original,null),/채팅 또는 계정이 변경되었습니다\. 메시지 관리를 다시 엽니다\./);
  assert.equal(ui.drafts.load(original).text,'composer only');assert.equal(ui.calls.length,0);
  ui.target={...ui.target,scope:original};await ui.binding.panel.options.edit(original,{id:'editor',version:'v',text:'manager only',editId:'attempt'});
  assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].url,'/messages?host=local');assert.equal(ui.calls[0].value.id,'editor');assert.equal(ui.calls[0].value.action,'edit');assert.equal(ui.calls[0].value.text,'manager only');
@@ -88,7 +88,7 @@ test('explicit local ignore makes no backend call and stale versions cannot remo
 test('native-only providers never get background HTTP requests or queue mutations',async()=>{
  const ui=fixture();ui.target={...ui.target,url:null,sendUrl:null};ui.drafts.begin(ui.scope,body,'id');
  assert.equal(await ui.binding.reconcile(),null);assert.equal((await ui.binding.load(ui.scope)).capabilities.edit,false);
- await assert.rejects(ui.binding.panel.options.edit(ui.scope,{id:'id',version:'v',text:'text',editId:'attempt'}),/原生客户端管理/);await assert.rejects(ui.binding.change(ui.scope,'withdraw',{}),/原生客户端管理/);
+ await assert.rejects(ui.binding.panel.options.edit(ui.scope,{id:'id',version:'v',text:'text',editId:'attempt'}),/이 연결은 네이티브 앱의 대기열을 사용합니다\. 컴퓨터에서 관리하세요\./);await assert.rejects(ui.binding.change(ui.scope,'withdraw',{}),/이 연결은 네이티브 앱의 대기열을 사용합니다\. 컴퓨터에서 관리하세요\./);
  assert.equal(ui.calls.length,0);assert.equal(ui.drafts.pendingSend(ui.scope).id,'id');
 });
 
@@ -106,7 +106,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 for(const outcome of ['unknown','refused'])test(`real two-tab editor CAS admits one attempt and handles ${outcome} without unknown ID release`,async()=>{
  let resolve,reject;const {a,b,pa,pb}=await sharedPanels(()=>new Promise((done,fail)=>{resolve=done;reject=fail;}),()=>{throw Error('Second tab must not send');});
  const one=pa.submitEditor(),two=pb.submitEditor();while(!resolve)await tick();await two;
- assert.equal(a.calls.length,1);assert.equal(b.calls.length,0);assert.match(pb.status.textContent,/另一页面更新/);
+ assert.equal(a.calls.length,1);assert.equal(b.calls.length,0);assert.match(pb.status.textContent,/이 수정사항은 다른 페이지에서 변경되었습니다\. 메시지 관리를 다시 엽니다\./);
  if(outcome==='unknown')resolve({status:'unknown'});else reject(Object.assign(Error('busy'),{status:400,code:'send_not_submitted'}));await one;
  const saved=a.binding.loadEditor(a.scope);assert.equal(saved.status,outcome==='refused'?'editing':'unknown');
  assert.equal(saved.id,'shared-id');
@@ -119,12 +119,12 @@ test('real late accepted reply cannot delete another tab newer queue editor',asy
  await b.binding.saveEditor(b.scope,null,claimed);
  const replacement={id:'replacement-id',status:'editing',body:{text:'new editor draft'}};await b.binding.saveEditor(b.scope,replacement,null);
  finish({queue:[{id:'shared-id',editId:claimed.attempt,text:'same text'}]});await task;
- assert.deepEqual(b.binding.loadEditor(b.scope),replacement);assert.match(pa.status.textContent,/另一页面更新/);assert.equal(a.calls.length,1);
+ assert.deepEqual(b.binding.loadEditor(b.scope),replacement);assert.match(pa.status.textContent,/이 수정사항은 다른 페이지에서 변경되었습니다\. 메시지 관리를 다시 엽니다\./);assert.equal(a.calls.length,1);
 });
 
 test('claim save failure and unavailable coordinator prevent actual panel enqueue',async()=>{
  const {a,pa}=await sharedPanels(()=>{throw Error('Must not dispatch');},()=>{});a.drafts.write=()=>false;await pa.submitEditor();
- assert.equal(a.calls.length,0);assert.equal(pa.editor.status,'editing');assert.match(pa.status.textContent,/无法保存/);
+ assert.equal(a.calls.length,0);assert.equal(pa.editor.status,'editing');assert.match(pa.status.textContent,/저장할 수 없습니다./);
  a.drafts.coordinate=async()=>null;await pa.submitEditor();assert.equal(a.calls.length,0);assert.equal(a.binding.loadEditor(a.scope).status,'editing');
 });
 
@@ -132,7 +132,7 @@ test('two panels cannot start competing edits from the same empty local editor s
  const local=storage(),a=fixture({local}),b=fixture({local});b.drafts.coordinate=a.drafts.coordinate;
  const pa=realPanel(a),pb=realPanel(b);pa.data=pb.data={version:'queue-version',draftAccountIdentity:a.scope.account};
  await Promise.all([pa.editRow({id:'queued',text:'original'}),pb.editRow({id:'queued',text:'original'})]);
- assert.equal(a.calls.length+b.calls.length,0);assert.match(pb.status.textContent,/另一页面更新/);assert.equal(a.binding.loadEditor(a.scope).sourceId,'queued');
+ assert.equal(a.calls.length+b.calls.length,0);assert.match(pb.status.textContent,/이 수정사항은 다른 페이지에서 변경되었습니다\. 메시지 관리를 다시 엽니다\./);assert.equal(a.binding.loadEditor(a.scope).sourceId,'queued');
 });
 
 test('binding open catches asynchronous load failures and notifies instead of rejecting',async()=>{
@@ -153,13 +153,13 @@ test('identityPending retries only bounded GET reads and eventually accepts veri
  await ui.binding.load(ui.scope);assert.equal(ui.calls.length,2);assert.ok(ui.calls.every(call=>call.value===undefined));
 });
 test('identityPending exhausts after four reads and never retries a mutation',async()=>{
- const ui=fixture({request:()=>({draftAccountIdentity:'',identityPending:true})});await assert.rejects(ui.binding.load(ui.scope),/账号状态尚未确认/);assert.equal(ui.calls.length,4);assert.ok(ui.calls.every(call=>call.value===undefined));
+ const ui=fixture({request:()=>({draftAccountIdentity:'',identityPending:true})});await assert.rejects(ui.binding.load(ui.scope),/아직 계좌가 확인되지 않았습니다\. 잠시 후 다시 시도하세요\./);assert.equal(ui.calls.length,4);assert.ok(ui.calls.every(call=>call.value===undefined));
  let mutations=0;const mutation=fixture({request:()=>{mutations++;throw Object.assign(Error('pending identity'),{status:409});}});
  await assert.rejects(mutation.binding.panel.options.edit(mutation.scope,{id:'id',version:'v',text:'new',editId:'attempt'}));assert.equal(mutations,1);
 });
 test('scope change during a readonly identity retry wait prevents the next request',async()=>{
  const ui=fixture({request:()=>({draftAccountIdentity:'',identityPending:true})}),old={...ui.scope};const task=ui.binding.load(old);
- await tick();ui.target={...ui.target,scope:{...old,account:'other'}};await assert.rejects(task,/切换/);assert.equal(ui.calls.length,1);
+ await tick();ui.target={...ui.target,scope:{...old,account:'other'}};await assert.rejects(task,/채팅 또는 계정이 변경되었습니다\. 메시지 관리를 다시 엽니다\./);assert.equal(ui.calls.length,1);
 });
 
 test('accepted lost response clears only the recorded submitted draft revision',async()=>{

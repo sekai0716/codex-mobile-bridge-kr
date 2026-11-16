@@ -74,15 +74,15 @@
   function review(reference) {
     if(!isReviewTarget(reference))return;
     const box=document.createElement('dialog');box.className='output-review-dialog';
-    const title=document.createElement('h3');title.textContent=t('代码审查链接');
+    const title=document.createElement('h3');title.textContent=t('코드 리뷰 링크');
     const source=document.createElement('p');source.textContent=reference;
-    const desktop=document.createElement('a');desktop.href=reference;desktop.textContent=t('在 Codex 桌面打开');
-    const head=document.createElement('div');head.className='output-review-heading';head.append(title,button('关闭',()=>box.close()));
+    const desktop=document.createElement('a');desktop.href=reference;desktop.textContent=t('Codex 데스크탑에서 열기');
+    const head=document.createElement('div');head.className='output-review-heading';head.append(title,button('닫기',()=>box.close()));
     const actions=document.createElement('div');actions.className='output-review-actions';
-    actions.append(desktop,button('复制链接',event=>window.BridgeClipboard?.copy(()=>reference,event.currentTarget)));
+    actions.append(desktop,button('링크 복사',event=>window.BridgeClipboard?.copy(()=>reference,event.currentTarget)));
     box.append(head,source,actions);
     const mapped=reviewUrl(reference);
-    if(mapped){const link=document.createElement('a');link.href=mapped;link.target='_blank';link.rel='noopener noreferrer';link.textContent=t('在 GitHub 查看 PR');actions.append(link);}
+    if(mapped){const link=document.createElement('a');link.href=mapped;link.target='_blank';link.rel='noopener noreferrer';link.textContent=t('GitHub에서 PR 보기');actions.append(link);}
     box.addEventListener('close',()=>box.remove());document.body.append(box);box.showModal();
   }
   function create(item, resolve) {
@@ -104,7 +104,7 @@
     const destination=resolve(file);
     const location=document.createElement(destination ? 'a' : 'span');location.textContent=file+(start ? ':'+start+(end && end !== start ? '–'+end : '') : '');location.className='output-comment-location';
     if(destination){location.href=destination.url;if(start)location.dataset.sourceLine=String(start);if(end)location.dataset.sourceEnd=String(end);}
-    card.append(heading,content,location,button('复制批注源码',event=>window.BridgeClipboard?.copy(()=>item.source,event.currentTarget)));return card;
+    card.append(heading,content,location,button('리뷰 소스 복사',event=>window.BridgeClipboard?.copy(()=>item.source,event.currentTarget)));return card;
   }
   window.BridgeOutputDirectives={read,create,review,reviewUrl,isReviewTarget,install(markdown){
     markdown.block.ruler.before('paragraph','output_directive',(state,startLine,endLine,silent)=>{

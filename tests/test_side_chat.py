@@ -144,7 +144,7 @@ class SideChatTests(unittest.TestCase):
             {'id': 'q', 'type': 'agentMessage', 'text': 'Question', 'questions': [{'title': 'Continue?'}]}]}]
         request = self.chat.view()['requests'][0]
         self.assertFalse(request['supported'])
-        self.assertNotIn('桌面', request['params']['message'])
+        self.assertNotIn('데스크탑', request['params']['message'])
 
     def test_runtime_death_is_not_resumed(self):
         self.runtime.emit('bridge/disconnected')
@@ -238,7 +238,7 @@ class SideChatServiceTests(unittest.TestCase):
         with patch('bridge.app.service.fork_attached', side_effect=CreationError('lost receipt')) as fork:
             with self.assertRaises(CreationError):
                 self.bridge.side_chat(support.THREAD, 'phone', 'create', body)
-            with self.assertRaisesRegex(CreationError, '不会重复创建'):
+            with self.assertRaisesRegex(CreationError, "보조\\ 채팅\\ 생성이\\ 확인되지\\ 않았습니다\\.\\ 메인\\ 채팅을\\ 확인하세요\\.\\ 다시\\ 생성되지\\ 않습니다\\."):
                 self.bridge.side_chat(support.THREAD, 'phone', 'create', body)
             self.assertEqual(fork.call_count, 1)
         self.assertFalse(self.bridge.side_chats.chats)
@@ -264,7 +264,7 @@ class SideChatServiceTests(unittest.TestCase):
              patch.object(desktop_runtime, 'connect', side_effect=[None, client]), \
              patch('bridge.features.sessions.create._runtime_operation') as spawn, \
              patch('bridge.app.service.fork_attached', side_effect=fork):
-            with self.assertRaisesRegex(CreationUnavailable, '自动完成.*账号管理'):
+            with self.assertRaisesRegex(CreationUnavailable, "기본\\ 사이드\\ 채팅\\ 연결이\\ 준비되기를\\ 기다리고\\ 있습니다\\.\\ 데스크톱\\ 작업이\\ 완료되고\\ 유휴\\ 상태가\\ 확인되면\\ 자동으로\\ 완료됩니다\\.\\ 계정\\ 관리에서\\ 준비\\ 상태를\\ 확인할\\ 수도\\ 있습니다\\.\\ 사이드\\ 채팅이\\ 아직\\ 생성되지\\ 않았습니다"):
                 bridge.side_chat(support.THREAD, 'phone', 'create', body)
             self.assertNotIn(body['creationId'], bridge.message_actions)
             client.request.assert_not_called()
@@ -322,7 +322,7 @@ class SideChatHttpTests(unittest.TestCase):
                     {'cwd': directory}, {'model': 'fixture', 'modelProvider': 'custom'})
             child = view['id']
             bridge = self.server.bridge
-            bridge.side_chats, bridge.host, bridge.host_label = manager, 'local', '此电脑'
+            bridge.side_chats, bridge.host, bridge.host_label = manager, 'local', '이 컴퓨터'
             bridge.store = SimpleNamespace(home=Path(directory))
             bridge.catalog_reader = Mock()
             bridge.send = Mock(side_effect=AssertionError('No parent executor'))
@@ -414,11 +414,11 @@ class SideSettingsTests(unittest.TestCase):
         settings = {'model': 'original', 'modelProvider': 'custom', 'config': {'model_reasoning_effort': 'low'}}
         chat = SideChat('runtime', '/home', parent, '/project', settings, RuntimeFixture)
         self.addCleanup(chat.close)
-        model = 'xmy:日卡/deepseek-v4.1-flash'
+        model = 'xmy:\u65e5\u5361/deepseek-v4.1-flash'
         chat.settings(model, 'high', {'models': [{'id': model, 'efforts': ['high']}]})
         chat.send('test', str(uuid.uuid4()))
         self.assertEqual(chat.runtime.calls[-1][1]['model'], model)
-        with self.assertRaisesRegex(ValueError, '模型 ID 格式不正确'):
+        with self.assertRaisesRegex(ValueError, "잘못된\\ 모델\\ ID"):
             chat.settings('route/\tmodel', 'low', {'models': []})
 
     def test_catalog_is_child_scoped_and_stale_id_cannot_mutate(self):

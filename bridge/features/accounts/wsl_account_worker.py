@@ -17,21 +17,21 @@ from urllib.parse import urlsplit
 
 
 ERROR_MESSAGES = {
-    'identity_changed': '账号身份已变化，请刷新后重新选择',
-    'external_change': '原生配置已被外部修改，请使用原工具处理',
-    'runtime_running': '此 WSL 配置仍有客户端或共享服务运行，无法保证重新载入认证；请先在原终端退出后切换',
-    'runtime_unknown': '无法核验 WSL 进程状态，暂不能切换账号',
-    'custom_routing': '原生配置包含其他共享认证提供商或不支持的路由，历史会话可能固定此路由，请使用原 CLI 管理',
-    'static_capture_notice': '此接入包含附加认证；首次切换时将完整保留，之后可恢复。',
-    'static_capture': '当前提供商使用静态 Bearer 或认证请求头，不能保存为 auth.json 登录；切换已保存 API 时会自动保留可完整恢复的原始快照',
-    'profile_managed': '此接入包含外部管理、配置 profile 或系统凭据，请使用 WSL 原工具管理',
-    'claude_managed': '此 Claude Code 接入由外部认证或组织策略管理',
-    'native_exists': '已保存原始登录；请保留现有快照',
-    'active_edit': '请先切换到其他接入，再编辑当前接入；名称可直接重命名',
-    'missing_account': '接入不存在',
-    'toml_unavailable': '需要支持 TOML 核验的 WSL Python，或配置无法解析',
-    'incomplete': '切换未完成；已保留原始快照，请刷新核验配置',
-    'failed': 'WSL 账号操作未完成，请刷新并检查原生配置、进程及权限',
+    'identity_changed': '계정 ID가 변경되었습니다. 새로고침하고 다시 선택하세요.',
+    'external_change': "네이티브 구성이 외부적으로 수정되었습니다. 원래 도구에서 해결하세요.",
+    'runtime_running': '이 WSL 구성에서 여전히 클라이언트 또는 공유 서비스가 실행 중이므로 인증 다시 로드가 보장되지 않습니다. 먼저 원래 터미널을 종료한 다음 전환하십시오.',
+    'runtime_unknown': '확인할 수 없습니다 WSL 처리상태, 계정을 일시적으로 전환할 수 없습니다.',
+    'custom_routing': "네이티브 구성에는 인증을 공유하는 다른 공급자 또는 지원되지 않는 라우팅이 포함되어 있습니다. 기존 채팅을 보존하려면 원래 CLI에서 관리하세요.",
+    'static_capture_notice': "이 프로필은 추가 자격 증명을 사용합니다. 첫 번째 스위치는 나중에 복원할 수 있도록 전체를 보존합니다.",
+    'static_capture': "이 공급자는 정적 전달자 토큰 또는 인증 헤더를 사용합니다. 저장된 API로 전환하면 복원을 위해 전체 원래 프로필이 보존됩니다.",
+    'profile_managed': '이 액세스에는 외부 관리, 구성이 포함됩니다. profile 또는 시스템 자격 증명을 사용하려면 WSL 원본 도구 관리',
+    'claude_managed': '이 Claude Code 액세스는 외부 인증 또는 조직 정책에 따라 관리됩니다.',
+    'native_exists': '원래 로그인이 저장되었습니다. 기존 스냅샷을 유지하세요.',
+    'active_edit': "활성 프로필을 편집하기 전에 다른 프로필로 전환하십시오. 이름을 직접 바꿀 수 있습니다.",
+    'missing_account': '액세스 권한이 존재하지 않습니다.',
+    'toml_unavailable': '지원이 필요하다 TOML 확인됨 WSL Python，또는 구성을 구문 분석할 수 없습니다.',
+    'incomplete': '전환이 완료되지 않았습니다. 원본 스냅샷이 유지되었습니다. 구성을 새로 고치고 확인하세요.',
+    'failed': 'WSL 계정 작업이 완료되지 않았습니다. 기본 구성, 프로세스 및 권한을 새로 고쳐서 확인하세요.',
 }
 
 
@@ -54,11 +54,11 @@ def _toml_loads(text):
 
 def _bytes(path):
     if path.is_symlink():
-        raise AccountError('配置文件不能是符号链接')
+        raise AccountError('구성 파일은 심볼릭 링크일 수 없습니다.')
     try:
         info = path.stat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_size > 2 * 1024 * 1024:
-            raise AccountError('配置文件权限或大小无法安全核验')
+            raise AccountError('구성 파일 권한 또는 크기를 안전하게 확인할 수 없습니다.')
         return path.read_bytes()
     except FileNotFoundError:
         return None
@@ -104,16 +104,16 @@ def runtime_blockers(provider, directory, verified_updaters=()):
     overrides = ('OPENAI_API_KEY', 'OPENAI_BASE_URL', 'CODEX_API_KEY') if provider == 'codex' else (
         'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN')
     if any(os.environ.get(key) for key in overrides):
-        return ['WSL 环境变量覆盖认证，请先在原终端处理']
+        return ['WSL 환경변수 커버리지 인증, 원래 단말기에서 먼저 처리해주세요']
     for name in ('.profile', '.bash_profile', '.bashrc', '.zprofile', '.zshrc', '.zshenv'):
         try:
             text = (Path(os.path.expanduser('~'))/name).read_text()
             if any(re.search(r'(?m)^\s*(?:export\s+)?'+key+r'\s*=', text) for key in overrides):
-                return ['WSL shell 配置包含认证覆盖，请使用原终端处理']
+                return ['WSL shell 구성에는 인증 범위가 포함됩니다. 처리하려면 원래 단말기를 사용하십시오.']
         except FileNotFoundError:
             pass
         except (OSError, UnicodeError):
-            return ['WSL shell 认证配置无法核验']
+            return ['WSL shell 인증 구성을 확인할 수 없습니다.']
     try:
         native_claude = set()
         native_names, native_paths = set(), set()
@@ -165,13 +165,13 @@ def runtime_blockers(provider, directory, verified_updaters=()):
                 if relevant:
                     executable = os.readlink(process/'exe')
                     if not executable.startswith('/') or executable.startswith('/mnt/') or executable.endswith('.exe'):
-                        return ['客户端可执行文件属于外部或 Windows 接入，请使用原工具管理']
+                        return ['클라이언트 실행 파일이 외부이거나 Windows 접근은 원래 도구 관리를 이용해주세요']
                     env = dict(item.split(b'=', 1) for item in (process/'environ').read_bytes().split(b'\0') if b'=' in item)
                     variable = b'CODEX_HOME' if provider == 'codex' else b'CLAUDE_CONFIG_DIR'
                     default = Path(os.fsdecode(env.get(b'HOME', os.fsencode(Path(os.path.expanduser('~')))))) / ('.codex' if provider == 'codex' else '.claude')
                     selected = Path(os.fsdecode(env[variable])) if variable in env else default
                     if not selected.is_absolute():
-                        return ['WSL 客户端目录无法核验，暂不能切换账号']
+                        return ['WSL 지금은 클라이언트 디렉터리를 확인할 수 없으며 계정을 전환할 수 없습니다.']
                     if selected.resolve() != Path(directory).resolve():
                         continue
                     if provider == 'codex':
@@ -179,42 +179,42 @@ def runtime_blockers(provider, directory, verified_updaters=()):
                         expected = next((row for row in verified_updaters if row.get('pid') == int(process.name)), None)
                         if codex_updater(process, executable, args, env, directory, expected):
                             continue
-                    return ['此 WSL 配置仍有客户端或共享服务运行，无法保证重新载入认证；请先在原终端退出后切换']
+                    return ['이 WSL 구성에서 여전히 클라이언트 또는 공유 서비스가 실행 중이므로 인증 다시 로드가 보장되지 않습니다. 먼저 원래 터미널을 종료한 다음 전환하십시오.']
             except FileNotFoundError:
                 if not process.exists():
                     continue
-                return ['WSL 进程身份读取期间变化，暂不能切换账号']
+                return ['WSL 읽는 동안 프로세스 ID가 변경되며 계정을 일시적으로 전환할 수 없습니다.']
             except OSError:
-                return ['无法核验 WSL 进程状态，暂不能切换账号']
+                return ['확인할 수 없습니다 WSL 처리상태, 계정을 일시적으로 전환할 수 없습니다.']
     except OSError:
-        return ['无法核验 WSL 进程状态，暂不能切换账号']
+        return ['확인할 수 없습니다 WSL 처리상태, 계정을 일시적으로 전환할 수 없습니다.']
     return []
 
 
 class AccountStore:
     def __init__(self, provider, directory, *, guard=runtime_blockers):
         if provider not in ('codex', 'claude'):
-            raise AccountError('WSL 客户端无效')
+            raise AccountError('WSL 잘못된 클라이언트')
         self.provider = provider
         self.directory = Path(directory)
         if not self.directory.is_absolute() or '..' in self.directory.parts or self.directory.is_symlink():
-            raise AccountError('WSL 配置目录无效')
+            raise AccountError('WSL 잘못된 구성 디렉터리')
         resolved = self.directory.resolve(strict=True)
         if resolved != self.directory or str(resolved).startswith('/mnt/'):
-            raise AccountError('共享或重定向配置目录由原工具管理')
+            raise AccountError('공유 또는 리디렉션된 구성 디렉터리는 원래 도구로 관리됩니다.')
         if not resolved.is_dir() or resolved.stat().st_uid != os.getuid():
-            raise AccountError('WSL 配置目录归属无法核验')
+            raise AccountError('WSL 구성 디렉터리 소유권을 확인할 수 없습니다.')
         self.root = resolved/'.codex-mobile-bridge-accounts'
         self.path = self.root/'store.json'
         self.guard = guard
         if self.root.is_symlink():
-            raise AccountError('账号存储目录无效')
+            raise AccountError('계정 저장소 디렉터리가 잘못되었습니다.')
         if self.root.exists() and (self.root.stat().st_uid != os.getuid() or self.root.stat().st_mode & 0o077):
-            raise AccountError('账号存储目录权限无效')
+            raise AccountError('계정 저장소 디렉터리 권한이 잘못되었습니다.')
         raw = _bytes(self.path)
         self.store = json.loads(raw) if raw else {'version': 1, 'accounts': [], 'activeId': None}
         if self.store.get('version') != 1:
-            raise AccountError('账号存储版本无法识别')
+            raise AccountError('계정 저장소 버전을 인식할 수 없습니다')
 
     def files(self):
         names = ('auth.json', 'config.toml') if self.provider == 'codex' else ('settings.json', '.credentials.json')
@@ -238,7 +238,7 @@ class AccountStore:
             try:
                 config = _toml_loads((files['config.toml'] or b'').decode())
             except (ImportError, ValueError, UnicodeError):
-                return ['需要支持 TOML 核验的 WSL Python，或配置无法解析']
+                return ['지원이 필요하다 TOML 확인됨 WSL Python，또는 구성을 구문 분석할 수 없습니다.']
             definitions = config.get('model_providers') or {}
             selected = config.get('model_provider', 'openai')
             definition = definitions.get(selected) or {}
@@ -264,15 +264,15 @@ class AccountStore:
                                    ('authorization', 'x-openai-actor-authorization') or not isinstance(value, str)
                                    for header, value in v['http_headers'].items()))))
                         for key, v in definitions.items())):
-                return ['此接入包含外部管理、配置 profile 或系统凭据，请使用 WSL 原工具管理']
+                return ['이 액세스에는 외부 관리, 구성이 포함됩니다. profile 또는 시스템 자격 증명을 사용하려면 WSL 원본 도구 관리']
         else:
             if any(path.exists() for path in (self.directory/'managed-settings.json', Path('/etc/claude-code/managed-settings.json'))):
-                return ['此 Claude Code 接入包含组织管理策略，请使用原工具管理']
+                return ['이 Claude Code 액세스에는 조직 관리 정책이 포함됩니다. 원래 도구 관리를 사용하십시오.']
             value = json.loads(files['settings.json'] or b'{}')
             if any(value.get(key) for key in ('apiKeyHelper', 'forceLoginMethod', 'forceLoginOrgUUID')) or any(
                     key in value.get('env', {}) for key in ('CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK',
                     'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY')):
-                return ['此 Claude Code 接入由外部认证或组织策略管理']
+                return ['이 Claude Code 액세스는 외부 인증 또는 조직 정책에 따라 관리됩니다.']
         return []
 
     def public(self):
@@ -286,7 +286,7 @@ class AccountStore:
                    'modelCatalogIdentity': _account_identity(row)}
                 for row in self.store['accounts']]
         if self.store.get('native'):
-            rows.insert(0, {'id': 'native', 'name': '原始 WSL 登录', 'kind': 'native',
+            rows.insert(0, {'id': 'native', 'name': "원래 WSL 로그인", 'kind': 'native',
                             'active': active == 'native', 'keySaved': False,
                             'identity': _identity({k: base64.b64decode(v) if v is not None else None for k, v in self.store['native'].items()})})
         protected = self.protected(files)
@@ -303,7 +303,7 @@ class AccountStore:
                 'capabilities': {'save': True, 'import': True, 'capture': not self.capture_blockers(files), 'switch': not blockers, 'restore': restore, 'models': True},
                 'captureNotice': (ERROR_MESSAGES['static_capture_notice']
                                   if not self.store.get('native') and not protected and self.capture_blockers(files) else None),
-                'loginGuidance': '官方登录请在此 WSL 环境的原 CLI 完成；文件切换后请重新打开 CLI，登录有效性尚未验证。'}
+                'loginGuidance': "이 WSL 환경의 원래 CLI에서 공식 로그인을 완료하세요. 파일을 전환한 후 CLI를 다시 엽니다. 로그인 유효성이 확인되지 않았습니다."}
 
     def route_summary(self):
         """No credentials, process inspection, model requests, or disk writes."""
@@ -333,30 +333,30 @@ class AccountStore:
         if action == 'save-api':
             name, model, url = value.get('name', ''), value.get('model', ''), value.get('baseUrl', '')
             if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or not isinstance(model, str) or not 1 <= len(model) <= 200 or any(c in model for c in '\r\n\0'):
-                raise AccountError('接入名称或模型无效')
+                raise AccountError('잘못된 액세스 이름 또는 모델')
             if not isinstance(url, str) or len(url) > 2048 or any(c in url for c in '\r\n\0'):
-                raise AccountError('API 地址无效')
+                raise AccountError('API 잘못된 주소')
             try:
                 parsed = urlsplit(url)
                 parsed.port
             except ValueError:
-                raise AccountError('API 地址无效') from None
+                raise AccountError('API 잘못된 주소') from None
             if (parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username or parsed.password
                     or parsed.query or parsed.fragment or len(url) > 2000 or any(c.isspace() for c in url)
                     or (parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'))):
-                raise AccountError('API 地址须为 HTTPS，只有 WSL 本机服务可使用 HTTP')
+                raise AccountError('API 주소는 다음과 같아야 합니다. HTTPS，오직 WSL 네이티브 서비스를 사용할 수 있습니다. HTTP')
             identifier = value.get('id') or uuid.uuid4().hex
             row = self.row(identifier)
             if not re.fullmatch('[0-9a-f]{32}', identifier) or (value.get('id') and row is None):
-                raise AccountError('接入标识无效')
+                raise AccountError('잘못된 액세스 ID')
             if row and self.store.get('activeId') == identifier:
                 raise AccountError(ERROR_MESSAGES['active_edit'])
             key = value.get('apiKey') or (row or {}).get('key')
             if not isinstance(key, str) or not 1 <= len(key) <= 8192 or any(c in key for c in '\0\r\n'):
-                raise AccountError('API Key 无效')
+                raise AccountError('API Key 유효하지 않은')
             scheme = value.get('authScheme', 'x-api-key')
             if scheme not in ('x-api-key', 'bearer'):
-                raise AccountError('认证方式无效')
+                raise AccountError('인증 방법이 잘못되었습니다.')
             saved = {'id': identifier, 'kind': 'api', 'name': name.strip(), 'baseUrl': url.rstrip('/'),
                      'model': model, 'key': key, 'authScheme': scheme}
             if row:
@@ -367,7 +367,7 @@ class AccountStore:
         elif action == 'import-current':
             files = self.files()
             if self.store.get('activeId') not in (None, 'native') or self.store.get('native'):
-                raise AccountError('已保存原始登录；请保留现有快照')
+                raise AccountError('원래 로그인이 저장되었습니다. 기존 스냅샷을 유지하세요.')
             capture = self.capture_blockers(files)
             if capture:
                 raise AccountError(capture[0])
@@ -377,28 +377,28 @@ class AccountStore:
         elif action in ('rename', 'delete'):
             row = self.row(value.get('id'))
             if not row:
-                raise AccountError('接入不存在')
+                raise AccountError('액세스 권한이 존재하지 않습니다.')
             if action == 'delete':
                 if self.public()['activeId'] == row['id']:
-                    raise AccountError('请先切换其他接入再删除')
+                    raise AccountError('삭제하기 전에 다른 액세스 권한으로 전환하세요.')
                 self.store['accounts'].remove(row)
             else:
                 name = value.get('name')
                 if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
-                    raise AccountError('接入名称无效')
+                    raise AccountError('잘못된 액세스 이름')
                 row['name'] = name.strip()
             self._save()
         elif action == 'switch':
             self.switch(value)
         else:
-            raise AccountError('WSL 账号操作不支持')
+            raise AccountError('WSL 계정 작업은 지원되지 않습니다')
         return self.public()
 
     def prepared(self, row, before):
         if row['id'] == 'native':
             native = self.store.get('native')
             if not native:
-                raise AccountError('尚未保存原始登录')
+                raise AccountError('원래 로그인이 아직 저장되지 않았습니다.')
             return {k: base64.b64decode(v) if v is not None else None for k, v in native.items()}
         if self.provider == 'claude':
             settings = json.loads(before['settings.json'] or b'{}')
@@ -420,7 +420,7 @@ class AccountStore:
         for line in lines:
             if any(re.match(r'^\s*'+key+r'\s*=', line) for key in keys):
                 if line.count('"""') or line.count("'''"):
-                    raise AccountError('复杂 TOML 配置请使用原 CLI 管理')
+                    raise AccountError('복잡한 TOML 원래 구성을 사용하십시오. CLI 관리하다')
                 continue
             clean.append(line)
         # Keep the selected provider ID so saved threads resume through the
@@ -460,7 +460,7 @@ class AccountStore:
                 if any(re.match(r'^\s*(?:' + key + r'|"' + key + r'"|\'' + key + r'\')\s*=', line)
                        for key in (*fields, *removed)):
                     if line.count('"""') or line.count("'''"):
-                        raise AccountError('复杂 TOML 配置请使用原 CLI 管理')
+                        raise AccountError('복잡한 TOML 원래 구성을 사용하십시오. CLI 관리하다')
                     continue
                 retained.append(line)
             body = ''.join(retained)
@@ -479,22 +479,22 @@ class AccountStore:
         expected_definitions = dict(definitions)
         expected_definitions[selected] = {**definition, **fields}
         if actual != expected or parsed.get('model_providers') != expected_definitions:
-            raise AccountError('复杂 TOML 配置请使用原 CLI 管理')
+            raise AccountError('복잡한 TOML 원래 구성을 사용하십시오. CLI 관리하다')
         return {'config.toml': result.encode(), 'auth.json': _json({'auth_mode': 'apikey', 'OPENAI_API_KEY': row['key']})}
 
     def preview_switch(self, value):
         """Read-only preimage/intent proof for an explicit gateway cold handoff."""
         before = self.files()
         if value.get('expectedIdentity') != _identity(before):
-            raise AccountError('账号身份已变化，请刷新后重新选择')
+            raise AccountError('계정 ID가 변경되었습니다. 새로고침하고 다시 선택하세요.')
         restoring = value.get('id') == 'native' and self.store.get('native') and self.store.get('appliedIdentity') == _identity(before)
         if not restoring and self.protected(before):
             raise AccountError(self.protected(before)[0])
         if self.store.get('native') and self.store.get('appliedIdentity') != _identity(before):
-            raise AccountError('原生配置已被外部修改，请使用原工具处理')
+            raise AccountError("네이티브 구성이 외부적으로 수정되었습니다. 원래 도구에서 해결하세요.")
         row = {'id': 'native'} if value.get('id') == 'native' else self.row(value.get('id'))
         if not row:
-            raise AccountError('接入不存在')
+            raise AccountError('액세스 권한이 존재하지 않습니다.')
         basis = before
         if self.store.get('activeId') and self.store.get('activeId') != 'native':
             basis = {key: base64.b64decode(content) if content is not None else None
@@ -505,23 +505,23 @@ class AccountStore:
     def switch(self, value):
         before = self.files()
         if value.get('expectedIdentity') != _identity(before):
-            raise AccountError('账号身份已变化，请刷新后重新选择')
+            raise AccountError('계정 ID가 변경되었습니다. 새로고침하고 다시 선택하세요.')
         restoring = (value.get('id') == 'native' and self.store.get('native')
                      and self.store.get('appliedIdentity') == _identity(before))
         blockers = ([] if restoring else self.protected(before)) + self.guard(self.provider, self.directory)
         if blockers:
             raise AccountError(blockers[0])
         if self.store.get('native') and self.store.get('appliedIdentity') != _identity(before):
-            raise AccountError('原生配置已被外部修改，请使用原工具处理')
+            raise AccountError("네이티브 구성이 외부적으로 수정되었습니다. 원래 도구에서 해결하세요.")
         row = {'id': 'native'} if value.get('id') == 'native' else self.row(value.get('id'))
         if not row:
-            raise AccountError('接入不存在')
+            raise AccountError('액세스 권한이 존재하지 않습니다.')
         # Rebase our own provider on the exact native preimage, preserving all
         # original unrelated configuration. External edits invalidate this path.
         basis = before
         if self.store.get('activeId') and self.store.get('activeId') != 'native':
             if self.store.get('appliedIdentity') != _identity(before):
-                raise AccountError('原生配置已被外部修改，请使用原工具处理')
+                raise AccountError("네이티브 구성이 외부적으로 수정되었습니다. 원래 도구에서 해결하세요.")
             basis = {k: base64.b64decode(v) if v is not None else None for k, v in self.store['native'].items()}
         after = self.prepared(row, basis)
         if 'native' not in self.store:
@@ -529,16 +529,16 @@ class AccountStore:
             self.store.update(activeId='native', appliedIdentity=_identity(before))
             self._save()  # Recovery snapshot and its exact baseline are durable before native writes.
         if self.files() != before or self.guard(self.provider, self.directory):
-            raise AccountError('WSL 状态已变化，请重新检查')
+            raise AccountError('WSL 상태가 변경되었습니다. 다시 확인해 주세요.')
         written = []
         try:
             for name, content in after.items():
                 if _bytes(self.directory/name) != before[name]:
-                    raise AccountError('配置发生外部修改')
+                    raise AccountError('구성의 외부 수정')
                 _write(self.directory/name, content)
                 written.append(name)
             if self.files() != after:
-                raise AccountError('配置发生外部修改')
+                raise AccountError('구성의 외부 수정')
             self.store.update(activeId=row['id'], appliedIdentity=_identity(after),
                               appliedAccountIdentity=_account_identity(row))
             self._save()
@@ -546,7 +546,7 @@ class AccountStore:
             for name in reversed(written):
                 if _bytes(self.directory/name) == after[name]:
                     _write(self.directory/name, before[name])
-            raise AccountError('切换未完成；已保留原始快照，请刷新核验配置') from None
+            raise AccountError('전환이 완료되지 않았습니다. 원본 스냅샷이 유지되었습니다. 구성을 새로 고치고 확인하세요.') from None
 
 
 def execute(request):
@@ -562,7 +562,7 @@ def execute(request):
     import fcntl
     lock = store.root/'lock'
     if lock.is_symlink():
-        raise AccountError('账号锁无效')
+        raise AccountError('계정 잠금이 잘못되었습니다.')
     fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -576,10 +576,10 @@ def execute(request):
 def fetch_models(store, request):
     row = store.row(request.get('id'))
     if not row:
-        return {'models': [], 'modelError': '原生登录模型请使用原 CLI 查看；此处支持已保存 API 的模型目录'}
+        return {'models': [], 'modelError': '원래 로그인 모델을 사용하십시오 CLI 보다; 저장된 지원은 여기에서 확인할 수 있습니다. API 모델 디렉토리'}
     identity = _account_identity(row)
     if request.get('modelIdentity') != identity:
-        raise AccountError('模型接入已变化，请刷新')
+        raise AccountError('모델 액세스 권한이 변경되었습니다. 새로고침하세요.')
     url = row['baseUrl'].rstrip('/')
     headers = None
     if store.provider == 'claude':
@@ -592,7 +592,7 @@ def fetch_models(store, request):
         models = model_catalog(url, row['key'], headers=headers)
         fresh = AccountStore(store.provider, str(store.directory))
         if _account_identity(fresh.row(row['id'])) != identity:
-            return {'models': [], 'modelError': '模型接入已变化，请刷新', 'identityChanged': True}
+            return {'models': [], 'modelError': '모델 액세스 권한이 변경되었습니다. 새로고침하세요.', 'identityChanged': True}
         return {'models': models}
     except Exception:
-        return {'models': [], 'modelError': '模型目录读取失败，请检查 API 权限、网络或手动填写模型 ID'}
+        return {'models': [], 'modelError': '모델 디렉터리를 읽지 못했습니다. 확인하세요. API 권한, 네트워크 또는 수동으로 모델 입력 ID'}

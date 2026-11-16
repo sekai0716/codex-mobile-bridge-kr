@@ -70,14 +70,14 @@ class ZCodeDefaultRegistration(unittest.TestCase):
 
     def test_fresh_discovery_prevents_stale_form_from_overwriting_existing_client(self):
         self.discovery.return_value = {'zcode': {'installed': True, 'application': '/existing/ZCode.app'}}
-        with self.assertRaisesRegex(ValueError, '客户端已存在'):
+        with self.assertRaisesRegex(ValueError, "ZCode는\\ 이미\\ 사용\\ 가능합니다\\.\\ 기존\\ 관리\\ 페이지를\\ 사용하세요\\."):
             self.manager.instance_control(self.request)
         self.assertNotIn('zcodeApplication', self.manager.config)
         self.assertNotIn('zcode', self.manager.adapters)
 
     def test_exact_native_identity_is_required_and_no_other_installation_is_substituted(self):
         wrong = self.bundle('Other.app', 'example.other')
-        with self.assertRaisesRegex(ValueError, '不是可用的 ZCode'):
+        with self.assertRaisesRegex(ValueError, "선택한\\ 경로는\\ 유효한\\ ZCode\\ 애플리케이션이\\ 아닙니다\\."):
             self.manager.instance_control({**self.request, 'application': str(wrong)})
         self.discovery.assert_called_once_with({})
         self.assertNotIn('zcodeApplication', self.manager.config)
@@ -90,17 +90,17 @@ class ZCodeDefaultRegistration(unittest.TestCase):
 
     def test_enabled_or_active_connection_cannot_be_replaced(self):
         self.manager.config.setdefault('enabled', {})['zcode'] = True
-        with self.assertRaisesRegex(ValueError, '先停用'):
+        with self.assertRaisesRegex(ValueError, "다른\\ 애플리케이션을\\ 선택하기\\ 전에\\ ZCode\\ 모바일\\ 액세스를\\ 비활성화하세요\\."):
             self.manager.instance_control(self.request)
         self.manager.config['enabled']['zcode'] = False
         pipe = Mock(); pipe.owner.return_value = {'pid': 123}
         self.manager.zcode_pipe = pipe
-        with self.assertRaisesRegex(ValueError, '活动连接'):
+        with self.assertRaisesRegex(ValueError, '활성 연결'):
             self.manager.instance_control(self.request)
         pipe.start.assert_not_called()
         self.manager.zcode_pipe = None
         self.manager._zcode_official_status.return_value = {'connected': True}
-        with self.assertRaisesRegex(ValueError, '活动连接'):
+        with self.assertRaisesRegex(ValueError, '활성 연결'):
             self.manager.instance_control(self.request)
         self.assertNotIn('zcodeApplication', self.manager.config)
 
@@ -142,7 +142,7 @@ class ZCodeDefaultRegistration(unittest.TestCase):
 
     def test_windows_network_path_is_not_a_local_application(self):
         with patch('bridge.clients.manager.sys.platform', 'win32'), patch('bridge.clients.manager.Path', PureWindowsPath):
-            with self.assertRaisesRegex(ValueError, '本机'):
+            with self.assertRaisesRegex(ValueError, "로컬\\ ZCode\\ 애플리케이션의\\ 전체\\ 경로를\\ 선택하십시오\\."):
                 self.manager.instance_control({**self.request, 'application': r'\\server\share\ZCode.exe'})
         self.discovery.assert_not_called()
 
@@ -152,7 +152,7 @@ class ZCodeDefaultRegistration(unittest.TestCase):
         self.manager._changing = Mock(side_effect=lambda *args, **kwargs: nullcontext())
         for state in ({'loginSaved': True, 'restoring': False}, {'restoring': True}, {}):
             self.manager._zcode_official_status.return_value = state
-            with self.assertRaisesRegex(ValueError, '请先在电脑网关'):
+            with self.assertRaisesRegex(ValueError, "먼저\\ 컴퓨터\\ 게이트웨이를\\ 구성하고\\ 공식\\ 원격\\ 제어에\\ 로그인하십시오\\."):
                 self.manager._select_zcode_connection('official-remote')
         self.manager._zcode_official_status.return_value = {'loginSaved': True, 'restoring': True, 'configured': False}
         self.manager._select_zcode_connection('official-remote')

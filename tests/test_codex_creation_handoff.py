@@ -119,7 +119,7 @@ class CodexCreationHandoff(unittest.TestCase):
 
     def test_owner_not_ready_retains_created_id_and_retries_only_handoff(self):
         self.bridge._target.side_effect = IPCError('Owner not ready')
-        with self.assertRaisesRegex(CreationError, '聊天已创建，所选模型尚未应用'):
+        with self.assertRaisesRegex(CreationError, "채팅이\\ 생성되었으나\\ 선택한\\ 모델이\\ 적용되지\\ 않았습니다\\.\\ 동일한\\ 채팅에\\ 계속\\ 연결하려면\\ 이\\ 생성을\\ 다시\\ 시도하세요\\.\\ 그러면\\ 다시\\ 생성되지\\ 않습니다\\."):
             self.create()
         self.assertEqual(self.bridge.creations[self.request_id]['id'], self.thread_id)
         self.assertEqual(self.bridge.creations[self.request_id]['modelSettingsPhase'], 'pending')
@@ -131,10 +131,10 @@ class CodexCreationHandoff(unittest.TestCase):
 
     def test_unknown_settings_are_reconciled_without_replaying_a_write(self):
         self.bridge.ipc.request.side_effect = IPCError('lost response')
-        with self.assertRaisesRegex(CreationError, '模型设置结果仍待核对'):
+        with self.assertRaisesRegex(CreationError, "채팅이\\ 생성되었지만\\ 모델\\ 설정\\ 결과를\\ 아직\\ 확인해야\\ 합니다\\.\\ 이\\ 채팅에서\\ 모델을\\ 확인해\\ 주시면\\ 다시\\ 제출하지\\ 않겠습니다\\."):
             self.create()
         self.assertEqual(self.bridge.creations[self.request_id]['modelSettingsPhase'], 'unknown')
-        with self.assertRaisesRegex(CreationError, '不会重复提交'):
+        with self.assertRaisesRegex(CreationError, "채팅이\\ 생성되었지만\\ 이전\\ 모델\\ 설정\\ 결과는\\ 여전히\\ 확인이\\ 필요합니다\\.\\ 이\\ 채팅에서\\ 모델을\\ 확인해\\ 주시면\\ 다시\\ 제출하지\\ 않겠습니다\\."):
             self.create()
         self.bridge.ipc.request.assert_called_once()
         self.session.state['latestModel'] = self.selected['model']
@@ -161,7 +161,7 @@ class CodexCreationHandoff(unittest.TestCase):
 
     def test_catalog_rejection_before_settings_write_can_be_explicitly_retried(self):
         self.bridge.catalog.return_value = {**self.catalog, 'models': [{'id': self.selected['model'], 'efforts': ['high']}]}
-        with self.assertRaisesRegex(CreationError, '不支持所选推理强度'):
+        with self.assertRaisesRegex(CreationError, "이\\ 모델은\\ 선택한\\ 추론\\ 강도를\\ 지원하지\\ 않습니다\\."):
             self.create()
         self.assertEqual(self.bridge.creations[self.request_id]['modelSettingsPhase'], 'pending')
         self.bridge.ipc.request.assert_not_called()

@@ -29,12 +29,12 @@ test('steering cannot switch mode and unfinished goals prevent another goal',()=
 });
 test('submitted request stays pending until a real goal appears; failure is explicit',()=>{
   const ui=fixture();ui.panel.open('local|a');ui.panel.render({...idle,goalSubmission:{status:'pending'}},'send',false);
-  assert.match(ui.text(),/正在开启原生目标/);assert.doesNotMatch(ui.text(),/目标进行中/);
-  ui.panel.render({...idle,goalSubmission:{status:'unconfirmed'}});assert.match(ui.text(),/尚未确认/);
+  assert.match(ui.text(),/네이티브 목표 시작 중…/);assert.doesNotMatch(ui.text(),/목표 활성/);
+  ui.panel.render({...idle,goalSubmission:{status:'unconfirmed'}});assert.match(ui.text(),/대상이 열려 있는지 확인되지 않았습니다\. 새로고침하거나 확인하세요\. Codex。/);
   ui.panel.render({...idle,goal:{objective:'Original goal',status:'active',tokensUsed:120,tokenBudget:500}});
-  assert.match(ui.text(),/Original goal/);assert.match(ui.text(),/120 \/ 500/);assert.match(ui.text(),/目标进行中/);
+  assert.match(ui.text(),/Original goal/);assert.match(ui.text(),/120 \/ 500/);assert.match(ui.text(),/목표 활성/);
   ui.goalRoot.firstElementChild.open=true;
-  ui.language();ui.panel.render();assert.match(ui.text(),/Goal active|目标进行中/);assert.match(ui.text(),/Original goal/);
+  ui.language();ui.panel.render();assert.match(ui.text(),/Goal active|목표 활성/);assert.match(ui.text(),/Original goal/);
   assert.equal(ui.goalRoot.firstElementChild.open,true);
 });
 test('goal selection resets only after accepted submission and never alters another chat',()=>{
@@ -75,16 +75,16 @@ test('paused and active goals expose resume and pause actions',async()=>{
  ui.panel.render({status:'idle',connected:true,host:'local',goal:{objective:'Work',status:'active'}},'send',false);
  const pause=ui.find(n=>(n.className||'').includes('goal-status'));
  assert.ok(pause);await ui.panel.setStatus('active');
- assert.match(ui.text(),/Goal active|目标进行中/);
+ assert.match(ui.text(),/Goal active|목표 활성/);
 });
 
 test('limited goals can pause and complete goals can be cleared',()=>{
  const ui=fixture();
  ui.panel.render({status:'idle',connected:true,host:'local',goal:{objective:'Work',status:'usageLimited'}},'send',false);
- assert.match(ui.text(),/目标已达到用量限制/);assert.match(ui.text(),/关闭目标/);
+ assert.match(ui.text(),/목표 사용량 한도 도달/);assert.match(ui.text(),/명확한 목표/);
  assert.ok(ui.find(n=>(n.className||'').includes('goal-status')));
  ui.panel.render({status:'idle',connected:true,host:'local',goal:{objective:'Work',status:'complete'}},'send',false);
- assert.match(ui.text(),/目标已完成/);assert.ok(ui.find(n=>(n.className||'').includes('goal-cancel')));
+ assert.match(ui.text(),/목표 완료/);assert.ok(ui.find(n=>(n.className||'').includes('goal-cancel')));
 });
 
 test('Goal mode is disabled when the desktop runtime is unavailable',()=>{
@@ -93,7 +93,7 @@ test('Goal mode is disabled when the desktop runtime is unavailable',()=>{
  ui.panel.render({...idle,goalRuntimeAvailable:false},'send',false);
  assert.equal(ui.goalOption.disabled,true);
  ui.select.value='goal';ui.select.onchange();ui.panel.render({...idle,goalRuntimeAvailable:false},'send',false);
- assert.match(ui.goalOption.title,/未找到桌面 App 的 Codex 运行时/);
+ assert.match(ui.goalOption.title,/데스크톱 Codex 런타임이 없습니다\./);
  ui.language();ui.panel.render({...idle,goalRuntimeAvailable:false},'send',false);
  assert.match(ui.goalOption.title,/desktop Codex runtime was not found/);
 });
@@ -114,9 +114,9 @@ test('remote Goal requires explicit native CLI capability while local legacy vie
    assert.equal(ui.find(n=>(n.className||'').includes('goal-status')),undefined);
  }
  ui.panel.render({...remote,access:{source:'cli',runtime:'cli',canUseGoal:false}},'send',false);
- assert.match(ui.goalOption.title,/当前 Codex 会话暂不支持目标模式/);
+ assert.match(ui.goalOption.title,/이 Codex 채팅에서는 목표 모드를 사용할 수 없습니다\./);
  ui.panel.render({...remote,access:{source:'cli',runtime:'desktop',canUseGoal:false}},'send',false);
- assert.match(ui.goalOption.title,/SSH 主机/);
+ assert.match(ui.goalOption.title,/SSH 호스트/);
  ui.panel.render(idle,'send',false);
  assert.equal(ui.goalOption.disabled,false);
 });
@@ -167,8 +167,8 @@ test('editing is only available paused and preserves draft across streamed rende
 
 test('native agent capabilities reuse goal controls without claiming unsupported Claude goals',()=>{
  const ui=fixture();ui.panel.open('claude|chat');ui.panel.render({...idle,capabilities:{plan:true,goal:false}},'send',false);
- assert.equal(ui.goalOption.disabled,true);assert.match(ui.goalOption.title,/原生目标/);
+ assert.equal(ui.goalOption.disabled,true);assert.match(ui.goalOption.title,/현재 클라이언트는 기본 대상 모드를 제공하지 않습니다\./);
  ui.panel.open('zcode|chat');const view={...idle,capabilities:{plan:true,goal:true,goalEdit:false},goal:{goalId:'native',objective:'target',status:'paused'}};
- ui.panel.render(view,'send',false);assert.match(ui.text(),/恢复目标/);assert.doesNotMatch(ui.text(),/修改目标/);
+ ui.panel.render(view,'send',false);assert.match(ui.text(),/목표 재개/);assert.doesNotMatch(ui.text(),/목표 수정/);
  const details=ui.goalRoot.firstElementChild;ui.panel.render(view,'send',false);assert.equal(ui.goalRoot.firstElementChild,details,'unchanged polling preserves reading position');
 });

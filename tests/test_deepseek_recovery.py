@@ -50,18 +50,18 @@ class RecoveryConfirmationTests(unittest.TestCase):
         self.assertNotIn('identities', preview)
         self.assertNotIn('executable', preview)
         self.assertNotIn('home', preview)
-        with self.assertRaisesRegex(ValueError, '明确确认'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 확인하고\\ 작업이\\ 중단될\\ 수\\ 있는지\\ 명시적으로\\ 확인하세요\\."):
             self.confirm(preview)
         self.quit.assert_not_called()
         self.assertTrue(self.confirm(preview, acknowledgeUnknown=True))
         self.quit.assert_called_once()
-        with self.assertRaisesRegex(ValueError, '已过期'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 복구\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
 
     def test_busy_after_preview_always_refuses_even_with_unknown_acknowledged(self):
         preview = self.preview()
         self.evidence['busy'] = True
-        with self.assertRaisesRegex(ValueError, '任务运行'):
+        with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
@@ -72,7 +72,7 @@ class RecoveryConfirmationTests(unittest.TestCase):
             if mutation == 'birth': self.state['identities'][12]['start'] = 'reused-pid'
             elif mutation == 'new-process': self.state['identities'][99] = {'start': 'new', 'parent': 1, 'command': 'new'}
             else: self.state['home'] = '/other/profile'
-            with self.assertRaisesRegex(ValueError, '进程已变化'):
+            with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                 self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
@@ -86,7 +86,7 @@ class RecoveryConfirmationTests(unittest.TestCase):
         self.evidence['unknown'] = False
         preview = self.preview()
         self.evidence['unknown'] = True
-        with self.assertRaisesRegex(ValueError, '重新检查'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 확인하고\\ 작업이\\ 중단될\\ 수\\ 있는지\\ 명시적으로\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
@@ -94,20 +94,20 @@ class RecoveryConfirmationTests(unittest.TestCase):
         self.state = snapshot(unknown=(19,))
         preview = self.preview()
         self.assertFalse(preview['canRecover'])
-        with self.assertRaisesRegex(ValueError, '其他或无法识别'):
+        with self.assertRaisesRegex(ValueError, "기타\\ 또는\\ 인식할\\ 수\\ 없는\\ Harness\\ 인스턴스가\\ 감지되었습니다\\.\\ 먼저\\ 컴퓨터에서\\ 종료하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
     def test_broken_connector_does_not_block_identity_preview_or_probe_untrusted_rpc(self):
-        self.adapter.discover_existing.side_effect = ValueError('已有 Harness 接入无法验证')
+        self.adapter.discover_existing.side_effect = ValueError('이미 Harness 액세스를 확인할 수 없습니다.')
         preview = self.preview(False)
         self.assertTrue(preview['unknown'])
         self.assertFalse(preview['canRecover'])
         self.assertEqual(preview['backgroundCount'], 2)
-        self.assertIn('尚未提交退出', preview['message'])
+        self.assertIn("Harness 액세스 구성을 확인할 수 없고 작업 상태를 알 수 없으며 종료가 아직 제출되지 않았습니다. 컴퓨터를 정상적으로 종료하거나 강제 종료를 미리 보고 확인하세요.", preview['message'])
         self.native.assert_called_once()
         self.probe.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '接入配置无法验证'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 액세스\\ 구성을\\ 확인할\\ 수\\ 없고\\ 작업\\ 상태를\\ 알\\ 수\\ 없으며\\ 종료가\\ 아직\\ 제출되지\\ 않았습니다\\.\\ 컴퓨터를\\ 정상적으로\\ 종료하거나\\ 강제\\ 종료를\\ 미리\\ 보고\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
@@ -120,9 +120,9 @@ class RecoveryConfirmationTests(unittest.TestCase):
         self.quit.assert_not_called()
 
     def test_identity_failure_is_not_hidden_by_broken_connector(self):
-        self.native.side_effect = ValueError('Harness 进程已变化')
+        self.native.side_effect = ValueError('Harness 프로세스가 변경되었습니다.')
         self.adapter.discover_existing.side_effect = ValueError('broken connector')
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.preview()
         self.adapter.discover_existing.assert_not_called()
         self.probe.assert_not_called()
@@ -139,7 +139,7 @@ class RecoveryConfirmationTests(unittest.TestCase):
         preview = self.preview(False)
         self.adapter.discover_existing.side_effect = None
         self.adapter.discover_existing.return_value = {'installed': True}
-        with self.assertRaisesRegex(ValueError, '接入配置无法验证'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 액세스\\ 구성을\\ 확인할\\ 수\\ 없고\\ 작업\\ 상태를\\ 알\\ 수\\ 없으며\\ 종료가\\ 아직\\ 제출되지\\ 않았습니다\\.\\ 컴퓨터를\\ 정상적으로\\ 종료하거나\\ 강제\\ 종료를\\ 미리\\ 보고\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
         preview = self.preview(False)
@@ -149,7 +149,7 @@ class RecoveryConfirmationTests(unittest.TestCase):
     def test_connector_failure_after_preview_never_dispatches(self):
         preview = self.preview(False)
         self.adapter.discover_existing.side_effect = ValueError('broken connector')
-        with self.assertRaisesRegex(ValueError, '接入配置无法验证'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 액세스\\ 구성을\\ 확인할\\ 수\\ 없고\\ 작업\\ 상태를\\ 알\\ 수\\ 없으며\\ 종료가\\ 아직\\ 제출되지\\ 않았습니다\\.\\ 컴퓨터를\\ 정상적으로\\ 종료하거나\\ 강제\\ 종료를\\ 미리\\ 보고\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_not_called()
 
@@ -158,7 +158,7 @@ class RecoveryConfirmationTests(unittest.TestCase):
         self.quit.side_effect = ValueError('native reply unknown')
         with self.assertRaisesRegex(ValueError, 'native reply unknown'):
             self.confirm(preview, acknowledgeUnknown=True)
-        with self.assertRaisesRegex(ValueError, '已过期'):
+        with self.assertRaisesRegex(ValueError, "Harness\\ 복구\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."):
             self.confirm(preview, acknowledgeUnknown=True)
         self.quit.assert_called_once()
 
@@ -230,7 +230,7 @@ class RecoveryEvidenceTests(unittest.TestCase):
                 patch('bridge.clients.deepseek.recovery._app', return_value=app), \
                 patch('bridge.clients.deepseek.recovery._identities', return_value={}), \
                 patch('bridge.clients.deepseek.recovery._commands', return_value={}):
-            with self.assertRaisesRegex(ValueError, '进程已变化'):
+            with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                 _snapshot({})
 
 
@@ -266,13 +266,13 @@ class RecoveryQuitSnapshotTests(unittest.TestCase):
                 if field == 'identity': identities.pop(11)
                 elif field == 'command': commands.pop(11)
                 else: commands[11] = ''
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                     self.sample([self.before['state'], self.before['state']], [identities], [commands])
 
     def test_new_pid_during_resample_is_never_ignored(self):
         orphans = snapshot(gui=False, hosts=(12, 13))
         for fresh in (snapshot(gui=False, hosts=(12, 13, 14)), snapshot(gui=False, hosts=(13, 14))):
-            with self.subTest(pids=fresh['state']['pids']), self.assertRaisesRegex(ValueError, '进程已变化'):
+            with self.subTest(pids=fresh['state']['pids']), self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                 self.sample([self.before['state'], fresh['state']], [orphans['identities']],
                     [{pid: self.commands[pid] for pid in (12, 13)}])
 
@@ -283,19 +283,19 @@ class RecoveryQuitSnapshotTests(unittest.TestCase):
                 commands = {pid: self.commands[pid] for pid in (12, 13)}
                 if field == 'start': orphans['identities'][12]['start'] = 'reused-pid'
                 else: commands[12] = 'unknown-process'
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                     self.sample([self.before['state']], [orphans['identities']], [commands])
 
     def test_reappearing_gui_is_rejected_before_host_cleanup(self):
         orphans = snapshot(gui=False, hosts=(12, 13))
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.sample([orphans['state'], snapshot(hosts=(13,))['state']],
                 [{13: orphans['identities'][13]}], [{13: self.commands[13]}], gui_allowed=False)
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.sample([self.before['state']], [], [], gui_allowed=False)
 
     def test_new_pid_in_initial_sample_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.sample([snapshot(hosts=(12, 13, 14))['state']], [], [])
 
 
@@ -378,7 +378,7 @@ class RecoveryQuitTests(unittest.TestCase):
                     patch('bridge.clients.deepseek.recovery._app', return_value=self.app), \
                     patch('bridge.clients.deepseek.recovery.subprocess.run'), \
                     patch('bridge.clients.deepseek.recovery.os.kill') as kill:
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                     _quit({}, self.before)
                 kill.assert_not_called()
 
@@ -390,7 +390,7 @@ class RecoveryQuitTests(unittest.TestCase):
                 patch('bridge.clients.deepseek.recovery.subprocess.run'), \
                 patch('bridge.clients.deepseek.recovery.time.monotonic', side_effect=[0, 16]), \
                 patch('bridge.clients.deepseek.recovery.os.kill') as kill:
-            with self.assertRaisesRegex(ValueError, '未终止后台任务'):
+            with self.assertRaisesRegex(ValueError, '백그라운드 작업이 종료되지 않았습니다.'):
                 _quit({}, self.before)
             kill.assert_not_called()
 

@@ -54,7 +54,7 @@ def login_processes():
                 except FileNotFoundError:
                     continue
                 if state not in ('Z', 'X'):
-                    raise ValueError('无法核验同用户进程，请稍后重试账号操作') from None
+                    raise ValueError('동일한 사용자 프로세스를 확인할 수 없습니다. 나중에 계정 작업을 다시 시도하십시오.') from None
             except PermissionError:
                 # Non-dumpable login helpers such as sd-pam are not clients.
                 # Keep an unreadable native candidate blocked, not silently idle.
@@ -63,7 +63,7 @@ def login_processes():
                 except FileNotFoundError:
                     continue
                 if not name or name in names or name.startswith(('antigravity', 'language_server')):
-                    raise ValueError('无法核验 Antigravity 进程，请先在原客户端处理') from None
+                    raise ValueError('확인할 수 없습니다 Antigravity 처리하려면 원래 클라이언트에서 먼저 처리하세요.') from None
         return result
     if sys.platform == 'win32':
         # Credential Manager is per user, including CLI processes in other sessions.
@@ -79,7 +79,7 @@ def login_processes():
                                 capture_output=True, text=True, check=True, timeout=15,
                                 creationflags=subprocess.CREATE_NO_WINDOW)
         return json.loads(result.stdout or '[]')
-    raise ValueError('当前系统无法核验 Antigravity 进程')
+    raise ValueError('현재 시스템에서는 확인할 수 없습니다. Antigravity 프로세스')
 
 
 @lru_cache(maxsize=8)
@@ -151,7 +151,7 @@ def profile_lease(path):
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         stream.close()
-        raise ValueError('此 Antigravity 用户资料已由另一网关接入，请先停用原接入') from None
+        raise ValueError('이 Antigravity 다른 게이트웨이에서 사용자 데이터에 액세스했습니다. 먼저 원래 액세스를 비활성화하세요.') from None
     return stream
 
 
@@ -185,7 +185,7 @@ def _identity(pid):
         from bridge.platforms.linux.force_exit import Native
     row = Native().identity(pid)
     if row['uid'] != os.getuid() or row['zombie']:
-        raise PermissionError('Antigravity 进程用户不匹配')
+        raise PermissionError('Antigravity 프로세스 사용자가 일치하지 않습니다.')
     return row
 
 
@@ -274,10 +274,10 @@ def _log_ports(log):
 def endpoint(surface, home):
     """Return one same-user, same-surface server, or fail without contacting it."""
     if Path(home).resolve() != Path.home().resolve():
-        raise ValueError('Antigravity 本机控制只支持当前系统用户资料')
+        raise ValueError('Antigravity 로컬 제어는 현재 시스템 사용자 프로필만 지원합니다.')
     data_name = {'app': 'antigravity', 'ide': 'antigravity-ide', 'cli': 'antigravity-cli'}.get(surface)
     if not data_name:
-        raise ValueError('Antigravity 来源无效')
+        raise ValueError('Antigravity 잘못된 소스')
     matches = []
     for pid, args in _candidates():
         if _flag(args, '--app_data_dir') != data_name:
@@ -317,7 +317,7 @@ def endpoint(surface, home):
             except (OSError, ValueError):
                 continue  # An old log port is not a current native endpoint.
     if len(matches) != 1:
-        raise ValueError('未找到唯一、同用户且属于此来源的 Antigravity 原生服务；请在电脑打开相应应用')
+        raise ValueError('이 소스에 속하는 고유한 동일한 사용자가 없습니다. Antigravity 네이티브 서비스; 컴퓨터에서 해당 응용 프로그램을 열어주세요')
     return matches[0]
 
 
@@ -326,4 +326,4 @@ def verify_endpoint(value):
     port = int(value['address'].rsplit(':', 1)[1])
     if (_identity(before['pid']) != before or not _trusted_image(before['image']) or
             not _listener(before['pid'], port, before['image'])):
-        raise ValueError('Antigravity 原生服务进程已变化，请重新连接')
+        raise ValueError('Antigravity 기본 서비스 프로세스가 변경되었습니다. 다시 연결해 주세요.')

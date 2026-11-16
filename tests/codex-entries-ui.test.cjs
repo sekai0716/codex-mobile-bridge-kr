@@ -43,7 +43,7 @@ test('app management groups native Codex and WSL environment controls under Code
  const {nav,node,all}=fixture();nav.manager={dialog:{open:true},list:node(),note:node()};nav.renderManager();
  assert.equal(nav.manager.list.children.length,1);const group=nav.manager.list.children[0];assert.equal(group['aria-label'],'Codex');
  const row=all(group).find(row=>row.dataset.clientId===wsl);assert.ok(row);const control=row.children.at(-1);assert.equal(control.children[0]['aria-checked'],'true');
- assert.equal(control.children.some(child=>child.textContent==='查看聊天'),true);assert.equal(control.children.some(child=>child.textContent==='关闭电脑 App…'),false);
+ assert.equal(control.children.some(child=>child.textContent==='채팅 보기'),true);assert.equal(control.children.some(child=>child.textContent==='데스크톱 앱 닫기…'),false);
  assert.equal(all(group).filter(row=>row.className==='client-management-row').length,3);
  assert.doesNotMatch(fs.readFileSync('web/index.html','utf8'),/id="codex-entries"/);
 });

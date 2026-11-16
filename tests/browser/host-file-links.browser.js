@@ -16,12 +16,12 @@ window.runHostFileLinkChecks=async({files,text})=>{
   renderMarkdown(chat,text,files,file=>timeline.fileUrl(file));
   check(chat.querySelectorAll('a').length===2&&!chat.querySelector('img'),'outside file and image are explicit links without automatic image requests');
   check(calls.length===0,'rendering does not read file metadata');
-  const anchor=chat.querySelector('a');anchor.click();await wait(()=>button('预览文件'));
+  const anchor=chat.querySelector('a');anchor.click();await wait(()=>button('미리보기 파일'));
   check(calls.length===1&&new URL(calls[0],location.href).searchParams.get('scope')==='host','click requests scoped metadata on the selected host');
-  check(!!document.querySelector('dialog[open] a[download]')&&!!button('定位并打开所在文件夹'),'original download and locate actions remain available');
-  button('预览文件').click();await wait(()=>previewed);
+  check(!!document.querySelector('dialog[open] a[download]')&&!!button('폴더를 찾아 엽니다.'),'original download and locate actions remain available');
+  button('미리보기 파일').click();await wait(()=>previewed);
   check(previewed.text==='outside preview','actual sibling file is previewed through the shared action');
-  anchor.click();await wait(()=>button('定位并打开所在文件夹'));button('定位并打开所在文件夹').click();await wait(()=>located);
+  anchor.click();await wait(()=>button('폴더를 찾아 엽니다.'));button('폴더를 찾아 엽니다.').click();await wait(()=>located);
   check(located===files[0].path,'locate receives the exact absolute target');
   return checks;
  }finally{chat.remove();document.querySelectorAll('dialog[open]').forEach(d=>d.close());}

@@ -26,9 +26,9 @@ for(const [name,status] of [
  ['unknown legacy owner',{transport:'file',stopped:false,busy:false,sessionId:'missing',lastWrite:Date.now()}]
 ])test(name+' remains intact and reports a one-time migration boundary',async()=>{
  const ui=fixture(status);
- await assert.rejects(ui.run(),/旧版 Claude 桥接无法核验在途请求/);
+ await assert.rejects(ui.run(),/이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다\. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요\. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）\.）/);
  assert.deepEqual(ui.counts(),{stopped:0,writes:0,starts:0});
- assert.match(ui.window.__codingRemoteInjectionError,/当前任务结束后重新加载或退出重开 Claude Desktop/);
+ assert.match(ui.window.__codingRemoteInjectionError,/이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다\. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요\. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）\.）/);
  assert.match(ui.errors.at(-1),/BRIDGE_OWNER_LEGACY.*\[current-attempt\]/);
 });
 test('same-workspace legacy with complete execution status may be replaced without exposing its token',async()=>{
@@ -43,13 +43,13 @@ test('same-workspace legacy with complete execution status may be replaced witho
 test('pending request or response write blocks even same-owner replacement',async()=>{
  for(const field of ['busy','writing']){
   const ui=fixture({transport:'file',stopped:false,sessionId:'legacy-session',[field]:true},config.cwd);
-  await assert.rejects(ui.run(),/请求进行中/);
+  await assert.rejects(ui.run(),/Claude 아직 브릿지 요청이 진행 중입니다\. 나중에 다시 연결해 보세요\./);
   assert.equal(ui.counts().stopped,0);
  }
 });
 test('legacy stopped flag alone does not prove a signed release',async()=>{
  const ui=fixture({transport:'file',stopped:true,busy:false,sessionId:'legacy-session'});
- await assert.rejects(ui.run(),/旧版 Claude 桥接无法核验在途请求/);
+ await assert.rejects(ui.run(),/이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다\. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요\. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）\.）/);
  assert.equal(ui.counts().stopped,0);
 });
 test('revision-5 timeout leaves an unknown mutation behind identical signed stop and closed receipt',async()=>{
@@ -74,7 +74,7 @@ test('revision-5 timeout leaves an unknown mutation behind identical signed stop
   // A later signed idle generation resets the single response slot. Its
   // completed seq 333 and signed stop seq 334 conceal the older operation.
   const ui=fixture({transport:'file',stopped:false,busy,sessionId:'legacy-session',lastWrite:Date.now()},config.cwd);
-  await assert.rejects(ui.run(),/无法核验在途请求/);
+  await assert.rejects(ui.run(),/전송 중인 요청을 확인할 수 없습니다./);
   assert.deepEqual(ui.counts(),{stopped:0,writes:0,starts:0});
   assert.match(ui.errors.at(-1),/BRIDGE_OWNER_LEGACY.*\[current-attempt\]/);
   assert.equal(completed,0);
@@ -86,7 +86,7 @@ test('a handoff method with a different protocol revision is not trusted',async(
  let calls=0;
  const ui=fixture({transport:'file',sessionId:'legacy-session',connectorRevision:4,
                    handoff(){calls++;return true;}});
- await assert.rejects(ui.run(),/旧版 Claude 桥接无法核验在途请求/);
+ await assert.rejects(ui.run(),/이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다\. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요\. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）\.）/);
  assert.equal(calls,0);
  assert.equal(ui.counts().stopped,0);
 });

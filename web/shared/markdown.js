@@ -76,7 +76,7 @@
             }).catch(() => {
               if(!formula.isConnected)return;
               const retry=document.createElement('button');retry.type='button';retry.className='plain';
-              retry.textContent=typeof BridgeI18n==='undefined'?'重试':BridgeI18n.t('重试');
+              retry.textContent=typeof BridgeI18n==='undefined'?'다시 시도':BridgeI18n.t('다시 시도');
               retry.onclick=()=>{retry.remove();load();};expression.append(retry);
             });
             load();
@@ -110,7 +110,7 @@
               if(!options.fullText)return token.content;
               const extract=complete=>{
                 const blocks=parse(complete).filter(t=>t.type==='fence'||t.type==='code_block');
-                if(!blocks[index])throw Error('读取完整正文失败，请重试');
+                if(!blocks[index])throw Error('전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요.');
                 return blocks[index].content;
               };
               const complete=options.fullText();
@@ -126,7 +126,7 @@
             const syntax=window.BridgeCodeSyntax, language=syntax.languageFor(token.info);
             const header=document.createElement('div');header.className='code-header';
             const label=document.createElement('span');label.className='code-language';label.dataset.language=language || '';label.textContent=syntax.label(language);
-            const button=document.createElement('button');button.className='plain code-copy';button.type='button';button.textContent=typeof BridgeI18n==='undefined'?'复制代码':BridgeI18n.t('复制代码');
+            const button=document.createElement('button');button.className='plain code-copy';button.type='button';button.textContent=typeof BridgeI18n==='undefined'?'코드 복사':BridgeI18n.t('코드 복사');
             button.onclick=()=>window.BridgeClipboard?.copy(getSource,button);
             header.append(label,button);wrapper.append(header,pre);parent.append(wrapper);
             if(language && syntax.eligible(token.content)){
@@ -137,7 +137,7 @@
           }
         } else if (token.type === 'image') {
           const destination = target(token.attrGet('src') || '');
-          const label = token.content || destination?.file?.name || '图片';
+          const label = token.content || destination?.file?.name || '그림';
           if (destination?.file?.image) {
             const image = document.createElement('img');
             image.className = 'artifact-image';
@@ -177,7 +177,7 @@
             scroll.className = 'markdown-table';
             scroll.tabIndex = 0;
             scroll.setAttribute('role', 'region');
-            scroll.setAttribute('aria-label', '表格，可横向滚动');
+            scroll.setAttribute('aria-label', '테이블, 가로로 스크롤 가능');
             scroll.append(element);
             parent.append(scroll);
           } else parent.append(element);

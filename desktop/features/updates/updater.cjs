@@ -2,7 +2,7 @@
 // Release metadata is authenticated independently of macOS/Windows code signing.
 const sync=require('node:fs'),fs=require('node:fs/promises'),path=require('node:path');
 const {createHash,verify}=require('node:crypto');
-const REPO='try2love/codex-mobile-bridge';
+const REPO='sekai0716/codex-mobile-bridge-kr';
 const RELEASES=`https://api.github.com/repos/${REPO}/releases?per_page=100`;
 // The mirror only changes transport. Release selection still requires GitHub's
 // manifest signature, and the ZIP is checked against its signed SHA-256.
@@ -36,18 +36,18 @@ function activeUpdateHandoff(env,target,version,pid){
 }
 function version(value){
   const match=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta|preview|rc)\.(0|[1-9]\d*))?$/.exec(value);
-  if(!match)throw Error('更新版本格式无效。');
+  if(!match)throw Error('업데이트 버전이 잘못되었습니다.');
   const parts=[...match.slice(1,4).map(Number),{alpha:0,beta:1,preview:2,rc:3}[match[4]]??4,Number(match[5]||0)];
-  if(parts.some(v=>!Number.isSafeInteger(v)))throw Error('更新版本格式无效。');
+  if(parts.some(v=>!Number.isSafeInteger(v)))throw Error('업데이트 버전이 잘못되었습니다.');
   return parts;
 }
 function compare(a,b){const x=version(a),y=version(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return x[i]>y[i]?1:-1;return 0;}
 function releaseUrl(v,name){version(v);return `https://github.com/${REPO}/releases/download/v${v}/${name}`;}
 function allowedUrl(value){
   const u=new URL(value);
-  if(u.protocol!=='https:'||u.username||u.password||u.port||u.hash)throw Error('更新地址未通过来源检查。');
+  if(u.protocol!=='https:'||u.username||u.password||u.port||u.hash)throw Error('URL 업데이트가 소스 확인에 실패했습니다.');
   if(value===RELEASES||u.hostname==='github.com'&&u.pathname.startsWith(`/${REPO}/releases/download/`)||['release-assets.githubusercontent.com','objects.githubusercontent.com'].includes(u.hostname))return u.href;
-  throw Error('更新地址未通过来源检查。');
+  throw Error('URL 업데이트가 소스 확인에 실패했습니다.');
 }
 function mirrorUrl(value){
   allowedUrl(value);
@@ -74,38 +74,38 @@ async function fetchWithMirror(fetch,url,{signal,headers}){
       const response=await fetch(allowedMirrorUrl(target),{signal,headers:requestHeaders});
       if(response.ok||label==='mirror'||!MIRROR_RETRIES.has(response.status))return response;
       await response.body?.cancel();
-      lastError=Error(`更新服务返回 ${response.status}。`);
+      lastError=Error(`서비스 반환 업데이트 ${response.status}。`);
     }catch(error){
       if(isAbort(error))throw error;
       lastError=error;
       if(index===attempts.length-1)throw error;
     }
   }
-  throw lastError||Error('无法获取更新，请检查网络后重试。');
+  throw lastError||Error('업데이트를 가져올 수 없습니다. 네트워크를 확인하고 다시 시도하세요.');
 }
 function assetName(v,platform,arch){
   version(v);
-  if(!({darwin:['arm64','x64'],win32:['x64']}[platform]||[]).includes(arch))throw Error('此系统暂无应用内更新包。');
+  if(!({darwin:['arm64','x64'],win32:['x64']}[platform]||[]).includes(arch))throw Error('이 시스템에는 인앱 업데이트 패키지가 없습니다.');
   return `Codex-Mobile-Bridge-${v}-${platform==='darwin'?'macOS':'Windows'}-${arch}.zip`;
 }
 function manifest(bytes,key,{current,platform,arch,expected}){
   const envelope=JSON.parse(bytes.toString('utf8'));
-  if(typeof envelope.payload!=='string'||typeof envelope.signature!=='string')throw Error('更新清单签名无效。');
+  if(typeof envelope.payload!=='string'||typeof envelope.signature!=='string')throw Error('업데이트 매니페스트 서명이 잘못되었습니다.');
   const payload=Buffer.from(envelope.payload,'base64'),signature=Buffer.from(envelope.signature,'base64');
-  if(signature.length!==64||!verify(null,payload,key,signature))throw Error('更新清单签名无效。');
+  if(signature.length!==64||!verify(null,payload,key,signature))throw Error('업데이트 매니페스트 서명이 잘못되었습니다.');
   const value=JSON.parse(payload.toString('utf8'));
-  if(value.schema!==1||value.version!==expected||compare(value.version,current)<=0||!current.includes('-')&&value.version.includes('-'))throw Error('更新版本不适用于当前应用。');
+  if(value.schema!==1||value.version!==expected||compare(value.version,current)<=0||!current.includes('-')&&value.version.includes('-'))throw Error('이 업데이트 버전은 설치된 앱에는 적용되지 않습니다.');
   const asset=value.assets?.[`${platform}-${arch}`],name=assetName(value.version,platform,arch);
-  if(!asset||asset.name!==name||!Number.isSafeInteger(asset.size)||asset.size<=0||asset.size>MAX_PACKAGE||!/^[a-f0-9]{64}$/.test(asset.sha256))throw Error('更新包校验信息不完整。');
+  if(!asset||asset.name!==name||!Number.isSafeInteger(asset.size)||asset.size<=0||asset.size>MAX_PACKAGE||!/^[a-f0-9]{64}$/.test(asset.sha256))throw Error('업데이트 패키지 확인 정보가 불완전합니다.');
   return {version:value.version,notes:typeof value.notes==='string'?value.notes.slice(0,20000):'',asset:{...asset,url:releaseUrl(value.version,name)}};
 }
 async function transfer(fetch,url,{limit,signal,file,onProgress=()=>{}}){
   const response=await fetchWithMirror(fetch,url,{signal,headers:{'User-Agent':'Codex-Mobile-Bridge','Accept':url===RELEASES?'application/vnd.github+json':'application/octet-stream'}});
-  if(!response.ok){await response.body?.cancel();throw Error('无法获取更新，请检查网络后重试。');}
+  if(!response.ok){await response.body?.cancel();throw Error('업데이트를 가져올 수 없습니다. 네트워크를 확인하고 다시 시도하세요.');}
   const reader=response.body.getReader(),chunks=[],hash=createHash('sha256');let size=0,handle;
   try{
     if(file)handle=await fs.open(file,'wx',0o600);
-    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>limit)throw Error('更新下载超出大小限制。');
+    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>limit)throw Error('업데이트 다운로드가 크기 제한을 초과했습니다.');
       const bytes=Buffer.from(value);hash.update(bytes);
       if(handle)await handle.writeFile(bytes);else chunks.push(bytes);
       onProgress(size);
@@ -130,7 +130,7 @@ class Updater{
     const value=(await this.skippedVersions())[this.skipIdentity];return typeof value==='string'?value:'';
   }
   async skip(){
-    if(this.checking||this.busy||!this.candidate||this.state.state!=='available')throw Error('请先检查更新。');
+    if(this.checking||this.busy||!this.candidate||this.state.state!=='available')throw Error('먼저 업데이트를 확인하세요.');
     const version=this.candidate.version;
     const skipped={...await this.skippedVersions(),[this.skipIdentity]:version};
     if(this.skipFile){await fs.mkdir(path.dirname(this.skipFile),{recursive:true,mode:0o700});await fs.writeFile(this.skipFile,JSON.stringify(skipped),{mode:0o600});}
@@ -144,7 +144,7 @@ class Updater{
       assetName(this.current,this.platform,this.arch);
       const signal=AbortSignal.timeout(30000);
       const releases=JSON.parse((await transfer(this.fetch,RELEASES,{signal,limit:4*1024*1024})).bytes);
-      if(!Array.isArray(releases))throw Error('更新列表无效。');
+      if(!Array.isArray(releases))throw Error('업데이트 목록이 잘못되었습니다.');
       const candidates=releases.filter(item=>{
         if(item.draft||!/^v/.test(item.tag_name||'')||!this.current.includes('-')&&item.prerelease)return false;
         try{return compare(item.tag_name.slice(1),this.current)>0&&(this.current.includes('-')||!item.tag_name.includes('-'))&&item.assets?.some(a=>a.name==='bridge-update.json');}catch{return false;}
@@ -160,7 +160,7 @@ class Updater{
   }
   async install(){
     if(this.busy)return this.status();
-    if(!this.candidate||this.checking)throw Error('请先检查更新。');
+    if(!this.candidate||this.checking)throw Error('먼저 업데이트를 확인하세요.');
     const candidate=this.candidate;let staging;
     this.set('preparing',{version:candidate.version});
     try{
@@ -171,7 +171,7 @@ class Updater{
       const archive=path.join(staging,'update.zip');
       const downloaded=await transfer(this.fetch,candidate.asset.url,{signal:AbortSignal.timeout(15*60*1000),limit:candidate.asset.size,file:archive,
         onProgress:received=>this.set('downloading',{version:candidate.version,received,total:candidate.asset.size})});
-      if(downloaded.size!==candidate.asset.size||downloaded.sha256!==candidate.asset.sha256)throw Error('更新包校验失败，已取消安装。');
+      if(downloaded.size!==candidate.asset.size||downloaded.sha256!==candidate.asset.sha256)throw Error('업데이트 확인에 실패했습니다. 설치가 취소되었습니다.');
       this.set('preparing',{version:candidate.version});
       await this.apply({...candidate,archive});
       return this.set('restarting',{version:candidate.version});

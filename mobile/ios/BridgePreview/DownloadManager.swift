@@ -90,7 +90,7 @@ final class DownloadManager: NSObject, URLSessionDataDelegate, @unchecked Sendab
             guard [.connecting, .downloading].contains(self.value.phase) else { return }
             self.stopTask(); self.value.phase = .paused; self.value.speed = 0
             self.value.canResume = self.value.received == 0 || self.etag != nil && self.canContinue && !(self.url.map { Self.diagnosticReport($0, origin: self.value.origin) } ?? false)
-            self.value.message = self.value.canResume ? "" : "当前服务器不支持续传，请重新下载"
+            self.value.message = self.value.canResume ? "" : "이 서버는 다운로드를 재개할 수 없습니다. 다운로드를 다시 시작하세요."
             self.publish()
         }
     }
@@ -129,9 +129,9 @@ final class DownloadManager: NSObject, URLSessionDataDelegate, @unchecked Sendab
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             self.folder = folder
             let file = folder.appendingPathComponent("payload.part")
-            guard FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw TransferError(message: "无法保存下载文件，请检查剩余空间") }
+            guard FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw TransferError(message: "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.") }
             handle = try FileHandle(forWritingTo: file)
-        } catch { fail("无法保存下载文件，请检查剩余空间", restart: true) }
+        } catch { fail("다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.", restart: true) }
     }
     private func discard() {
         try? handle?.close(); handle = nil
@@ -160,7 +160,7 @@ final class DownloadManager: NSObject, URLSessionDataDelegate, @unchecked Sendab
             self.credentials?(origin, url) { cookie in
                 self.queue.async {
                     guard ticket == self.epoch, [.connecting, .downloading].contains(self.value.phase) else { return }
-                    guard let cookie, !cookie.isEmpty else { self.fail("登录已失效，请重新连接电脑"); return }
+                    guard let cookie, !cookie.isEmpty else { self.fail("로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오."); return }
                     self.request(url, cookie: cookie)
                 }
             }
@@ -199,35 +199,35 @@ final class DownloadManager: NSObject, URLSessionDataDelegate, @unchecked Sendab
     private func finish() {
         do {
             try handle?.synchronize(); try handle?.close(); handle = nil
-            guard let folder else { throw TransferError(message: "无法保存下载文件，请检查剩余空间") }
+            guard let folder else { throw TransferError(message: "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.") }
             let file = folder.appendingPathComponent(value.name)
             let partial = folder.appendingPathComponent("payload.part")
             if file != partial { try FileManager.default.moveItem(at: partial, to: file) }
             stopTask(); value.phase = .complete; value.file = file; value.speed = 0; value.message = ""; publish()
-        } catch { fail("无法保存下载文件，请检查剩余空间", restart: true) }
+        } catch { fail("다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.", restart: true) }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        if task === self.task { fail("下载地址发生跳转，已取消。请重新打开电脑附件。", restart: true) }
+        if task === self.task { fail("다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.", restart: true) }
         completionHandler(nil)
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         guard dataTask === task, let response = response as? HTTPURLResponse, let responseURL = response.url,
               Self.allows(responseURL, origin: value.origin) else { completionHandler(.cancel); return }
         do {
-            if [401, 403].contains(response.statusCode) { throw TransferError(message: "登录已失效，请重新连接电脑") }
+            if [401, 403].contains(response.statusCode) { throw TransferError(message: "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.") }
             if response.statusCode == 409 {
-                guard response.expectedContentLength <= 16384 else { throw TransferError(message: "下载失败，请检查网络后重试") }
+                guard response.expectedContentLength <= 16384 else { throw TransferError(message: "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.") }
                 errorBody = Data(); completionHandler(.allow); return
             }
             let encoding = response.value(forHTTPHeaderField: "Content-Encoding")?.lowercased() ?? "identity"
-            guard encoding == "identity" else { throw TransferError(message: "下载响应格式不正确，请重新下载", restart: true) }
+            guard encoding == "identity" else { throw TransferError(message: "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
             let tag = response.value(forHTTPHeaderField: "ETag").flatMap { $0.hasPrefix("\"") && $0.hasSuffix("\"") && $0.count > 2 ? $0 : nil }
-            if value.received > 0, tag == nil || tag != etag { throw TransferError(message: "文件已变化，请重新下载", restart: true) }
+            if value.received > 0, tag == nil || tag != etag { throw TransferError(message: "파일이 변경되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
             value.name = Self.filename(response.suggestedFilename ?? value.name)
             if response.statusCode == 416 {
                 let expected = "bytes */\(value.received)"
                 guard response.value(forHTTPHeaderField: "Content-Range") == expected,
-                      value.total == nil || value.total == value.received else { throw TransferError(message: "文件已变化，请重新下载", restart: true) }
+                      value.total == nil || value.total == value.received else { throw TransferError(message: "파일이 변경되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
                 value.total = value.received; completionHandler(.cancel); finish(); return
             }
             if response.statusCode == 206 {
@@ -237,49 +237,49 @@ final class DownloadManager: NSObject, URLSessionDataDelegate, @unchecked Sendab
                 guard let match = regex.firstMatch(in: field, range: NSRange(location: 0, length: source.length)),
                       let start = Int64(source.substring(with: match.range(at: 1))),
                       let end = Int64(source.substring(with: match.range(at: 2))),
-                      start == value.received, end >= start, end <= requestedEnd else { throw TransferError(message: "下载响应格式不正确，请重新下载", restart: true) }
+                      start == value.received, end >= start, end <= requestedEnd else { throw TransferError(message: "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
                 let total = Int64(source.substring(with: match.range(at: 3)))
-                if let total, total <= end || total > Self.limit { throw TransferError(message: "下载响应格式不正确，请重新下载", restart: true) }
-                if let prior = value.total, total != prior { throw TransferError(message: "文件已变化，请重新下载", restart: true) }
+                if let total, total <= end || total > Self.limit { throw TransferError(message: "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
+                if let prior = value.total, total != prior { throw TransferError(message: "파일이 변경되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
                 expectedBytes = end - start + 1; value.total = total
-                guard response.expectedContentLength < 0 || response.expectedContentLength == expectedBytes else { throw TransferError(message: "下载响应格式不正确，请重新下载", restart: true) }
-                guard tag != nil else { throw TransferError(message: "网关不支持安全续传，请更新网关后重试", restart: true) }
+                guard response.expectedContentLength < 0 || response.expectedContentLength == expectedBytes else { throw TransferError(message: "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
+                guard tag != nil else { throw TransferError(message: "다운로드를 안전하게 재개하려면 게이트웨이를 업데이트하세요.", restart: true) }
             } else if response.statusCode == 200 && value.received == 0 {
                 wholeResponse = true; expectedBytes = response.expectedContentLength >= 0 ? response.expectedContentLength : nil
                 value.total = expectedBytes; canContinue = tag != nil && !Self.diagnosticReport(responseURL, origin: value.origin)
-                if let total = value.total, total > Self.limit { throw TransferError(message: "下载响应格式不正确，请重新下载", restart: true) }
-            } else { throw TransferError(message: value.received > 0 ? "文件已变化或服务器不支持续传，请重新下载" : "下载失败，请检查网络后重试", restart: value.received > 0) }
+                if let total = value.total, total > Self.limit { throw TransferError(message: "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
+            } else { throw TransferError(message: value.received > 0 ? "파일이 변경되었거나 서버가 파일을 재개할 수 없습니다. 다운로드를 다시 시작하세요." : "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.", restart: value.received > 0) }
             etag = tag
             accepted = true; value.phase = .downloading; publish(); completionHandler(.allow)
         } catch let error as TransferError { completionHandler(.cancel); fail(error.message, restart: error.restart) }
-        catch { completionHandler(.cancel); fail("下载响应格式不正确，请重新下载", restart: true) }
+        catch { completionHandler(.cancel); fail("다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         guard dataTask === task else { return }
         if var body = errorBody {
-            guard body.count + data.count <= 16384 else { fail("下载失败，请检查网络后重试"); return }
+            guard body.count + data.count <= 16384 else { fail("다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요."); return }
             body.append(data); errorBody = body; return
         }
         guard accepted else { return }
         let count = Int64(data.count)
         guard value.received + count <= Self.limit, expectedBytes == nil || responseBytes + count <= expectedBytes! else {
-            fail("下载响应格式不正确，请重新下载", restart: true); return
+            fail("다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true); return
         }
         do { try handle?.write(contentsOf: data); value.received += count; responseBytes += count }
-        catch { fail("无法保存下载文件，请检查剩余空间", restart: true) }
+        catch { fail("다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.", restart: true) }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard task === self.task else { return }
         self.task = nil
         if let body = errorBody {
             let payload = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
-            if payload?["code"] as? String == "download_changed" { fail("文件已变化，请重新下载", restart: true) }
-            else { fail("电脑暂时不可用，可继续下载") }
+            if payload?["code"] as? String == "download_changed" { fail("파일이 변경되었습니다. 다운로드를 다시 시작하세요.", restart: true) }
+            else { fail("컴퓨터를 일시적으로 사용할 수 없습니다. 다운로드를 재개할 수 있습니다.") }
             return
         }
-        guard error == nil, accepted, expectedBytes == nil || responseBytes == expectedBytes else { fail("下载中断，可继续下载"); return }
+        guard error == nil, accepted, expectedBytes == nil || responseBytes == expectedBytes else { fail("다운로드가 중단되었습니다. 재개할 수 있습니다."); return }
         if wholeResponse || value.total == value.received { finish(); return }
-        guard value.received < Self.limit else { fail("下载响应格式不正确，请重新下载", restart: true); return }
+        guard value.received < Self.limit else { fail("다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.", restart: true); return }
         fetch()
     }
 }

@@ -14,11 +14,11 @@ async function runBootstrapBrowserChecks(){
   }else if(fatal){
     check(!root.hidden&&root.dataset.state==='failed','Expected a bounded terminal failure');
     check(!details.open&&!details.hidden,'Diagnostics must be available but collapsed');
-    check(!/启动诊断|resource|Mozilla/.test(document.getElementById('bootstrap-message').textContent),'Diagnostics leaked into main copy');
+    check(!/진단 시작|resource|Mozilla/.test(document.getElementById('bootstrap-message').textContent),'Diagnostics leaked into main copy');
     check(!probe.executed.includes('/app.js')||state.case==='pair-unknown','Dependent app executed after failure');
   }else{
     check(root.hidden&&!document.getElementById('login').hidden,'Expected recovered login');
-    check(!probe.titles.some(title=>title.includes('尚未加载完成')),'Transient failure exposed the terminal page');
+    check(!probe.titles.some(title=>title.includes('아직 로드되지 않음')),'Transient failure exposed the terminal page');
     check(probe.errors.length===(['opaque-error','external-runtime'].includes(state.case)?1:0),'Unexpected runtime exception count');
     check(probe.rejections.length===(state.case==='external-rejection'?1:0),'Unexpected unhandled rejection count');
     check(probe.loadClipboard===true,'Native load hook ran before the clipboard definition');

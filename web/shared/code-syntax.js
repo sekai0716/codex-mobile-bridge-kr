@@ -7,7 +7,7 @@ window.BridgeCodeSyntax = (() => {
     const name = String(info || '').trim().split(/\s/,1)[0].toLowerCase();
     return Object.hasOwn(aliases,name) ? aliases[name] : Object.hasOwn(labels,name) ? name : null;
   };
-  const plainLabel = () => typeof BridgeI18n === 'undefined' ? '纯文本' : BridgeI18n.t('纯文本');
+  const plainLabel = () => typeof BridgeI18n === 'undefined' ? '일반 텍스트' : BridgeI18n.t('일반 텍스트');
   const label = language => labels[language] || plainLabel();
   const eligible = text => text.length <= 65536 && (text.match(/\r\n|\r|\n/g) || []).length < 4000;
   const tokenize = (text, language) => {

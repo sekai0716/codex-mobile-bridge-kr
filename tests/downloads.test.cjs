@@ -165,5 +165,5 @@ test('all download interface and error messages have English translations', () =
   const fs = require('node:fs'), i18n = require('../web/shared/i18n.js');
   i18n.setLanguage('en');
   for (const match of fs.readFileSync(require.resolve('../web/features/workspace/downloads.js'),'utf8').matchAll(/'([^'\n]*[\u4e00-\u9fff][^'\n]*)'/g)) assert.doesNotMatch(i18n.t(match[1]), /[\u4e00-\u9fff]/, match[1]);
-  i18n.setLanguage('zh');
+  i18n.setLanguage('ko');
 });

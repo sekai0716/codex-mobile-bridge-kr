@@ -40,11 +40,11 @@ class ClaudeCliRenameTests(unittest.TestCase):
         remote._get = lambda sid: dict(self.row)
         for client in (local, remote):
             with self.subTest(client=type(client).__name__), patch('subprocess.Popen') as spawn:
-                result = client.call('rename', 'gateway-id', {'title': ' 原生中文名称 '})
+                result = client.call('rename', 'gateway-id', {'title': ' 네이티브 중국어 이름 '})
                 self.assertEqual(result, {'status': 'confirmed', 'scope': 'native',
-                                          'result': {'id': 'gateway-id', 'title': '原生中文名称'}})
+                                          'result': {'id': 'gateway-id', 'title': '네이티브 중국어 이름'}})
                 self.assertTrue(client._public(self.row)['capabilities']['rename'])
-                self.owned.control.assert_called_with({'subtype': 'rename_session', 'title': '原生中文名称',
+                self.owned.control.assert_called_with({'subtype': 'rename_session', 'title': '네이티브 중국어 이름',
                                                        'source': 'host', 'session_id': self.native})
                 self.owned.write.assert_not_called()
                 spawn.assert_not_called()
@@ -78,7 +78,7 @@ class ClaudeCliRenameTests(unittest.TestCase):
         with patch('bridge.features.sessions.display_metadata.time.sleep'):
             self.assertEqual(_rename_cli(self.owned, self.row, 'new', read)['status'], 'confirmed')
         self.owned.control.assert_called_once()
-        with self.assertRaisesRegex(BridgeUnavailable, '待核对'):
+        with self.assertRaisesRegex(BridgeUnavailable, "이름\\ 변경\\ 결과는\\ 확인\\ 대기\\ 중입니다\\.\\ 원본을\\ 확인하세요\\.\\ Claude\\ Code\\ 세션;\\ 중복\\ 제출\\ 불가"):
             _rename_cli(self.owned, self.row, 'new', lambda: {**self.row, 'title': 'new', 'cwd': '/changed'})
         self.assertEqual(self.owned.control.call_count, 2)
 
@@ -87,20 +87,20 @@ class ClaudeCliRenameTests(unittest.TestCase):
         events = [
             {'type': 'user', 'sessionId': self.native, 'cwd': str(self.home),
              'permissionMode': 'default', 'message': {'role': 'user', 'content': 'first message'}},
-            {'type': 'custom-title', 'sessionId': self.native, 'customTitle': '原生中文标题'},
+            {'type': 'custom-title', 'sessionId': self.native, 'customTitle': '네이티브 중국어 제목'},
             {'type': 'custom-title', 'sessionId': str(uuid.uuid4()), 'customTitle': 'wrong target'},
             {'type': 'user', 'sessionId': self.native, 'cwd': str(self.home),
              'message': {'role': 'user', 'content': 'later message'}},
         ]
         path.write_text('\n'.join(json.dumps(row) for row in events)+'\n')
         before = path.read_bytes()
-        self.assertEqual(_saved(path, 'fixture')['title'], '原生中文标题')
+        self.assertEqual(_saved(path, 'fixture')['title'], '네이티브 중국어 제목')
         source = worker_source()
         scope = {'__name__': 'isolated_worker'}
         exec(compile(source, 'isolated_worker', 'exec'), scope)
         with patch.dict(os.environ, {}, clear=True), patch.object(Path, 'home', return_value=self.home):
             row = scope['saved'](path, {'origin': 'fixture', 'directory': str(self.home), 'binary': '/fixture/claude'})
-        self.assertEqual(row['title'], '原生中文标题')
+        self.assertEqual(row['title'], '네이티브 중국어 제목')
         self.assertEqual(path.read_bytes(), before)
 
 

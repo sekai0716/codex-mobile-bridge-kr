@@ -9,8 +9,8 @@ async function check(){
   if(!claim)return;
   try{const result=await request('/relay/claim-status',{claim});
     if(result.state==='approved'){claim=null;location.replace(base+'/');return;}
-    if(result.state!=='pending'){claim=null;statusText.textContent='连接申请已拒绝或失效，请在电脑上重新配对。';return;}
-    statusText.textContent='等待电脑批准，请核对电脑上显示的手机名称。';setTimeout(check,2500);
+    if(result.state!=='pending'){claim=null;statusText.textContent='연결 요청이 거부되었거나 만료되었습니다. 컴퓨터에서 다시 페어링해 주세요.。';return;}
+    statusText.textContent='컴퓨터 승인을 기다리는 중입니다. 컴퓨터에 표시된 휴대폰 이름을 확인하세요.。';setTimeout(check,2500);
   }catch(error){claim=null;statusText.textContent=error.message;}
 }
 form.hidden=!pairToken;

@@ -11,7 +11,7 @@ const renderer=fs.readFileSync('desktop/shell/renderer.js','utf8');
 const wiring=renderer.slice(renderer.indexOf('const wslAccountScopes=[];'),renderer.lastIndexOf("document.addEventListener('bridge-client-config',"));
 async function fixture(){
   const local=new Node('article'),cli=new Node('div'),calls=[];let accounts=[];
-  const state=()=>({provider:'codex',entry:'wsl-test',identity:'fixture',available:true,target:{distribution:'Fixture',user:'test'},blockers:['自定义 provider 路由','runningCLI'],capabilities:{save:true,import:false,switch:false,models:false},accounts:accounts.map(row=>({...row}))});
+  const state=()=>({provider:'codex',entry:'wsl-test',identity:'fixture',available:true,target:{distribution:'Fixture',user:'test'},blockers:['사용자 정의 provider 라우팅','runningCLI'],capabilities:{save:true,import:false,switch:false,models:false},accounts:accounts.map(row=>({...row}))});
   const context={window:{loadWslAccounts:async()=>{}},activeTab:'overview',document:{createElement:tag=>new Node(tag),addEventListener(){},removeEventListener(){}},Option:class extends Node{constructor(text,value){super('option',text);this.value=value;}},$:id=>id==='accounts-content'?local:id==='cli-access-content'?cli:null,t:key=>key,BridgeI18n:{t:key=>key,locale:()=> 'en'},Date,clearTimeout,desktopConnections:null,accountsPanel:{visible:()=>true,clear(){},refresh(){}},codexCliAccessPanel:{clear(){},refresh(){}},claudeCliAccessPanel:null,api:{platform:'win32',cliAccess:async value=>{
     calls.push({...value});assert.equal(value.action,'wslAccounts');assert.equal(value.provider,'codex');
     if(value.operation==='environments')return{environments:[{id:'wsl-test',distribution:'Fixture',user:'test'}]};
@@ -32,7 +32,7 @@ async function submit(panel,name){
 test('desktop WSL wiring can add and edit isolated API credentials despite switch blockers',async()=>{
   const {panel,calls,local,cli}=await fixture();assert.equal(panel.desktop,true);assert.equal(local.hidden,true);assert.equal(cli.hidden,false,'Codex no longer has a separate API editor');
   await submit(panel,'Added fixture');assert.equal(panel.value.accounts[0].name,'Added fixture');assert.equal(panel.key.value,'');
-  const edit=all(panel.root).find(node=>node.tagName==='button'&&node.textContent==='编辑');assert.ok(edit);edit.onclick();
+  const edit=all(panel.root).find(node=>node.tagName==='button'&&node.textContent==='편집');assert.ok(edit);edit.onclick();
   await submit(panel,'Edited fixture');assert.equal(panel.value.accounts[0].name,'Edited fixture');
   const saves=calls.filter(value=>value.operation==='save-api');assert.equal(saves.length,2);assert.equal(saves[0].id,undefined);assert.equal(saves[1].id,'saved-fixture');
   assert.ok(saves.every(value=>value.entry==='wsl-test'&&value.action==='wslAccounts'));assert.equal(calls.some(value=>['switch','models','import-current'].includes(value.operation)),false);

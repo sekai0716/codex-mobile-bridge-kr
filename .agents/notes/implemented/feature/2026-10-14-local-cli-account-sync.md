@@ -1,51 +1,51 @@
-# Agent Note: 可选的本地 CLI 账号同步
+# Agent Note: 선택적 로컬 CLI 계정 동기화
 
 Status: implemented
 
-## 问题
+## 문제
 
-Codex Desktop 与本地 Codex CLI 共享配置主目录。即使用户未选择 CLI 同步，Desktop 切换仍修改 CLI 文件，而已运行的 CLI 守护进程可能保留旧设置。Claude Desktop 官方 Cookie 不是 Claude Code CLI 凭据；API 配置只有在核验保存的 Desktop 配置后才能复制。
+Codex Desktop 현지와 함께 Codex CLI 공유 구성 홈 디렉토리. 사용자가 선택하지 않더라도 CLI 동기식，Desktop 토글은 여전히 ​​수정됨 CLI 실행된 파일 CLI 데몬이 이전 설정을 유지할 수 있습니다.。Claude Desktop 공식적인 Cookie 아니요 Claude Code CLI 신임장；API 구성은 확인 후에만 저장됩니다. Desktop 구성 후에만 복사할 수 있습니다.。
 
-## 决策
+## 결정
 
-Desktop 切换请求可显式选择本地 CLI 同步。Codex 告知共享配置事实；选中同步时，在 Desktop 验证后单独验证 CLI 账号/provider/配置。CLI 失败保留已验证的 Desktop 切换，报告部分失败。未选 CLI 同步时，UI 说明共享配置已改变，但 CLI 运行时尚未验证。
+Desktop 스위치 요청은 명시적으로 로컬을 선택할 수 있습니다. CLI 동기식。Codex 공유 구성 사실을 알려줍니다. 동기화를 선택하면 Desktop 확인 후 별도 확인 CLI 계정/provider/설정。CLI 확인된 내용을 유지하지 못함 Desktop 스위치, 부분 오류를 보고합니다. 선택되지 않음 CLI 동기화할 때，UI 설명 공유 구성이 변경되었지만 CLI 런타임 시 아직 확인되지 않음。
 
-Desktop 停止时，仅 CLI 的 Codex 切换使用现有账号准备与原生凭据快照，应用到共享主目录，通过新的原生账号/配置 RPC 验证，失败则恢复快照。Desktop 运行时使用既有停止/应用/重启事务。已加入 CLI 会话、待处理任务和存活 CLI 控制守护进程均阻止切换。辅助程序不终止外部守护进程，也不触碰 SSH 配置。
+Desktop 정지된 경우에만 CLI 의 Codex 기존 계정의 사용을 전환하여 기본 자격 증명으로 스냅샷을 준비하고, 공유 홈 디렉터리에 적용하고, 새 기본 계정을 전달합니다./설정 RPC 확인하고 실패하면 스냅샷을 복원합니다.。Desktop 기존 정류장을 이용한 런타임/애플리케이션/거래를 다시 시작하세요. 이미 가입했습니다 CLI 세션, 보류 중인 작업 및 생존 CLI 제어 데몬은 모두 전환을 방지합니다. 도우미 프로그램은 외부 데몬을 종료하지도 않고 건드리지도 않습니다. SSH 설정。
 
-Claude Desktop 同步只接受当前生效、指纹匹配的已保存 API 配置。在 Desktop 成功后创建并选择受管 Claude Code 配置。原生 OAuth/Cookie 配置保持独立，只读选择。Claude Code API 设置使用文档中的基础 URL、认证和模型环境变量。验证不调用模型。
+Claude Desktop 동기화는 현재 유효하고 지문이 일치하는 저장된 파일만 허용합니다. API 구성. 존재하다 Desktop 성공 후 관리형 생성 및 선택 Claude Code 구성. 토종의 OAuth/Cookie 구성은 독립적이며 읽기 전용 선택으로 유지됩니다.。Claude Code API 설명서의 기본 사항을 사용하여 설정 URL、인증 및 모델 환경 변수. 모델이 호출되지 않았는지 확인。
 
-Web、手机和网关桌面界面中，本地 CLI 接入控件位于各 provider 的账号管理视图。Codex 和 Claude Code 各有固定 provider 面板。已保存 API 接入可显式查询或测试上游模型列表端点，使用私有保存凭据，但不选择该接入、不发送聊天请求。测试只确认模型列表端点连通和授权；端点不可用时，仍可手动填写模型 ID。
+Web、휴대폰 및 게이트웨이 데스크톱 인터페이스에서 로컬 CLI 액세스 제어 장치는 각 위치에 있습니다. provider 계정 관리 보기。Codex 및 Claude Code 각각은 자체적으로 고정되어 있습니다. provider 패널. 저장됨 API 액세스는 업스트림 모델 목록 엔드포인트를 명시적으로 쿼리하거나 테스트하고 자격 증명을 비공개로 저장할 수 있지만 액세스를 선택하지 않고 채팅 요청을 보내지 않습니다. 테스트에서는 모델 목록 엔드포인트 연결 및 승인만 확인합니다. 끝점을 사용할 수 없는 경우에도 모델을 수동으로 채울 수 있습니다. ID。
 
-## 备选方案
+## 대안
 
-原记录明确区分 Desktop 切换成功与 CLI 运行时已验证，不能以共享文件已更新代替 CLI 验证；Claude Desktop 官方 Cookie 也不能当作 CLI 凭据直接同步。这些边界来自本篇的问题和决策记录。除此之外，原记录未保留独立方案比较；后续本地 Codex 统一账号决定见文末互链，不能倒写成最初已作出的决定。
+원본 기록은 명확하게 구별됩니다. Desktop 다음으로 성공적으로 전환하세요. CLI 런타임이 확인되었으며 공유 파일이 업데이트되어 대체될 수 없습니다. CLI 검증；Claude Desktop 공식적인 Cookie 또한 로 간주될 수도 없다. CLI 자격 증명은 직접 동기화됩니다. 이러한 경계는 이 문서의 문제 및 결정 기록에서 비롯됩니다. 또한, 독립적인 계획 비교를 위해 원본 기록이 보관되지 않습니다. 후속 지역 Codex 계정 통합 결정은 글 말미에 링크되어 있어 원래 내린 결정에 다시 쓸 수 없습니다.。
 
-## 影响
+## 영향
 
-Desktop 与 CLI 可以产生不同验证结果，因此保留部分成功反馈；已确认的 Desktop 切换不因 CLI 验证失败而被描述为全部失败。共享主目录仍可能已改变，未验证运行时必须明确标注。活动会话、任务及活跃或未知守护进程状态会阻止切换；真实登录与运行时重载能力仍以各平台已记录的验收范围为限。Claude 同步保持可选，Codex 的后续规则由文末链接说明。
+Desktop 및 CLI 다양한 검증 결과가 생성될 수 있으므로 부분적인 성공 피드백이 유지됩니다. 확인됨 Desktop 인해 스위칭이 발생하지 않습니다. CLI 인증에 실패했으며 전체 실패로 설명되었습니다. 공유 홈 디렉터리는 여전히 변경되었을 수 있으며 확인되지 않은 실행은 명확하게 표시되어야 합니다. 활성 세션, 작업 및 활성 또는 알 수 없는 데몬 상태로 인해 전환이 방지됩니다. 실제 로그인 및 런타임 다시 로드 기능은 여전히 ​​각 플랫폼의 문서화된 허용 제한으로 제한됩니다.。Claude 선택적으로 동기화 유지，Codex 후속 규칙은 기사 끝의 링크로 설명됩니다.。
 
-## 验证
+## 검증
 
-定向 Python 夹具覆盖 Codex 回滚、活跃守护进程阻止、受管 Claude API 设置、Desktop API 导入，以及 Desktop/CLI 独立结果。UI 夹具覆盖主动勾选框提交。隔离原生 Codex 验收配合回环模型服务，确认新 CLI 轮次使用所选模型和端点，并阻止外部连接尝试；该夹具未执行账号切换。未运行真实账号变更、付费模型调用、现有守护进程重载或 SSH 配置变更。
+정위 Python 고정물 적용 범위 Codex 롤백, 활성 데몬 차단, 관리형 Claude API 설정、Desktop API 가져오기 및 Desktop/CLI 독립적인 결과。UI 픽스쳐 오버라이드 활성 체크박스 제출. 네이티브를 분리 Codex 루프백 모델로 서비스를 수락하고 새로운 내용을 확인합니다. CLI 라운드에서는 선택한 모델과 끝점을 사용하고 외부 연결 시도를 차단합니다. Fixture는 계정 전환을 수행하지 않습니다. 실제 계정 변경, 유료 모델 호출, 기존 데몬 재로드 또는 SSH 구성 변경。
 
-## 跨平台账号保护的后续调整
+## 크로스 플랫폼 계정 보호에 대한 후속 조정
 
-仅 CLI 切换向 Codex CLI 会话层询问原生守护进程是否仍可能运行。不确定状态会阻止切换，账号层不再假设使用 Unix 套接字。原生验证同时检查选定 API provider URL、既有 Codex 聊天使用的 `openai_base_url` 路由及账号类型。Claude Code API 验证使用与启动路径相同的受管 provider 环境，并在选择配置前检查 `auth status --json` 返回的配置目录。导入 Claude 目录时，在解析之前拒绝所提供路径为符号链接的情况。
+오직 CLI 로 전환하다 Codex CLI 세션 계층은 기본 데몬에게 여전히 실행이 가능한지 묻습니다. 불확실한 상태로 인해 전환이 불가능하며, 계정 레이어는 더 이상 사용되지 않는 것으로 간주됩니다. Unix 소켓. 기본 유효성 검사도 선택됨 API provider URL、기존의 Codex 채팅에 사용됩니다 `openai_base_url` 라우팅 및 계정 유형。Claude Code API 동일한 관리되는 제품을 사용하고 있는지 확인하세요. provider 환경을 확인하고 구성을 선택하기 전에 확인하십시오. `auth status --json` 반환된 구성 디렉터리입니다. 수입 Claude 디렉토리, 구문 분석하기 전에 제공된 경로가 심볼릭 링크인 경우를 거부합니다.。
 
-跨平台账号夹具覆盖守护进程状态阻止、两条有效 Codex API 路由、Claude 报告的配置目录和符号链接导入拒绝。macOS 上已安装 Claude Code 2.1.287 对使用占位密钥的隔离临时配置分别返回 `authMethod=api_key` 和 `authMethod=oauth_token`；没有模型请求或真实账号变更。支持的环境键及 provider 路由覆盖已对照[官方 Claude Code 环境变量参考](https://code.claude.com/docs/en/env-vars)。仅这些 macOS 检查不能证明 Windows/Linux 行为；Linux Codex 验收如下。
+크로스 플랫폼 계정 고정 장치는 데몬 상태 차단을 재정의합니다. 두 가지 유효 Codex API 라우팅、Claude 구성 디렉터리 및 기호 링크 가져오기 거부가 보고되었습니다.。macOS 에 설치됨 Claude Code 2.1.287 자리 표시자 키를 사용하여 격리된 임시 구성에 대한 별도 반환 `authMethod=api_key` 및 `authMethod=oauth_token`；모델 요청이나 실제 계정 변경이 없습니다. 지원되는 환경 키 및 provider 경로 적용 범위 확인됨[공식적인 Claude Code 환경 변수 참조](https://code.claude.com/docs/en/env-vars)。이것만 macOS 검사로 입증할 수 없음 Windows/Linux 행동；Linux Codex 수락은 다음과 같습니다。
 
-在 Linux x86_64 服务器、Python 3.10.12、已安装 Codex CLI 0.160.0 上，`tests/acceptance/cli_sync_native.py` 从 `<test-root>/accounts` 运行通过，使用隔离 `CODEX_HOME`、两个独立回环 Responses API 服务及占位密钥。验证了原生 A 路由、注入 B 失败后恢复 A 文件并完成后续原生 A 轮次，以及成功切换 B 并完成原生 B 轮次。还通过已安装 CLI 的只读守护进程状态探测，阻止已加入 CLI 会话及临时 PID 材料产生的未知守护进程状态；本地模拟代理拒绝 25 次外部 CONNECT。未启动真实活跃守护进程、触碰日常账号目录、调用付费模型或验证 Claude Code 账号切换。已验证这些假 API 配置的 Linux 原生凭据行为及回滚；真实登录与活跃守护进程生命周期仍未测试。
+에서 Linux x86_64 섬기는 사람、Python 3.10.12、설치됨 Codex CLI 0.160.0 우수한，`tests/acceptance/cli_sync_native.py` ～에서 `<test-root>/accounts` 실행, 격리 사용 `CODEX_HOME`、두 개의 독립 루프 Responses API 서비스 및 자리 표시자 키. 검증된 네이티브 A 라우팅, 주입 B 실패 후 복구 A 파일을 작성하고 후속 네이티브를 완료하세요. A 라운드 및 성공적인 전환 B 그리고 네이티브를 완성하세요 B 라운드. 또한 다음을 통해 설치됩니다. CLI 읽기 전용 데몬 상태 감지, 차단이 합류했습니다 CLI 세션 및 임시 PID 자료 생성에 대한 알 수 없는 데몬 상태입니다. 로컬 시뮬레이션 에이전트가 거부됨 25 하위 외부 CONNECT。실제 활성 데몬이 시작되지 않고 일일 계정 디렉터리가 터치되고 유료 모델이 호출되거나 확인됩니다. Claude Code 계정 전환. 이 가짜는 확인되었습니다 API 구성된 Linux 기본 자격 증명 동작 및 롤백 실제 로그인 및 활성 데몬 수명주기는 아직 테스트되지 않았습니다.。
 
-Windows 10.0.19045 x64 上，已安装 Codex MSIX 包含版本 0.162.0-alpha.17.2 的 `app/resources/codex.exe`。SSH 会话可从 `WindowsApps` 读取但不能执行；按字节复制到 `<test-root>/accounts/codex.exe` 后无需安装即可运行。在 Python 3.11 下，以同一隔离夹具在该临时目录测试，原生 A/B 轮次到达各自回环端点，凭据占位值和模型匹配。注入 B 失败后恢复 A 并再次完成原生 A 轮次；已加入会话和未知守护进程保护阻止切换，23 次外部 CONNECT 被拒绝。这证明复制的原生二进制 app-server 路径及基于文件的 API 账号事务，不证明其属于受支持受管守护进程包，也不验证真实运行守护进程、桌面重启路径或真实凭据。
+Windows 10.0.19045 x64 켜짐, 설치됨 Codex MSIX 버전 포함 0.162.0-alpha.17.2 의 `app/resources/codex.exe`。SSH 세션은 다음에서 액세스할 수 있습니다. `WindowsApps` 읽기만 하고 실행하지는 않습니다. 바이트를 다음으로 복사 `<test-root>/accounts/codex.exe` 설치 없이 실행 가능합니다. 존재하다 Python 3.11 다음으로, 동일한 격리 픽스처를 사용하여 임시 디렉터리인 네이티브에서 테스트합니다. A/B 각 라운드는 해당 루프백 끝점에 도달하고 자리 표시자 값은 모델과 일치합니다. 주입 B 실패 후 복구 A 그리고 다시 네이티브를 완성하세요 A 둥근; 세션에 참여했으며 알 수 없는 데몬 보호로 인해 전환이 방지됩니다.，23 하위 외부 CONNECT 거부되었습니다. 이는 복사된 네이티브 바이너리가 app-server 경로 및 파일 기반 API 지원되는 관리 데몬 패키지에 속해 있음을 증명하지 않거나 실제 실행 중인 데몬, 데스크톱 다시 시작 경로 또는 실제 자격 증명을 확인하지 않는 계정 트랜잭션。
 
-Windows Claude Code 2.1.168 的 `auth status --json` 省略 `configDirectory`，不同于 macOS/Ubuntu 2.1.287。选定临时 API 配置时，2.1.168 对相应假凭据报告 `api_key` 或 `oauth_token`；独立空临时配置报告 `loggedIn=false`、`authMethod=none`。账号验证器只有在第二次原生探测使用同一可执行文件及净化环境证明配置隔离后，才接受目录字段省略。目录字段存在时仍须精确匹配。回归拒绝空配置仍有环境登录、控制输出错误/超时、选定方法错误，以及存在但为 null 或不匹配的目录。
+Windows Claude Code 2.1.168 의 `auth status --json` 생략 `configDirectory`，와는 다르다 macOS/Ubuntu 2.1.287。임시 선택됨 API 구성할 때，2.1.168 해당 위조 자격증명 신고 `api_key` 또는 `oauth_token`；독립형 빈 임시 구성 보고서 `loggedIn=false`、`authMethod=none`。계정 유효성 검사기는 동일한 실행 가능하고 정리된 환경을 사용하는 두 번째 기본 프로브가 구성 격리를 입증한 후에만 디렉터리 필드 생략을 허용합니다. 디렉터리 필드는 존재하는 경우에도 정확히 일치해야 합니다. 회귀는 빈 구성을 거부하고 여전히 환경 로그인 및 제어 출력 오류를 발생시킵니다./시간 초과, 선택한 메서드 오류, 존재하지만 null 또는 일치하지 않는 디렉토리。
 
-Ubuntu x86_64、Python 3.10.12 和限定的官方 Claude Code 2.1.287 二进制上，`tests/acceptance/claude_sync_native.py` 完全在 `<test-root>/accounts/` 下通过。原生 A/B 轮次到达独立回环端点，使用设置中的选定 x-api-key 或 bearer token 及默认模型，无 CLI 模型覆盖。注入 B 验证失败后精确恢复 A 设置并再次完成原生 A 轮次。原生切回恢复原设置，模拟的活跃网关持有 Claude 会话阻止预检。14 次外部 CONNECT 被拒绝。
+Ubuntu x86_64、Python 3.10.12 그리고 제한된 공식 Claude Code 2.1.287 바이너리，`tests/acceptance/claude_sync_native.py` 완전히 `<test-root>/accounts/` 다음으로 패스하세요. 토종의 A/B 라운드는 선택된 루프백 끝점을 사용하여 독립적인 루프백 끝점에 도달합니다. x-api-key 또는 bearer token 및 기본 모델, 없음 CLI 모델 적용 범위. 주입 B 검증 실패 후 정확한 복구 A 네이티브를 다시 설정하고 완료하세요. A 라운드. 기본 스위치백은 원래 설정을 복원하고 시뮬레이션된 활성 게이트웨이를 유지합니다. Claude 세션 차단 프리플라이트。14 하위 외부 CONNECT 거부됨。
 
-将提交 `3c99462` 的原生 Windows 写入者保护整合到隔离源码后，同一夹具在 Windows 10.0.19045、Python 3.11、已安装 Claude Code 2.1.168 的 `<test-root>/accounts/claude` 下通过。原生 A/B 请求使用选定端点、假 x-api-key 或 bearer 凭据及默认模型；注入 B 失败恢复 A，并再次完成原生 A 轮次。已完成原生轮次的会话注册表不阻止后续切换，模拟活跃网关持有会话则阻止。13 次外部 CONNECT 被拒绝。Linux/Windows 运行均未改变日常配置或调用付费模型。该账号夹具未测试真实活跃外部写入者或真实凭据；平台保护有独立原生身份测试。
+제출할 것이다 `3c99462` 원주민의 Windows 격리된 소스 코드에 작성자 보호 기능이 통합되어 있어 동일한 고정 장치 Windows 10.0.19045、Python 3.11、설치됨 Claude Code 2.1.168 의 `<test-root>/accounts/claude` 다음으로 패스하세요. 토종의 A/B 선택한 엔드포인트 사용 요청, false x-api-key 또는 bearer 자격 증명 및 기본 모델 주입 B 장애 복구 A，그리고 다시 네이티브를 완성하세요 A 라운드. 기본 라운드를 완료한 세션 레지스트리는 후속 전환을 방지하지 않는 반면, 시뮬레이션된 활성 게이트웨이 보유 세션은 방지합니다.。13 하위 외부 CONNECT 거부됨。Linux/Windows 어떤 실행도 일일 구성을 변경하거나 유료 모델을 호출하지 않았습니다. 이 계정 고정 장치는 실제 활동 중인 외부 작성자나 실제 자격 증명을 테스트하지 않습니다. 플랫폼 보호에는 독립적인 기본 ID 테스트가 있습니다.。
 
-账号配置 JSON 和原生 Claude 认证输出显式以 UTF-8 读取，不受 Windows 系统代码页影响。旧版阴性对照探测保留同样编码，并要求原生退出码为 1 且 JSON 表示已退出登录。
+계정 구성 JSON 그리고 원주민 Claude 인증 출력은 명시적으로 다음으로 시작됩니다. UTF-8 읽다, 대상이 아니다 Windows 시스템 코드 페이지 영향. 이전 음성 대조 프로브는 동일한 코딩을 유지하며 기본 종료 코드가 필요합니다. 1 그리고 JSON 로그아웃했음을 나타냅니다.。
 
-[WSL 账号管理](2026-10-25-wsl-account-management.md)采用独立注册环境事务，不将原生本地账号同步扩展到 WSL，也不自动镜像 Windows 凭据。
+[WSL 계정 관리](2026-10-25-wsl-account-management.md)독립적인 등록 환경 업무를 채택하고 기본 로컬 계정의 확장을 동기화하지 않습니다. WSL，자동 미러링도 안 됨 Windows 신임장。
 
-Codex 主动选择同步的决定由[统一本地 Codex 账号](2026-10-26-unified-codex-accounts.md)替代。Claude 同步仍可选。
+Codex 동기화를 적극적으로 선택하는 결정은 다음에 의해 이루어집니다.[통합 로컬 Codex 계정](2026-10-26-unified-codex-accounts.md)대리자。Claude 동기화는 여전히 선택사항입니다.。

@@ -1,9 +1,9 @@
-# Android 原生壳
+# Android 네이티브 셸
 
-- `src/io/github/try2love/codexbridge/MainActivity.java` 保留 Activity 生命周期、WebView 导航和原生提示桥的校验。`MobileWebScripts.java` 只按既有顺序读取 assets，不负责授权。
-- 两端共用页面脚本放 `../shared/web/`；`assets/mobile-session.js` 是 Android Cookie 落盘与后台同步通知脚本，不能挪入共用目录并注入 iOS。
-- 普通 APK 由根目录 `scripts/build-mobile-android.py` 打包；可选 FCM 使用 `../android-push/build.gradle`。调整共享资源须同步两种输入，不能在两处保留同名 JS；缺资源继续显式失败，不使用空字符串。
-- 保留 token、当前 WebView、URL origin、窗口焦点、大小限制以及导航主框架/用户手势检查。共享 JS 不能替代原生端的校验，不能新增不受限的 JavascriptInterface。
-- `GatewayURL`、下载、通知和文件选择保留原来的 URL、Cookie、已保存电脑与回调代际边界。普通 APK 不包含 Firebase SDK；推送特有依赖只在 `android-push`。
-- Java 包名与清单入口保持一致；新源文件由既有递归源码构建发现。不要因目录整理改 applicationId、版本或签名。
-- 源码回归：`node --test mobile/tests/*.test.cjs`。`scripts/test-mobile-*.py` 会运行 JDK/Swift 等工具；构建、安装及真机验证必须符合本次任务范围。
+- `src/io/github/try2love/codexbridge/MainActivity.java`의 Activity 수명 주기, WebView 탐색, 네이티브 프롬프트 브리지 검증을 유지합니다. `MobileWebScripts.java`는 기존 순서로 에셋을 읽기만 하며 권한 부여를 담당하지 않습니다.
+- Android/iOS 공용 페이지 스크립트는 `../shared/web/`에 둡니다. `assets/mobile-session.js`는 Android의 Cookie 저장과 백그라운드 동기화 알림을 위한 스크립트입니다. 공용 디렉터리로 옮겨 iOS에도 삽입해서는 안 됩니다.
+- 일반 APK는 저장소 루트의 `scripts/build-mobile-android.py`로 빌드하고, 선택적 FCM 빌드는 `../android-push/build.gradle`을 사용합니다. 공용 리소스를 수정할 때 두 빌드의 입력을 함께 갱신하며, 두 위치에 같은 이름의 JS를 두어서는 안 됩니다. 리소스가 없으면 계속 명시적으로 실패해야 하며 빈 문자열로 대체하지 않습니다.
+- token, 현재 WebView, URL origin, 창 포커스, 크기 제한, 탐색의 메인 프레임·사용자 제스처 검사를 유지합니다. 공용 JS로 네이티브 검증을 대신하거나, 제한 없는 JavascriptInterface를 새로 추가해서는 안 됩니다.
+- `GatewayURL`, 다운로드, 알림, 파일 선택에서 기존 URL·Cookie·저장된 컴퓨터·콜백 세대 구분 경계를 유지합니다. 일반 APK에는 Firebase SDK를 포함하지 않으며, 푸시 전용 의존성은 `android-push`에만 둡니다.
+- Java 패키지 이름과 매니페스트 진입점을 일치시킵니다. 새 소스 파일은 기존의 재귀 소스 탐색 빌드가 찾습니다. 디렉터리 정리를 이유로 applicationId, 버전, 서명을 변경하지 않습니다.
+- 소스 회귀 검사: `node --test mobile/tests/*.test.cjs`. `scripts/test-mobile-*.py`는 JDK/Swift 등의 도구를 실행합니다. 빌드·설치·실기기 검증은 이번 작업에서 허용된 범위 안에서 수행해야 합니다.

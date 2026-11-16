@@ -2,7 +2,7 @@
   "name": "codex-mobile-bridge-desktop",
   "desktopName": "codex-mobile-bridge.desktop",
   "version": "2.2.1",
-  "description": "Codex App 手机网关桌面启动器",
+  "description": "Codex App 모바일 게이트웨이 데스크탑 런처",
   "author": "try2love",
   "license": "AGPL-3.0-only",
   "private": true,
@@ -83,8 +83,7 @@
       "electronLanguages": [
         "en-GB",
         "en-US",
-        "zh-CN",
-        "zh-TW"
+        "ko"
       ],
       "icon": "desktop/assets/icon.ico",
       "target": [

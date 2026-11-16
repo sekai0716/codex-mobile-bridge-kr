@@ -16,7 +16,7 @@ from .local_rpc import MAX_FRAME, packet, read_packet, write_packet
 
 def serve(profile, name, parent_pid):
     if os.name != 'nt' or not re.fullmatch('[a-z-]+', name):
-        raise ValueError('此本机服务不适用于当前系统')
+        raise ValueError('이 기본 서비스는 현재 시스템에서 사용할 수 없습니다.')
     import msvcrt
     from bridge.platforms.windows import local_service as native
     for stream in (sys.stdin, sys.stdout):msvcrt.setmode(stream.fileno(), os.O_BINARY)
@@ -76,9 +76,9 @@ def serve(profile, name, parent_pid):
         output({'type': 'ready'})
         while True:
             head = exact(4);size = struct.unpack('!I', head)[0]
-            if not 0 < size <= MAX_FRAME:raise ValueError('本机服务父进程回执过大')
+            if not 0 < size <= MAX_FRAME:raise ValueError('기본 서비스 상위 프로세스 수신이 너무 큽니다.')
             message = json.loads(exact(size))
-            if not isinstance(message, dict) or set(message) != {'id', 'reply'}:raise ValueError('本机服务父进程回执无效')
+            if not isinstance(message, dict) or set(message) != {'id', 'reply'}:raise ValueError('기본 서비스 상위 프로세스 수신이 잘못되었습니다.')
             with lock:
                 waiting = pending.get(message['id'])
                 if waiting:waiting[1].append(message['reply']);waiting[0].set()

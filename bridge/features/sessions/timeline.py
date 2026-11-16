@@ -111,7 +111,7 @@ class Timeline:
                 text = turn['error'] if isinstance(turn['error'], str) else json.dumps(turn['error'], ensure_ascii=False)
                 error = turn['error']
                 if isinstance(error, dict) and isinstance(error.get('codexErrorInfo'), dict) and 'responseStreamDisconnected' in error['codexErrorInfo'] and error.get('additionalDetails') == 'Connection failed: error sending request':
-                    text = '电脑上的 Codex 无法连接模型服务。使用本机 CLI 时，可在聊天详情中检查 CLI 网络。'
+                    text = '컴퓨터에서 Codex 모델 서비스에 연결할 수 없습니다. 이 기계를 사용하세요 CLI , 채팅 세부정보에서 확인하실 수 있습니다 CLI 회로망。'
                 rows.append(dict(key=key, turnId=turn['id'], order=len(rows), role='error', text=text[:TEXT_PREVIEW],
                                  truncated=len(text) > TEXT_PREVIEW, version=hashlib.sha256(text.encode()).hexdigest()[:24]))
                 details[key] = text
@@ -180,7 +180,7 @@ class Timeline:
     def detail(self, cursor, offset=0, version=None):
         position = self.position(cursor)
         if position is None:
-            raise ValueError('这条内容已更新，请重新打开聊天')
+            raise ValueError('내용이 업데이트되었습니다. 채팅을 다시 열어주세요.')
         row = self.rows[position]
         text = self.details[row['key']]
         offset = max(0, min(offset, len(text))) if version == row['version'] else 0

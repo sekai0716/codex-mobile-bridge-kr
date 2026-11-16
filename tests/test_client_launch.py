@@ -36,7 +36,7 @@ class ClientLaunchTests(unittest.TestCase):
         self.app.processes.return_value = [123]
         self.commands.side_effect = lambda app, pids: {123: str(app.executable)+' --expose-internals /app/@deepseek-ai/dsh-desktop-host/lib/index.js /dsh '+str(app.home/'profiles/desktop')+' /runtime'}
         with patch('bridge.platforms.macos.desktop.subprocess.run') as run:
-            with self.assertRaisesRegex(ValueError, '残留.*后台实例'):
+            with self.assertRaisesRegex(ValueError, "남은\\ Harness\\ 백그라운드\\ 프로세스가\\ 발견되었으며\\ 해당\\ 작업을\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터에서\\ Harness를\\ 종료한\\ 후\\ 다시\\ 시도하십시오\\."):
                 launch_deepseek(self.descriptor)
         self.app.stop.assert_not_called(); run.assert_not_called()
 
@@ -159,7 +159,7 @@ class ProcessLifecycleTests(unittest.TestCase):
         from bridge.clients.lifecycle import stop_client
         state = {'running': True, 'pids': [11], 'mainPids': [11], 'runtimePids': [], 'unknown': False}
         with patch('bridge.clients.lifecycle.inspect_client', return_value={**state, 'pids': [11, 22]}), patch('bridge.clients.lifecycle._app') as factory:
-            with self.assertRaisesRegex(ValueError, '进程已变化'):
+            with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되어\\ 작업\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 닫기\\ 전에\\ 다시\\ 확인하세요\\."):
                 stop_client({}, state=state)
             factory.assert_not_called()
 
@@ -213,8 +213,8 @@ class ClaudeQuitTests(unittest.TestCase):
     def test_pending_or_failed_never_reports_success(self):
         for result in ('pending', 'failed'):
             with self.subTest(result=result):
-                self.native.return_value.update(quitState=result, reason='原生确认等待处理')
-                with self.assertRaisesRegex(ValueError, '原生确认'):
+                self.native.return_value.update(quitState=result, reason='네이티브 확인 대기 중')
+                with self.assertRaisesRegex(ValueError, '네이티브 확인 대기 중'):
                     self.stop()
         self.app.stop.assert_not_called()
 
@@ -222,20 +222,20 @@ class ClaudeQuitTests(unittest.TestCase):
         for change in ({'pids': [11, 12, 13]}, {'mainPids': [11, 13]}, {'unknown': True}):
             with self.subTest(change=change):
                 self.inspect.return_value = {**self.state, **change}
-                with self.assertRaisesRegex(ValueError, '进程已变化'):
+                with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
                     self.stop()
         self.native.assert_not_called()
 
     def test_new_process_during_cleanup_is_not_closed(self):
         self.inspect.side_effect = [self.state, {**self.state, 'pids': [13]}]
-        with self.assertRaisesRegex(ValueError, '进程已变化'):
+        with self.assertRaisesRegex(ValueError, '프로세스가 변경되었습니다.'):
             self.stop()
         self.app.stop.assert_not_called()
 
     def test_cleanup_timeout_does_not_force_quit(self):
         self.app.processes.return_value = [11]
         with patch('bridge.clients.lifecycle.time.monotonic', side_effect=[0, 76]):
-            with self.assertRaisesRegex(ValueError, '尚未退出'):
+            with self.assertRaisesRegex(ValueError, "Claude가\\ 종료되지\\ 않았습니다\\.\\ 작업을\\ 처리하거나\\ 컴퓨터에\\ 프롬프트를\\ 저장한\\ 후\\ 다시\\ 시도하세요\\."):
                 self.stop()
         self.native.assert_called_once()
         self.app.stop.assert_not_called()

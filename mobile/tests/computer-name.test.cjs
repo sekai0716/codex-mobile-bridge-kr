@@ -14,7 +14,7 @@ function fixture(alias='My computer',mode=null,cold=false){
  vm.runInNewContext(script.replace("'__BRIDGE_CONNECTION_NAME__'",JSON.stringify(alias)),context);return {events,clicks,store,name,computer,markers,rules,context,sheet};
 }
 test('native header defaults to saved connection name and toggles real device name',()=>{
- const alias="办公室 'quoted' \\\n<Mac>";
+ const alias="사무실 'quoted' \\\n<Mac>";
  const f=fixture(alias);assert.equal(f.name.textContent,alias);assert.equal(f.computer.role,'button');
  f.clicks.click();assert.equal(f.name.textContent,'Real Mac');assert.equal(f.store['bridge-computer-name-mode'],'device');
  f.clicks.keydown({key:'Enter',preventDefault(){}});assert.equal(f.name.textContent,alias);

@@ -34,7 +34,7 @@ class ParentWaitTests(unittest.TestCase):
         self.assertFalse(updater.process_exists(child.pid))
 
     def test_live_parent_still_times_out(self):
-        with self.assertRaisesRegex(TimeoutError, '应用尚未退出'):
+        with self.assertRaisesRegex(TimeoutError, "앱이\\ 종료되지\\ 않았습니다\\.\\ 업데이트가\\ 취소되었습니다\\."):
             updater.wait_parent(os.getpid(), timeout=.01)
 
     def test_unavailable_state_probe_does_not_treat_live_process_as_exited(self):
@@ -109,9 +109,9 @@ class PreparePreflightTests(unittest.TestCase):
                 app, worker, _ = updater.locations(target)
                 worker.parent.mkdir(parents=True)
                 app.touch(); worker.touch()
-                with patch.object(updater, 'preflight', side_effect=ValueError('正常退出 ZCode')) as check, \
+                with patch.object(updater, 'preflight', side_effect=ValueError('정상적으로 종료 ZCode')) as check, \
                         patch.object(updater.hashlib, 'sha256') as digest:
-                    with self.assertRaisesRegex(ValueError, '正常退出 ZCode'):
+                    with self.assertRaisesRegex(ValueError, '정상적으로 종료 ZCode'):
                         updater.prepare(data, {'target': str(target), 'archive': 'unused'})
                     check.assert_called_once_with(target)
                     digest.assert_not_called()
@@ -155,15 +155,15 @@ class TransactionTests(unittest.TestCase):
             self.assertEqual((self.data / name).read_text(), 'preserve exactly: ' + name)
 
     def test_holder_appearing_before_apply_preserves_original_app_and_gateway(self):
-        with patch.object(updater, 'preflight', side_effect=ValueError('正常退出 ZCode')):
+        with patch.object(updater, 'preflight', side_effect=ValueError('정상적으로 종료 ZCode')):
             result = self.run_update()
         self.assertEqual(result['state'], 'failed')
-        self.assertIn('正常退出 ZCode', result['message'])
+        self.assertIn('정상적으로 종료 ZCode', result['message'])
         self.assertNotIn('stop', self.calls)
         self.assertEqual((self.target/'version').read_text(), 'old')
 
     def test_holder_appearing_after_gateway_stop_is_rechecked_before_swap(self):
-        with patch.object(updater, 'preflight', side_effect=[{'ready': True}, ValueError('正常退出 ZCode')]):
+        with patch.object(updater, 'preflight', side_effect=[{'ready': True}, ValueError('정상적으로 종료 ZCode')]):
             result = self.run_update()
         self.assertEqual(result['state'], 'failed')
         self.assertIn('stop', self.calls)
@@ -279,7 +279,7 @@ class TransactionTests(unittest.TestCase):
         with patch.object(updater, 'STOP_RETRY_SECONDS', .1):
             result = self.run_update(desktop=Desktop())
         self.assertEqual(result['state'], 'failed')
-        self.assertIn('网关尚未停止', result['message'])
+        self.assertIn("게이트웨이가 중지되지 않았으며 업데이트가 취소되었습니다.：", result['message'])
         self.assertNotIn('launch-new', self.calls)
         self.assertTrue(self.state['running'])
 
@@ -297,7 +297,7 @@ class TransactionTests(unittest.TestCase):
         transaction.mkdir()
         updater.write_json(transaction/'plan.json', {'target': str(self.target)})
         (transaction/'helper.json').write_text(json.dumps({'pid': updater.os.getpid()}))
-        with self.assertRaisesRegex(ValueError, '上一次更新事务尚未完成'):
+        with self.assertRaisesRegex(ValueError, "마지막\\ 업데이트\\ 트랜잭션이\\ 완료되지\\ 않았습니다\\.\\ 몇\\ 분\\ 정도\\ 기다렸다가\\ 다시\\ 시도해\\ 주세요\\.。"):
             updater.reject_pending_transaction(self.target)
 
     def test_stale_pending_transaction_is_removed(self):
@@ -340,7 +340,7 @@ class TransactionTests(unittest.TestCase):
             if stale:
                 updater.os.utime(transaction, (0, 0))
             with patch.object(updater, 'process_exists', return_value=False):
-                with self.assertRaisesRegex(ValueError, '已保留备份'):
+                with self.assertRaisesRegex(ValueError, "마지막\\ 업데이트의\\ 복구\\ 상태가\\ 확인되지\\ 않았으며\\ 백업이\\ 유지되었습니다\\.\\ 업데이트\\ 로그를\\ 확인하시고\\ 복구\\ 후\\ 다시\\ 시도해주세요。"):
                     updater.reject_pending_transaction(self.target)
             updater.clean_transactions(self.target)
             self.assertEqual(backup.read_text(), 'old')
@@ -352,7 +352,7 @@ class TransactionTests(unittest.TestCase):
         updater.write_json(transaction/'ready.json', {'token': 'started'})
         updater.write_json(transaction/'helper.json', {'pid': updater.os.getpid()})
         updater.os.utime(transaction, (0, 0))
-        with self.assertRaisesRegex(ValueError, '已保留备份'):
+        with self.assertRaisesRegex(ValueError, "마지막\\ 업데이트의\\ 복구\\ 상태가\\ 확인되지\\ 않았으며\\ 백업이\\ 유지되었습니다\\.\\ 업데이트\\ 로그를\\ 확인하시고\\ 복구\\ 후\\ 다시\\ 시도해주세요。"):
             updater.reject_pending_transaction(self.target)
         self.assertTrue((transaction/'ready.json').exists())
 

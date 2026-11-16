@@ -11,6 +11,16 @@ from pathlib import Path
 from bridge.features.notifications.channels import write_json
 
 
+QUICK_URL_NAMES = ('외부 접속 주소.txt', '\u5916\u7f51\u5730\u5740.txt')
+
+
+def quick_url_path(directory):
+    """한국어 출력 파일을 우선하고 실행 중인 이전 버전의 주소 파일도 읽는다."""
+    directory = Path(directory)
+    return next((directory / name for name in QUICK_URL_NAMES if (directory / name).is_file()),
+                directory / QUICK_URL_NAMES[0])
+
+
 class QuickTunnel:
     URL = re.compile(r'https://(?!api\.)[a-z0-9-]+\.trycloudflare\.com\b')
     LOST_TUNNEL = re.compile(r'Unauthorized: Tunnel not found')
@@ -45,7 +55,8 @@ class QuickTunnel:
         self._network_cooldown = 0.0
 
     def status(self, state, message):
-        write_json(self.data_dir/'cloudflare-status.json', {'pid': os.getpid(), 'state': state, 'message': message})
+        write_json(self.data_dir/'cloudflare-status.json', {'pid': os.getpid(), 'state': state, 'message': message,
+                                                         **({'url': self.url} if self.url else {})})
 
     def network_changed(self):
         """Allow cloudflared to recover before checking its local readiness.
@@ -116,7 +127,7 @@ class QuickTunnel:
                 self.ready.clear()
                 self.broken.set()
                 self.finished.set()
-                self.status('reconnecting', '临时 HTTPS 在网络变化后未恢复，正在重新连接；网址会变化。')
+                self.status('reconnecting', '일시적인 HTTPS 네트워크 변경 후 복원되지 않아 다시 연결 중입니다. URL이 변경됩니다。')
             elif self._network_checks >= 3:
                 self._network_due = None
             else:
@@ -129,9 +140,9 @@ class QuickTunnel:
 
     def start(self):
         if self.closed.is_set():
-            raise RuntimeError("隧道已停止")
+            raise RuntimeError("터널이 멈췄다")
         if not self.executable.is_file():
-            raise RuntimeError("缺少 cloudflared，请查看 README 的外网访问配置")
+            raise RuntimeError("부족 cloudflared，확인해주세요 README 외부 네트워크 접속 구성")
 
         # A Quick Tunnel URL is created by cloudflared.  If the tunnel is
         # tombstoned after sleep/network loss, retrying the same process cannot
@@ -144,7 +155,7 @@ class QuickTunnel:
         while not self.closed.wait(self.START_POLL):
             if self.ready.is_set():
                 return self.url
-        raise RuntimeError("隧道已停止")
+        raise RuntimeError("터널이 멈췄다")
 
     def _supervise(self):
         delay = 0
@@ -156,15 +167,15 @@ class QuickTunnel:
                 if self.closed.is_set():
                     break
                 if self.finished.is_set():
-                    self.status('reconnecting', '临时 HTTPS 已中断，正在自动重建连接；网址会变化。')
+                    self.status('reconnecting', '일시적인 HTTPS 중단되면 연결이 자동으로 다시 설정됩니다. URL이 변경됩니다。')
             elif self.closed.is_set():
                 break
             elif not self.url:
-                self.status('connecting', '正在建立临时 HTTPS 连接，局域网可独立使用。')
+                self.status('connecting', "임시 HTTPS를 연결하는 중입니다. LAN 액세스는 독립적으로 가능합니다.")
             self._retire()
 
     def _spawn(self):
-        self.status('connecting', '正在建立临时 HTTPS 连接，局域网可独立使用。')
+        self.status('connecting', "임시 HTTPS를 연결하는 중입니다. LAN 액세스는 독립적으로 가능합니다.")
         config = self.data_dir / 'cloudflared.yml'
         config.write_text('{}\n', encoding='utf-8')
         config.chmod(0o600)
@@ -210,16 +221,16 @@ class QuickTunnel:
                             self.url = match[0]
                             self.on_origin(self.url)
                         if 'Registered tunnel connection' in line and self.url:
-                            (self.data_dir / '外网地址.txt').write_text(self.url + '\n\n账号和密码与局域网网关相同。重启隧道后地址会变化。\n', encoding='utf-8')
-                            self.status('ready', '临时 HTTPS 已连接。')
+                            (self.data_dir / QUICK_URL_NAMES[0]).write_text(self.url + '\n\n로그인 정보는 기존 게이트웨이와 같습니다. 터널을 다시 시작하면 주소가 변경됩니다.\n', encoding='utf-8')
+                            self.status('ready', "임시 HTTPS가 연결되었습니다.")
                             self.ready.set()
                         if self.LOST_TUNNEL.search(line) and not self.closed.is_set():
                             self.broken.set()
                             self.ready.clear()
-                            self.status('reconnecting', '临时 HTTPS 已失效，正在自动重建连接；网址会变化。')
+                            self.status('reconnecting', '일시적인 HTTPS 만료되었으며 연결이 자동으로 다시 설정되고 있습니다. URL이 변경됩니다.。')
         finally:
             if not self.closed.is_set() and self.process is process and not self.broken.is_set():
-                self.status('failed', '临时 HTTPS 连接已中断，请查看 Cloudflare 日志并重启网关重试；局域网仍可使用。')
+                self.status('failed', "임시 HTTPS 연결이 끊어졌습니다. Cloudflare 로그를 확인하고 게이트웨이를 다시 시작하여 다시 시도하세요. LAN 액세스는 계속 가능합니다.")
             if self.process is process:
                 self.finished.set()
 
@@ -248,8 +259,9 @@ class QuickTunnel:
         self.cancel_network_check()
         self._retire()
         with self.lifecycle_lock:
-            path = self.data_dir / '外网地址.txt'
-            if path.exists() and self.url and path.read_text(encoding='utf-8').startswith(self.url):
-                path.unlink()
+            for name in QUICK_URL_NAMES:
+                path = self.data_dir / name
+                if path.is_file() and self.url and path.read_text(encoding='utf-8').splitlines()[:1] == [self.url]:
+                    path.unlink()
         if self.supervisor and self.supervisor is not threading.current_thread():
             self.supervisor.join(timeout=5)

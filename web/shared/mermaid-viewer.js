@@ -93,24 +93,24 @@
     } else lastTap = null;
   }
   function exactSource() {
-    if (!entry) throw Error(t('读取源码失败，请重试。'));
+    if (!entry) throw Error(t('소스를 로드할 수 없습니다. 다시 시도해 보세요.'));
     if (typeof entry.exactSource === 'string') return entry.exactSource;
     if (entry.getSource) {
       const current = entry, value = current.getSource();
       const accept = value => {
-        if (current !== entry || typeof value !== 'string') throw Error(t('读取源码失败，请重试。'));
+        if (current !== entry || typeof value !== 'string') throw Error(t('소스를 로드할 수 없습니다. 다시 시도해 보세요.'));
         current.exactSource = value;
         return value;
       };
       return typeof value === 'string' ? accept(value) : Promise.resolve(value).then(accept);
     }
     if (typeof entry.source === 'string') return entry.exactSource = entry.source;
-    throw Error(t('读取源码失败，请重试。'));
+    throw Error(t('소스를 로드할 수 없습니다. 다시 시도해 보세요.'));
   }
   async function showSource() {
     if (!sourcePanel.hidden) {
       sourcePanel.hidden = true; canvas.hidden = false; controls.hidden = false; sourceButton.setAttribute('aria-pressed', 'false');
-      sourceButton.textContent = t('源码'); measure(); return;
+      sourceButton.textContent = t('원천'); measure(); return;
     }
     const current = generation;
     sourceButton.disabled = true;
@@ -119,24 +119,24 @@
       if (current !== generation || !dialog.open) return;
       if (sourcePanel.textContent !== value) sourcePanel.textContent = value;
       sourcePanel.hidden = false; canvas.hidden = true; controls.hidden = true;
-      clearPointers(); sourceButton.setAttribute('aria-pressed', 'true'); sourceButton.textContent = t('查看图表');
+      clearPointers(); sourceButton.setAttribute('aria-pressed', 'true'); sourceButton.textContent = t('다이어그램 보기');
       status.textContent = '';
-    } catch (error) { if (current === generation) status.textContent = error.message || t('读取源码失败，请重试。'); }
+    } catch (error) { if (current === generation) status.textContent = error.message || t('소스를 로드할 수 없습니다. 다시 시도해 보세요.'); }
     finally { if (current === generation) sourceButton.disabled = false; }
   }
   function relabel() {
-    dialog.setAttribute('aria-label', t('图表'));
-    if (image) image.alt = t('图表');
-    closeButton.textContent = '× ' + t('关闭'); closeButton.setAttribute('aria-label', t('关闭图表预览'));
-    sourceButton.textContent = sourcePanel.hidden ? t('源码') : t('查看图表');
-    copyButton.textContent = t('复制源码');
+    dialog.setAttribute('aria-label', t('도표'));
+    if (image) image.alt = t('도표');
+    closeButton.textContent = '× ' + t('닫기'); closeButton.setAttribute('aria-label', t('다이어그램 미리보기 닫기'));
+    sourceButton.textContent = sourcePanel.hidden ? t('원천') : t('다이어그램 보기');
+    copyButton.textContent = t('소스 복사');
     zoomOut.textContent = '−'; zoomIn.textContent = '+';
-    zoomOut.setAttribute('aria-label', t('缩小图表')); zoomIn.setAttribute('aria-label', t('放大图表'));
-    fitButton.textContent = t('适应屏幕'); percentage.setAttribute('aria-label', t('图表缩放比例'));
+    zoomOut.setAttribute('aria-label', t('다이어그램 축소')); zoomIn.setAttribute('aria-label', t('다이어그램 확대'));
+    fitButton.textContent = t('화면에 맞추기'); percentage.setAttribute('aria-label', t('다이어그램 확대/축소 수준'));
   }
   function create() {
     dialog = document.createElement('dialog'); dialog.id = 'mermaid-preview-dialog'; dialog.className = 'mermaid-preview';
-    dialog.setAttribute('aria-label', t('图表'));
+    dialog.setAttribute('aria-label', t('도표'));
     const toolbar = document.createElement('div'); toolbar.className = 'mermaid-preview-toolbar';
     const button = (id, action) => { const node = document.createElement('button'); node.id = 'mermaid-preview-' + id;
       node.type = 'button'; node.onclick = action; return node; };
@@ -200,10 +200,10 @@
       sourcePanel.textContent = ''; sourcePanel.hidden = true; canvas.hidden = false; controls.hidden = false;
       sourceButton.disabled = false; sourceButton.setAttribute('aria-pressed', 'false');
       percentage.textContent = '100%'; zoomOut.disabled = zoomIn.disabled = fitButton.disabled = true;
-      canvas.classList.remove('is-zoomed'); status.textContent = t('正在加载图表…'); relabel();
-      const current = image = document.createElement('img'); current.alt = t('图表'); current.draggable = false;
+      canvas.classList.remove('is-zoomed'); status.textContent = t('다이어그램 로드 중…'); relabel();
+      const current = image = document.createElement('img'); current.alt = t('도표'); current.draggable = false;
       current.onload = () => { if (image === current && dialog.open) { status.textContent = ''; measure(); } };
-      current.onerror = () => { if (image === current && dialog.open) { current.hidden = true; status.textContent = t('图表加载失败，请关闭后重试。'); } };
+      current.onerror = () => { if (image === current && dialog.open) { current.hidden = true; status.textContent = t('다이어그램을 로드하지 못했습니다. 닫고 다시 시도하세요.'); } };
       canvas.replaceChildren(current);
       if (!dialog.open) dialog.showModal();
       observer.observe(canvas); current.src = value.image.url;

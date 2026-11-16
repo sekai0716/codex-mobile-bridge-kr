@@ -6,10 +6,10 @@ class Workbench {
     window.BridgeFileActions?.register(chat,this);
     this.sessions = new Map();
     this.scrollPositions = new WeakMap();
-    this.strip = this.node('nav', 'workbench-tabs'); this.strip.dataset.i18nAriaLabel='工作台标签';this.strip.setAttribute("data-i18n-aria-label",'工作台标签');this.strip.setAttribute('aria-label', BridgeI18n.t('工作台标签'));
+    this.strip = this.node('nav', 'workbench-tabs'); this.strip.dataset.i18nAriaLabel="워크벤치 탭";this.strip.setAttribute("data-i18n-aria-label","워크벤치 탭");this.strip.setAttribute('aria-label', BridgeI18n.t("워크벤치 탭"));
     this.tabs = this.node('div', 'wb-tabs'); this.tabs.setAttribute('role', 'tablist');
-    const add = this.button('＋', () => this.newTab(), BridgeI18n.t('新标签页')); add.className = 'wb-add';
-    this.mainLabel=this.button('主会话',()=>{this.chat.querySelector('.timeline').focus();},'主会话');this.mainLabel.className='wb-main-label';
+    const add = this.button('＋', () => this.newTab(), BridgeI18n.t("새 탭")); add.className = 'wb-add';
+    this.mainLabel=this.button("메인채팅",()=>{this.chat.querySelector('.timeline').focus();},"메인채팅");this.mainLabel.className='wb-main-label';
     this.toolStrip=this.node('div','wb-tool-strip');this.toolStrip.append(this.tabs,add);this.strip.append(this.mainLabel,this.toolStrip);
     const plus=document.createElementNS('http://www.w3.org/2000/svg','svg');plus.setAttribute('viewBox','0 0 24 24');plus.setAttribute('aria-hidden','true');plus.innerHTML='<path d="M12 5v14M5 12h14"/>';add.replaceChildren(plus);
     this.panel = this.node('section', 'workbench-panel'); this.panel.hidden = true;
@@ -18,11 +18,11 @@ class Workbench {
     for (const child of [...chat.children]) if (!child.matches('.chat-head')) this.mainPane.append(child);
     this.divider = this.node('div', 'wb-divider'); this.divider.tabIndex=0;
     this.divider.setAttribute('role','separator'); this.divider.setAttribute('aria-orientation','vertical');
-    this.divider.dataset.i18nAriaLabel='调整分屏宽度'; this.divider.setAttribute('aria-label',BridgeI18n.t('调整分屏宽度'));
-    this.dropZone = this.node('div','wb-split-drop','拖到这里，在右侧打开');
+    this.divider.dataset.i18nAriaLabel="분할 창 크기 조정"; this.divider.setAttribute('aria-label',BridgeI18n.t("분할 창 크기 조정"));
+    this.dropZone = this.node('div','wb-split-drop',"여기로 내려오면 오른쪽에 열립니다.");
     this.layout.append(this.mainPane,this.divider,this.panel,this.dropZone);
     chat.querySelector('.chat-head').after(this.strip,this.layout);
-    this.splitButton=this.button('',()=>this.splitMode?this.unsplit():this.split(this.current?.active),'在右侧分屏');
+    this.splitButton=this.button('',()=>this.splitMode?this.unsplit():this.split(this.current?.active),"분할 보기로 열기");
     this.splitButton.className='wb-split-button';this.toolStrip.append(this.splitButton);
     const splitIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');splitIcon.setAttribute('viewBox','0 0 24 24');splitIcon.setAttribute('aria-hidden','true');splitIcon.innerHTML='<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>';this.splitButton.append(splitIcon);
     this.divider.onpointerdown=event=>{
@@ -166,19 +166,19 @@ class Workbench {
     for (const node of this.panel.querySelectorAll('.wb-file-list,.wb-preview-content,.wb-git-list,.wb-git-diff,.wb-branch-list,.wb-side-messages')) this.scrollPositions.set(node, node.scrollTop);
     this.splitEligible=this.canSplit();
     this.tabs.replaceChildren();
-    for (const tab of [{id: 'chat', name: BridgeI18n.t('聊天')}, ...session.files]) {
+    for (const tab of [{id: 'chat', name: BridgeI18n.t('채팅')}, ...session.files]) {
       const group = this.node('div', 'wb-tab');group.dataset.tab=tab.id; group.classList.toggle('selected', this.splitMode ? ['chat',session.splitTab].includes(tab.id) : session.active === tab.id);
       const select = this.button(tab.name, () => this.select(tab.id)); if(tab.id.startsWith('file:'))this.raw(select); select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(this.splitMode?['chat',session.splitTab].includes(tab.id):session.active===tab.id));
       group.append(select);
       group.draggable=this.splitEligible&&tab.id!=='chat';
       group.ondragstart=event=>{if(!group.draggable){event.preventDefault();return;}this.dragTab=tab.id;event.dataTransfer.setData('text/plain',tab.id);event.dataTransfer.effectAllowed='move';this.layout.classList.add('wb-dragging');};
       group.ondragend=()=>this.endDrag();
-      if (tab.id !== 'chat') group.append(this.button('×', () => this.close(tab.id), BridgeI18n.t('关闭')));
+      if (tab.id !== 'chat') group.append(this.button('×', () => this.close(tab.id), BridgeI18n.t('닫기')));
       this.tabs.append(group);
     }
     this.chat.classList.toggle('workbench-active', this.isFileVisible); this.panel.hidden = !this.isFileVisible&&!this.splitMode;
     this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitMode&&session.active==='chat';
-    const splitLabel=this.splitMode?'退出分屏':'在右侧分屏';this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
+    const splitLabel=this.splitMode?"분할 보기 종료":"분할 보기로 열기";this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
     const active = session.files.find(t => t.id === (this.splitMode?session.splitTab:session.active));
     // Keep the visible tool mounted across resizing (including its focus and scroll).
     if(this.panel.firstElementChild!==active?.body)this.panel.replaceChildren(...(active?[active.body]:[]));
@@ -202,7 +202,7 @@ class Workbench {
   files() {
     const session = this.current; if (!session) return;
     if (!session.files.some(t => t.id === 'files')) {
-      const tab = {id: 'files', name: BridgeI18n.t('文件'), body: this.node('div', 'wb-browser')}; session.files.unshift(tab);
+      const tab = {id: 'files', name: BridgeI18n.t('파일'), body: this.node('div', 'wb-browser')}; session.files.unshift(tab);
       this.directory(session, tab, session.directory);
     }
     this.select('files');
@@ -211,7 +211,7 @@ class Workbench {
     if(session!==this.current)return;
     session.search='';session.hidden=true;
     let tab=session.files.find(t=>t.id==='files');
-    if(!tab){tab={id:'files',name:BridgeI18n.t('文件'),body:this.node('div','wb-browser')};session.files.unshift(tab);}
+    if(!tab){tab={id:'files',name:BridgeI18n.t('파일'),body:this.node('div','wb-browser')};session.files.unshift(tab);}
     this.select('files');
     await this.directory(session,tab,path.split('/').slice(0,-1).join('/'));
     while(session===this.current&&Number.isInteger(tab.next)&&!Array.from(tab.list.children).some(row=>row.dataset.path===path)){const next=tab.next;await this.directory(session,tab,session.directory,true);if(tab.next===next)break;}
@@ -222,12 +222,12 @@ class Workbench {
   newTab() {
     if (!this.current) return;
     const dialog = this.node('dialog', 'picker wb-new-tab'), head = this.node('div', 'picker-head');
-    head.append(this.node('h2', '', BridgeI18n.t('新标签页')), this.button('×', () => dialog.close(), BridgeI18n.t('关闭')));
+    head.append(this.node('h2', '', BridgeI18n.t("새 탭")), this.button('×', () => dialog.close(), BridgeI18n.t('닫기')));
     const choices = this.node('div', 'wb-tab-choices');
-    for (const [name, description, action] of [[BridgeI18n.t('文件'), BridgeI18n.t('浏览项目文件、上传与下载'), () => this.files()], ['Git', BridgeI18n.t('历史、暂存、提交与分支管理'), () => this.git()], [BridgeI18n.t('终端'), BridgeI18n.t('运行项目命令、构建与查看输出'), () => this.terminal()], [BridgeI18n.t('侧边聊天'), BridgeI18n.t('继承当前上下文，临时讨论并跨设备接续'), () => this.sideChat()], [BridgeI18n.t('子智能体'), BridgeI18n.t('查看派生任务关系与执行记录'), () => this.agents()]]) {
+    for (const [name, description, action] of [[BridgeI18n.t('파일'), BridgeI18n.t("프로젝트 파일 찾아보기, 업로드 및 다운로드"), () => this.files()], ['Git', BridgeI18n.t("기록, 준비, 커밋 및 분기"), () => this.git()], [BridgeI18n.t("터미널"), BridgeI18n.t("명령 실행, 출력 빌드 및 보기"), () => this.terminal()], [BridgeI18n.t('보조 채팅'), BridgeI18n.t("현재 상황에 대해 토론하고 여러 기기에서 계속 진행하세요."), () => this.sideChat()], [BridgeI18n.t('하위 에이전트'), BridgeI18n.t("작업 관계 및 실행 기록 보기"), () => this.agents()]]) {
       const button = this.button('', () => { dialog.close(); action(); }, name);
       button.append(this.node('strong', '', name), this.node('span', '', description));
-      if(this.current.provider&&['侧边聊天','子智能体'].map(BridgeI18n.t).includes(name)) {button.disabled=true;button.lastChild.textContent=BridgeI18n.t('当前客户端尚未提供此能力');}
+      if(this.current.provider&&['보조 채팅','하위 에이전트'].map(BridgeI18n.t).includes(name)) {button.disabled=true;button.lastChild.textContent=BridgeI18n.t("이 클라이언트는 아직 이 기능을 제공하지 않습니다.");}
       choices.append(button);
     }
     dialog.append(head, choices); dialog.addEventListener('close', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
@@ -243,7 +243,7 @@ class Workbench {
   agents() {
     const session=this.current;if(!session)return;
     if(!session.files.some(tab=>tab.id==='agents')) {
-      const tab={id:'agents',name:BridgeI18n.t('子智能体'),body:this.node('div','wb-agents')};
+      const tab={id:'agents',name:BridgeI18n.t('하위 에이전트'),body:this.node('div','wb-agents')};
       session.files.push(tab);tab.agents=new AgentsPanel(this,session,tab);
     }
     this.select('agents');
@@ -251,7 +251,7 @@ class Workbench {
   sideChat() {
     const session=this.current;if(!session)return;
     if(!session.files.some(tab=>tab.id==='sidechat')) {
-      const tab={id:'sidechat',name:BridgeI18n.t('侧边聊天'),body:this.node('div','wb-side-content')};
+      const tab={id:'sidechat',name:BridgeI18n.t('보조 채팅'),body:this.node('div','wb-side-content')};
       session.files.push(tab);tab.sideChat=new SideChatPanel(this,session,tab);
     }
     this.select('sidechat');
@@ -259,7 +259,7 @@ class Workbench {
   terminal() {
     const session=this.current;if(!session)return;
     if(!session.files.some(tab=>tab.id==='terminal')) {
-      const tab={id:'terminal',name:BridgeI18n.t('终端'),body:this.node('div','wb-terminal')};
+      const tab={id:'terminal',name:BridgeI18n.t("터미널"),body:this.node('div','wb-terminal')};
       session.files.push(tab);tab.terminal=new TerminalPanel(this,session,tab);
     }
     this.select('terminal');
@@ -270,16 +270,16 @@ class Workbench {
       if (session === this.current) this.stopThumbnails();
       session.directory = path; tab.body.replaceChildren();
       const toolbar = this.node('div', 'wb-toolbar');
-      const up = this.button('‹', () => this.directory(session, tab, path.split('/').slice(0, -1).join('/')), BridgeI18n.t('上一级目录')); up.disabled = !path;
-      const crumb = this.node('div', 'wb-path', path || BridgeI18n.t('项目文件')); if(path)this.raw(crumb);else crumb.dataset.i18nTitle='当前聊天的项目目录';crumb.title = path || BridgeI18n.t('当前聊天的项目目录');
-      toolbar.append(up, crumb, this.button('↻', () => this.directory(session, tab, path), BridgeI18n.t('刷新目录')), this.button(BridgeI18n.t('上传'), () => this.uploadDialog(session, tab, path)));
+      const up = this.button('‹', () => this.directory(session, tab, path.split('/').slice(0, -1).join('/')), BridgeI18n.t("상위 디렉터리")); up.disabled = !path;
+      const crumb = this.node('div', 'wb-path', path || BridgeI18n.t('프로젝트 파일')); if(path)this.raw(crumb);else crumb.dataset.i18nTitle="이 채팅의 프로젝트 디렉토리";crumb.title = path || BridgeI18n.t("이 채팅의 프로젝트 디렉토리");
+      toolbar.append(up, crumb, this.button('↻', () => this.directory(session, tab, path), BridgeI18n.t("디렉터리 새로 고침")), this.button(BridgeI18n.t('업로드'), () => this.uploadDialog(session, tab, path)));
       const filters = this.node('div', 'wb-filters');
-      const search = this.node('input'); search.type = 'search'; search.setAttribute("data-i18n-placeholder",'搜索当前目录');search.placeholder = BridgeI18n.t('搜索当前目录'); search.setAttribute("data-i18n-aria-label",'搜索当前目录');search.setAttribute('aria-label', BridgeI18n.t('搜索当前目录')); search.value = session.search;
-      const form = this.node('form', 'wb-search'); form.append(search, this.button(BridgeI18n.t('搜索'), () => { session.search = search.value; this.directory(session, tab, path); }));
+      const search = this.node('input'); search.type = 'search'; search.setAttribute("data-i18n-placeholder","이 디렉토리 검색");search.placeholder = BridgeI18n.t("이 디렉토리 검색"); search.setAttribute("data-i18n-aria-label","이 디렉토리 검색");search.setAttribute('aria-label', BridgeI18n.t("이 디렉토리 검색")); search.value = session.search;
+      const form = this.node('form', 'wb-search'); form.append(search, this.button(BridgeI18n.t('찾다'), () => { session.search = search.value; this.directory(session, tab, path); }));
       form.onsubmit = e => { e.preventDefault(); session.search = search.value; this.directory(session, tab, path); };
       const label = this.node('label'), hidden = this.node('input'); hidden.type = 'checkbox'; hidden.checked = session.hidden;
-      hidden.onchange = () => { session.hidden = hidden.checked; this.directory(session, tab, path); }; label.append(hidden, this.node('span', '', '隐藏文件'));
-      filters.append(form, label); tab.list = this.node('div', 'wb-file-list'); tab.status = this.node('p', 'wb-status', BridgeI18n.t('正在读取文件…')); tab.status.setAttribute('role', 'status');
+      hidden.onchange = () => { session.hidden = hidden.checked; this.directory(session, tab, path); }; label.append(hidden, this.node('span', '', '숨겨진 파일'));
+      filters.append(form, label); tab.list = this.node('div', 'wb-file-list'); tab.status = this.node('p', 'wb-status', BridgeI18n.t("파일 로드 중…")); tab.status.setAttribute('role', 'status');
       tab.body.append(toolbar, filters, tab.status, tab.list);
     }
     try {
@@ -288,17 +288,17 @@ class Workbench {
       if (controller.signal.aborted || !this.sessions.has(session.key)) return;
       session.project = result.project; const crumb=tab.body.querySelector('.wb-path');delete crumb.dataset.i18n;crumb.textContent = result.project + (path ? ' / ' + path : '');
       delete tab.status.dataset.i18n;
-      tab.status.replaceChildren(...(result.total ? [this.node('span', '', String(result.total)), this.node('span', '', ' 项 · '), this.node('span', '', session.host === 'local' ? '电脑上的项目' : 'SSH 项目')] : [this.node('span', '', '当前目录没有匹配的文件')]));
+      tab.status.replaceChildren(...(result.total ? [this.node('span', '', String(result.total)), this.node('span', '', "아이템 ·"), this.node('span', '', session.host === 'local' ? "로컬 프로젝트" : 'SSH 프로젝트')] : [this.node('span', '', "이 디렉터리에 일치하는 파일이 없습니다.")]));
       tab.body.querySelector('.wb-load-more')?.remove();
       for (const entry of result.entries) {
         const row = this.raw(this.button('', () => { if (entry.kind === 'directory') { session.search = ''; this.directory(session, tab, entry.path); } else this.preview(session, entry); }, entry.name));
         row.dataset.path=entry.path;window.BridgeFileActions?.bindRow(row,this,session,entry);
         row.className = 'wb-file'; row.disabled = entry.kind === 'blocked';
-        row.append(this.fileIcon(entry), this.raw(this.node('span', 'wb-file-name', entry.name)), this.node('span', 'wb-file-meta', entry.kind === 'directory' ? BridgeI18n.t('文件夹') : entry.kind === 'blocked' ? BridgeI18n.t('链接或特殊文件') : this.size(entry.size)));
+        row.append(this.fileIcon(entry), this.raw(this.node('span', 'wb-file-name', entry.name)), this.node('span', 'wb-file-meta', entry.kind === 'directory' ? BridgeI18n.t('접는 사람') : entry.kind === 'blocked' ? BridgeI18n.t('링크 또는 특수 파일') : this.size(entry.size)));
         tab.list.append(row);
       }
       tab.next = result.nextOffset;
-      if (tab.next !== null) { const more = this.button(BridgeI18n.t('加载更多'), () => this.directory(session, tab, path, true)); more.className = 'wb-load-more'; tab.body.append(more); }
+      if (tab.next !== null) { const more = this.button(BridgeI18n.t("더 로드하기"), () => this.directory(session, tab, path, true)); more.className = 'wb-load-more'; tab.body.append(more); }
       if (session === this.current) this.refreshThumbnails();
     } catch (error) { if (error.name !== 'AbortError') { tab.status.textContent=BridgeI18n.t(error.message); tab.status.classList.add('error'); } }
   }
@@ -306,45 +306,45 @@ class Workbench {
     if (session !== this.current) return;
     const id = 'file:' + entry.path;
     if (session.files.some(t => t.id === id)) { this.select(id); return; }
-    if (session.files.filter(t => t.id.startsWith('file:')).length >= 8) { this.notify(BridgeI18n.t('最多同时打开 8 个文件，请先关闭一个标签')); return; }
+    if (session.files.filter(t => t.id.startsWith('file:')).length >= 8) { this.notify(BridgeI18n.t("최대 8개의 파일을 열 수 있습니다. 먼저 탭을 닫으세요.")); return; }
     const tab = {id, name: entry.name, body: this.node('div', 'wb-preview'), controller: new AbortController()}; session.files.push(tab);
-    tab.body.append(this.node('p', 'wb-status', BridgeI18n.t('正在读取文件…'))); this.select(id);
+    tab.body.append(this.node('p', 'wb-status', BridgeI18n.t("파일 로드 중…"))); this.select(id);
     try {
       const result = await this.request(this.url(session, 'preview', entry.path), undefined, tab.controller.signal);
       if (tab.controller.signal.aborted || !this.sessions.has(session.key)) return;
       const head = this.node('div', 'wb-preview-head'), title = this.node('div');
       title.append(this.raw(this.node('strong', '', result.name)), this.node('small', '', this.size(result.size) + ' · ' + entry.path));
       head.append(title);
-      { const download = this.node('a', 'wb-download', BridgeI18n.t('下载')); download.href = this.url(session, 'download', entry.path); download.download = result.name; head.append(download); }
+      { const download = this.node('a', 'wb-download', BridgeI18n.t('다운로드')); download.href = this.url(session, 'download', entry.path); download.download = result.name; head.append(download); }
       const content = this.node('div', 'wb-preview-content');
       if (result.kind === 'image') { const image = this.node('img'); image.src = 'data:' + result.mime + ';base64,' + result.data; image.alt = result.name; window.BridgeImageViewer?.registerWorkspaceImage(image, result); content.append(image); }
       else if (result.kind === 'text') {
         if (/\.md$/i.test(result.name)) renderMarkdown(content, result.text);
         else { const pre = this.node('pre'); pre.append(this.node('code', '', result.text)); content.append(pre); }
-      } else content.append(this.node('p', 'wb-empty', BridgeI18n.t('此文件暂不支持在线预览，可下载后打开。')));
+      } else content.append(this.node('p', 'wb-empty', BridgeI18n.t("미리보기를 사용할 수 없습니다. 이 파일을 다운로드하여 열어보세요.")));
       tab.body.replaceChildren(head, content);
-    } catch (error) { if (error.name !== 'AbortError') tab.body.replaceChildren(this.node('p', 'wb-status error', error.message), this.button(BridgeI18n.t('重试'), () => { this.close(id); this.preview(session, entry); })); }
+    } catch (error) { if (error.name !== 'AbortError') tab.body.replaceChildren(this.node('p', 'wb-status error', error.message), this.button(BridgeI18n.t("다시 시도"), () => { this.close(id); this.preview(session, entry); })); }
   }
   uploadDialog(session, tab, directory) {
     const dialog = this.node('dialog', 'picker wb-upload'), form = this.node('form');
-    const file = this.node('input'); file.type = 'file'; file.required = true; file.setAttribute("data-i18n-aria-label",'选择上传文件');file.setAttribute('aria-label', BridgeI18n.t('选择上传文件'));
-    const name = this.node('input'); name.required = true; name.setAttribute("data-i18n-aria-label",'保存文件名');name.setAttribute('aria-label', BridgeI18n.t('保存文件名')); name.setAttribute("data-i18n-placeholder",'保存文件名');name.placeholder = BridgeI18n.t('保存文件名');
+    const file = this.node('input'); file.type = 'file'; file.required = true; file.setAttribute("data-i18n-aria-label","업로드할 파일을 선택하세요");file.setAttribute('aria-label', BridgeI18n.t("업로드할 파일을 선택하세요"));
+    const name = this.node('input'); name.required = true; name.setAttribute("data-i18n-aria-label","파일 이름");name.setAttribute('aria-label', BridgeI18n.t("파일 이름")); name.setAttribute("data-i18n-placeholder","파일 이름");name.placeholder = BridgeI18n.t("파일 이름");
     file.onchange = () => { name.value = file.files[0]?.name || ''; };
     const error = this.node('p', 'error'); error.setAttribute('role', 'alert'); const progress = this.node('progress'); progress.max = 100; progress.value = 0; progress.hidden = true;
     const status = this.node('p', 'wb-status'); status.setAttribute('role', 'status');
-    const submit = this.node('button', 'primary', BridgeI18n.t('上传到此目录')); submit.type = 'submit';
-    const cancel = this.button(BridgeI18n.t('取消'), () => dialog.close()); cancel.className = 'wb-upload-cancel'; const actions = this.node('div', 'wb-upload-actions'); actions.append(cancel, submit);
-    form.append(this.node('h2', '', BridgeI18n.t('上传文件')), this.node('p', 'wb-upload-target', BridgeI18n.t('保存到：') + (session.project || BridgeI18n.t('项目')) + '/' + directory), file, name, this.node('p', 'muted', BridgeI18n.t('单个文件最多 20 MB。同名文件不会被覆盖。')), progress, status, error, actions);
+    const submit = this.node('button', 'primary', BridgeI18n.t("여기에 업로드하세요")); submit.type = 'submit';
+    const cancel = this.button(BridgeI18n.t('취소'), () => dialog.close()); cancel.className = 'wb-upload-cancel'; const actions = this.node('div', 'wb-upload-actions'); actions.append(cancel, submit);
+    form.append(this.node('h2', '', BridgeI18n.t('파일 업로드')), this.node('p', 'wb-upload-target', BridgeI18n.t("다음 위치에 저장:") + (session.project || BridgeI18n.t('프로젝트')) + '/' + directory), file, name, this.node('p', 'muted', BridgeI18n.t("파일당 최대 20개의 MB. 기존 파일은 덮어쓰지 않습니다.")), progress, status, error, actions);
     dialog.append(form); document.body.append(dialog);
     dialog.onclose = () => { this.uploadController?.abort(); this.uploadController = null; dialog.remove(); };
     form.onsubmit = async event => {
       event.preventDefault(); const selected = file.files[0]; if (!selected || submit.disabled) return;
-      if (selected.size > 20 * 1024 * 1024 || !name.value || /[\\/:\x00-\x1f]/.test(name.value) || ['.', '..'].includes(name.value)) { error.textContent = BridgeI18n.t('请选择不超过 20 MB 的文件，并填写不含路径的文件名'); return; }
+      if (selected.size > 20 * 1024 * 1024 || !name.value || /[\\/:\x00-\x1f]/.test(name.value) || ['.', '..'].includes(name.value)) { error.textContent = BridgeI18n.t("MB까지 최대 20개의 파일을 선택하고 경로 없이 파일 이름을 입력하세요."); return; }
       error.textContent = ''; progress.hidden = false; progress.value = 0; submit.disabled = true; file.disabled = name.disabled = true;
       const path = (directory ? directory + '/' : '') + name.value;
       try {
-        const result = await this.upload(this.url(session, 'upload', path), selected, value => { progress.value = value; status.textContent = value === 100 ? BridgeI18n.t('正在确认保存结果…') : BridgeI18n.t('正在上传 ') + value + '%'; });
-        dialog.close(); this.notify(result.existing ? BridgeI18n.t('同名文件内容一致，已核对保存结果') : BridgeI18n.t('文件已上传到项目目录'));
+        const result = await this.upload(this.url(session, 'upload', path), selected, value => { progress.value = value; status.textContent = value === 100 ? BridgeI18n.t("저장된 파일 확인 중…") : BridgeI18n.t("업로드 중") + value + '%'; });
+        dialog.close(); this.notify(result.existing ? BridgeI18n.t("일치하는 파일이 이미 저장되었습니다.") : BridgeI18n.t("프로젝트 디렉터리에 업로드된 파일"));
         if (this.sessions.has(session.key) && session.files.includes(tab) && session.directory === directory) this.directory(session, tab, directory);
       } catch (failure) { error.textContent=BridgeI18n.t(failure.message); status.textContent = ''; }
       finally { submit.disabled = false; file.disabled = name.disabled = false; }
@@ -356,9 +356,9 @@ class Workbench {
       const xhr = this.uploadController = new XMLHttpRequest(); xhr.open('POST', url); xhr.timeout = 120000;
       xhr.setRequestHeader('X-CSRF-Token', this.csrf()); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       xhr.upload.onprogress = e => { if (e.lengthComputable) progress(Math.round(e.loaded / e.total * 100)); };
-      const uncertain = () => reject(Error(BridgeI18n.t('上传结果未确认，请刷新目录核对，或重试同一文件；不会覆盖已有文件。')));
+      const uncertain = () => reject(Error(BridgeI18n.t("업로드가 확인되지 않았습니다. 디렉터리를 새로 고치거나 동일한 파일을 다시 시도하십시오. 기존 파일은 덮어쓰지 않습니다.")));
       xhr.onerror = xhr.ontimeout = xhr.onabort = uncertain;
-      xhr.onload = () => { try { const result = JSON.parse(xhr.responseText); if (xhr.status === 401) this.onUnauthorized(); if (xhr.status < 200 || xhr.status >= 300) throw Error(result.error || BridgeI18n.t('上传失败')); resolve(result); } catch (e) { reject(e); } };
+      xhr.onload = () => { try { const result = JSON.parse(xhr.responseText); if (xhr.status === 401) this.onUnauthorized(); if (xhr.status < 200 || xhr.status >= 300) throw Error(result.error || BridgeI18n.t('업로드 실패')); resolve(result); } catch (e) { reject(e); } };
       xhr.send(file);
     });
   }

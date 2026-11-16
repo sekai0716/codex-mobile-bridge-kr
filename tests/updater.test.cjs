@@ -93,16 +93,16 @@ test('preview.2 discovers signed preview.3 only after it leaves draft',async()=>
 test('signatures authenticate exact payload and reject another release identity',()=>{
   assert.equal(validate(signed(info())).version,next);
   const envelope=JSON.parse(signed(info()));envelope.payload=Buffer.from(JSON.stringify({...info(),notes:'tampered'})).toString('base64');
-  assert.throws(()=>validate(Buffer.from(JSON.stringify(envelope))),/签名/);
-  assert.throws(()=>validate(signed(info(),generateKeyPairSync('ed25519').privateKey)),/签名/);
+  assert.throws(()=>validate(Buffer.from(JSON.stringify(envelope))),/업데이트 매니페스트 서명이 잘못되었습니다\./);
+  assert.throws(()=>validate(signed(info(),generateKeyPairSync('ed25519').privateKey)),/업데이트 매니페스트 서명이 잘못되었습니다\./);
 });
 test('manifest rejects downgrades, wrong architecture, incomplete hashes and filename injection',()=>{
-  const data=info();data.version=current;assert.throws(()=>validate(signed(data)),/版本/);
+  const data=info();data.version=current;assert.throws(()=>validate(signed(data)),/버전/);
   for(const patch of [{name:'../../app.zip'},{size:0},{sha256:'123'}]){
-    const value=info();Object.assign(value.assets['darwin-arm64'],patch);assert.throws(()=>validate(signed(value)),/校验/);
+    const value=info();Object.assign(value.assets['darwin-arm64'],patch);assert.throws(()=>validate(signed(value)),/업데이트 패키지 확인 정보가 불완전합니다\./);
   }
-  assert.throws(()=>manifest(signed(info()),keys.publicKey,{current,platform,arch:'x64',expected:next}),/校验/);
-  assert.throws(()=>manifest(signed(info()),keys.publicKey,{current:'0.1.0',platform,arch,expected:next}),/版本/);
+  assert.throws(()=>manifest(signed(info()),keys.publicKey,{current,platform,arch:'x64',expected:next}),/업데이트 패키지 확인 정보가 불완전합니다\./);
+  assert.throws(()=>manifest(signed(info()),keys.publicKey,{current:'0.1.0',platform,arch,expected:next}),/버전/);
 });
 test('network allowlist rejects external destinations, credentials and non-HTTPS URLs',()=>{
   assert.equal(allowedUrl(RELEASES),RELEASES);
@@ -122,7 +122,7 @@ test('checking never installs and installation only receives verified bytes',asy
 });
 test('a live local holder blocks installation before package download and permits retry after exit',async t=>{
   const f=await fixture(t);await f.updater.check();
-  f.updater.preflight=async()=>{throw Error('请先结束任务并正常退出 ZCode，再更新网关。');};
+  f.updater.preflight=async()=>{throw Error('먼저 작업을 종료하고 정상적으로 종료해주세요. ZCode，게이트웨이를 다시 업데이트하세요.。');};
   const requests=f.requests.length;
   assert.equal((await f.updater.install()).state,'error');
   assert.equal(f.requests.length,requests);assert.equal(f.installed(),0);
@@ -160,7 +160,7 @@ test('unpublished/draft releases are excluded and stable users stay on stable',a
   assert.equal((await f.updater.check()).state,'current');
 });
 test('a signature failure leaves no installable candidate',async t=>{
-  const f=await fixture(t,{key:generateKeyPairSync('ed25519').publicKey});assert.equal((await f.updater.check()).state,'error');await assert.rejects(f.updater.install(),/检查/);assert.equal(f.installed(),0);
+  const f=await fixture(t,{key:generateKeyPairSync('ed25519').publicKey});assert.equal((await f.updater.check()).state,'error');await assert.rejects(f.updater.install(),/먼저 업데이트를 확인하세요\./);assert.equal(f.installed(),0);
 });
 test('failed preparation reports an error and preserves the candidate for retry',async t=>{
   let tries=0;const f=await fixture(t,{apply:async()=>{if(!tries++)throw Error('unwritable directory');}});await f.updater.check();

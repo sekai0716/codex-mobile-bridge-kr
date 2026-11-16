@@ -66,12 +66,12 @@ class SideRuntime:
     def write(self, value):
         with self.lock:
             if self.closed:
-                raise SideChatError('侧边聊天已失效，请关闭后新建')
+                raise SideChatError("보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.")
             try:
                 self.process.stdin.write(json.dumps(value) + '\n')
                 self.process.stdin.flush()
             except (OSError, ValueError) as exc:
-                raise SideChatError('侧边聊天运行时已断开') from exc
+                raise SideChatError("보조 채팅 런타임 연결이 끊어졌습니다.") from exc
 
     def request(self, method, params, timeout=30):
         with self.lock:
@@ -84,11 +84,11 @@ class SideRuntime:
             try:
                 value = result.get(timeout=timeout)
             except queue.Empty as exc:
-                raise SideChatError('侧边聊天操作结果未确认，请刷新状态，不要重复发送') from exc
+                raise SideChatError("작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.") from exc
             if value is None:
-                raise SideChatError('侧边聊天运行时已断开')
+                raise SideChatError("보조 채팅 런타임 연결이 끊어졌습니다.")
             if 'error' in value:
-                error = SideChatError('Codex 未完成侧边聊天操作，请检查模型接入和运行时版本')
+                error = SideChatError("Codex가 보조 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.")
                 error.rpc_error = value['error']
                 raise error
             return value.get('result') or {}
@@ -129,7 +129,7 @@ class SideRuntime:
         try:
             self.process.wait(timeout=10)
         except subprocess.TimeoutExpired as exc:
-            raise SideChatError('临时侧聊正在正常退出，请稍后再次结束；尚未清除内容') from exc
+            raise SideChatError('임시 사이드 채팅이 정상적으로 종료됩니다. 나중에 다시 종료해 주세요. 아직 내용이 지워지지 않았습니다') from exc
         if self.reader.ident is not None:
             self.reader.join(timeout=2)
         self.process.stdout.close()
@@ -144,7 +144,7 @@ def check_runtime(executable, directory):
         paths = list(Path(folder).rglob('ThreadForkParams.json'))
         properties = json.loads(paths[0].read_text()).get('properties', {}) if paths else {}
         if result.returncode or not {'ephemeral', 'excludeTurns'} <= properties.keys():
-            raise SideChatError('此 Codex 运行时不支持临时侧边聊天，请更新 Codex')
+            raise SideChatError("이 런타임은 임시 보조 채팅을 지원하지 않습니다. Codex를 업데이트하세요.")
 
 
 class SideChat:
@@ -175,11 +175,11 @@ class SideChat:
             child = result['thread']
             self.id = str(uuid.UUID(child['id']))
             if self.id == parent or child.get('ephemeral') is not True:
-                raise SideChatError('无法确认临时分支，已取消创建')
+                raise SideChatError("임시 지점을 확인할 수 없습니다. 생성이 취소되었습니다.")
             if result.get('modelProvider') != settings['modelProvider'] or result.get('model') != settings['model']:
-                raise SideChatError('侧边聊天的模型接入与主聊天不一致，已取消创建')
+                raise SideChatError("모델 연결이 상위 연결과 일치하지 않아 보조 채팅 생성이 취소되었습니다.")
             if str(result.get('cwd', child.get('cwd'))) != cwd:
-                raise SideChatError('侧边聊天工作目录不一致，已取消创建')
+                raise SideChatError("작업 디렉터리가 일치하지 않아 보조 채팅 생성이 취소되었습니다.")
             self.state['id'] = self.id
             self.state['latestThreadSettings'] = copy.deepcopy(self.turn_permissions)
             if result.get('sandbox'):
@@ -209,7 +209,7 @@ class SideChat:
                 return
             self.changed()
             if method == 'bridge/disconnected':
-                self.error = '侧边聊天已失效，请关闭后新建'
+                self.error = "보조 채팅이 만료되었습니다. 끝내고 새로 만드세요."
                 self.state['requests'] = []
                 return
             if 'id' in message:
@@ -222,7 +222,7 @@ class SideChat:
             if not self.ready or params.get('threadId') != self.id:
                 return
             if method == 'thread/closed':
-                self.error = '侧边聊天已关闭或失效'
+                self.error = "보조 채팅이 폐쇄되었거나 만료되었습니다."
                 self.state['requests'] = []
             elif method == 'thread/tokenUsage/updated':
                 self.state['latestTokenUsageInfo'] = copy.deepcopy(params.get('tokenUsage'))
@@ -268,7 +268,7 @@ class SideChat:
                 self.state['requests'] = [r for r in self.state['requests'] if r['id'] != params.get('requestId')]
                 self.queue_event.set()
             elif method == 'error' and not params.get('willRetry'):
-                self.error = '侧边聊天执行失败，请检查模型接入后重试'
+                self.error = "보조 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요."
                 self.state['threadRuntimeStatus']['type'] = 'idle'
 
     def changed(self):
@@ -303,22 +303,22 @@ class SideChat:
             for request in result['requests']:
                 if not request['supported'] or request['method'] in ('item/plan/requestImplementation', 'bridge/requestUserInputAsync'):
                     request['supported'] = False
-                    request['params'] = {'message': '此请求暂不支持在侧边聊天处理，请停止本次回复。'}
+                    request['params'] = {'message': "이 요청은 보조 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오."}
             # Side-chat screenshots have no preview route; omit their descriptors.
             return {**result, 'sequence': self.sequence, 'turns': public_turns(result['turns'], image_previews=False), 'parentId': self.parent, 'error': self.error,
                     'submissions': [{'id': k, 'status': v['status'], 'text': v['text'], 'mode': v.get('mode', 'send'), 'workMode': v.get('workMode', 'default'), 'attachments': v.get('attachments', []), 'error': v.get('error')} for k, v in self.submissions.items()]}
 
     def settings(self, model, effort, catalog):
         if not valid_model_id(model):
-            raise ValueError("模型 ID 格式不正确")
+            raise ValueError("잘못된 모델 ID")
         if effort not in ("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"):
-            raise ValueError("请选择有效的推理强度")
+            raise ValueError("유효한 추론 강도를 선택하세요.")
         known = next((m for m in catalog.get('models', []) if m['id'] == model), None)
         if known and known.get('efforts') and effort not in known['efforts']:
-            raise ValueError("这个模型不支持所选推理强度")
+            raise ValueError("이 모델은 선택한 추론 강도를 지원하지 않습니다.")
         with self.actions, self.lock:
             if not self.view()['connected']:
-                raise SideChatError('侧边聊天已失效，请关闭后新建')
+                raise SideChatError("보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.")
             # Shared next-turn settings. No parent mutation or provider switch.
             self.state['latestModel'] = model
             self.state['latestReasoningEffort'] = effort
@@ -326,15 +326,15 @@ class SideChat:
 
     def permissions(self, preset, confirmed=False):
         if preset not in ('ask', 'auto-review', 'full-access'):
-            raise ValueError('权限设置无效')
+            raise ValueError('잘못된 권한 설정')
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError('请确认完全访问权限')
+            raise ValueError("전체 액세스 확인")
         settings = {'permissions': ':danger-full-access' if preset == 'full-access' else ':workspace',
                     'approvalPolicy': 'never' if preset == 'full-access' else 'on-request',
                     'approvalsReviewer': 'auto_review' if preset == 'auto-review' else 'user'}
         with self.actions:
             if not self.view()['connected']:
-                raise SideChatError('侧边聊天已失效，请关闭后新建')
+                raise SideChatError("보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.")
             self.runtime.request('thread/settings/update', {'threadId': self.id, **settings})
             with self.lock:
                 self.turn_permissions.update(settings)
@@ -344,52 +344,52 @@ class SideChat:
     @staticmethod
     def _skills(identifiers, catalog_reader, cwd):
         if not isinstance(identifiers, list) or len(identifiers) > 8 or any(not isinstance(v, str) for v in identifiers):
-            raise ValueError('最多选择 8 个 Skill')
+            raise ValueError("최대 8개 스킬 선택")
         if not identifiers:
             return []
         if catalog_reader is None:
-            raise ValueError('Skill 不可用，请刷新列表')
+            raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
         rows = catalog_reader.validate_skills(cwd, sorted(set(identifiers)))
         if {row['id'] for row in rows} != set(identifiers):
-            raise ValueError('Skill 不可用，请刷新列表')
+            raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
         return rows
 
     def send(self, text, submission, attachments=None, *, mode='send', work_mode='default', skills=None, catalog_reader=None, references=None):
         uuid.UUID(str(submission))
         if not isinstance(text, str) or (not text.strip() and not attachments and not references) or len(text) > 20000:
-            raise ValueError('请输入 1–20000 字的消息')
+            raise ValueError("1~20,000자의 메시지를 입력하세요.")
         if mode not in ('send', 'queue', 'steer') or (work_mode not in ('default', 'plan') if mode != 'steer' else work_mode is not None):
-            raise ValueError('侧边聊天支持普通模式和计划模式；补充内容沿用当前任务模式')
+            raise ValueError("보조 채팅은 기본 및 계획 모드를 지원합니다. 후속 작업은 실행 중인 작업 모드를 사용합니다.")
         attachments = [] if attachments is None else attachments
         skills = [] if skills is None else skills
         references = [] if references is None else references
         if not isinstance(attachments, list) or any(not isinstance(value, str) for value in attachments):
-            raise ValueError('附件列表格式不正确')
+            raise ValueError("잘못된 첨부 파일 목록")
         if not isinstance(skills, list) or len(skills) > 8 or any(not isinstance(value, str) for value in skills):
-            raise ValueError('最多选择 8 个 Skill')
+            raise ValueError("최대 8개 스킬 선택")
         digest = hashlib.sha256(json.dumps([text, attachments, mode, work_mode, sorted(set(skills)), references], ensure_ascii=False).encode()).hexdigest()
         with self.actions:
             with self.lock:
                 prior = self.submissions.get(submission)
                 if prior:
                     if prior['digest'] != digest:
-                        raise ValueError('同一消息标识不能用于不同内容')
+                        raise ValueError("ID 메시지는 다른 콘텐츠에 재사용할 수 없습니다.")
                     return {'id': submission, 'status': prior['status']}
                 if not self.view()['connected']:
-                    raise SideChatError('侧边聊天已失效，请关闭后新建')
+                    raise SideChatError("보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.")
                 active = self.state['threadRuntimeStatus']['type'] == 'active'
                 if mode == 'steer' and (not active or self.state['requests']):
-                    raise ValueError('当前没有可补充的任务，请发送新消息')
+                    raise ValueError("후속 작업을 실행 중인 작업이 없습니다. 새 메시지를 보내세요.")
                 if mode == 'send' and (active or self.state['requests']):
-                    raise ValueError('请先等待回复完成，或选择完成后发送／补充当前任务')
+                    raise ValueError("응답을 기다리거나, 메시지를 대기열에 넣거나, 실행 중인 작업에 대한 후속 조치를 취하세요.")
                 if sum(row['status'] == 'queued' for row in self.submissions.values()) >= 20:
-                    raise ValueError('待发送消息已达上限，请先等待或取消排队')
+                    raise ValueError("메시지 큐가 가득 찼습니다. 대기 중인 메시지를 기다리거나 취소합니다.")
             files = self.uploads.resolve(self.id, attachments) if self.uploads else []
             files += Workspace(self.state['cwd']).references(references) if references else []
             if not isinstance(references, list) or len(files) > 10:
-                raise ValueError('每条消息最多添加 10 个不同附件')
+                raise ValueError("메시지당 최대 10개의 파일 첨부")
             if attachments and not self.uploads:
-                raise ValueError('附件已不可用，请重新上传')
+                raise ValueError("첨부파일을 사용할 수 없습니다. 다시 업로드하세요.")
             self._skills(skills, catalog_reader, self.state['cwd'])
             row = {'digest': digest, 'status': 'queued', 'text': text, 'mode': mode, 'workMode': work_mode,
                    'attachments': [Uploads.public(file) for file in files], 'attachmentIds': attachments,
@@ -423,7 +423,7 @@ class SideChat:
             if row['mode'] == 'steer':
                 turn = next((t for t in reversed(self.state['turns']) if t.get('status') == 'inProgress'), None)
                 if turn is None:
-                    raise ValueError('当前没有可补充的任务，请发送新消息')
+                    raise ValueError("후속 작업을 실행 중인 작업이 없습니다. 새 메시지를 보내세요.")
                 row['turnId'] = turn['turnId']
                 params['expectedTurnId'] = turn['turnId']
             else:
@@ -480,7 +480,7 @@ class SideChat:
         with self.actions, self.lock:
             row = self.submissions.get(submission)
             if row is None or row['status'] != 'queued':
-                raise ValueError('消息已开始发送或已处理，请刷新状态')
+                raise ValueError("이 메시지는 전송을 시작했거나 이미 처리되었습니다. 상태를 새로 고칩니다.")
             row['status'] = 'cancelled'
             return self.view()
 
@@ -494,40 +494,40 @@ class SideChat:
 
     def respond(self, identifier, response):
         if not isinstance(response, dict):
-            raise ValueError('确认回复格式不正确')
+            raise ValueError("잘못된 승인 응답")
         with self.actions:
             with self.lock:
                 request = next((r for r in self.state['requests'] if str(r['id']) == str(identifier)), None)
                 if not request:
-                    raise ValueError('此请求已处理或已失效')
+                    raise ValueError('이 요청은 처리되었거나 만료되었습니다.')
                 method, params = request['method'], request['params']
                 if not normalize_request(request)['supported']:
-                    raise ValueError('此请求暂不支持，请停止本次回复')
+                    raise ValueError("지원되지 않는 요청입니다. 이 응답을 중지하십시오.")
                 if method in ('item/commandExecution/requestApproval', 'item/fileChange/requestApproval'):
                     decision = response.get('decision')
                     if set(response) != {'decision'} or decision not in ('accept', 'decline', 'cancel') or (params.get('availableDecisions') and decision not in params['availableDecisions']):
-                        raise ValueError('请选择本次允许、拒绝或取消')
+                        raise ValueError("한 번 허용, 거부 또는 취소를 선택하세요.")
                     result = {'decision': decision}
                 elif method == 'item/permissions/requestApproval':
                     if set(response) != {'decision'} or response['decision'] not in ('accept', 'decline'):
-                        raise ValueError('请选择本次允许或拒绝')
+                        raise ValueError("한 번 허용 또는 거부를 선택하세요.")
                     result = {'permissions': params.get('permissions', {}) if response['decision'] == 'accept' else {}, 'scope': 'turn'}
                 elif method in ('item/tool/requestUserInput', 'tool/requestUserInput'):
                     answers = response.get('answers')
                     keys = {q['id'] for q in params.get('questions', [])}
                     if set(response) != {'answers'} or not isinstance(answers, dict) or not keys or set(answers) != keys or any(not isinstance(v, list) or len(v) != 1 or not isinstance(v[0], str) or not v[0].strip() or len(v[0]) > 20000 for v in answers.values()):
-                        raise ValueError('请完整回答问题')
+                        raise ValueError("모든 질문에 답변해 주세요.")
                     result = {'answers': {k: {'answers': v} for k, v in answers.items()}}
                 elif method == 'mcpServer/elicitation/request':
                     from bridge.app.service import validate_form
                     action = response.get('action')
                     if set(response) - {'action', 'content'} or action not in ('accept', 'decline', 'cancel'):
-                        raise ValueError('确认操作无效')
+                        raise ValueError("잘못된 승인 작업")
                     if action == 'accept':
                         validate_form(response.get('content'), params.get('requestedSchema', {}))
                     result = {'action': action, 'content': response.get('content') if action == 'accept' else None}
                 else:
-                    raise ValueError('此请求暂不支持，请停止本次回复')
+                    raise ValueError("지원되지 않는 요청입니다. 이 응답을 중지하십시오.")
                 self.runtime.write({'id': request['id'], 'result': result})
                 self.state['requests'].remove(request)
                 self.queue_event.set()
@@ -586,17 +586,17 @@ class SideChats:
                 if token in self.creations:
                     original_parent, child = self.creations[token]
                     if original_parent != parent or not chat or chat.id != child:
-                        raise ValueError('此次创建的侧边聊天已关闭，请重新打开标签后新建')
+                        raise ValueError("이 보조 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.")
                     return chat.view()
                 if chat:
                     return chat.view()
                 if self.host != 'local':
-                    raise ValueError('此预览暂支持网关电脑上的聊天，SSH 远程工作区尚未接入侧边聊天')
+                    raise ValueError("보조 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.")
                 if len(self.chats) >= 8 or len(self.creations) >= 1000:
-                    raise ValueError('临时侧边聊天数量已达上限，请关闭不用的聊天；必要时重启网关')
+                    raise ValueError("임시 보조 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.")
                 executable = self.executable_getter() if self.executable_getter else self.executable
                 if not executable:
-                    raise SideChatError('找不到桌面 App 的 Codex 运行时')
+                    raise SideChatError("데스크톱 Codex 런타임을 찾을 수 없습니다.")
                 if not self.checked or executable != self._checked_executable:
                     check_runtime(executable, self.directory)
                     self.checked = True
@@ -608,7 +608,7 @@ class SideChats:
                 self.creations[token] = (parent, chat.id)
                 return chat.view()
             if not chat or chat.id != body.get('id'):
-                raise ValueError('此侧边聊天已关闭或已失效，请刷新标签')
+                raise ValueError("보조 채팅이 폐쇄되었거나 만료되었습니다. 이 탭을 새로 고칩니다.")
             if action == 'close':
                 chat.close()
                 self.chats.pop(parent)
@@ -618,7 +618,7 @@ class SideChats:
         if action == 'linux-permission-options':
             from bridge.features.sessions.linux_permissions import enabled
             if not enabled(self.host):
-                raise ValueError('此主机未启用 Linux 权限检查')
+                raise ValueError('이 호스트는 활성화되지 않았습니다. Linux 권한 확인')
             return chat.permission_options()
         if action == 'permissions':
             return chat.permissions(body.get('preset'), body.get('confirmed'))
@@ -637,13 +637,13 @@ class SideChats:
             return chat.stop()
         if action == 'respond':
             return chat.respond(body.get('requestId'), body.get('response'))
-        raise ValueError('无效侧边聊天操作')
+        raise ValueError("잘못된 보조 채팅 작업")
 
     def attachment(self, parent, child, operation, *args):
         with self.lock:
             chat = self.chats.get(parent)
             if self.host != 'local' or not chat or chat.id != child or chat.closed:
-                raise ValueError('此侧边聊天已关闭或已失效，请刷新标签')
+                raise ValueError("보조 채팅이 폐쇄되었거나 만료되었습니다. 이 탭을 새로 고칩니다.")
             with chat.actions:
                 return getattr(chat.uploads, operation)(child, *args)
 

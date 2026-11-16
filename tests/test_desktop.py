@@ -91,7 +91,34 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(snapshot['notifications']['enabled'])
         self.assertFalse(snapshot['notifications']['barkEnabled'])
         self.assertNotIn('hash', snapshot['auth'])
-        self.assertTrue((self.directory/'首次登录.txt').is_file())
+        self.assertTrue((self.directory/'첫 로그인.txt').is_file())
+
+    def test_initial_korean_credentials_can_authenticate_without_label_truncation(self):
+        self.value()
+        password = self.desktop.read_credentials({})['password']
+        self.assertTrue(password)
+        auth = Auth(self.desktop.config()['auth'])
+        token, _ = auth.login('admin', password, '127.0.0.1')
+        self.assertIsNotNone(auth.get(token))
+
+    def test_legacy_credential_file_remains_readable_and_password_change_removes_both_names(self):
+        from bridge.features.auth.auth import initial_credentials_path
+        self.value()
+        current = self.directory/'첫 로그인.txt'
+        legacy = self.directory/'\u9996\u6b21\u767b\u5f55.txt'
+        password = self.desktop.read_credentials({})['password']
+        legacy.write_text('\u5bc6\u7801：'+password+'\n', encoding='utf-8')
+        self.assertEqual(initial_credentials_path(self.directory), current)
+        current.unlink()
+        self.assertTrue(self.desktop.snapshot()['credentialsAvailable'])
+        self.assertEqual(self.desktop.read_credentials({})['password'], password)
+        self.assertEqual(initial_credentials_path(self.directory), legacy)
+        current.write_text('비밀번호: '+password+'\n', encoding='utf-8')
+        value = self.value()
+        value['auth']['password'] = 'new-password-for-fixture'
+        self.desktop.save(value)
+        self.assertFalse(current.exists())
+        self.assertFalse(legacy.exists())
 
     def test_save_roundtrip_and_secrets_are_not_returned(self):
         value = self.value()
@@ -113,14 +140,13 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.desktop.config()['auth']['hash'], old_hash)
         value['auth']['password'] = 'a new password for test'
         self.desktop.save(value)
-        self.assertFalse((self.directory/'首次登录.txt').exists())
+        self.assertFalse((self.directory/'첫 로그인.txt').exists())
         self.assertNotEqual(self.desktop.config()['auth']['hash'], old_hash)
 
     def test_password_change_can_keep_only_current_phone_bindings(self):
         value = self.value()
         old_config = self.desktop.config()['auth']
-        old_password = next(line[3:] for line in (self.directory/'首次登录.txt').read_text(encoding='utf-8').splitlines()
-                            if line.startswith('密码：'))
+        old_password = self.desktop.read_credentials({})['password']
         auth = Auth(old_config, self.directory)
         kept, _ = auth.new_session('192.0.2.1', 'BridgeMobile/0.1-iOS')
         revoked, _ = auth.new_session('192.0.2.2', 'BridgeMobile/0.1-Android')
@@ -272,7 +298,7 @@ class DesktopTests(unittest.TestCase):
             ntfy.assert_called_once()
             with self.assertRaises(ValueError): self.desktop.test_notification({'channel': 'unknown'})
         with patch('bridge.app.desktop.publish_bark', side_effect=RuntimeError('private-bark-key')):
-            with self.assertRaisesRegex(ValueError, '^Bark 测试失败') as error:
+            with self.assertRaisesRegex(ValueError, '^Bark 테스트에 실패했습니다') as error:
                 self.desktop.test_notification({'channel': 'bark'})
             self.assertNotIn('private-bark-key', str(error.exception))
 
@@ -307,7 +333,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(visible['webhookResolvedProvider'], 'feishu')
         (self.directory/'gateway.log').write_text('private-sign-secret\n')
         self.assertNotIn('private-sign-secret', self.desktop.logs()['text'])
-        with patch('bridge.app.desktop.publish_webhook', side_effect=WebhookDeliveryError('飞书未接受通知（19021：签名或时间无效）')):
+        with patch('bridge.app.desktop.publish_webhook', side_effect=WebhookDeliveryError('Feishu는 알림을 수락하지 않았습니다.（19021：잘못된 서명 또는 시간）')):
             with self.assertRaisesRegex(ValueError, '19021'):
                 self.desktop.test_notification({'channel': 'webhook'})
 
@@ -320,7 +346,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.desktop.snapshot()['notifications']['webhookUrl'], '')
 
     def test_named_webhook_desktop_snapshot_test_reveal_and_log_redaction(self):
-        value = self.desktop.webhook_endpoint({'action': 'upsert', 'webhookName': '机器人',
+        value = self.desktop.webhook_endpoint({'action': 'upsert', 'webhookName': '기계 인간',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/private-path',
             'webhookSignEnabled': True, 'webhookSignSecret': 'private-sign',
             'webhookHeaders': {'Authorization': 'Bearer private-header'}})
@@ -347,7 +373,7 @@ class DesktopTests(unittest.TestCase):
         self.desktop.save(value)
         self.desktop.status = lambda: {'running': True, 'portOccupied': False, 'supportsNotifications': True}
         value['preferences']['port'] = 9999
-        with self.assertRaisesRegex(ValueError, '先停止'): self.desktop.save(value)
+        with self.assertRaisesRegex(ValueError, "현재\\ 연결이\\ 끊어지지\\ 않도록\\ 네트워크\\ 설정이나\\ 런타임\\ 경로를\\ 변경하기\\ 전에\\ 게이트웨이를\\ 중지하세요\\."): self.desktop.save(value)
         self.assertEqual(self.desktop.preferences()['port'], 8787)
 
     def test_validation_does_not_partially_change_gateway_config(self):
@@ -382,7 +408,7 @@ class CloudflareSetupTests(unittest.TestCase):
             write_json(data/'desktop.json', {'cloudflared': '', 'codexHome': directory, 'tunnel': True})
             with patch('bridge.app.desktop.shutil.which', return_value=''), patch('bridge.app.desktop.sys.platform', 'fixture'), patch('bridge.app.desktop.sys._MEIPASS', str(data/'absent-bundle'), create=True):
                 with patch('bridge.app.desktop.subprocess.Popen') as spawn:
-                    with self.assertRaisesRegex(ValueError, '一键安装'): desktop.start()
+                    with self.assertRaisesRegex(ValueError, "실행\\ 가능한\\ cloudflared를\\ 찾을\\ 수\\ 없습니다\\.\\ 런타임\\ 설정에서\\ 설치하고\\ 임시\\ Cloudflare\\ 연결을\\ 저장하거나\\ 비활성화합니다\\."): desktop.start()
                     spawn.assert_not_called()
                 (data/'bin').mkdir()
                 executable = data/'bin'/('cloudflared.exe' if os.name == 'nt' else 'cloudflared')
@@ -408,8 +434,31 @@ class CloudflareSetupTests(unittest.TestCase):
             desktop = Desktop(data)
             desktop.status = lambda: {'running': True, 'pid': 100}
             write_json(data/'desktop.json', {'tunnel': True, 'cloudflared': ''})
-            (data/'外网地址.txt').write_text('https://old.trycloudflare.com\n', encoding='utf-8')
+            (data/'외부 접속 주소.txt').write_text('https://old.trycloudflare.com\n', encoding='utf-8')
             write_json(data/'cloudflare-status.json', {'pid': 100, 'state': 'ready', 'message': ''})
             self.assertIn('https://old.trycloudflare.com', desktop.snapshot()['urls'])
             write_json(data/'cloudflare-status.json', {'pid': 100, 'state': 'reconnecting', 'message': ''})
             self.assertNotIn('https://old.trycloudflare.com', desktop.snapshot()['urls'])
+
+    def test_legacy_quick_url_file_remains_readable_but_live_status_wins(self):
+        from bridge.features.notifications.channels import write_json
+        from bridge.features.network.tunnel import quick_url_path
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as directory:
+            data = Path(directory)
+            desktop = Desktop(data)
+            desktop.status = lambda: {'running': True, 'pid': 100}
+            write_json(data/'desktop.json', {'tunnel': True, 'cloudflared': ''})
+            legacy = data/'\u5916\u7f51\u5730\u5740.txt'
+            legacy.write_text('https://legacy.trycloudflare.com\n', encoding='utf-8')
+            write_json(data/'cloudflare-status.json', {'pid': 100, 'state': 'ready', 'message': ''})
+            self.assertEqual(quick_url_path(data), legacy)
+            self.assertIn('https://legacy.trycloudflare.com', desktop.snapshot()['urls'])
+            current = data/'외부 접속 주소.txt'
+            current.write_text('https://stale.trycloudflare.com\n', encoding='utf-8')
+            self.assertEqual(quick_url_path(data), current)
+            write_json(data/'cloudflare-status.json', {'pid': 100, 'state': 'ready', 'message': '',
+                                                     'url': 'https://live.trycloudflare.com'})
+            snapshot = desktop.snapshot()
+            self.assertIn('https://live.trycloudflare.com', snapshot['urls'])
+            self.assertNotIn('https://legacy.trycloudflare.com', snapshot['urls'])
+            self.assertNotIn('https://stale.trycloudflare.com', snapshot['urls'])

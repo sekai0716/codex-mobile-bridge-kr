@@ -121,9 +121,9 @@ class GatewayServer(ThreadingHTTPServer):
     def ui_language(self):
         try:
             value = json.loads(self.ui_language_path.read_text(encoding='utf-8')) if self.ui_language_path else {}
-            return 'en' if value.get('language') == 'en' else 'zh'
+            return 'en' if value.get('language') == 'en' else 'ko'
         except (OSError, ValueError, AttributeError):
-            return 'zh'
+            return 'ko'
 
     def server_close(self):
         if self.mobile_updates_owner and self.cli_connections:
@@ -183,14 +183,14 @@ class Handler(BaseHTTPRequestHandler):
         """Resolve explicit entries once; unknown entries never use defaults."""
         manager = self.server.desktop_sessions
         if manager is None:
-            raise ValueError('桌面会话接入不可用')
+            raise ValueError('데스크톱 세션에 액세스할 수 없습니다.')
         # Preserve empty values here: ?entry= is an invalid explicit selection,
         # not permission to operate on the default account.
         values = parse_qs(urlsplit(self.path).query, keep_blank_values=True).get('entry')
         if values is None:
             return manager, self.server.desktop_uploads, 'desktop:' + provider
         if len(values) != 1 or not re.fullmatch(r'(claude|deepseek):[0-9a-f]{32}', values[0]):
-            raise ValueError('独立接入标识无效')
+            raise ValueError('독립 액세스 ID가 잘못되었습니다.')
         selected = manager.resolve_instance(provider, values[0], require_enabled=require_enabled)
         return selected, selected.uploads, 'desktop:' + values[0]
 
@@ -322,15 +322,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def check_request(self, write=False):
         if len(self.headers.get_all("Host", [])) != 1 or self.headers.get("Host") not in self.server.hosts:
-            raise PermissionError("此访问地址未在网关配置中允许")
+            raise PermissionError("이 액세스 주소는 게이트웨이 구성에서 허용되지 않습니다.")
         host = self.headers.get('Host', '')
         local_host = urlsplit('http://' + host).hostname in ('127.0.0.1', 'localhost')
         if not self.server.local_access and (local_host or (self.connection.getsockname()[0] == '127.0.0.1' and host not in self.server.secure_hosts)):
-            raise PermissionError('本机网页访问已关闭')
+            raise PermissionError("로컬 브라우저 액세스가 비활성화되었습니다.")
         origin = self.headers.get("Origin")
         expected_origin = ('https://' if host in self.server.secure_hosts else 'http://') + host
         if len(self.headers.get_all("Origin", [])) > 1 or (origin and origin != expected_origin) or (write and not origin):
-            raise PermissionError("不允许跨站请求")
+            raise PermissionError("교차 사이트 요청은 허용되지 않습니다.")
+
         # External links may open the public HTML shell. Fetches, embedded pages
         # and API requests must still pass the cross-site restriction.
         homepage_navigation = (not write and self.command == 'GET' and urlsplit(self.path).path in ('/', '/harness', '/harness/', '/mobile-channel')
@@ -339,34 +340,34 @@ class Handler(BaseHTTPRequestHandler):
         renderer_script = is_public_renderer_script(urlsplit(self.path).path, self.command,
                                                     self.headers.get('Sec-Fetch-Dest'))
         if self.headers.get("Sec-Fetch-Site") == "cross-site" and not (homepage_navigation or renderer_script):
-            raise PermissionError("不允许跨站请求")
+            raise PermissionError("교차 사이트 요청은 허용되지 않습니다.")
 
     def authorized(self, write=False):
         if not self.server.auth.permitted(self.client()['ip']):
-            raise PermissionError('此 IP 已被访问规则禁止')
+            raise PermissionError("이 IP는 액세스 규칙에 의해 차단되었습니다.")
         session = self.login_session()
         if not session:
             self.close_connection = True
-            self.output(401, {"error": "请登录", "code": "unauthenticated"})
+            self.output(401, {"error": "로그인해주세요", "code": "unauthenticated"})
             return None
         if write and not hmac.compare_digest(self.headers.get("X-CSRF-Token", ""), session["csrf"]):
-            raise PermissionError("登录验证已失效，请刷新页面")
+            raise PermissionError("로그인 인증이 만료되었습니다. 페이지를 새로고침하세요.")
         return session
 
     def read_json(self):
         if self.headers.get("Transfer-Encoding"):
-            raise ValueError("不支持分块请求体")
+            raise ValueError("청크 요청 본문은 지원되지 않습니다.")
         if self.headers.get_content_type() != "application/json":
-            raise ValueError("需要 JSON 请求")
+            raise ValueError("필요 JSON 묻다")
         sizes = self.headers.get_all("Content-Length", [])
         if len(sizes) != 1 or not sizes[0].isdigit():
-            raise ValueError("请求长度无效")
+            raise ValueError("잘못된 요청 길이")
         size = int(sizes[0])
         if not 0 < size <= 512000:
-            raise ValueError("请求过大或为空")
+            raise ValueError("요청이 너무 크거나 비어 있습니다.")
         value = json.loads(self.rfile.read(size))
         if not isinstance(value, dict):
-            raise ValueError("请求内容必须为对象")
+            raise ValueError("요청 콘텐츠는 객체여야 합니다.")
         return value
 
     def do_GET(self):
@@ -429,7 +430,7 @@ class Handler(BaseHTTPRequestHandler):
                 if (self.client_address[0] != '127.0.0.1' or self.connection.getsockname()[0] != '127.0.0.1'
                         or self.headers.get_all('Host', []) not in [[host] for host in expected]
                         or self.headers.get('Origin') or self.headers.get('Sec-Fetch-Site') == 'cross-site'):
-                    raise PermissionError('仅允许本机状态检查')
+                    raise PermissionError("로컬 상태 확인만 허용됩니다.")
                 return self.output(200, {'service': 'codex-mobile-bridge', 'instanceId': self.server.instance_id,
                                          'notifications': self.server.notifications is not None})
             self.check_request(write)
@@ -480,12 +481,12 @@ class Handler(BaseHTTPRequestHandler):
                 target = ('https://' if host in self.server.secure_hosts else 'http://') + host
                 return self.output(200, discovery.prove(query.get('id', [''])[0], query.get('challenge', [''])[0], target, query.get('device', [None])[0]))
             if not self.server.auth.permitted(self.client()['ip']) and path != '/api/login':
-                raise PermissionError('此 IP 已被访问规则禁止')
+                raise PermissionError("이 IP는 액세스 규칙에 의해 차단되었습니다.")
             if write and path == "/api/login":
                 body = self.read_json()
                 username, password = body.get("username", ""), body.get("password", "")
                 if not isinstance(username, str) or not isinstance(password, str) or len(username) > 200 or len(password) > 1000:
-                    raise ValueError("账号或密码格式不正确")
+                    raise ValueError("계정 또는 비밀번호 형식이 올바르지 않습니다.")
                 token, session = self.server.auth.login(username, password, self.client()['ip'], self.headers.get('User-Agent', ''), self.client(), remember=body.get('remember'))
                 self.server.auth.logout(self.token())
                 return self.output(200, {"csrf": session["csrf"]}, cookie=self.cookie(token))
@@ -494,7 +495,7 @@ class Handler(BaseHTTPRequestHandler):
                 host = self.headers.get('Host', '')
                 origin = ('https://' if host in self.server.secure_hosts else 'http://') + host
                 if self.headers.get('Origin') != origin:
-                    raise PermissionError('不允许的请求来源')
+                    raise PermissionError("요청 출처는 허용되지 않습니다.")
                 token, session = self.server.pairing.exchange(body.get('token'), origin, self.client()['ip'], self.headers.get('User-Agent', ''), self.client())
                 self.server.auth.logout(self.token())
                 return self.output(200, {'csrf': session['csrf']}, cookie=self.cookie(token))
@@ -505,18 +506,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/connection/routes':
                 discovery = getattr(self.server, 'connection_discovery', None)
                 if not discovery or not self.server.auth.mobile_client(self.headers.get('User-Agent', '')):
-                    raise PermissionError('需要手机网关绑定')
+                    raise PermissionError('휴대폰 게이트웨이 바인딩이 필요합니다.')
                 return self.output(200, discovery.renew(self.token(), self.read_json()) if write else discovery.mobile_routes(self.token()))
             desktop_socket = re.fullmatch(r'/api/desktop-sessions/(deepseek|claude)/terminal', path)
             if not write and self.headers.get('Upgrade', '').lower() == 'websocket' and (terminal_socket or desktop_socket):
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('终端需要启用网关密码保护')
+                    raise PermissionError('터미널은 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
                 # Browser WebSocket cannot set a custom header. The CSRF secret
                 # is sent as a subprotocol, never as a URL or cookie substitute.
                 self.check_request(True)
                 if desktop_socket:
                     if self.server.desktop_sessions is None:
-                        return self.output(503, {'error': '桌面会话接入不可用'})
+                        return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                     sid = query.get('sessionId', [''])[0]
                     manager, _, _ = self.desktop_context(desktop_socket[1], query)
                     bridge = manager.workspace_bridge(desktop_socket[1], sid)
@@ -529,63 +530,63 @@ class Handler(BaseHTTPRequestHandler):
                     thread = terminal_socket[1]
                     enabled = lambda: self.server.desktop_sessions is None or self.server.desktop_sessions.require_enabled('codex') is None
                 if len(query.get('id', [])) != 1 or len(query.get('after', [])) != 1:
-                    raise ValueError('终端连接参数无效')
+                    raise ValueError('잘못된 터미널 연결 매개변수')
                 identifier = query['id'][0]
                 after = int(query['after'][0])
                 if not 0 <= after <= 10**12:
-                    raise ValueError('无效输出游标')
+                    raise ValueError('잘못된 출력 커서')
                 from bridge.api.terminal_ws import serve
                 return serve(self, bridge, thread, self.server.auth.key(self.token()), identifier, after, auth['csrf'], enabled)
             if path == SHELL_PATH:
                 if write or query:
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 return self.output(200, (self.server.web_dir / SHELL_FILE).read_bytes(),
                                    'text/html; charset=utf-8', preview_shell=True)
             if path == VISUALIZE_SHELL_PATH:
                 if write or query:
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 return self.output(200, visualization_shell_bytes(self.server.web_dir),
                                    'text/html; charset=utf-8', visualize_shell=True)
             if path == MERMAID_SHELL_PATH:
                 if write or query:
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 return self.output(200, mermaid_shell_bytes(self.server.web_dir),
                                    'text/html; charset=utf-8', mermaid_shell=True)
             mobile_update = re.fullmatch(r'/api/mobile/update(?:/(prepare|status/([a-f0-9]{64})|packages/([a-f0-9]{64})))?', path)
             if mobile_update:
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('请启用密码保护后使用电脑协助更新')
+                    raise PermissionError('비밀번호 보호를 활성화하고 컴퓨터를 사용하여 업데이트를 지원하십시오.')
                 updates = self.server.mobile_updates
                 if updates is None:
-                    return self.output(503, {'error': '此网关暂不支持协助更新'})
+                    return self.output(503, {'error': '이 게이트웨이는 현재 지원 업데이트를 지원하지 않습니다.'})
                 operation, identifier, package = mobile_update.groups()
                 if write:
                     if operation != 'prepare' or query:
-                        return self.output(405, {'error': '请求方式无效'})
+                        return self.output(405, {'error': '잘못된 요청 방법'})
                     return self.output(200, updates.prepare(self.read_json()))
                 if operation is None:
                     if set(query) != {'current'} or len(query['current']) != 1:
-                        raise ValueError('更新请求无效')
+                        raise ValueError('잘못된 업데이트 요청')
                     return self.output(200, updates.check(query['current'][0]))
                 if query:
-                    raise ValueError('更新请求无效')
+                    raise ValueError('잘못된 업데이트 요청')
                 if identifier:
                     return self.output(200, updates.status(identifier))
                 if package:
                     with updates.download(package, **self.download_request()) as (metadata, stream):
                         return self.download_response(metadata, stream, 'application/vnd.android.package-archive')
-                return self.output(405, {'error': '请求方式无效'})
+                return self.output(405, {'error': '잘못된 요청 방법'})
             if path == '/api/clients/claude/reconnect':
                 if not write:
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 value = self.read_json()
                 if value != {}:
-                    raise ValueError('重新连接请求无效')
+                    raise ValueError('잘못된 재연결 요청')
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('请启用密码保护后再重新连接客户端')
+                    raise PermissionError("클라이언트를 다시 연결하기 전에 비밀번호 보호를 활성화하십시오.")
                 manager, _, _ = self.desktop_context('claude', query)
                 if manager is None:
-                    return self.output(503, {'error': '应用管理不可用'})
+                    return self.output(503, {'error': '애플리케이션 관리를 사용할 수 없습니다.'})
                 result = manager.reconnect_claude()
                 if manager is not self.server.desktop_sessions:
                     result = self.server.desktop_sessions.clients(refresh=True)
@@ -594,40 +595,40 @@ class Handler(BaseHTTPRequestHandler):
                 return self.output(200, transfer_settings(self.server.transfer_directory, self.read_json() if write else None))
             if path == '/api/network-adaptation':
                 if query:
-                    raise ValueError('网络变化自动恢复请求无效')
+                    raise ValueError('네트워크 변경 자동 복구 요청이 잘못되었습니다.')
                 adaptation = self.server.network_adaptation
                 if adaptation is None:
-                    return self.output(503, {'error': '此网关暂不支持网络变化自动恢复'})
+                    return self.output(503, {'error': '이 게이트웨이는 현재 네트워크 변경 사항에 대한 자동 복구를 지원하지 않습니다.'})
                 if write:
                     if self.server.auth.config.get('mode') == 'none':
-                        raise PermissionError('请启用密码保护后更改网络恢复设置')
+                        raise PermissionError('네트워크 복구 설정을 변경하기 전에 비밀번호 보호를 활성화하세요.')
                     value = self.read_json()
                     if not isinstance(value, dict) or set(value) != {'enabled'}:
-                        raise ValueError('网络变化自动恢复请求无效')
+                        raise ValueError('네트워크 변경 자동 복구 요청이 잘못되었습니다.')
                     return self.output(200, {**adaptation.control({'action': 'set', **value}), 'canEdit': True})
                 return self.output(200, {**adaptation.public(), 'canEdit': self.server.auth.config.get('mode') != 'none'})
             if path == '/api/clients':
                 manager = self.server.desktop_sessions
                 if manager is None:
-                    return self.output(503, {'error': '应用管理不可用'})
+                    return self.output(503, {'error': '애플리케이션 관리를 사용할 수 없습니다.'})
                 if write:
                     value = self.read_json()
                     if value == {'action': 'scan-wsl'}:
                         return self.output(200, manager.scan_wsl())
                     if not isinstance(value, dict) or not {'provider', 'enabled'} <= set(value) or set(value) - {'provider', 'enabled', 'quitDesktop', 'initializeDesktop', 'connectionMode', 'forceDesktop', 'forceConfirmed', 'acknowledgeUnavailable'}:
-                        raise ValueError('应用开关无效')
+                        raise ValueError("잘못된 클라이언트 액세스 설정")
                     if (value.get('provider') == 'zcode' and value.get('enabled') is True
                             and self.server.auth.config.get('mode') == 'none'):
-                        raise PermissionError('请启用密码保护后再连接 ZCode')
+                        raise PermissionError('연결하기 전에 비밀번호 보호를 활성화하세요. ZCode')
                     return self.output(200, manager.toggle_client(value))
                 return self.output(200, manager.clients_status())
             desktop_image = re.fullmatch(r'/api/desktop-sessions/(deepseek|claude|zcode|antigravity)/images/([0-9a-f]{64})', path)
             if desktop_image:
                 if write:
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 manager = self.server.desktop_sessions
                 if manager is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 provider, identifier = desktop_image.groups()
                 manager, _, _ = self.desktop_context(provider, query)
                 artifact, variant = manager.image_preview(provider, query.get('sessionId', [None])[0], identifier)
@@ -636,7 +637,7 @@ class Handler(BaseHTTPRequestHandler):
             if desktop_upload:
                 manager, uploads = self.server.desktop_sessions, self.server.desktop_uploads
                 if manager is None or uploads is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 provider, identifier, operation = desktop_upload.groups()
                 manager, uploads, _ = self.desktop_context(provider, query)
                 manager.require_enabled(provider)
@@ -645,20 +646,20 @@ class Handler(BaseHTTPRequestHandler):
                 # Check the original desktop conversation before accepting files.
                 detail = manager.call(provider, 'detail', sid)
                 if not detail.get('session'):
-                    raise ValueError('会话标识无效')
+                    raise ValueError("잘못된 세션 식별자")
                 if not write and operation == 'preview':
                     download = query.get('download') == ['1']
                     artifact, variant = uploads.store.preview(scope, identifier, 'original' if download else query.get('variant', ['thumb'])[0])
                     return self.attachment_preview(artifact, variant, download=download)
                 if not write or operation == 'preview':
-                    return self.output(405, {'error': '请求方式无效'})
+                    return self.output(405, {'error': '잘못된 요청 방법'})
                 maximum = 1024 * 1024 if operation == 'thumb' else MAX_FILE
                 sizes = self.headers.get_all('Content-Length', [])
                 if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 < int(sizes[0]) <= maximum:
-                    raise ValueError('附件大小无效')
+                    raise ValueError("잘못된 첨부 파일 크기")
                 data = self.rfile.read(int(sizes[0]))
                 if len(data) != int(sizes[0]):
-                    raise ValueError('附件上传中断，请重试')
+                    raise ValueError("첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.")
                 if operation == 'thumb':
                     result = uploads.store.set_thumb(scope, identifier, data, int(query.get('width', ['0'])[0]), int(query.get('height', ['0'])[0]))
                 else:
@@ -668,21 +669,21 @@ class Handler(BaseHTTPRequestHandler):
             if desktop_accounts:
                 manager, _, _ = self.desktop_context(desktop_accounts.group(1), query, require_enabled=False)
                 if manager is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 value = self.read_json() if write else {'action': 'list'}
                 operation = value.get('action')
                 if operation not in (('details', 'switch') if write else ('list',)):
-                    return self.output(403, {'error': '添加、修改与删除账号请在电脑端完成。'})
+                    return self.output(403, {'error': "데스크톱 앱에서 계정을 추가, 편집, 제거하세요."})
                 if write and operation == 'switch' and (set(value) - {'action', 'id', 'syncLocalCli'} or not isinstance(value.get('id'), str) or value.get('syncLocalCli', False) not in (True, False)):
-                    raise ValueError('账号切换请求包含不支持的字段')
+                    raise ValueError('계정 전환 요청에 지원되지 않는 필드가 포함되어 있습니다.')
                 if operation == 'switch' and self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('请启用密码保护后再切换账号')
+                    raise PermissionError('계정을 전환하기 전에 비밀번호 보호를 활성화하세요')
                 return self.output(200, manager.client_accounts(desktop_accounts.group(1), {**value, 'operation': operation}))
             desktop_notifications = re.fullmatch(r'/api/desktop-sessions/(deepseek|claude|zcode|antigravity)/notifications', path)
             if desktop_notifications:
                 manager = self.server.desktop_sessions
                 if manager is None or self.server.notifications is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 provider = desktop_notifications.group(1)
                 manager, _, notification_host = self.desktop_context(provider, query)
                 manager.require_enabled(provider)
@@ -693,10 +694,10 @@ class Handler(BaseHTTPRequestHandler):
             desktop_projects = re.fullmatch(r'/api/desktop-sessions/(deepseek|claude|zcode|antigravity)/projects/(browse|register|trust)', path)
             if desktop_projects:
                 if not write:
-                    return self.output(405, {'error': '请通过目录选择器浏览'})
+                    return self.output(405, {'error': '디렉토리 선택기를 통해 찾아보십시오.'})
                 manager = self.server.desktop_sessions
                 if manager is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 provider, action = desktop_projects.groups()
                 manager, _, _ = self.desktop_context(provider, query)
                 manager.require_enabled(provider)
@@ -705,7 +706,7 @@ class Handler(BaseHTTPRequestHandler):
                           else {'projectKey', 'confirmed'} if action == 'trust'
                           else {'environment', 'path', 'createDirectory'})
                 if not isinstance(body, dict) or set(body) != fields:
-                    raise ValueError('项目目录请求无效')
+                    raise ValueError('잘못된 프로젝트 디렉터리 요청')
                 if action == 'browse':
                     return self.output(200, manager.project_directories(provider, **body))
                 if action == 'trust':
@@ -715,15 +716,15 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/cli-connections':
                 connections = self.server.cli_connections
                 if connections is None:
-                    raise ValueError('CLI 连接管理不可用')
+                    raise ValueError('CLI 연결 관리를 사용할 수 없습니다.')
                 return self.output(200, connections.submit(self.read_json()) if write else connections.view())
             if path.startswith('/api/desktop-sessions/') and not desktop_workspace:
                 parts = path.strip('/').split('/')
                 manager = self.server.desktop_sessions
                 if manager is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 if len(parts) != 4 or parts[2] not in ('deepseek', 'claude', 'zcode', 'antigravity') or parts[3] not in (WRITES if write else READS):
-                    return self.output(404, {'error': '接口不存在'})
+                    return self.output(404, {'error': '인터페이스가 존재하지 않습니다'})
                 manager, uploads, _ = self.desktop_context(parts[2], query)
                 manager.require_enabled(parts[2])
                 body = self.read_json() if write else ({'section': query.get('section', ['all'])[0],
@@ -739,13 +740,13 @@ class Handler(BaseHTTPRequestHandler):
                     if query.get('historyBefore'):
                         before = query['historyBefore'][0]
                         if len(before) > 16384:
-                            raise ValueError('历史游标过长')
+                            raise ValueError('기록 커서가 너무 깁니다.')
                         body['historyBefore'] = before
                 if write and any(key in body for key in ('resolvedImages', 'resolvedFiles', 'resolvedReferences')):
-                    raise ValueError('附件格式无效')
+                    raise ValueError("잘못된 첨부파일 형식")
                 if write and parts[3] == 'send' and 'attachments' in body:
                     if uploads is None:
-                        return self.output(503, {'error': '桌面会话接入不可用'})
+                        return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                     detail = manager.call(parts[2], 'detail', sid)
                     session = detail.get('session') or {}
                     local_cli = parts[2] == 'claude' and session.get('backend') == 'cli'
@@ -764,39 +765,39 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/mobile/push':
                 manager = self.server.notifications
                 if manager is None:
-                    return self.output(503, {'error': '手机推送暂不可用'})
+                    return self.output(503, {'error': '모바일 푸시를 일시적으로 사용할 수 없습니다.'})
                 if not write:
                     return self.output(200, manager.mobile_push.status())
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('请启用密码保护后注册系统推送')
+                    raise PermissionError('시스템 푸시에 등록하기 전에 비밀번호 보호를 활성화하십시오.')
                 origin = self.headers.get('Origin', '')
                 if origin not in self.server.origins:
-                    raise PermissionError('不允许的推送注册来源')
+                    raise PermissionError('허용되지 않는 푸시 등록 소스')
                 return self.output(200, manager.mobile_push.register(self.read_json(), self.server.auth.key(self.token()), origin))
             if path == '/api/mobile/events/read' and write:
                 manager = self.server.notifications
                 if manager is None:
-                    return self.output(503, {'error': '手机通知暂不可用'})
+                    return self.output(503, {'error': '모바일 알림을 일시적으로 사용할 수 없습니다.'})
                 body = self.read_json()
                 if set(body) != {'provider', 'streamId', 'through'}:
-                    raise ValueError('通知已读参数无效')
+                    raise ValueError('읽기 매개변수가 유효하지 않다는 알림')
                 manager.mobile.acknowledge(body['provider'], body['streamId'], body['through'])
                 return self.output(200, manager.mobile_snapshot(manager.mobile.checkpoint()['cursor']))
             if not write and path == '/api/mobile/events':
                 query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
                 manager = self.server.notifications
                 if manager is None:
-                    return self.output(503, {'error': '手机通知暂不可用'})
+                    return self.output(503, {'error': '모바일 알림을 일시적으로 사용할 수 없습니다.'})
                 value = query.get('after', ['0'])[0]
                 if not value.isdigit() or len(value) > 16:
-                    raise ValueError('通知游标格式不正确')
+                    raise ValueError('알림 커서 형식이 잘못되었습니다.')
                 wait = query.get('wait', ['0'])[0]
                 stream = query.get('streamId', [None])[0]
                 revision = query.get('revision', [None])[0]
                 if (not wait.isascii() or not wait.isdigit() or len(wait) > 2 or int(wait) > 60
                         or (stream is not None and (not 1 <= len(stream) <= 128 or any(ord(c) < 32 for c in stream)))
                         or (revision is not None and not re.fullmatch('[a-f0-9]{32}', revision))):
-                    raise ValueError('通知等待参数无效')
+                    raise ValueError('알림 대기 매개변수가 잘못되었습니다.')
                 result = manager.mobile_snapshot(int(value), wait=int(wait), stream=stream, revision=revision)
                 if self.authorized():
                     return self.output(200, result)
@@ -808,10 +809,10 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/wsl-accounts', '/api/wsl-accounts/environments'):
                 manager = getattr(self.server.bridge, 'wsl_accounts', None)
                 if manager is None:
-                    return self.output(503, {'error': 'WSL 账号管理不可用'})
+                    return self.output(503, {'error': 'WSL 계정 관리를 사용할 수 없습니다.'})
                 if write:
                     if path != '/api/wsl-accounts' or query:
-                        raise ValueError('WSL 账号请求参数无效')
+                        raise ValueError('WSL 계정 요청 매개변수가 잘못되었습니다.')
                     body = self.read_json()
                     common = {'provider', 'entry', 'action'}
                     fields = {'switch': (common | {'id', 'expectedIdentity'}, set()),
@@ -824,17 +825,17 @@ class Handler(BaseHTTPRequestHandler):
                               'delete': (common | {'id'}, set()), 'rename': (common | {'id', 'name'}, set())}
                     schema = fields.get(body.get('action')) if isinstance(body, dict) else None
                     if schema is None or not schema[0] <= set(body) or set(body) - schema[0] - schema[1]:
-                        raise ValueError('WSL 账号请求字段无效')
+                        raise ValueError("잘못된 WSL 계정 요청 필드")
                     if body['action'] == 'recover-restart' and body['provider'] != 'codex':
-                        raise ValueError('仅 Codex WSL 支持恢复共享服务')
+                        raise ValueError("Codex WSL만 공유 서비스 복구를 지원합니다.")
                     if 'refresh' in body and type(body['refresh']) is not bool:
-                        raise ValueError('模型刷新参数无效')
+                        raise ValueError('모델 새로고침 매개변수가 잘못되었습니다.')
                     if body['action'] != 'models' and self.server.auth.config.get('mode') == 'none':
-                        raise PermissionError('免密访问不能管理 WSL 账号')
+                        raise PermissionError("비밀번호 없는 액세스는 WSL 계정을 관리할 수 없습니다.")
                     return self.output(200, manager.change(body, desktop=False))
                 fields = {'provider'} if path.endswith('/environments') else {'provider', 'entry'}
                 if set(query) != fields or any(len(values) != 1 or not values[0] for values in query.values()):
-                    raise ValueError('WSL 账号查询参数无效')
+                    raise ValueError('WSL 계정 쿼리 매개변수가 잘못되었습니다.')
                 provider = query['provider'][0]
                 if path.endswith('/environments'):
                     return self.output(200, manager.environments(provider))
@@ -846,13 +847,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.output(200, result)
             if path == '/api/cli-access':
                 if query:
-                    raise ValueError('CLI 接入请求包含不支持的参数')
+                    raise ValueError('CLI 액세스 요청에 지원되지 않는 매개변수가 포함되어 있습니다.')
                 manager = self.server.bridge.cli_access
                 if manager is None:
-                    return self.output(503, {'error': '本机 CLI 接入不可用'})
+                    return self.output(503, {'error': '로컬 머신 CLI 액세스할 수 없음'})
                 if write:
                     if self.server.auth.config.get('mode') == 'none':
-                        raise PermissionError('免密访问不能修改 CLI 接入')
+                        raise PermissionError('비밀번호 없는 액세스는 수정할 수 없습니다. CLI 연결')
                     return self.output(200, manager.change(self.read_json()))
                 return self.output(200, manager.public())
             account_bridge = self.server.bridge
@@ -862,15 +863,15 @@ class Handler(BaseHTTPRequestHandler):
                     if not write and path == '/api/accounts':
                         return self.output(200, self.server.bridge.for_host(entry).access_summary())
                     if not write and path == '/api/account':
-                        return self.output(200, {'visible': False, 'reason': 'WSL 接入由原环境管理'})
-                    raise ValueError('WSL 接入由原环境管理，不能对它执行桌面账号操作')
+                        return self.output(200, {'visible': False, 'reason': 'WSL 액세스는 원래 환경에서 관리됩니다.'})
+                    raise ValueError('WSL 액세스는 원래 환경에서 관리되며 데스크톱 계정 작업을 수행할 수 없습니다.')
                 account_bridge = self.server.bridge if entry == 'desktop' else self.server.bridge.account_target(entry)
             if write and path == '/api/accounts/ssh-retry':
                 if account_bridge is not self.server.bridge:
-                    raise ValueError('独立配置不管理默认 SSH 连接')
+                    raise ValueError('독립 실행형 구성은 기본값을 관리하지 않습니다. SSH 연결')
                 body = self.read_json()
                 if not isinstance(body, dict) or set(body) != {'host'}:
-                    raise ValueError('SSH 重试请求包含不支持的字段')
+                    raise ValueError('SSH 재시도 요청에 지원되지 않는 필드가 포함되어 있습니다.')
                 self.server.bridge.retry_ssh(body['host'])
                 return self.output(202, account_bridge.accounts.public())
             if not write and path == '/api/accounts':
@@ -884,38 +885,38 @@ class Handler(BaseHTTPRequestHandler):
             if write and path == '/api/accounts/reset-dynamic':
                 body = self.read_json()
                 if set(body) != {'enabled'}:
-                    raise ValueError('重置动态设置无效')
+                    raise ValueError('동적 설정을 재설정해도 효과가 없습니다.')
                 account_bridge.accounts.set_reset_dynamic(body['enabled'])
                 return self.output(200, account_bridge.accounts.public())
             if write and path == '/api/accounts/reminders':
                 body = self.read_json()
                 if set(body) != {'preferences'}:
-                    raise ValueError('提醒设置无效')
+                    raise ValueError('알림 설정이 잘못되었습니다.')
                 account_bridge.accounts.monitor.configure(body['preferences'])
                 return self.output(200, account_bridge.accounts.public())
             if write and path == '/api/accounts/desktop-update':
                 if account_bridge is not self.server.bridge:
-                    raise ValueError('独立配置不管理默认 Codex Desktop')
+                    raise ValueError('독립 실행형 구성은 기본값을 관리하지 않습니다. Codex Desktop')
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('免密访问不能操作桌面更新，请在桌面端操作')
+                    raise PermissionError("비밀번호 없는 액세스는 데스크탑 업데이트를 제어할 수 없습니다. 컴퓨터를 사용하세요.")
                 body = self.read_json()
                 if body == {'action':'checkDesktopUpdate'}:
                     account_bridge.accounts.updates.check()
                 elif body.get('action') == 'requestDesktopUpdate':
                     account_bridge.accounts.updates.request({k:v for k,v in body.items() if k != 'action'})
                 else:
-                    raise ValueError('桌面更新请求无效')
+                    raise ValueError('데스크톱 업데이트 요청이 잘못되었습니다.')
                 return self.output(202, account_bridge.accounts.public())
             if write and path == '/api/accounts/desktop-runtime':
                 if account_bridge is not self.server.bridge:
-                    raise ValueError('独立配置不管理默认 Codex Desktop')
+                    raise ValueError('독립 실행형 구성은 기본값을 관리하지 않습니다. Codex Desktop')
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('免密访问不能初始化桌面连接，请在桌面端操作')
+                    raise PermissionError('비밀번호 없는 액세스는 데스크탑 연결을 초기화할 수 없습니다. 데스크탑 측에서 조작하십시오.')
                 body = self.read_json()
                 if (not isinstance(body, dict)
                         or set(body) - {'acknowledgeUnavailable'} != {'requestId', 'confirmed', 'tasksConfirmed'}
                         or 'acknowledgeUnavailable' in body and body['acknowledgeUnavailable'] is not True):
-                    raise ValueError('初始化请求包含不支持的字段')
+                    raise ValueError('초기화 요청에 지원되지 않는 필드가 포함되어 있습니다.')
                 return self.output(202, account_bridge.accounts.control({'action': 'initializeDesktopRuntime', **body}))
             if write and path == '/api/accounts/account':
                 body = self.read_json()
@@ -923,21 +924,21 @@ class Handler(BaseHTTPRequestHandler):
             if write and path == '/api/accounts/details':
                 body = self.read_json()
                 if set(body) - {'id', 'section', 'refresh'} or not {'id', 'section'} <= set(body):
-                    raise ValueError('账号详情请求包含不支持的字段')
+                    raise ValueError("지원되지 않는 계정 세부정보 요청 필드")
                 return self.output(202, account_bridge.accounts.info.request(body))
             if write and path == '/api/accounts/ignore-submission':
                 body = self.read_json()
                 if set(body) != {'threadId', 'submissionId', 'host'}:
-                    raise ValueError('忽略请求包含不支持的字段')
+                    raise ValueError('지원되지 않는 필드가 포함된 요청 무시')
                 return self.output(200, account_bridge.accounts.ignore_submission(body))
             if write and path == '/api/accounts/switch':
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('免密访问不能切换账号，请在桌面端操作')
+                    raise PermissionError("인증 없이는 계정 전환이 불가능합니다. 데스크톱 앱을 사용하세요.")
                 body = self.read_json()
                 if (set(body) - {'id', 'requestId', 'confirmed', 'tasksConfirmed', 'syncLocalCli'}
                         or not {'id', 'requestId', 'confirmed', 'tasksConfirmed'} <= set(body)
                         or 'syncLocalCli' in body and not isinstance(body['syncLocalCli'], bool)):
-                    raise ValueError('账号切换请求包含不支持的字段')
+                    raise ValueError('계정 전환 요청에 지원되지 않는 필드가 포함되어 있습니다.')
                 return self.output(202, account_bridge.accounts.switch(body))
             if not write and path == '/api/account':
                 return self.output(200, account_bridge.account.read(refresh=query.get('cached', [''])[0] != '1'))
@@ -945,7 +946,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.output(200, account_bridge.account.consume(self.read_json()))
             if not write and path == '/api/sessions/diagnostics':
                 if set(query) - {'thread'}:
-                    raise ValueError('诊断请求包含不支持的字段')
+                    raise ValueError('진단 요청에 지원되지 않는 필드가 포함되어 있습니다.')
                 report = self.server.bridge.discovery_diagnostics(query.get('thread', [None])[0])
                 return self.output(200, report, content_disposition='attachment; filename="codex-session-diagnostics.json"')
             if not write and path == "/api/sessions":
@@ -964,12 +965,12 @@ class Handler(BaseHTTPRequestHandler):
                             entry if entry.startswith(('wsl:', 'codex:')) else 'codex')
                 source = query.get('source', ['all'])[0]
                 if source not in ('all', 'desktop', 'cli', 'ide', 'wsl'):
-                    raise ValueError('不支持的会话来源')
+                    raise ValueError('지원되지 않는 세션 소스')
                 feed = self.server.notifications.mobile.checkpoint() if self.server.notifications else None
                 entry = query.get('entry', [None])[0]
                 if query.get('scope', [None])[0] == 'host':
                     if entry not in (None, 'desktop'):
-                        raise ValueError('Codex 入口与主机范围不能同时指定')
+                        raise ValueError('Codex 항목과 호스트 범위를 동시에 지정할 수 없습니다.')
                     host = query.get('host', ['local'])[0]
                     host_infos = dict(self.server.bridge.hosts.hosts()) if native_enabled else {}
                     entries = getattr(self.server.bridge, 'entries', None)
@@ -979,7 +980,7 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         host_infos = codex_list_hosts(host_infos, registered)
                     if host != 'local' and host not in host_infos:
-                        raise ValueError('未知 Codex 主机')
+                        raise ValueError('알려지지 않은 Codex 주인')
                     offset = max(0, int(query.get('offset', [0])[0]))
                     host_info = host_infos.get(host, {})
                     options = dict(query=query.get('q', [''])[0][:200], limit=offset + 101,
@@ -1032,7 +1033,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.server.desktop_sessions.require_enabled(body['id'])
                     return self.output(200, entries.get(body['id']).connect())
                 if set(body) != {'action', 'id', 'enabled'} or body['action'] != 'configure':
-                    raise ValueError('Codex 入口请求无效')
+                    raise ValueError('Codex 잘못된 참가 요청')
                 return self.output(200, entries.configure(body['id'], body['enabled']))
             if path in ('/api/projects', '/api/projects/browse', '/api/projects/trust', '/api/projects/models'):
                 entry = query.get('entry', ['desktop'])[0]
@@ -1043,41 +1044,41 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     target = self.server.bridge
                 if path.endswith('/models'):
-                    if write: return self.output(405, {'error': '模型目录只支持读取'})
+                    if write: return self.output(405, {'error': '모델 디렉터리는 읽기만 지원합니다.'})
                     options = {key: query[key][0] for key in ('kind', 'host', 'path') if key in query}
                     return self.output(200, target.creation_models(query.get('project', [None])[0],
                         refresh=query.get('refresh') == ['true'], **options))
                 if path.endswith('/trust'):
-                    if not write: return self.output(405, {'error': '请通过项目确认操作信任'})
+                    if not write: return self.output(405, {'error': '프로젝트를 통해 운영신뢰를 확인해주세요'})
                     body = self.read_json()
                     if (entry != 'desktop' or not isinstance(body, dict)
                             or not {'key', 'confirmed'} <= set(body)
                             or set(body) - {'key', 'confirmed', 'confirmation'}):
-                        raise ValueError('目录信任请求无效')
+                        raise ValueError('디렉터리 신뢰 요청이 잘못되었습니다.')
                     return self.output(200, target.project_trust(**body))
                 if path.endswith('/browse'):
-                    if not write: return self.output(405, {'error': '请通过目录选择器浏览'})
+                    if not write: return self.output(405, {'error': '디렉토리 선택기를 통해 찾아보십시오.'})
                     body = self.read_json()
                     if not isinstance(body, dict) or set(body) != {'host', 'path', 'hidden', 'name', 'identity'}:
-                        raise ValueError('目录浏览请求无效')
+                        raise ValueError('디렉터리 찾아보기 요청이 잘못되었습니다.')
                     return self.output(200, target.project_directories(**body))
                 if write:
                     body = self.read_json()
                     if (not isinstance(body, dict) or not {'path', 'createDirectory', 'host'} <= set(body)
                             or set(body) - {'path', 'createDirectory', 'host', 'kind'}):
-                        raise ValueError('项目目录请求无效')
+                        raise ValueError('잘못된 프로젝트 디렉터리 요청')
                     options = {'kind': body['kind']} if 'kind' in body else {}
                     return self.output(200, {'project': target.register_project(body['path'], body['createDirectory'], body['host'], **options)})
                 project_host = query.get('host', [None])[0]
                 if project_host is not None and entry != 'desktop':
-                    raise ValueError('项目环境请求无效')
+                    raise ValueError('잘못된 프로젝트 환경 요청')
                 return self.output(200, {'projects': target.projects(host=project_host) if project_host is not None else target.projects(),
                     'environments': target.project_environments() if hasattr(target, 'project_environments') else [],
                     'createModels': hasattr(target, 'creation_models')})
             if write and path == '/api/activity':
                 groups = self.read_json().get('hosts')
                 if not isinstance(groups, dict) or len(groups) > 20:
-                    raise ValueError('会话状态请求无效')
+                    raise ValueError("잘못된 채팅 상태 요청")
                 rows = []
                 for host, identifiers in groups.items():
                     if self.server.desktop_sessions:
@@ -1101,40 +1102,40 @@ class Handler(BaseHTTPRequestHandler):
                 return self.output(200, result)
             if path == '/api/notifications/defaults':
                 if self.server.notifications is None:
-                    raise ValueError('当前网关未启用通知服务')
+                    raise ValueError("이 게이트웨이에서는 알림이 활성화되지 않았습니다.")
                 return self.output(200, self.server.notifications.defaults(self.read_json() if write else None))
             if path == '/api/notifications/channels/common':
                 manager = self.server.notifications
                 if manager is None:
-                    raise ValueError('当前网关未启用通知服务')
+                    raise ValueError("이 게이트웨이에서는 알림이 활성화되지 않았습니다.")
                 fields = ('includeTitle', 'clickBase', 'securityEnabled', 'addressEnabled', 'addressName')
                 with manager.lock:
                     if write:
                         body = self.read_json()
                         if not isinstance(body, dict) or set(body) - set(fields):
-                            raise ValueError('通知配置格式不正确')
+                            raise ValueError('알림 구성 형식이 잘못되었습니다.')
                         config = save_notification_settings(manager.data_dir, body)
                     else:
                         config = notification_settings(manager.data_dir)
                     return self.output(200, {key: config[key] for key in fields})
             if path == '/api/notifications/channels/webhook/endpoints':
                 if not write:
-                    return self.output(405, {'error': '需要 POST 请求'})
+                    return self.output(405, {'error': '필요 POST 묻다'})
                 manager = self.server.notifications
                 if manager is None:
-                    raise ValueError('当前网关未启用通知服务')
+                    raise ValueError("이 게이트웨이에서는 알림이 활성화되지 않았습니다.")
                 with manager.lock:
                     config, selected = save_webhook_endpoint(manager.data_dir, self.read_json())
                     return self.output(200, {**visible_webhook(config), 'selectedWebhookId': selected})
             if path == '/api/notifications/channels/webhook/url':
                 if not write:
-                    return self.output(405, {'error': '需要 POST 请求'})
+                    return self.output(405, {'error': '필요 POST 묻다'})
                 manager = self.server.notifications
                 if manager is None:
-                    raise ValueError('当前网关未启用通知服务')
+                    raise ValueError("이 게이트웨이에서는 알림이 활성화되지 않았습니다.")
                 body = self.read_json()
                 if not isinstance(body, dict) or set(body) - {'webhookId'}:
-                    raise ValueError('Webhook 地址读取请求格式不正确')
+                    raise ValueError('Webhook 주소 읽기 요청 형식이 잘못되었습니다.')
                 with manager.lock:
                     return self.output(200, {'webhookUrl': webhook_config(notification_settings(manager.data_dir), body.get('webhookId', 'legacy')).get('webhookUrl', '')})
             channel_parts = path.removeprefix('/api/notifications/channels/').split('/') if path.startswith('/api/notifications/channels/') else []
@@ -1142,7 +1143,7 @@ class Handler(BaseHTTPRequestHandler):
             if channel or path in ('/api/notifications/pushplus', '/api/notifications/pushplus/test'):
                 manager = self.server.notifications
                 if manager is None:
-                    raise ValueError('当前网关未启用通知服务')
+                    raise ValueError("이 게이트웨이에서는 알림이 활성화되지 않았습니다.")
                 selected = channel or 'pushplus'
                 fields = {'ntfy': ('enabled', 'server', 'topic', 'token', 'clearToken'),
                           'bark': ('barkEnabled', 'barkServer', 'barkKey', 'clearBarkKey'),
@@ -1154,30 +1155,30 @@ class Handler(BaseHTTPRequestHandler):
                     config = notification_settings(manager.data_dir)
                     if path.endswith('/test'):
                         if not write:
-                            return self.output(405, {'error': '需要 POST 请求'})
+                            return self.output(405, {'error': '필요 POST 묻다'})
                         test_body = self.read_json()
                         try:
                             sender = {'ntfy': publish, 'bark': publish_bark, 'pushplus': publish_pushplus, 'webhook': publish_webhook}[selected]
                             name = {'ntfy': 'ntfy', 'bark': 'Bark', 'pushplus': 'PushPlus', 'webhook': 'Webhook'}[selected]
                             if selected == 'webhook':
                                 config = webhook_config(config, test_body.get('webhookId', 'legacy') if isinstance(test_body, dict) else 'legacy')
-                                sender(config, 'Codex 手机通知测试', f'收到这条消息表示 {name} 通道已连通。', event='test')
+                                sender(config, 'Codex 모바일 알림 테스트', f'이 메시지를 받았다는 뜻은 {name} 채널이 연결되었습니다。', event='test')
                             else:
-                                sender(config, 'Codex 手机通知测试', f'收到这条消息表示 {name} 通道已连通。')
+                                sender(config, 'Codex 모바일 알림 테스트', f'이 메시지를 받았다는 뜻은 {name} 채널이 연결되었습니다。')
                         except WebhookDeliveryError as error:
                             raise ValueError(str(error)) from None
                         except Exception:
-                            message = 'PushPlus 测试失败，请检查 Token 和网络' if not channel else f'{name} 测试失败，请检查服务地址、认证和网络'
+                            message = "PushPlus 테스트가 실패했습니다. 토큰과 네트워크를 확인하세요." if not channel else f'{name} 테스트에 실패했습니다. 서비스 주소, 인증 및 네트워크를 확인하세요.'
                             raise ValueError(message) from None
                         provider = resolved_webhook_provider(config) if selected == 'webhook' else 'generic'
-                        accepted = {'feishu': '飞书', 'dingtalk': '钉钉', 'discord': 'Discord', 'telegram': 'Telegram'}.get(provider, name)
-                        return self.output(200, {'ok': True, 'message': f'{accepted} 已接受测试通知'})
+                        accepted = {'feishu': 'Feishu', 'dingtalk': 'DingTalk', 'discord': 'Discord', 'telegram': 'Telegram'}.get(provider, name)
+                        return self.output(200, {'ok': True, 'message': f'{accepted} 테스트 알림이 승인되었습니다.'})
                     if write:
                         body = self.read_json()
                         allowed = set(fields)
                         if not isinstance(body, dict) or set(body) - allowed or any(
                                 key in body and not isinstance(body[key], bool) for key in allowed if key.startswith('clear')):
-                            raise ValueError('通知配置格式不正确' if channel else 'PushPlus 配置格式不正确')
+                            raise ValueError('알림 구성 형식이 잘못되었습니다.' if channel else "잘못된 PushPlus 설정")
                         config = save_notification_settings(manager.data_dir, body)
                     visible = visible_webhook(config) if selected == 'webhook' else {key: config[key] for key in fields if key != secret and not key.startswith('clear')}
                     if selected != 'webhook':
@@ -1185,7 +1186,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.output(200, visible)
             if desktop_workspace:
                 if self.server.desktop_sessions is None:
-                    return self.output(503, {'error': '桌面会话接入不可用'})
+                    return self.output(503, {'error': '데스크톱 세션에 액세스할 수 없습니다.'})
                 provider, operation = desktop_workspace.groups()
                 sid = query.get('sessionId', [''])[0]
                 manager, _, _ = self.desktop_context(provider, query)
@@ -1199,11 +1200,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.server.desktop_sessions.require_enabled(host if host.startswith(('wsl:', 'codex:')) else 'codex')
             side = query.get('side', [None])[0]
             if side is not None and self.server.auth.config.get('mode') == 'none':
-                raise PermissionError('侧边聊天需要启用网关密码保护')
+                raise PermissionError('사이드 채팅에서는 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
             side_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/side-chat", path)
             if side_match:
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('侧边聊天需要启用网关密码保护')
+                    raise PermissionError('사이드 채팅에서는 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
                 owner = self.server.auth.key(self.token())
                 body = self.read_json() if write else {}
                 action = body.get('action') if write else 'list' if query.get('view') == ['native'] else 'read'
@@ -1214,37 +1215,37 @@ class Handler(BaseHTTPRequestHandler):
                           'close': {'action', 'id'}, 'stop': {'action', 'id'},
                           'respond': {'action', 'id', 'requestId', 'response'}, 'read': set(), 'list': set()}
                 if action not in fields or set(body) - fields[action] or (write and action in ('read', 'list')):
-                    raise ValueError('无效侧边聊天操作')
+                    raise ValueError("잘못된 보조 채팅 작업")
                 return self.output(200, bridge.side_chat(side_match[1], owner, action, body))
             temporary_match = re.match(r'/api/sessions/([0-9a-f-]{36})(?:/|$)', path)
             temporary = (bridge.side_chats.find(temporary_match[1])
                          if temporary_match and hasattr(bridge, 'side_chats') else None)
             if temporary:
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('侧边聊天需要启用网关密码保护')
+                    raise PermissionError('사이드 채팅에서는 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
                 if side is not None:
-                    raise ValueError('临时侧聊附件使用当前聊天标识')
+                    raise ValueError('임시 사이드 채팅 첨부 파일은 현재 채팅 ID를 사용합니다.')
                 from bridge.features.sessions.temporary_session import TemporarySession
                 route = THREAD_ROUTE.fullmatch(path)
                 if ((route and route[2] not in TemporarySession.actions) or
                         (not route and not any(pattern.fullmatch(path) for pattern in
                             (UPLOAD_PREVIEW_ROUTE, UPLOAD_THUMB_ROUTE)) and
                          not re.fullmatch(r'/api/sessions/[0-9a-f-]{36}/files/[a-f0-9]{64}', path))):
-                    raise ValueError('临时侧边聊天不支持此操作，请返回主聊天')
+                    raise ValueError('임시 사이드 채팅은 이 작업을 지원하지 않습니다. 기본 채팅으로 돌아가세요.')
                 bridge = TemporarySession(bridge, temporary)
             agent_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/subagents", path)
             if agent_match:
-                if write: return self.output(405, {'error': '子智能体面板仅查看现有任务'})
+                if write: return self.output(405, {'error': '하위 에이전트 패널에는 기존 작업만 표시됩니다.'})
                 return self.output(200, bridge.subagents(agent_match[1], query.get('id', [None])[0]))
             terminal_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/terminal", path)
             if terminal_match:
                 if self.server.auth.config.get('mode') == 'none':
-                    raise PermissionError('终端需要启用网关密码保护')
+                    raise PermissionError('터미널은 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
                 owner = self.server.auth.key(self.token())
                 if write:
                     body = self.read_json()
                     if set(body) - {'action', 'id', 'command', 'inputId', 'data', 'cols', 'rows', 'text', 'selectionStart'} or body.get('action') not in ('start', 'stop', 'open', 'input', 'resize', 'close', 'complete'):
-                        raise ValueError('无效终端操作')
+                        raise ValueError('잘못된 터미널 작동')
                     return self.output(200, bridge.terminal(terminal_match[1], owner, body['action'], body))
                 identifier = query.get('id', [''])[0]
                 return self.output(200, bridge.terminal(terminal_match[1], owner, ('poll' if query.get('mode') == ['pty'] else 'read') if identifier else 'info',
@@ -1254,25 +1255,25 @@ class Handler(BaseHTTPRequestHandler):
                 thread_id, operation = workspace_match.groups()
                 relative = query.get('path', [''])[0]
                 if query.get('scope') not in (None, ['host']):
-                    raise ValueError('文件浏览范围无效')
+                    raise ValueError("잘못된 파일 탐색 범위")
                 scope = {'scope': 'host'} if query.get('scope') == ['host'] else {}
                 if scope and (write or operation not in (None, 'info', 'preview', 'download')):
-                    raise PermissionError('宿主机文件浏览仅支持读取')
+                    raise PermissionError("호스트 파일 탐색은 읽기 전용입니다.")
                 if write:
                     if operation == 'git-action':
                         body = self.read_json()
                         if set(body) - {'action', 'version', 'path', 'branch', 'message'} or not {'action', 'version'} <= set(body):
-                            raise ValueError('Git 操作请求无效')
+                            raise ValueError('Git 잘못된 작업 요청')
                         return self.output(200, bridge.workspace(thread_id, operation, body))
-                    if operation != 'upload': return self.output(405, {'error': '不支持此文件操作'})
+                    if operation != 'upload': return self.output(405, {'error': '이 파일 작업은 지원되지 않습니다'})
                     sizes = self.headers.get_all('Content-Length', [])
                     if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 <= int(sizes[0]) <= MAX_TRANSFER:
-                        raise ValueError('每个文件不能超过 20 MB')
+                        raise ValueError('각 파일은 다음을 초과할 수 없습니다. 20 MB')
                     content = self.rfile.read(int(sizes[0]))
-                    if len(content) != int(sizes[0]): raise ValueError('上传中断，请重试')
+                    if len(content) != int(sizes[0]): raise ValueError('업로드가 중단되었습니다. 다시 시도해 주세요.')
                     return self.output(200, bridge.workspace(thread_id, 'upload', {'path': relative, 'encoded': base64.b64encode(content).decode()}))
-                if operation == 'upload': return self.output(405, {'error': '请使用上传操作'})
-                if operation == 'git-action': return self.output(405, {'error': 'Git 操作需要 POST 请求'})
+                if operation == 'upload': return self.output(405, {'error': '업로드 작업을 사용해 주세요'})
+                if operation == 'git-action': return self.output(405, {'error': 'Git 운영 요구 사항 POST 묻다'})
                 if operation == 'git-history':
                     return self.output(200, bridge.workspace(thread_id, operation, {'limit': int(query.get('limit', ['40'])[0]), 'ref': query.get('ref', ['all'])[0]}))
                 if operation == 'git-commit':
@@ -1292,7 +1293,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.output(200, {**bridge.workspace(thread_id, 'info', {**scope, 'path': relative}), **policy, 'locatable': True})
                     preview = query.get('preview') == ['1']
                     if 'preview' in query and (not preview or 'explicit' in query or 'archive' in query):
-                        raise ValueError('无效预览下载参数')
+                        raise ValueError('잘못된 미리보기 다운로드 매개변수')
                     explicit = query.get('explicit') == ['1']
                     params = {**scope, 'path': relative, 'limit': min(MAX_TRANSFER, policy['clickDownloadMiB'] * 1024 * 1024) if preview else None if explicit else policy['clickDownloadMiB'] * 1024 * 1024, **self.download_request()}
                     action = 'archive-stream' if explicit and query.get('archive') == ['1'] else 'download-stream'
@@ -1318,14 +1319,14 @@ class Handler(BaseHTTPRequestHandler):
             if write and thumb_match:
                 sizes = self.headers.get_all('Content-Length', [])
                 if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 < int(sizes[0]) <= 1024 * 1024:
-                    raise ValueError('缩略图需为 1 字节至 1 MB')
+                    raise ValueError('썸네일은 다음과 같아야 합니다. 1 바이트 1 MB')
                 data = self.rfile.read(int(sizes[0]))
                 if len(data) != int(sizes[0]):
-                    raise ValueError('缩略图上传中断，请重试')
+                    raise ValueError('썸네일 업로드가 중단되었습니다. 다시 시도해 주세요.')
                 try:
                     width, height = int(query.get('width', ['0'])[0]), int(query.get('height', ['0'])[0])
                 except ValueError:
-                    raise ValueError('缩略图尺寸无效') from None
+                    raise ValueError('썸네일 크기가 잘못되었습니다.') from None
                 return self.output(200, bridge.side_attachment(thumb_match[1], side, 'set_thumb', thumb_match[2], data, width, height) if side is not None else bridge.upload_thumb(thumb_match[1], thumb_match[2], data, width, height))
             goal_match = GOAL_CANCEL_ROUTE.fullmatch(path)
             if write and goal_match:
@@ -1343,40 +1344,40 @@ class Handler(BaseHTTPRequestHandler):
                                                               body.get("id", ""), body.get("uiLocale"), expected=body.get("expected")))
             match = THREAD_ROUTE.fullmatch(path)
             if not match:
-                return self.output(404, {"error": "页面不存在"})
+                return self.output(404, {"error": "페이지가 존재하지 않습니다"})
             thread_id, action = match.groups()
             if action == 'cli-network':
                 if not hasattr(bridge, 'cli_network'):
-                    raise ValueError('只支持本机 Codex CLI')
+                    raise ValueError('로컬 컴퓨터만 지원 Codex CLI')
                 return self.output(200, bridge.cli_network(thread_id, self.read_json() if write else None))
             if action == 'delete':
                 if not hasattr(bridge, 'deletion'):
-                    raise ValueError('此接入暂不支持永久删除，请在原客户端操作')
+                    raise ValueError('이 액세스는 영구 삭제를 지원하지 않습니다. 원래 클라이언트에서 작업하십시오.')
                 if not write:
                     return self.output(200, bridge.deletion(thread_id))
                 body = self.read_json()
                 if (set(body) - {'retry'} != {'id', 'scope', 'confirmed'} or body['confirmed'] is not True
                         or not isinstance(body['id'], str)):
-                    raise ValueError('请确认永久删除及受影响的聊天范围')
+                    raise ValueError('영구 삭제 및 영향을 받는 채팅 범위를 확인하세요.')
                 return self.output(200, bridge.deletion(thread_id, body['id'], body['scope'],
                     **({'retry': body['retry']} if 'retry' in body else {})))
             if action == 'organization':
                 if not hasattr(bridge, 'organization'):
-                    raise ValueError('此客户端暂未提供原生项目与分区')
+                    raise ValueError("이 클라이언트에서는 네이티브 프로젝트 및 섹션을 사용할 수 없습니다.")
                 return self.output(200, bridge.organization(thread_id, self.read_json() if write else None))
             if write and action == 'uploads':
                 sizes = self.headers.get_all('Content-Length', [])
                 if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 < int(sizes[0]) <= MAX_FILE:
-                    raise ValueError('每个附件需为 1 字节至 20 MB')
+                    raise ValueError("각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.")
                 size = int(sizes[0])
                 data = self.rfile.read(size)
                 if len(data) != size:
-                    raise ValueError('附件上传中断，请重试')
+                    raise ValueError("첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.")
                 return self.output(200, bridge.side_attachment(thread_id, side, 'put', query.get('id', [''])[0], query.get('name', [''])[0], data) if side is not None else bridge.upload(thread_id, query.get('id', [''])[0], query.get('name', [''])[0], data))
             if action == 'notifications':
                 if getattr(bridge, 'capabilities', {}).get('notifications') is False:
                     if write:
-                        raise ValueError('此会话暂不提供后台通知')
+                        raise ValueError('이 세션에서는 아직 백그라운드 알림을 사용할 수 없습니다.')
                     return self.output(200, {'available': False, 'watching': False, 'notifyOnCompletion': False})
                 if self.server.notifications is None:
                     return self.output(200, {'available': False, 'watching': False, 'notifyOnCompletion': False})
@@ -1384,7 +1385,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.output(200, self.server.notifications.policy(thread_id, bridge.host, body if write else None))
             if action == 'message-management':
                 if not hasattr(bridge, 'message_management'):
-                    return self.output(400, {'error': '此接入暂不支持消息管理'})
+                    return self.output(400, {'error': '이 액세스는 현재 메시지 관리를 지원하지 않습니다.'})
                 return self.output(200, bridge.manage_messages(thread_id, self.read_json()) if write else bridge.message_management(thread_id, query.get('id', [])))
             if not write:
                 if action == 'permissions':
@@ -1405,10 +1406,10 @@ class Handler(BaseHTTPRequestHandler):
                         offset = max(0, int(query.get("offset", ["0"])[0]))
                         limit = min(500, max(1, int(query.get("limit", ["200"])[0])))
                     except ValueError:
-                        raise ValueError("Skill 分页参数无效") from None
+                        raise ValueError("Skill 잘못된 페이지 매기기 매개변수") from None
                     requested_ids = [value for value in query.get("id", []) if value]
                     if len(requested_ids) > 8:
-                        raise ValueError("最多关联 8 个已选 Skill")
+                        raise ValueError("가장 관련성이 높은 8 선택된 Skill")
                     ids = list(dict.fromkeys(requested_ids))
                     return self.output(200, bridge.catalog(
                         thread_id, refresh=query.get("refresh") == ["true"], kind=kind,
@@ -1417,7 +1418,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.poll(bridge, thread_id, int(query.get("after", ["-1"])[0]))
                 if action == "events":
                     return self.stream(bridge, thread_id)
-                return self.output(404, {"error": "接口不存在"})
+                return self.output(404, {"error": "인터페이스가 존재하지 않습니다"})
             body = self.read_json()
             if action == "message-action":
                 result = bridge.message_action(thread_id, body)
@@ -1427,26 +1428,26 @@ class Handler(BaseHTTPRequestHandler):
                                      attachments=body.get('attachments'), references=body.get('references'), ui_locale=body.get("uiLocale"))
             elif action == "archive":
                 if set(body) not in ({'archived', 'id'}, {'archived', 'id', 'disconnect'}):
-                    raise ValueError('聊天归档设置无效')
+                    raise ValueError('잘못된 채팅 보관 설정')
                 result = bridge.archive(thread_id, body['archived'], body['id'], **({'disconnect': body['disconnect']} if 'disconnect' in body else {}))
             elif action == "pin":
                 if set(body) not in ({'pinned'}, {'pinned', 'clientId', 'revision'}):
-                    raise ValueError('聊天置顶设置无效')
+                    raise ValueError('채팅 상단 설정이 잘못되었습니다.')
                 result = bridge.pin(thread_id, body['pinned'], **({'client_id': body['clientId'], 'revision': body['revision']} if 'clientId' in body else {}))
             elif action == "rename":
                 result = bridge.rename(thread_id, body.get("title"))
             elif action == "permissions":
                 if set(body) - {'preset', 'confirmed', 'expectedRuntime'}:
-                    raise ValueError('权限设置无效')
+                    raise ValueError('잘못된 권한 설정')
                 result = bridge.permissions(thread_id, body.get('preset'), body.get('confirmed', False),
                                             expected_runtime=body.get('expectedRuntime'))
             elif action == "settings":
                 if 'fastMode' in body and not isinstance(body['fastMode'], bool):
-                    raise ValueError('Fast 模式开关无效')
+                    raise ValueError("잘못된 빠른 모드 설정")
                 result = bridge.settings(thread_id, body.get("model"), body.get("effort"), **({'fast_mode': body['fastMode']} if 'fastMode' in body else {}))
             elif action == "compact":
                 if set(body) != {'id'} or not isinstance(body.get('id'), str):
-                    raise ValueError('上下文压缩请求无效')
+                    raise ValueError('잘못된 컨텍스트 압축 요청')
                 result = bridge.compact(thread_id, body['id'])
             elif action == "stop":
                 result = bridge.interrupt(thread_id)
@@ -1455,11 +1456,11 @@ class Handler(BaseHTTPRequestHandler):
             elif action == "respond":
                 response = body.get("response")
                 if not isinstance(response, dict):
-                    raise ValueError("请求回应格式不正确")
+                    raise ValueError("요청 응답 형식이 잘못되었습니다.")
                 result = bridge.respond(thread_id, body.get("requestId"), response)
             elif action == "reconnect":
                 if 'rebuild' in body and (body.get('rebuild') is not True or body.get('activate') is not True or set(body) != {'activate', 'rebuild'}):
-                    raise ValueError('重建连接请求无效')
+                    raise ValueError('잘못된 재연결 요청')
                 if body.get('activate') is True:
                     if hasattr(bridge, 'reconnect_session'):
                         session = bridge.reconnect_session(thread_id, rebuild=bool(body.get('rebuild')))
@@ -1475,7 +1476,7 @@ class Handler(BaseHTTPRequestHandler):
             elif action == "queue":
                 result = bridge.cancel_queued(thread_id, body.get("id", ""))
             else:
-                return self.output(404, {"error": "接口不存在"})
+                return self.output(404, {"error": "인터페이스가 존재하지 않습니다"})
             self.output(200, result)
         except LoginRejected as exc:
             self.close_connection = True
@@ -1488,7 +1489,7 @@ class Handler(BaseHTTPRequestHandler):
             self.output(404, {"error": str(exc.args[0]), "code": "terminal_missing"})
         except KeyError:
             self.close_connection = True
-            self.output(404, {"error": "找不到这个会话"})
+            self.output(404, {"error": "채팅을 찾을 수 없습니다"})
         except SubmissionRejected as exc:
             self.close_connection = True
             self.output(400, {"error": str(exc), "code": "send_not_submitted"})
@@ -1509,7 +1510,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             LOG.exception("Gateway operation failed")
             self.close_connection = True
-            self.output(500, {"error": "网关操作失败，请查看本机日志"})
+            self.output(500, {"error": "게이트웨이 작업이 실패했습니다. 로컬 로그를 확인하세요."})
 
     def download(self, bridge, thread_id, artifact_id, info=False, preview=False):
         artifact = bridge.artifact(thread_id, artifact_id)

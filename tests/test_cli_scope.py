@@ -118,7 +118,7 @@ class CliScopeTests(CliForceFixture):
         self.idle.side_effect = CliTasksPending('busy fixture')
         self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         (self.home/'config.toml').write_text('model="changed"')
-        with self.assertRaisesRegex(ValueError, '重新预览'):
+        with self.assertRaisesRegex(ValueError, "CLI\\ 구성,\\ 원래\\ 프로세스\\ 또는\\ 영향\\ 범위가\\ 변경되었습니다\\.\\ 다시\\ 미리보세요\\."):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'failed')
         self.stop.assert_not_called()
@@ -139,7 +139,7 @@ class CliScopeTests(CliForceFixture):
 
     def test_scope_previews_reject_keys_from_other_scope(self):
         manager = self.manager()
-        with self.assertRaisesRegex(ValueError, '不属于当前范围'):
+        with self.assertRaisesRegex(ValueError, '현재 범위에 속하지 않습니다.'):
             manager.submit({'mode': 'scopePreview', 'scopeKey': 'other-home', 'connections': ['key-a']})
         self.stop.assert_not_called()
 
@@ -170,7 +170,7 @@ class CliScopeTests(CliForceFixture):
         operation = str(uuid.uuid4())
         self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.scope.cancel(operation)['status'], 'cancelled')
-        with self.assertRaisesRegex(ValueError, '取消'):
+        with self.assertRaisesRegex(ValueError, '취소'):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.stop.assert_not_called()
 
@@ -178,7 +178,7 @@ class CliScopeTests(CliForceFixture):
         manager = self.manager()
         preview = manager.submit({'mode': 'scopePreview', 'scopeKey': self.scope.descriptor()['scopeKey'], 'all': True})
         with patch.object(manager, '_connections', return_value=self.rows()[:1]):
-            with self.assertRaisesRegex(ValueError, '变化'):
+            with self.assertRaisesRegex(ValueError, "연결이\\ 변경되었거나\\ 현재\\ 범위에\\ 속하지\\ 않습니다\\.\\ 다시\\ 선택하십시오\\."):
                 manager.submit({'mode': 'scopeWait', 'id': str(uuid.uuid4()), 'scopeKey': preview['scopeKey'],
                                 'connections': preview['connections'], 'generation': preview['generation']})
         self.stop.assert_not_called()
@@ -212,7 +212,7 @@ class CliScopeTests(CliForceFixture):
             if self.idle.call_count == 2:
                 self.scope.cancel(operation)
         self.idle.side_effect = idle
-        with self.assertRaisesRegex(ValueError, '取消|变化'):
+        with self.assertRaisesRegex(ValueError, '취소|변화'):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'cancelled')
         self.stop.assert_not_called()
@@ -275,7 +275,7 @@ class CliScopeTests(CliForceFixture):
                             cancelled = manager.submit({'mode': 'scopeCancel', 'id': job['id']})
                             self.assertTrue(all(row['status'] == 'cancelled' for row in cancelled['results']))
                         else:
-                            with self.assertRaisesRegex(ValueError, '退出阶段'):
+                            with self.assertRaisesRegex(ValueError, '종료 단계'):
                                 manager.submit({'mode': 'scopeCancel', 'id': job['id']})
                     finally:
                         resume.set()

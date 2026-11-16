@@ -75,14 +75,14 @@ class DesktopIdle(unittest.TestCase):
             'turns': [], 'requests': [], 'turnHistory': {'kind': 'canonical', 'history': {
                 'entitiesByKey': {'turn': {'turnId': 'turn', 'status': 'inProgress'}},
                 'islands': [{'entries': [{'value': 'turn'}]}]}}}
-        with self.assertRaisesRegex(ValueError, '任务运行'):
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."):
             self.bridge.assert_desktop_idle()
         self.bridge.activate.assert_not_called()
         self.assertEqual(self.bridge.live, {})
 
     def test_unfollowed_desktop_busy_thread_prevents_shutdown(self):
         self.states[('local', 'desktop-only')] = {'id': 'desktop-only', 'threadRuntimeStatus': {'type': 'active'}, 'turns': [], 'requests': []}
-        with self.assertRaisesRegex(ValueError, '任务运行'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."): self.bridge.assert_desktop_idle()
         self.assertIn(('follow', 'local', 'desktop-only', 'owner'), self.calls)
         self.assertEqual(self.bridge.live, {})
         self.bridge.activate.assert_not_called(); self.bridge.store.history.assert_not_called()
@@ -97,10 +97,10 @@ class DesktopIdle(unittest.TestCase):
         self.bridge.assert_desktop_idle()
         self.states[('local', 'desktop-only')] = {'id': 'desktop-only',
             'threadRuntimeStatus': {'type': 'active'}, 'turns': [], 'requests': []}
-        with self.assertRaisesRegex(ValueError, '任务运行'):
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."):
             self.bridge.assert_desktop_idle()
         del self.states[('local', 'desktop-only')]['requests']
-        with self.assertRaisesRegex(ValueError, '无法确认'):
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
             self.bridge.assert_desktop_idle()
 
     def test_missing_ipc_does_not_prove_the_selected_desktop_is_stopped(self):
@@ -133,7 +133,7 @@ class DesktopIdle(unittest.TestCase):
             elif sid == 'tail-busy':
                 tail_seen.set()
         self.before_request = before
-        with self.assertRaisesRegex(ValueError, '任务运行'):
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."):
             self.bridge.assert_desktop_idle()
         self.assertTrue(first_finished.wait(1))
         self.assertEqual(overlapping, [True], 'A silent historical owner must not hold up the other candidates')
@@ -153,7 +153,7 @@ class DesktopIdle(unittest.TestCase):
         self.before_request = before
         started = time.monotonic()
         try:
-            with self.assertRaisesRegex(TaskAuditIncomplete, '超时') as failure:
+            with self.assertRaisesRegex(TaskAuditIncomplete, "Codex\\ 작업\\ 확인\\ 시간이\\ 초과되었습니다\\.\\ 아직\\ 확인되지\\ 않은\\ 세션이\\ 있습니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\.") as failure:
                 self.bridge.assert_desktop_idle(timeout=.04)
             self.assertNotIsInstance(failure.exception, TaskStateUnavailable)
             self.assertLess(time.monotonic()-started, .4)
@@ -172,7 +172,7 @@ class DesktopIdle(unittest.TestCase):
                 finished.set()
         self.after_follow = hold
         try:
-            with self.assertRaisesRegex(ValueError, '任务运行') as failure:
+            with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\.") as failure:
                 self.bridge.assert_desktop_idle(timeout=.04)
             self.assertNotIsInstance(failure.exception, TaskAuditIncomplete)
         finally:
@@ -202,7 +202,7 @@ class DesktopIdle(unittest.TestCase):
 
     def test_initialization_scope_is_used_for_each_submission_recheck(self):
         self.bridge.accounts.blockers.side_effect = [[], [], [{'reason': 'unknown'}]]
-        with self.assertRaisesRegex(ValueError, '操作'):
+        with self.assertRaisesRegex(ValueError, "Codex에\\ 작업\\ 또는\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 닫기\\ 전에\\ 문제를\\ 해결하세요\\."):
             self.bridge.assert_desktop_idle(desktop_only=True)
         self.assertEqual(self.bridge.accounts.blockers.call_count, 3)
 
@@ -239,12 +239,12 @@ class DesktopIdle(unittest.TestCase):
         self.bridge.store.lifecycle_threads.return_value = []
         for probe in (None, 'unknown', 'absent'):
             session.desktop_owner_probe = probe
-            self.owners[('local', identifier)] = IPCError('读取超时')
+            self.owners[('local', identifier)] = IPCError('읽기 시간 초과')
             with self.assertRaises(TaskStateUnavailable):
                 self.bridge.assert_desktop_idle(desktop_only=True)
         self.owners[('local', identifier)] = 'app-owner'
         self.states[('local', identifier)] = {'id': identifier, 'threadRuntimeStatus': {'type': 'active'}}
-        with self.assertRaisesRegex(ValueError, '任务运行'):
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."):
             self.bridge.assert_desktop_idle(desktop_only=True)
 
     def test_native_cli_absence_and_proxy_identity_are_rechecked_before_finishing(self):
@@ -255,7 +255,7 @@ class DesktopIdle(unittest.TestCase):
         def before(sid, options):
             requests.append(sid)
             if len(requests) == 2:
-                self.owners[('local', identifier)] = IPCError('读取超时')
+                self.owners[('local', identifier)] = IPCError('읽기 시간 초과')
         self.before_request = before
         with self.assertRaises(TaskStateUnavailable):
             self.bridge.assert_desktop_idle(desktop_only=True)
@@ -320,7 +320,7 @@ class DesktopIdle(unittest.TestCase):
                 with patch('bridge.app.service.time', SimpleNamespace(monotonic=lambda: clock[0])), \
                      patch('bridge.app.service.ThreadPoolExecutor', side_effect=[executor, ThreadPoolExecutor(max_workers=2)]), \
                      patch('bridge.app.service.threading', SimpleNamespace(Condition=SnapshotCondition)), \
-                     self.assertRaisesRegex(ValueError, '任务运行') as failure:
+                     self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\.") as failure:
                     self.bridge.assert_desktop_idle(timeout=.2)
                 self.assertNotIsInstance(failure.exception, TaskStateUnavailable)
                 self.assertIn(('follow', 'local', 'z-busy', 'owner'), self.calls)
@@ -341,7 +341,7 @@ class DesktopIdle(unittest.TestCase):
         # depending on a loaded CI runner scheduling threads within 200 ms.
         with patch('bridge.app.service.ThreadPoolExecutor', side_effect=[executor, ThreadPoolExecutor(max_workers=1)]), \
              patch('bridge.app.service.time', SimpleNamespace(monotonic=lambda: clock[0])):
-            with self.assertRaisesRegex(ValueError, '任务运行') as failure:
+            with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\.") as failure:
                 self.bridge.assert_desktop_idle(timeout=20)
             self.assertNotIsInstance(failure.exception, TaskStateUnavailable)
         self.assertEqual(clock[0], 10)
@@ -351,7 +351,7 @@ class DesktopIdle(unittest.TestCase):
         self.bridge.store.lifecycle_threads.side_effect = OSError('temporary database failure')
         self.bridge.live['known-session'] = SimpleNamespace(owner='previous-owner', connected=False)
         self.states[('local', 'known-session')] = {'id': 'known-session', 'threadRuntimeStatus': {'type': 'active'}}
-        with self.assertRaisesRegex(ValueError, '任务运行') as failure:
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\.") as failure:
             self.bridge.assert_desktop_idle()
         self.assertNotIsInstance(failure.exception, TaskStateUnavailable)
         self.assertIn(('follow', 'local', 'known-session', 'owner'), self.calls)
@@ -360,13 +360,13 @@ class DesktopIdle(unittest.TestCase):
         for value in (IPCError('timed out'), IPCError('no-client-found: unavailable'), None, ''):
             with self.subTest(value=str(value)):
                 self.owners[('local', 'desktop-only')] = value
-                with self.assertRaisesRegex(ValueError, '无法确认'): self.bridge.assert_desktop_idle()
+                with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'): self.bridge.assert_desktop_idle()
 
     def test_pending_approval_or_turn_overrides_idle_runtime(self):
         for update in ({'requests': [{'id': 1, 'method': 'item/commandExecution/requestApproval', 'params': {}}]},
                        {'turns': [{'turnId': 'turn', 'status': 'inProgress', 'items': []}]}):
             self.states[('local', 'desktop-only')] = {'id': 'desktop-only', 'threadRuntimeStatus': {'type': 'idle'}, **update}
-            with self.assertRaisesRegex(ValueError, '任务运行'): self.bridge.assert_desktop_idle()
+            with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."): self.bridge.assert_desktop_idle()
 
     def test_missing_runtime_or_snapshot_is_unknown(self):
         for state in ({'id': 'desktop-only', 'turns': [], 'requests': []}, None):
@@ -375,10 +375,10 @@ class DesktopIdle(unittest.TestCase):
 
     def test_metadata_failure_and_unresolved_submission_block_before_following(self):
         self.bridge.store.lifecycle_threads.side_effect = StoreUnavailable('fixture')
-        with self.assertRaisesRegex(ValueError, '读取'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex\\ 데스크톱\\ 및\\ SSH\\ 채팅을\\ 읽을\\ 수\\ 없습니다\\.\\ 연결을\\ 확인하고\\ 다시\\ 시도하십시오\\."): self.bridge.assert_desktop_idle()
         self.bridge.store.lifecycle_threads.side_effect = None
         self.bridge.accounts.blockers.return_value = [{'reason': 'unknown'}]
-        with self.assertRaisesRegex(ValueError, '操作'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex에\\ 작업\\ 또는\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 닫기\\ 전에\\ 문제를\\ 해결하세요\\."): self.bridge.assert_desktop_idle()
         self.assertEqual(self.calls, [])
 
     def test_remote_and_live_only_threads_are_checked_with_their_original_host(self):
@@ -389,7 +389,7 @@ class DesktopIdle(unittest.TestCase):
         self.bridge.for_host = Mock(return_value=remote)
         self.bridge.remote_bridges['remote:test'] = remote
         self.states[('remote:test', 'remote-live')] = {'id': 'remote-live', 'threadRuntimeStatus': {'type': 'active'}}
-        with self.assertRaisesRegex(ValueError, '任务运行'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."): self.bridge.assert_desktop_idle()
         self.assertIn(('follow', 'remote:test', 'remote-live', 'owner'), self.calls)
         self.assertIn(('thread-owner-discovery', 'remote:test', 'remote-history'), self.calls)
 
@@ -398,7 +398,7 @@ class DesktopIdle(unittest.TestCase):
         self.bridge.hosts.lifecycle_hosts.return_value = {'remote:test': {'alias': 'test'}}
         self.bridge.remote_bridges['remote:test'] = remote
         self.states[('local', 'desktop-only')] = {'id': 'desktop-only', 'threadRuntimeStatus': {'type': 'active'}}
-        with self.assertRaisesRegex(ValueError, '任务运行') as failure:
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\.") as failure:
             self.bridge.assert_desktop_idle()
         self.assertNotIsInstance(failure.exception, TaskStateUnavailable)
         self.assertIn(('follow', 'local', 'desktop-only', 'owner'), self.calls)
@@ -422,12 +422,12 @@ class DesktopIdle(unittest.TestCase):
                                        'type': 'patches', 'baseRevision': 1, 'revision': 2,
                                        'patches': [{'op': 'replace', 'path': ['threadRuntimeStatus', 'type'], 'value': 'active'}]}}})
         self.after_follow = update
-        with self.assertRaisesRegex(ValueError, '任务运行'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."): self.bridge.assert_desktop_idle()
 
     def test_owner_disconnect_after_idle_snapshot_is_unknown(self):
         self.after_follow = lambda sid, follower: follower.on_event({
             'method': 'client-status-changed', 'params': {'status': 'disconnected', 'clientId': 'owner'}})
-        with self.assertRaisesRegex(ValueError, '无法确认'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'): self.bridge.assert_desktop_idle()
 
     def test_snapshot_from_wrong_owner_protocol_or_session_cannot_establish_idle(self):
         def wrong_session(message):
@@ -437,23 +437,23 @@ class DesktopIdle(unittest.TestCase):
                           lambda message: {**message, 'sourceClientId': 'other'}, wrong_session):
             with self.subTest(transform=transform):
                 self.transform_event = transform
-                with self.assertRaisesRegex(ValueError, '无法确认'): self.bridge.assert_desktop_idle()
+                with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'): self.bridge.assert_desktop_idle()
 
     def test_unresolved_submission_arriving_during_audit_prevents_shutdown(self):
         self.bridge.accounts.blockers.side_effect = [[], [], [{'reason': 'unknown'}]]
-        with self.assertRaisesRegex(ValueError, '操作'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex에\\ 작업\\ 또는\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 닫기\\ 전에\\ 문제를\\ 해결하세요\\."): self.bridge.assert_desktop_idle()
         self.assertTrue(all(instance.closed for instance in self.instances))
 
     def test_corrupted_global_metadata_does_not_silently_remove_remote_coverage(self):
         (self.bridge.codex_home/'.codex-global-state.json').write_text('{broken')
-        with self.assertRaisesRegex(ValueError, '读取'): self.bridge.assert_desktop_idle()
+        with self.assertRaisesRegex(ValueError, "Codex\\ 데스크톱\\ 및\\ SSH\\ 채팅을\\ 읽을\\ 수\\ 없습니다\\.\\ 연결을\\ 확인하고\\ 다시\\ 시도하십시오\\."): self.bridge.assert_desktop_idle()
         self.assertEqual(self.calls, [])
 
     def test_slow_metadata_read_is_bounded_without_following_partial_results(self):
         release = threading.Event()
         self.bridge.store.lifecycle_threads.side_effect = lambda: release.wait(2) or []
         try:
-            with self.assertRaisesRegex(ValueError, '读取'): self.bridge.assert_desktop_idle(timeout=.02)
+            with self.assertRaisesRegex(ValueError, "Codex\\ 데스크톱\\ 및\\ SSH\\ 채팅을\\ 읽을\\ 수\\ 없습니다\\.\\ 연결을\\ 확인하고\\ 다시\\ 시도하십시오\\."): self.bridge.assert_desktop_idle(timeout=.02)
             self.assertFalse(release.is_set())
             self.assertEqual(self.calls, [])
         finally:
@@ -477,5 +477,5 @@ class DesktopIdle(unittest.TestCase):
         self.assertEqual([row['id'] for row in self.bridge.store.lifecycle_threads()], ['child', 'grandchild', 'parent'])
         self.states[('local', 'grandchild')] = {'id': 'grandchild', 'threadRuntimeStatus': {'type': 'active'}}
         with patch.object(self.bridge.store, 'history', side_effect=AssertionError('Do not read history')):
-            with self.assertRaisesRegex(ValueError, '任务运行'): self.bridge.assert_desktop_idle()
+            with self.assertRaisesRegex(ValueError, "Codex에는\\ 실행\\ 중인\\ 작업이나\\ 보류\\ 중인\\ 확인이\\ 있습니다\\.\\ 닫기\\ 전에\\ 완료하세요\\."): self.bridge.assert_desktop_idle()
         self.assertIn(('follow', 'local', 'grandchild', 'owner'), self.calls)

@@ -131,7 +131,7 @@ class ConnectionSetupTests(unittest.TestCase):
             self.assertEqual(json.loads(call[2]), {'password': 'very-secret'})
             self.assertNotEqual(connection_secrets.service(self.directory), connection_secrets.service(self.directory/'other'))
             vault.set_password.side_effect = RuntimeError('vault locked')
-            with self.assertRaisesRegex(ValueError, '无法保存'):
+            with self.assertRaisesRegex(ValueError, '저장할 수 없습니다.'):
                 connection_secrets.save(self.directory, 'two', {'password': 'very-secret'})
         self.assertNotIn('very-secret', ''.join(p.read_text(encoding='utf-8') for p in self.directory.iterdir()))
         self.assertEqual(read_json(self.directory/'connection-vault.json', {}), {'one': True})
@@ -149,7 +149,7 @@ class ConnectionSetupTests(unittest.TestCase):
                     else:
                         resolve.return_value = dns
                     result = server_connection.inspect(entry(), self.directory)
-                self.assertIn('尚未验证', result['message'])
+                self.assertIn("SSH 로그인이 통과되었습니다. 전달 권한 및 HTTPS 액세스는 확인되지 않습니다. 수동 설정을 완료한 후 연결을 시작하고 고정된 항목을 확인하세요.", result['message'])
                 self.assertEqual(result['dnsReady'], not isinstance(dns, Exception))
                 self.assertEqual(client.mock_calls, [call.close()])
                 self.assertNotIn('configured', result)
@@ -162,18 +162,18 @@ class ConnectionSetupTests(unittest.TestCase):
         desktop.save(value)
         self.assertNotIn('sshSudo', desktop.preferences()['connections'][0])
         with patch.object(server_connection, 'connect') as connect:
-            with self.assertRaisesRegex(ValueError, '手动完成'):
+            with self.assertRaisesRegex(ValueError, "이\\ 앱은\\ SSH\\ 연결\\ 확인만\\ 지원합니다\\.\\ 서버\\ 소프트웨어\\ 및\\ 권한을\\ 수동으로\\ 구성합니다\\."):
                 desktop.server_setup({'id': 'test-server', 'action': 'deploy', 'sudoPassword': 'fixture'})
             connect.assert_not_called()
 
     def test_server_export_is_manual_reference_without_agent_deployment_order(self):
         files = access.deployment(entry(port=8787))
-        self.assertIn('http://127.0.0.1:18787', files['部署说明.md'])
-        self.assertIn('管理员权限的命令必须由用户自行执行', files['部署说明.md'])
+        self.assertIn('http://127.0.0.1:18787', files['배포 지침.md'])
+        self.assertIn("## 수동으로 경계 구성\n\n이 내용은 사용자 검사 및 수동 구성에만 해당되며 자동 배포 지침이 아닙니다. 관리자 권한과 관련된 명령은 사용자가 직접 실행해야 합니다. 허용하지 않는다 App 또는 배포 Agent 대리 운송 sudo 비밀번호를 설정하거나 서비스를 설치하거나 시스템 권한을 수정하세요. 기존 사이트 유지、Codex 신임장、SSH 개인 키 및 컴퓨터 게이트웨이 포트。\n", files['배포 지침.md'])
         self.assertIn('Administrative commands must be executed by the user', files['DEPLOYMENT_EN.md'])
-        self.assertNotIn('## 给部署 Agent', files['部署说明.md'])
+        self.assertNotIn('## 배포하다 Agent', files['배포 지침.md'])
         self.assertNotIn('## Instructions for deployment Agents', files['DEPLOYMENT_EN.md'])
-        self.assertIn('检查 SSH 登录', files['部署说明.md'])
+        self.assertIn("` 서버 연결도 확인하세요. App 내부용“조사하다 SSH 로그인”。첫 번째 연결에서는 호스트 지문을 확인해야 합니다. 비밀번호, 개인 키 또는 SSH Agent 에서 App 구성, 자격 증명은 이 배포 패키지에 포함되지 않습니다.。\n2. 서버는 원격 포트 전달을 허용해야 합니다.（AllowTcpForwarding remote 또는 yes），GatewayPorts 사용 no 또는 clientspecified。루프백 포트 ", files['배포 지침.md'])
 
     def test_disabled_saved_ssh_can_be_checked_and_prompt_is_read_only(self):
         desktop = Desktop(self.directory)
@@ -184,7 +184,7 @@ class ConnectionSetupTests(unittest.TestCase):
         with patch.object(server_connection, 'inspect', return_value={'message': 'ok'}) as inspect:
             self.assertEqual(desktop.server_setup({'id': 'test-server', 'action': 'inspect'})['message'], 'ok')
             inspect.assert_called_once()
-        for language in ('zh', 'en'):
+        for language in ('ko', 'en'):
             with patch.object(server_connection, 'connect') as connect:
                 result = desktop.server_setup({'id': 'test-server', 'action': 'diagnostics', 'language': language})
                 connect.assert_not_called()
@@ -279,12 +279,12 @@ class SSHIntegrationTests(unittest.TestCase):
         self.thread.join(timeout=2)
 
     def test_host_confirmation_password_auth_and_key_change(self):
-        with self.assertRaisesRegex(ValueError, '主机指纹'):
+        with self.assertRaisesRegex(ValueError, '호스트 지문'):
             server_connection.connect(self.row, self.directory, {'password': 'correct-secret'})
         probe = server_connection.host_probe(self.row, self.directory)
         self.assertFalse(probe['trusted'])
         self.assertEqual(self.authentication_count, 0)
-        with self.assertRaisesRegex(ValueError, '变化'):
+        with self.assertRaisesRegex(ValueError, "서버\\ 호스트\\ 지문이\\ 변경되었습니다\\.\\ 다시\\ 확인하세요\\.\\ 아직\\ 신뢰가\\ 저장되지\\ 않았습니다。"):
             server_connection.trust(self.row, self.directory, 'SHA256:wrong')
         server_connection.trust(self.row, self.directory, probe['fingerprint'])
         client = server_connection.connect(self.row, self.directory, {'password': 'correct-secret'})
@@ -292,7 +292,7 @@ class SSHIntegrationTests(unittest.TestCase):
         client.close()
         self.key = paramiko.RSAKey.generate(2048)
         count = self.authentication_count
-        with self.assertRaisesRegex(ValueError, '指纹'):
+        with self.assertRaisesRegex(ValueError, '지문'):
             server_connection.connect(self.row, self.directory, {'password': 'correct-secret'})
         self.assertEqual(self.authentication_count, count)
 
@@ -317,7 +317,7 @@ class SSHIntegrationTests(unittest.TestCase):
             resolve = socket.getaddrinfo
             with patch.object(server_connection.socket, 'getaddrinfo', side_effect=lambda host, *args, **kwargs: resolve(host, *args, **kwargs) if host == '127.0.0.1' else []):
                 result = desktop.server_setup({'id': self.row['id'], 'action': 'inspect'})
-            self.assertIn('SSH 登录通过', result['message'])
+            self.assertIn("SSH 로그인이 통과되었습니다. 전달 권한 및 HTTPS 액세스는 확인되지 않습니다. 수동 설정을 완료한 후 연결을 시작하고 고정된 항목을 확인하세요.", result['message'])
             self.assertTrue(self.authenticated.is_set())
             with patch('bridge.app.desktop.socket.socket'), patch('bridge.app.desktop.subprocess.Popen') as spawn:
                 self.assertTrue(desktop.start()['started'])

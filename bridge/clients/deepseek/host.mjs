@@ -13,18 +13,18 @@ export async function recordLocation(ctx,sid){
 }
 export async function readHistoryPage(controller,row,body={},signal=new AbortController().signal){
   const limit=body.historyLimit??40;
-  if(!Number.isInteger(limit)||limit<1||limit>100)throw Error('历史页大小无效');
+  if(!Number.isInteger(limit)||limit<1||limit>100)throw Error('잘못된 기록 페이지 크기');
   let cursor;
   if(body.historyBefore!=null){
-    try{cursor=JSON.parse(Buffer.from(body.historyBefore,'base64url').toString('utf8'));}catch{throw Error('历史游标无效');}
-    if(cursor?.sid!==row.sessionId||!Number.isSafeInteger(cursor.seq)||cursor.seq<0||!Number.isSafeInteger(cursor.before)||cursor.before<0)throw Error('历史游标无效');
+    try{cursor=JSON.parse(Buffer.from(body.historyBefore,'base64url').toString('utf8'));}catch{throw Error('기록 커서가 잘못되었습니다.');}
+    if(cursor?.sid!==row.sessionId||!Number.isSafeInteger(cursor.seq)||cursor.seq<0||!Number.isSafeInteger(cursor.before)||cursor.before<0)throw Error('기록 커서가 잘못되었습니다.');
   }
   const projection=cursor?null:await controller.projections({sessionId:row.sessionId},signal);
   const seq=cursor?.seq??projection?.asOfSeq??row.projections?.asOfSeq;
-  if(!Number.isSafeInteger(seq)||seq<0)throw Error('历史版本无效');
+  if(!Number.isSafeInteger(seq)||seq<0)throw Error('이전 버전이 잘못되었습니다.');
   const page=await controller.page({address:{kind:'session',sessionId:row.sessionId},throughSeq:seq,...cursor?{beforeSeq:cursor.before}:{},maxMessages:limit},signal);
   const rows=page.records||[],boundary=rows[0]?.event?.seq;
-  if(!Array.isArray(rows)||typeof page.hasMore!=='boolean'||page.hasMore&&(!Number.isSafeInteger(boundary)||cursor&&boundary>=cursor.before))throw Error('历史分页响应无效');
+  if(!Array.isArray(rows)||typeof page.hasMore!=='boolean'||page.hasMore&&(!Number.isSafeInteger(boundary)||cursor&&boundary>=cursor.before))throw Error('기록 페이지 매기기 응답이 잘못되었습니다.');
   return {rows,history:{before:page.hasMore?Buffer.from(JSON.stringify({sid:row.sessionId,seq,before:boundary})).toString('base64url'):null,hasMore:page.hasMore}};
 }
 // Retain only display metadata from request headers; never forward the header itself.
@@ -52,17 +52,17 @@ export async function historyRecords(ctx,rows,signal=new AbortController().signa
   return result;
 }
 export async function readHistoryImage(ctx,sid,source,signal=new AbortController().signal){
-  if(!Number.isSafeInteger(source?.seq)||source.seq<0||!Number.isSafeInteger(source?.part)||source.part<0||source.part>=4096)throw Error('图片引用无效');
+  if(!Number.isSafeInteger(source?.seq)||source.seq<0||!Number.isSafeInteger(source?.part)||source.part<0||source.part>=4096)throw Error('잘못된 이미지 참조');
   const query=ctx.get?.('sessionQuery'),attachments=ctx.get?.('attachments');
-  if(typeof query?.observeSession!=='function'||typeof attachments?.readImage!=='function')throw Error('当前 Harness 未提供历史图片读取接口');
+  if(typeof query?.observeSession!=='function'||typeof attachments?.readImage!=='function')throw Error('현재 Harness 과거 이미지 판독 인터페이스는 제공되지 않습니다.');
   const observation=await query.observeSession(sid,{signal,projectionMode:'none'});
   try{
     const event=observation.events.find(event=>event.seq===source.seq);
-    if(!event||!['user/message','assistant/message'].includes(event.type))throw Error('原生历史中未找到可预览图片');
+    if(!event||!['user/message','assistant/message'].includes(event.type))throw Error('기본 역사에서 미리보기 이미지를 찾을 수 없습니다.');
     const message=event.data?.message||event.data,block=message?.content?.[source.part],ref=block?.attachment;
-    if(block?.type!=='image'||!ref||!Number.isSafeInteger(ref.bytes)||ref.bytes<=0||ref.bytes>20*1024*1024)throw Error('原生图片格式或大小不支持预览');
+    if(block?.type!=='image'||!ref||!Number.isSafeInteger(ref.bytes)||ref.bytes<=0||ref.bytes>20*1024*1024)throw Error('기본 이미지 형식 또는 크기가 미리보기를 지원하지 않습니다.');
     const stored=await attachments.readImage(ref,signal);
-    if(!stored?.data||stored.data.byteLength!==ref.bytes||stored.ref?.attachmentId!==ref.attachmentId)throw Error('原生图片标识已变化');
+    if(!stored?.data||stored.data.byteLength!==ref.bytes||stored.ref?.attachmentId!==ref.attachmentId)throw Error('기본 이미지 로고가 변경되었습니다.');
     return {mediaType:stored.ref.mediaType,data:Buffer.from(stored.data).toString('base64')};
   }finally{observation[Symbol.dispose]();}
 }
@@ -74,7 +74,7 @@ export async function apply(ctx,config){
   let quitting=false,activeMutations=0;
   const signal=()=>new AbortController().signal;
   const list=async()=> (await ctx.sessionController.list({},signal())).items;
-  const find=async id=>{const row=(await list()).find(r=>r.sessionId===id);if(!row)throw Error('DeepSeek 会话不存在');return row;};
+  const find=async id=>{const row=(await list()).find(r=>r.sessionId===id);if(!row)throw Error('DeepSeek 세션이 존재하지 않습니다');return row;};
   const values=row=>row.projections?.values||{};
   const modeServices=row=>{
     const agent=row&&ctx.agents?.get?.(row.sessionId),scope=agent?.ctx||ctx,commands=scope.get?.('commands');
@@ -116,20 +116,20 @@ export async function apply(ctx,config){
     return result;
   };
   const permissionState=row=>{const catalog=ctx.permissionPresets.catalog(),mode=values(row).permissions?.currentValue||catalog.defaultPreset,option=catalog.options.find(o=>o.value===mode);return {permissionMode:mode,permissionLabel:localized(option?.label||option?.name)||mode};};
-  const normalize=row=>{const v=values(row),m=v.modelSelection?.next||v.modelSelection?.lastUsed||ctx.get?.('agentDefaultModel')?.currentSelection()||{};return {id:row.sessionId,capabilities:capabilities(row),title:v.title||'新会话',cwd:row.cwd||'',backend:'deepseek',mode:'desktop',connectionState:typeof ctx.agents?.get!=='function'?'unknown':ctx.agents.get(row.sessionId)?'ready':'detached',status:typeof row.running==='boolean'?(row.running?'active':'idle'):'unknown',runtimeKnown:typeof row.running==='boolean',updatedAt:row.updatedAt,model:m.provider&&m.model?m.provider+'/'+m.model:'',effort:m.reasoningEffort||'',...membership(row),...permissionState(row),...workState(row),contextUsage:contextUsage(row),requests:[...questions.values()].filter(q=>q.sid===row.sessionId).map(q=>q.public)};};
+  const normalize=row=>{const v=values(row),m=v.modelSelection?.next||v.modelSelection?.lastUsed||ctx.get?.('agentDefaultModel')?.currentSelection()||{};return {id:row.sessionId,capabilities:capabilities(row),title:v.title||'새 세션',cwd:row.cwd||'',backend:'deepseek',mode:'desktop',connectionState:typeof ctx.agents?.get!=='function'?'unknown':ctx.agents.get(row.sessionId)?'ready':'detached',status:typeof row.running==='boolean'?(row.running?'active':'idle'):'unknown',runtimeKnown:typeof row.running==='boolean',updatedAt:row.updatedAt,model:m.provider&&m.model?m.provider+'/'+m.model:'',effort:m.reasoningEffort||'',...membership(row),...permissionState(row),...workState(row),contextUsage:contextUsage(row),requests:[...questions.values()].filter(q=>q.sid===row.sessionId).map(q=>q.public)};};
   const organization=async row=>{
-    if(!workspaceCapable())throw Error('当前 Harness 未提供已确认的原生项目接口');
+    if(!workspaceCapable())throw Error('현재 Harness 확인된 기본 프로젝트 인터페이스가 제공되지 않습니다.');
     const cwd=await realpath(row.cwd),projects=[],members=[];
     for(const workspace of ctx.workspaceRegistry.list()){
       if(workspace.sessionIds.includes(row.sessionId))members.push(workspace.id);
       let path;try{path=await realpath(workspace.path);}catch{continue;}
       if(path===cwd)projects.push({id:workspace.id,title:workspace.title||workspace.path});
     }
-    if(members.length>1)throw Error('原生项目成员关系不唯一，请先在原客户端核对');
+    if(members.length>1)throw Error('네이티브 프로젝트 멤버 관계는 고유하지 않습니다. 먼저 원래 클라이언트를 확인하세요.');
     return {projectId:members[0]||null,projects,scope:'native',identity:{id:row.sessionId,cwd:row.cwd}};
   };
-  const bounded=async promise=>{let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('插件目录读取超时，请重试')),6000);})]);}finally{clearTimeout(timer);}};
-  const localized=value=>typeof value==='string'?value:value?.['zh-CN']||value?.zh||value?.en||'';
+  const bounded=async promise=>{let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('플러그인 디렉터리 읽기 시간이 초과되었습니다. 다시 시도해 주세요.')),6000);})]);}finally{clearTimeout(timer);}};
+  const localized=value=>typeof value==='string'?value:value?.['ko-KR']||value?.ko||value?.en||'';
   const catalog=async(sid,section='all')=>{
     const row=normalize(await find(sid)),result={currentModel:row.model,currentEffort:row.effort,capabilities:row.capabilities};
     if(section!=='plugins'){
@@ -147,13 +147,13 @@ export async function apply(ctx,config){
           const snapshot=await bounded(inventory.list()),packages=new Map();
           for(const entry of [...(snapshot.entries||[]),...(snapshot.agentPresets||[]).flatMap(p=>p.rows.map(r=>({...r,preset:p.name||p.id})))]){
             const key=entry.moduleName;if(!key)continue;
-            const status=entry.fiberPhase==='active'?'运行中':entry.fiberPhase==='failed'?'加载失败':entry.enabled===false?'已停用':'按会话启用';
-            const old=packages.get(key);if(old?.status==='运行中')continue;
+            const status=entry.fiberPhase==='active'?'달리기':entry.fiberPhase==='failed'?'로드 실패':entry.enabled===false?'비활성화됨':'세션당 활성화';
+            const old=packages.get(key);if(old?.status==='달리기')continue;
             packages.set(key,{id:'installed:'+key,name:localized(entry.meta?.title)||key.replace('@deepseek-ai/dsh-',''),description:localized(entry.meta?.description),kind:'plugin',selectable:false,status});
           }
           result.skills.push(...[...packages.values()].sort((a,b)=>a.name.localeCompare(b.name)));
         }catch(error){result.pluginError=String(error.message||error);}
-      }else result.pluginError='当前 Harness 未提供插件清单，请更新或重新打开 Harness';
+      }else result.pluginError='현재 Harness 제공된 플러그인 목록이 없습니다. 업데이트하거나 다시 열어주세요. Harness';
     }
     return result;
   };
@@ -190,8 +190,8 @@ export async function apply(ctx,config){
       let resolveMobile,rejectMobile;
       const mobile=new Promise((resolve,reject)=>{resolveMobile=resolve;rejectMobile=reject;});
       const approval=event==='approval/request';
-      questions.set(id,{sid:req.agent.id,approval,public:{id,tool:approval?req.toolName:'提问',needsInput:!approval,input:approval?{reason:req.reason||''}:{questions:req.questions}},resolve:resolveMobile});
-      const abort=()=>rejectMobile(Error('请求已取消'));original?.addEventListener('abort',abort,{once:true});
+      questions.set(id,{sid:req.agent.id,approval,public:{id,tool:approval?req.toolName:'질문하기',needsInput:!approval,input:approval?{reason:req.reason||''}:{questions:req.questions}},resolve:resolveMobile});
+      const abort=()=>rejectMobile(Error('요청이 취소되었습니다.'));original?.addEventListener('abort',abort,{once:true});
       // A missing desktop answerer is not a user's denial.
       const desktop=Promise.resolve().then(next).then(value=>value==='unavailable'?mobile:value);
       try{return await Promise.race([desktop,mobile]);}
@@ -226,10 +226,10 @@ export async function apply(ctx,config){
   async function dispatch(action,sid,body){
     if(action==='lifecycle')return lifecycle();
     if(action==='quit'){
-      if(quitting)throw Error('Harness 正在退出，请稍后重试');
-      if(body.expectedPid!==process.pid||body.expectedGeneration!==generation)throw Error('Harness 进程已变化，请重新检查后再退出');
-      if(typeof ctx.get?.('appExit')!=='function')throw Error('当前 Harness 未提供正常退出接口，请在电脑端退出');
-      if(activeMutations||!idle(lifecycle()))throw Error('有任务运行、等待确认或状态未知，请先在电脑端检查后再退出');
+      if(quitting)throw Error('Harness 종료합니다. 나중에 다시 시도해 주세요.');
+      if(body.expectedPid!==process.pid||body.expectedGeneration!==generation)throw Error('Harness 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하시기 바랍니다.');
+      if(typeof ctx.get?.('appExit')!=='function')throw Error('현재 Harness 정상적인 종료 인터페이스는 제공되지 않습니다. 컴퓨터에서 종료하십시오.');
+      if(activeMutations||!idle(lifecycle()))throw Error('실행 중이거나 확인을 기다리는 작업이 있거나 상태를 알 수 없습니다. 종료하기 전에 컴퓨터에서 확인하시기 바랍니다.');
       quitting=true;
       return {status:'accepted',pid:process.pid,generation};
     }
@@ -241,74 +241,74 @@ export async function apply(ctx,config){
       let project;
       if(body.projectDirectory){
         const expected=body.projectDirectory,cwd=await realpath(expected.cwd),identity=await stat(cwd);
-        if(!identity.isDirectory()||cwd!==expected.cwd||identity.dev!==expected.device||identity.ino!==expected.inode)throw Error('项目目录已变化，请重新选择目录');
+        if(!identity.isDirectory()||cwd!==expected.cwd||identity.dev!==expected.device||identity.ino!==expected.inode)throw Error('프로젝트 디렉터리가 변경되었습니다. 디렉터리를 다시 선택하세요.');
         project={cwd};
       }else project=(await dispatch('projects')).projects.find(p=>p.key===body.projectKey);
-      if(!project)throw Error('请选择项目目录');
+      if(!project)throw Error('프로젝트 디렉터리를 선택하세요.');
       // cwd alone deliberately creates an ungrouped native session. Use the
       // registry's durable workspace identity so Desktop owns membership too.
-      if(typeof ctx.workspaceRegistry.resolveByPath!=='function'||typeof ctx.workspaceRegistry.create!=='function')throw Error('当前 Harness 不支持原生项目关联，请更新 Harness 后重试');
+      if(typeof ctx.workspaceRegistry.resolveByPath!=='function'||typeof ctx.workspaceRegistry.create!=='function')throw Error('현재 Harness 기본 프로젝트 연결은 지원되지 않습니다. 업데이트하세요. Harness 나중에 다시 시도해 보세요');
       const canonical=await realpath(project.cwd);
       const workspace=await ctx.workspaceRegistry.resolveByPath(canonical)||await ctx.workspaceRegistry.create(canonical);
-      if(!workspace?.id||workspace.path!==canonical)throw Error('原生项目目录未确认，请在 Harness 检查工作区');
+      if(!workspace?.id||workspace.path!==canonical)throw Error('네이티브 프로젝트 디렉토리가 확인되지 않았습니다. Harness 작업공간 확인');
       const result=await ctx.sessionController.create({sessionId:'session-'+body.id,workspaceId:workspace.id});
       if(body.model!==undefined)await dispatch('settings',result.sessionId,{model:body.model,
         ...(body.effort!==undefined?{effort:body.effort}:{}),...(body.manualModel?{manualModel:true}:{}),...(body.manualEffort?{manualEffort:true}:{})});
       if(body.title)await ctx.sessionController.rename({sessionId:result.sessionId,title:body.title});
-      return {status:'ready',result:{id:result.sessionId,title:body.title||'新会话'}};
+      return {status:'ready',result:{id:result.sessionId,title:body.title||'새 세션'}};
     }
     const row=await find(sid);
     if(action==='record-location')return recordLocation(ctx,sid);
     if(action==='fork'){
-      if(!capabilities().fork)throw Error('当前 Harness 未提供原生分支接口');
+      if(!capabilities().fork)throw Error('현재 Harness 기본 분기 인터페이스가 제공되지 않습니다.');
       const atSeq=Number(body.messageId);
-      if(typeof body.messageId!=='string'||!/^\d+$/.test(body.messageId)||!Number.isSafeInteger(atSeq)||atSeq<0)throw Error('分支消息标识无效');
+      if(typeof body.messageId!=='string'||!/^\d+$/.test(body.messageId)||!Number.isSafeInteger(atSeq)||atSeq<0)throw Error('분기 메시지 ID가 잘못되었습니다.');
       const page=await ctx.sessionController.page({address:{kind:'session',sessionId:sid},throughSeq:atSeq,maxMessages:1},signal());
       const anchor=page.records?.find(record=>record.event?.seq===atSeq)?.event;
-      if(anchor?.type!=='turn/end'||anchor.data?.reason?.kind!=='completed')throw Error('原回复尚未完成或已不可用，请刷新聊天后重试');
+      if(anchor?.type!=='turn/end'||anchor.data?.reason?.kind!=='completed')throw Error('원래 답변이 완료되지 않았거나 더 이상 사용할 수 없습니다. 채팅을 새로고침하고 다시 시도해 주세요.');
       const child=await ctx.sessionController.fork({sessionId:sid,atSeq,allowMigration:false});
-      if(typeof child?.sessionId!=='string'||!child.sessionId||child.sessionId===sid)throw Error('Harness 尚未确认分支结果，请在桌面核对');
+      if(typeof child?.sessionId!=='string'||!child.sessionId||child.sessionId===sid)throw Error('Harness 아직 브랜치 결과가 확인되지 않았습니다. 바탕화면에서 확인해주세요');
       return {status:'ready',result:{id:child.sessionId}};
     }
     if(action==='rename'){
       const title=typeof body.title==='string'?body.title.trim():'';
-      if(!title||[...title].length>120||/[\u0000-\u001f\u007f]/u.test(body.title))throw Error('标题为 1–120 字，不能包含控制字符');
+      if(!title||[...title].length>120||/[\u0000-\u001f\u007f]/u.test(body.title))throw Error('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.');
       // The native Session store can retain a loaded chat without an Agent.
       // Never use sessionController.rename here: it resumes a cold Agent.
       const session=nativeSession(sid),titles=ctx.get?.('sessionTitle');
-      if(!session||session.id!==sid||typeof titles?.rename!=='function')return {notSent:true,message:'请先连接原会话，再执行原生改名'};
+      if(!session||session.id!==sid||typeof titles?.rename!=='function')return {notSent:true,message:'먼저 원본 세션에 연결한 다음 기본 이름 바꾸기를 수행하세요.'};
       const limit=titles.config?.maxTitleBytes;
-      if(!Number.isInteger(limit)||limit<=0)return {notSent:true,message:'无法核验原客户端的标题长度限制，尚未执行改名'};
-      if(title.replace(/\s+/gu,' ')!==title||/[\u007f-\u009f\u200b\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/u.test(title))return {notSent:true,message:'名称包含原客户端会改写的空白或不可见字符，请调整后重试'};
-      if(Buffer.byteLength(title,'utf8')>limit)return {notSent:true,message:'名称超出原客户端的长度限制，请缩短后重试'};
+      if(!Number.isInteger(limit)||limit<=0)return {notSent:true,message:'원래 클라이언트의 제목 길이 제한을 확인할 수 없으며 이름 변경이 아직 수행되지 않았습니다.'};
+      if(title.replace(/\s+/gu,' ')!==title||/[\u007f-\u009f\u200b\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/u.test(title))return {notSent:true,message:'이름에는 원래 클라이언트가 다시 쓸 공백 또는 보이지 않는 문자가 포함되어 있습니다. 조정한 후 다시 시도해 주세요.'};
+      if(Buffer.byteLength(title,'utf8')>limit)return {notSent:true,message:'이름이 원래 클라이언트의 길이 제한을 초과합니다. 길이를 줄이고 다시 시도하세요.'};
       const accepted=await titles.rename(session,title),fresh=await find(sid);
-      if(accepted?.title!==title||values(fresh).title!==title||fresh.cwd!==row.cwd||nativeSession(sid)!==session)throw Error('改名结果待核对，请检查原客户端；不会重复提交');
+      if(accepted?.title!==title||values(fresh).title!==title||fresh.cwd!==row.cwd||nativeSession(sid)!==session)throw Error('이름 변경 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요. 중복 제출은 되지 않습니다');
       return {status:'confirmed',scope:'native',result:{id:sid,title},...(Number.isSafeInteger(accepted.eventSeq)?{nativeEventSeq:accepted.eventSeq}:{})};
     }
     if(action==='organization'){
       const before=await organization(row);
       if(!body.operation||body.operation==='read')return before;
-      if(body.operation!=='set-project'||body.projectId!==null&&typeof body.projectId!=='string')throw Error('项目设置无效');
-      if(body.projectId!==null&&!before.projects.some(w=>w.id===body.projectId))return {notSent:true,message:'项目必须与会话原工作目录一致'};
+      if(body.operation!=='set-project'||body.projectId!==null&&typeof body.projectId!=='string')throw Error('잘못된 프로젝트 설정');
+      if(body.projectId!==null&&!before.projects.some(w=>w.id===body.projectId))return {notSent:true,message:'프로젝트는 세션의 원래 작업 디렉터리와 일치해야 합니다.'};
       if(before.projectId!==body.projectId){
         // Tauri variants can relax attachSession's cwd check. Enforce the
         // original directory here even when the native registry accepts more.
         const target=body.projectId===null?null:ctx.workspaceRegistry.get(body.projectId);
-        if(target&&await realpath(target.path)!==await realpath(row.cwd))return {notSent:true,message:'项目目录已变化，未执行修改'};
-        if(body.projectId!==null&&!target)return {notSent:true,message:'项目已不存在，未执行修改'};
+        if(target&&await realpath(target.path)!==await realpath(row.cwd))return {notSent:true,message:'프로젝트 디렉토리가 변경되었으며 수정이 수행되지 않았습니다.'};
+        if(body.projectId!==null&&!target)return {notSent:true,message:'프로젝트가 더 이상 존재하지 않으며 수정이 수행되지 않았습니다.'};
         if(target)await target.attachSession(sid);
         if(before.projectId)await ctx.workspaceRegistry.get(before.projectId).detachSession(sid);
       }
       const fresh=await organization(await find(sid));
-      if(fresh.projectId!==body.projectId||fresh.identity.cwd!==row.cwd)throw Error('项目修改结果待核对，请检查原客户端；不会重复提交');
+      if(fresh.projectId!==body.projectId||fresh.identity.cwd!==row.cwd)throw Error('프로젝트 수정 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요. 반복 제출은 이루어지지 않습니다.');
       return {...fresh,status:'confirmed'};
     }
     if(action==='archive-state')return {...normalize(row),archived:(ctx.workspaceRegistry.archivedSessionIds||[]).includes(sid),_archiveFlags:{[sid]:(ctx.workspaceRegistry.archivedSessionIds||[]).includes(sid)},archiveSafe:row.running===false&&![...questions.values()].some(q=>q.sid===sid)};
     if(action==='archive'){
-      if(typeof body.archived!=='boolean'||!capabilities().archive)throw Error('当前接入尚未确认原生归档和恢复能力');
-      if(body.disconnect!=null&&typeof body.disconnect!=='boolean'||body.disconnect&&!body.archived)throw Error('归档设置无效');
+      if(typeof body.archived!=='boolean'||!capabilities().archive)throw Error('현재 액세스에서는 아직 기본 보관 및 복구 기능이 확인되지 않았습니다.');
+      if(body.disconnect!=null&&typeof body.disconnect!=='boolean'||body.disconnect&&!body.archived)throw Error('잘못된 보관 설정');
       if(body.disconnect){
-        if(typeof ctx.parallel!=='function'||typeof ctx.waterfall!=='function'||typeof row.running!=='boolean')return {archiveNotSent:true,message:'无法确认可停止的原生任务，未停止或归档'};
+        if(typeof ctx.parallel!=='function'||typeof ctx.waterfall!=='function'||typeof row.running!=='boolean')return {archiveNotSent:true,message:'중지되거나 보관되지 않았으며 중지 가능한 기본 작업을 확인할 수 없습니다.'};
         // Native stop providers cover this session's turn, jobs, schedules and descendants.
         // Do not use stopActivity: that native option writes the archive flag BEFORE stopping.
         await ctx.parallel('workspace/session-stop',{sessionId:sid});
@@ -317,12 +317,12 @@ export async function apply(ctx,config){
           const activity=await ctx.waterfall('workspace/session-activity',{sessionId:sid},()=>Promise.resolve([]));
           const fresh=await find(sid);
           if(Array.isArray(activity)&&!activity.length&&fresh.running===false&&![...questions.values()].some(q=>q.sid===sid))break;
-          if(Date.now()>=deadline)throw Error('停止结果待核对，尚未发送归档请求');
+          if(Date.now()>=deadline)throw Error('확인 대기 중인 결과 중지, 보관 요청이 아직 전송되지 않음');
           await new Promise(resolve=>setTimeout(resolve,100));
         }
-      }else if(row.running!==false||[...questions.values()].some(q=>q.sid===sid))return {archiveNotSent:true,message:'聊天有运行、审批或未知状态，请先在原客户端处理'};
+      }else if(row.running!==false||[...questions.values()].some(q=>q.sid===sid))return {archiveNotSent:true,message:'채팅이 실행 중, 승인 또는 알 수 없는 상태입니다. 먼저 원본 클라이언트에서 처리해 주세요.'};
       try{if(body.archived)await ctx.workspaceRegistry.archiveSession(sid,{});else await ctx.workspaceRegistry.unarchiveSession(sid);}
-      catch(error){if(error?.name==='WorkspaceActiveSessionError'&&error.sessionId===sid&&Array.isArray(error.activity))return {archiveNotSent:true,message:'聊天或子智能体有运行中的工作，请先在原客户端处理'};throw error;}
+      catch(error){if(error?.name==='WorkspaceActiveSessionError'&&error.sessionId===sid&&Array.isArray(error.activity))return {archiveNotSent:true,message:'채팅이나 하위 에이전트에서 작업이 실행 중입니다. 먼저 원래 클라이언트에서 처리해 주세요.'};throw error;}
       return {status:'accepted'};
     }
     if(action==='open')return {ok:true};
@@ -333,64 +333,64 @@ export async function apply(ctx,config){
     if(action==='tasks')return {tasks:tasks(row)};
     if(action==='stop-task'){
       const task=tasks(row).find(task=>task.id===body.taskId);
-      if(!task?.cancellable)throw Error('后台任务已结束或不支持独立停止');
+      if(!task?.cancellable)throw Error('백그라운드 작업이 종료되었거나 독립적인 중지가 지원되지 않습니다.');
       if(task.id.startsWith('job:'))await ctx.get('jobs').kill(task.id.slice(4),sid,'user');
       else await ctx.get('subagents').interrupt(task.id.slice(6),{kind:'user',parentSessionId:sid});
       return {status:'accepted'};
     }
     if(action==='compact'){
       const agent=ctx.agents.get(sid),services=modeServices(row);
-      if(!agent||row.running!==false||!services.compact||[...questions.values()].some(q=>q.sid===sid))throw Error('请等待当前任务结束并连接原会话后再压缩上下文');
+      if(!agent||row.running!==false||!services.compact||[...questions.values()].some(q=>q.sid===sid))throw Error('컨텍스트를 압축하기 전에 현재 작업이 종료되고 원래 세션에 연결될 때까지 기다리십시오.');
       const result=await services.commands.execute(agent,'/compact',[],signal());
-      if(result?.result?.kind!=='success')throw Error(result?.result?.text||'原生上下文压缩未确认');
+      if(result?.result?.kind!=='success')throw Error(result?.result?.text||'기본 컨텍스트 압축이 확인되지 않았습니다.');
       return {status:'accepted',message:result.result.text};
     }
     if(action==='work-mode'||action==='goal'){
       const services=modeServices(row);
-      if(action==='work-mode'&&(!services.plan||!['default','plan'].includes(body.mode))||action==='goal'&&!services.goals)throw Error('当前 Harness 未提供此原生工作模式');
-      if(action==='work-mode'&&row.running!==false)throw Error('请等待当前任务结束后再切换模式');
-      if(action==='goal'&&!['set','pause','resume','clear','edit'].includes(body.operation))throw Error('目标操作无效');
+      if(action==='work-mode'&&(!services.plan||!['default','plan'].includes(body.mode))||action==='goal'&&!services.goals)throw Error('현재 Harness 이 기본 작업 모드는 제공되지 않습니다.');
+      if(action==='work-mode'&&row.running!==false)throw Error('모드를 전환하기 전에 현재 작업이 끝날 때까지 기다리십시오.');
+      if(action==='goal'&&!['set','pause','resume','clear','edit'].includes(body.operation))throw Error('잘못된 대상 작업');
       // Explicit controls may restore the native owner; passive reads above never do.
       const found=await ctx.sessionController.resolveAgent(sid);if(found.error)throw found.error;
       const agent=found.agent;if(agent?.id!==sid)throw Error('Native session identity changed');
       if(action==='work-mode'){
         const result=await services.commands.execute(agent,body.mode==='plan'?'/plan':'/plan off',[],signal());
-        if(result?.result?.kind!=='success')throw Error(result?.result?.text||'原生计划模式未确认');
+        if(result?.result?.kind!=='success')throw Error(result?.result?.text||'기본 계획 모드가 확인되지 않았습니다.');
         return {status:'accepted'};
       }
       const goal=services.goals.get(agent),expected=body.expected;
-      if(body.operation!=='set'&&(!goal||expected?.goalId!==goal.id||expected?.revision!==goal.revision))throw Error('目标已变化，请刷新后操作');
-      if(['set','resume'].includes(body.operation)&&(row.running!==false||[...questions.values()].some(q=>q.sid===sid)))throw Error('请等待当前任务结束后再开启目标');
-      if(['set','edit'].includes(body.operation)&&(typeof body.objective!=='string'||!body.objective.trim()||body.objective.length>4000))throw Error('请输入 1–4000 字的目标');
-      if(['set','resume'].includes(body.operation)&&workState(row).collaborationMode==='plan')throw Error('请先退出计划模式');
+      if(body.operation!=='set'&&(!goal||expected?.goalId!==goal.id||expected?.revision!==goal.revision))throw Error('대상이 변경되었습니다. 새로고침 후 진행해주세요.');
+      if(['set','resume'].includes(body.operation)&&(row.running!==false||[...questions.values()].some(q=>q.sid===sid)))throw Error('대상을 열기 전에 현재 작업이 끝날 때까지 기다리십시오.');
+      if(['set','edit'].includes(body.operation)&&(typeof body.objective!=='string'||!body.objective.trim()||body.objective.length>4000))throw Error('입력해주세요 1–4000 단어 대상');
+      if(['set','resume'].includes(body.operation)&&workState(row).collaborationMode==='plan')throw Error('먼저 계획 모드를 종료하세요.');
       const ref=goal?{id:goal.id,revision:goal.revision}:null;
       if(body.operation==='set')services.goals.create(agent,{objective:body.objective});
       else if(body.operation==='edit')services.goals.edit(agent,ref,{objective:body.objective});
       else services.goals[body.operation](agent,ref);
       return {status:'accepted'};
     }
-    if(action==='access'){const presets=ctx.permissionPresets.catalog(),options=presets.options;if(body.mode){if(!options.some(o=>o.value===body.mode))throw Error('权限选项无效');await ctx.sessionController.create({sessionId:sid,cwd:row.cwd});const agent=ctx.agents.get(sid);if(!agent)throw Error('当前会话没有活动智能体');ctx.permissionPresets.set(agent.session,body.mode);}return {status:'accepted',mode:body.mode||values(row).permissions?.currentValue||presets.defaultPreset,modes:options.map(o=>o.value),options};}
-    if(action==='settings'){const c=body.manualModel===true?{models:[],currentModel:'',currentEffort:''}:await catalog(sid,'models'),selected=body.model||c.currentModel,m=c.models.find(m=>m.id===selected);if(typeof selected!=='string'||!/^([^\s/\x00-\x1f\x7f]{1,128})\/([^\s\x00-\x1f\x7f]{1,256})$/.test(selected))throw Error('请输入 provider/model 格式的模型名称');const effort=body.effort??(selected===c.currentModel?c.currentEffort:m?.defaultEffort);if(effort&&(typeof effort!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(effort)))throw Error('请输入有效的思考强度');if(effort&&body.manualEffort!==true&&m&&!m.efforts.includes(effort))throw Error('该模型不支持所选思考强度');const slash=selected.indexOf('/'),result=await ctx.sessionController.selectModel({sessionId:sid,provider:selected.slice(0,slash),model:selected.slice(slash+1),reasoningEffort:effort||undefined}),actual=result.selected;if(!actual||actual.provider+'/'+actual.model!==selected||(body.effort&&actual.reasoningEffort!==body.effort))throw Error('Harness 未确认模型或思考强度设置，请刷新检查');return {status:'accepted',model:actual.provider+'/'+actual.model,effort:actual.reasoningEffort||''};}
+    if(action==='access'){const presets=ctx.permissionPresets.catalog(),options=presets.options;if(body.mode){if(!options.some(o=>o.value===body.mode))throw Error('잘못된 권한 옵션');await ctx.sessionController.create({sessionId:sid,cwd:row.cwd});const agent=ctx.agents.get(sid);if(!agent)throw Error('현재 세션에는 활성 상담원이 없습니다.');ctx.permissionPresets.set(agent.session,body.mode);}return {status:'accepted',mode:body.mode||values(row).permissions?.currentValue||presets.defaultPreset,modes:options.map(o=>o.value),options};}
+    if(action==='settings'){const c=body.manualModel===true?{models:[],currentModel:'',currentEffort:''}:await catalog(sid,'models'),selected=body.model||c.currentModel,m=c.models.find(m=>m.id===selected);if(typeof selected!=='string'||!/^([^\s/\x00-\x1f\x7f]{1,128})\/([^\s\x00-\x1f\x7f]{1,256})$/.test(selected))throw Error('입력해주세요 provider/model 형식 모델 이름');const effort=body.effort??(selected===c.currentModel?c.currentEffort:m?.defaultEffort);if(effort&&(typeof effort!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(effort)))throw Error('올바른 사고 강도를 입력하세요.');if(effort&&body.manualEffort!==true&&m&&!m.efforts.includes(effort))throw Error('모델이 선택한 사고 강도를 지원하지 않습니다.');const slash=selected.indexOf('/'),result=await ctx.sessionController.selectModel({sessionId:sid,provider:selected.slice(0,slash),model:selected.slice(slash+1),reasoningEffort:effort||undefined}),actual=result.selected;if(!actual||actual.provider+'/'+actual.model!==selected||(body.effort&&actual.reasoningEffort!==body.effort))throw Error('Harness 모델 또는 반사 강도 설정이 확인되지 않았습니다. 새로고침해 주세요.');return {status:'accepted',model:actual.provider+'/'+actual.model,effort:actual.reasoningEffort||''};}
     if(action==='stop'){await ctx.sessionController.cancel({sessionId:sid});return {status:'accepted'};}
     if(action==='send'){
-      if(body.attachments?.length||body.resolvedFiles?.length)throw Error('此应用的消息附件仅支持图片；其他文件请使用文件传输。');
-      let text=body.text||'';if(body.plugins?.length){const c=await catalog(sid,'plugins');if(body.plugins.some(id=>!c.skills.some(s=>s.id===id&&s.selectable!==false)))throw Error('插件已不可用');text='请使用以下已安装技能：'+body.plugins.join(', ')+'\n\n'+text;}
+      if(body.attachments?.length||body.resolvedFiles?.length)throw Error('이 앱의 메시지 첨부 파일은 이미지만 지원합니다. 그 외 파일은 파일전송을 이용해주세요。');
+      let text=body.text||'';if(body.plugins?.length){const c=await catalog(sid,'plugins');if(body.plugins.some(id=>!c.skills.some(s=>s.id===id&&s.selectable!==false)))throw Error('플러그인을 더 이상 사용할 수 없습니다.');text='아래 설치된 스킬을 사용해 주세요：'+body.plugins.join(', ')+'\n\n'+text;}
       const content=text?[{type:'text',text}]:[];
-      for(const image of body.resolvedImages||[]){const match=/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/.exec(image.url);if(!match)throw Error('图片格式无效');content.push({type:'image',mediaType:match[1],data:match[2],...(image.name?{name:image.name}:{})});}
-      if(!content.length)throw Error('请输入内容');
+      for(const image of body.resolvedImages||[]){const match=/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/.exec(image.url);if(!match)throw Error('잘못된 이미지 형식');content.push({type:'image',mediaType:match[1],data:match[2],...(image.name?{name:image.name}:{})});}
+      if(!content.length)throw Error('내용을 입력해주세요');
       const mode=body.mode==='steer'&&row.running?'steer':'queue',result=await ctx.sessionController.prompt({sessionId:sid,requestId:body.id,mode,content},signal());
-      if(result?.accepted!==true)throw Error('Harness 未确认接收消息，请在桌面核对');
+      if(result?.accepted!==true)throw Error('Harness 수신된 메시지가 확인되지 않았습니다. 데스크톱에서 확인하세요.');
       return {status:row.running&&mode==='queue'?'queued':'accepted'};
     }
-    if(action==='respond'){const pending=questions.get(body.requestId);if(!pending||pending.sid!==sid)throw Error('提问已过期');if(pending.approval){const outcome={accept:'allowed-once',decline:'rejected'}[body.decision];if(!outcome)throw Error('请选择本次允许或拒绝');questions.delete(body.requestId);pending.resolve(outcome);return {status:'accepted'};}const answers=pending.public.input.questions.map(q=>{const selected=body.answers?.[q.id]?.answers;if(!Array.isArray(selected)||!selected.length||selected.some(s=>typeof s!=='string'||s.length>20000))throw Error('请回答每一项问题');const labels=(q.options||[]).map(o=>o.label);return {id:q.id,selected:selected.filter(s=>labels.includes(s)),custom:selected.filter(s=>!labels.includes(s)).join('\n')};});questions.delete(body.requestId);pending.resolve({answers});return {status:'accepted'};}
-    throw Error('不支持的 DeepSeek 操作');
+    if(action==='respond'){const pending=questions.get(body.requestId);if(!pending||pending.sid!==sid)throw Error('질문이 만료되었습니다');if(pending.approval){const outcome={accept:'allowed-once',decline:'rejected'}[body.decision];if(!outcome)throw Error('이번에는 허용할지 거부할지 선택하세요.');questions.delete(body.requestId);pending.resolve(outcome);return {status:'accepted'};}const answers=pending.public.input.questions.map(q=>{const selected=body.answers?.[q.id]?.answers;if(!Array.isArray(selected)||!selected.length||selected.some(s=>typeof s!=='string'||s.length>20000))throw Error('각 질문에 답해주세요.');const labels=(q.options||[]).map(o=>o.label);return {id:q.id,selected:selected.filter(s=>labels.includes(s)),custom:selected.filter(s=>!labels.includes(s)).join('\n')};});questions.delete(body.requestId);pending.resolve({answers});return {status:'accepted'};}
+    throw Error('지원되지 않음 DeepSeek 작동하다');
   }
   const server=createServer(async(req,res)=>{try{
     const credential=String(req.headers.authorization||'').replace(/^Bearer /,'');const a=Buffer.from(credential),b=Buffer.from(token);
     if(req.method!=='POST'||req.url!=='/mobile'||req.headers.origin||a.length!==b.length||!timingSafeEqual(a,b)){res.writeHead(403);res.end();return;}
-    let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>maxRequestBytes)throw Error('请求过大');chunks.push(chunk);}const {action,sid,body={}}=JSON.parse(Buffer.concat(chunks));
+    let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>maxRequestBytes)throw Error('요청이 너무 큼');chunks.push(chunk);}const {action,sid,body={}}=JSON.parse(Buffer.concat(chunks));
     const mutating=['create','fork','rename','archive','stop','send','respond','settings','resume','work-mode','goal','compact','stop-task'].includes(action)||(action==='access'&&Boolean(body?.mode))||(action==='organization'&&body?.operation==='set-project');
-    if(mutating&&quitting)throw Error('Harness 正在退出，请稍后重试');
+    if(mutating&&quitting)throw Error('Harness 종료합니다. 나중에 다시 시도해 주세요.');
     let result;
     if(mutating)activeMutations++;
     try{result=await dispatch(action,sid,body);}finally{if(mutating)activeMutations--;}

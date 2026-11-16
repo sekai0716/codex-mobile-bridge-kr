@@ -55,7 +55,7 @@ class DesktopProjectHTTP(unittest.TestCase):
         bridge.project_host = Mock(return_value='local')
         bridge.for_host = Mock(return_value=bridge)
         bridge.cli_sessions = Mock()
-        message = '此 Codex CLI 缺少完整的后台运行组件。请安装或修复完整的 Codex CLI 后重试。'
+        message = '이 Codex CLI 완전한 백그라운드 실행 구성 요소가 부족합니다. 전체를 설치하거나 수리하십시오. Codex CLI 나중에 다시 시도해 보세요。'
         bridge.cli_sessions.creation_context.side_effect = AppServerUnavailable(message)
         bridge.creation_models = Bridge.creation_models.__get__(bridge)
         path = '/api/projects/models?project=local%7Cp&kind=cli'

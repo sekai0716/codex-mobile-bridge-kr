@@ -8,7 +8,7 @@ async function checkChatFeedback(){
   viewport.style.cssText='height:400px;width:100%;overflow:auto;overflow-anchor:none';viewport.append(older,messages,newer);root.append(viewport,input);document.body.append(root);
   let scope={gateway:'fixture',provider:'codex',account:'one',host:'local',session:'one'},changes=0;
   const quotes=new ComposerQuotes({messages,input,container:root,scope:()=>scope,onChange:()=>changes++,onPrompt:()=>{}});
-  const pending=[],row=(n,role='assistant')=>({key:'r'+n,order:n,role,kind:role==='activity'?'commandExecution':'agentMessage',version:'v1',text:'Reply '+n+' 中文 '+('sample '.repeat(50))});
+  const pending=[],row=(n,role='assistant')=>({key:'r'+n,order:n,role,kind:role==='activity'?'commandExecution':'agentMessage',version:'v1',text:'Reply '+n+' 중국어 '+('sample '.repeat(50))});
   const page=(rows,epoch='a',hasMore=true)=>({rows,epoch,hasMore,before:epoch+'.'+rows[0]?.key,sequence:1,meta:{requests:[]},files:[]});
   const timeline=new ChatTimeline({elements:{viewport,container:messages,older,newer},url:action=>'/synthetic/'+action+'?fixture=1',request:url=>new Promise(resolve=>pending.push({url,resolve})),renderMeta:()=>{},renderText:(node,text)=>node.textContent=text,status:()=>{}});
   try{
@@ -31,15 +31,15 @@ async function checkChatFeedback(){
     check(new URL(pending[0].url,location.origin).searchParams.get('before')==='b.r300','A concurrent live reset retries with the current history cursor');
     pending.shift().resolve(page([row(299)],'b',false));await until(()=>!timeline.busy);
     check(timeline.rows.has('r299')&&!timeline.hasMore,'History retry completes in place after a live reset');
-    input.value='Keep this draft 保留草稿';
+    input.value='Keep this draft 초안을 유지하다';
     timeline.nodes.get('r299').node.querySelector('.message-quote').click();await until(()=>quotes.quotes.length===1);
     check(quotes.quotes[0].text===row(299).text,'Codex message quote reaches the composer');
-    check(input.value==='Keep this draft 保留草稿'&&changes===1,'Quote adds context without replacing or submitting the draft');
+    check(input.value==='Keep this draft 초안을 유지하다'&&changes===1,'Quote adds context without replacing or submitting the draft');
     const delayed={...row(298),truncated:true};timeline.apply(page([delayed],'b',true),false,true);
     timeline.nodes.get('r298').node.querySelector('.message-quote').click();await until(()=>pending.length===1);
     scope={...scope,session:'two'};
     pending.shift().resolve({key:'r298',version:'v1',offset:0,text:'Full stale body',next:null});await frame();await frame();
-    check(quotes.quotes.length===1&&input.value==='Keep this draft 保留草稿','Delayed quote cannot enter another chat draft');
+    check(quotes.quotes.length===1&&input.value==='Keep this draft 초안을 유지하다','Delayed quote cannot enter another chat draft');
     // A touch drag at the boundary must also load history with no scroll event.
     viewport.scrollTop=0;timeline.lastTop=0;await frame();await frame();
     if(pending.length){pending.shift().resolve(page([row(297)],'b',false));await until(()=>!timeline.busy);}

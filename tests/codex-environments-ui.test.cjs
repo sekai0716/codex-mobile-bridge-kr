@@ -27,7 +27,7 @@ function fixture({native=true,listSource='all',host='local',wslSupported=true}={
  class AccountsPanel{constructor(options){Object.assign(this,options);this.clears=0;this.refreshButton=node('button');}attachApiAccess(panel,details){this.apiPanel=panel;this.apiDetails=details;}clear(){this.clears++;}visible(){return nodes.get('accounts-dialog').open&&!nodes.get('accounts-content').hidden;}refresh(){return this.read();}}
  class CliAccessPanel{constructor(options){Object.assign(this,options);this.clears=0;this.refreshes=0;}clear(){this.clears++;}refresh(){this.refreshes++;return this.read();}}
  class WslAccountsPanel{constructor(options){Object.assign(this,options);}clear(){}select(entry){this.entry=entry;return this.read(entry);}}
- const close=node('button'),context=vm.createContext({$,api,Option,AccountsPanel,CliAccessPanel,WslAccountsPanel,URL,Event:class{constructor(type){this.type=type;}},window:{BridgeFeatures:{load:async name=>{calls.push({feature:name});}}},BridgeI18n:{t:value=>value,locale:()=> 'zh'},document:{getElementById:$,createElement:node,querySelector:()=>close},
+ const close=node('button'),context=vm.createContext({$,api,Option,AccountsPanel,CliAccessPanel,WslAccountsPanel,URL,Event:class{constructor(type){this.type=type;}},window:{BridgeFeatures:{load:async name=>{calls.push({feature:name});}}},BridgeI18n:{t:value=>value,locale:()=> 'ko'},document:{getElementById:$,createElement:node,querySelector:()=>close},
   t:value=>value,el:(tag,_class='',text='')=>Object.assign(node(tag),{textContent:text}),
   clientNavigation:{wslSupported,provider:'codex',clients:[{id:'codex',entries}]},currentHost:host,currentId:null,listSource,listRows:[],
   renderSourceFilter(){},uuid:()=> '11111111-1111-4111-8111-111111111111',setLanguageBusy(){},loadList:async()=>{},openChat:async(id,where)=>opened.push({id,host:where}),toast:message=>notices.push(message),isCodexClient:id=>id==='codex',
@@ -115,7 +115,7 @@ test('Codex CLI exposes configured SSH environments before any project exists an
  const ui=fixture({listSource:'cli',host:'build-host'});
  ui.setHandler(async(url,body)=>{
   if(url==='/api/projects/browse')return {path:'/srv/work',home:'/home/fixture',parent:'/srv',roots:[],directories:[],identity:'ssh-directory'};
-  if(url==='/api/projects')return body?{project:{key:'cli|build-host|new'}}:{projects:[],environments:[{key:'cli|local',type:'cli',host:'local',name:'此电脑 · Codex CLI'},{key:'cli|build-host',type:'cli',host:'build-host',name:'Build host · Codex CLI'}]};
+  if(url==='/api/projects')return body?{project:{key:'cli|build-host|new'}}:{projects:[],environments:[{key:'cli|local',type:'cli',host:'local',name:'이 컴퓨터 · Codex CLI'},{key:'cli|build-host',type:'cli',host:'build-host',name:'Build host · Codex CLI'}]};
   return {id:'created',host:'build-host'};
  });
  await ui.$('new-chat').onclick();assert.equal(ui.$('new-chat-entry').value,'cli|build-host');assert.equal(ui.$('new-chat-entry-label').hidden,false);assert.equal(ui.$('new-chat-submit').disabled,true);

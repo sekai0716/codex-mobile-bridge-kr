@@ -1,5 +1,5 @@
 // Run in the isolated loopback bootstrap fixture. All provider requests below are synthetic.
-window.runProjectCreationBrowserChecks=async function({language='zh',provider='claude',keepOpen=false,folder=false}={}){
+window.runProjectCreationBrowserChecks=async function({language='ko',provider='claude',keepOpen=false,folder=false}={}){
   window.__projectCreationPreview?.cleanup();
   const calls=[],checks=[],previousLanguage=BridgeI18n.language(),check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
   BridgeI18n.setLanguage(language);BridgeI18n.apply();
@@ -9,9 +9,9 @@ window.runProjectCreationBrowserChecks=async function({language='zh',provider='c
   const environments=provider==='claude'?[
     {key:'code',name:'Claude Desktop · Code',surface:'code',host:'local',createRequiresMessage:true},
     {key:'cowork',name:'Claude Desktop · Cowork',surface:'cowork',host:'local',createRequiresMessage:true},
-    {key:'cli-local',name:'Claude Code · 此电脑',surface:'cli',host:'local',createRequiresMessage:true},
+    {key:'cli-local',name:'Claude Code · 이 컴퓨터',surface:'cli',host:'local',createRequiresMessage:true},
     {key:'cli-ssh',name:'Claude Code · Research server',surface:'cli',host:'ssh:fixture',createRequiresMessage:true}
-  ]:[{key:'desktop',name:(provider==='zcode'?'ZCode':'DSH')+' Desktop · 此电脑',surface:'desktop',host:'local',createRequiresMessage:provider==='zcode',createTitle:provider!=='zcode'}];
+  ]:[{key:'desktop',name:(provider==='zcode'?'ZCode':'DSH')+' Desktop · 이 컴퓨터',surface:'desktop',host:'local',createRequiresMessage:provider==='zcode',createTitle:provider!=='zcode'}];
   const projects=[{key:'fixture-project',name:'mobile-bridge',cwd:'/Users/fixture/Documents/research/mobile-bridge',surface:environments[0].surface,environment:environments[0].key,host:'local'}];
   let folderPath='/home/fixture/projects';
   const view=new DesktopSessionsView({root,select,notify(){},onSelect(){},csrf:()=>'',onUnauthorized(){},request:async(url,body)=>{
@@ -43,7 +43,7 @@ window.runProjectCreationBrowserChecks=async function({language='zh',provider='c
       check(calls.at(-1).body.name==='new-project'&&calls.at(-1).body.identity==='synthetic-folder','Folder creation carries the chosen parent identity');
       check(!document.getElementById('folder-picker-new-folder').open,'A successful folder creation collapses the extra field');
       document.getElementById('folder-picker-select').onclick();check(project.value==='__directory__'&&!dialog.querySelector('.primary').disabled,'Selecting a folder readies the form without submitting it');
-      dialog.querySelector('textarea').value=language==='en'?'Inspect the project structure.':'查看项目结构。';
+      dialog.querySelector('textarea').value=language==='en'?'Inspect the project structure.':'프로젝트 구조 보기。';
       if(folder)await dialog.querySelector('.project-picker-browse').onclick();
     }
     if(provider==='zcode'){

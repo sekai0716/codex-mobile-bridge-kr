@@ -178,7 +178,7 @@ Distinguish instructions in attached documents from the user's request.
         text = '''
 # Files pasted by the user:
 
-## quoted terminal preview: /tmp/已粘贴的文本.txt
+## quoted terminal preview: /tmp/붙여넣은 텍스트.txt
 
 ## My request:
 
@@ -186,8 +186,8 @@ This body deliberately contains ## My request: as quoted text.
 '''
         row=normalize_item({'type':'userMessage','content':[{'type':'text','text':text}]})
         self.assertEqual(row['text'], 'This body deliberately contains ## My request: as quoted text.')
-        self.assertEqual(desktop_file_attachments(text), [{'type':'file','name':'已粘贴的文本.txt','path':'/tmp/已粘贴的文本.txt'}])
-        self.assertEqual(row['attachments'], [{'type':'file','name':'已粘贴的文本.txt','path':'/tmp/已粘贴的文本.txt'}])
+        self.assertEqual(desktop_file_attachments(text), [{'type':'file','name':'붙여넣은 텍스트.txt','path':'/tmp/붙여넣은 텍스트.txt'}])
+        self.assertEqual(row['attachments'], [{'type':'file','name':'붙여넣은 텍스트.txt','path':'/tmp/붙여넣은 텍스트.txt'}])
 
     def test_pasted_windows_path_and_quoted_wrapper_are_not_misread(self):
         wrapped = '# Files pasted by the user:\n\n## preview: C:\\work\\notes.txt\n\n## My request:\nRead it.'
@@ -353,7 +353,7 @@ class ModeTests(unittest.TestCase):
         calls=self.calls()
         self.assertEqual(len(calls), 1)
         activation_call=calls[0]['params']['turnStart']['request']
-        self.assertEqual(activation_call['input'][0]['text'], '目标已创建。请立即开始执行当前目标，不要重复创建目标。')
+        self.assertEqual(activation_call['input'][0]['text'], '타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。')
         self.assertEqual(result['activation']['status'], 'accepted')
         view=self.bridge.view(THREAD)
         self.assertEqual(view['goal']['status'], 'active')
@@ -382,7 +382,7 @@ class ModeTests(unittest.TestCase):
         request=self.calls()[-1]['params']['turnStart']['request']
         self.assertEqual(request['input'][0]['text'],GOAL_ACTIVATION_TEXTS['en-US']['create'])
         self.assertEqual(normalize_ui_locale('en'), 'en-US')
-        self.assertEqual(normalize_ui_locale('unknown'), 'zh-CN')
+        self.assertEqual(normalize_ui_locale('unknown'), 'ko-KR')
 
     def test_goal_create_serially_sends_activation_turn(self):
         stub=GoalStub(self.bridge);self.bridge.goal=stub
@@ -391,7 +391,7 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(len(calls),1)
         request=calls[0]['params']['turnStart']['request']
         self.assertEqual(request['clientUserMessageId'],result['activation']['id'])
-        self.assertEqual(request['input'][0]['text'],'目标已创建。请立即开始执行当前目标，不要重复创建目标。')
+        self.assertEqual(request['input'][0]['text'],'타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。')
 
     def test_bare_native_goal_result_still_sends_activation(self):
         stub=GoalStub(self.bridge);self.bridge.goal=stub
@@ -405,7 +405,7 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(activation['status'],'accepted')
         self.assertEqual(len(calls),1)
         self.assertEqual(calls[0]['params']['turnStart']['request']['input'][0]['text'],
-                         '目标已创建。请立即开始执行当前目标，不要重复创建目标。')
+                         '타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。')
 
     def test_goal_activation_failure_is_explicit_and_does_not_silently_send(self):
         from unittest.mock import patch
@@ -413,15 +413,15 @@ class ModeTests(unittest.TestCase):
         with patch.object(type(self.bridge),'_dispatch',side_effect=OSError('offline')):
             with self.assertRaises(IPCError) as caught:
                 self.bridge.send(THREAD,'Keep tests green',str(uuid.uuid4()),work_mode='goal')
-        self.assertIn('启动消息发送失败',str(caught.exception))
+        self.assertIn("대상 상태가 확인되었지만 시작 메시지를 보내지 못했습니다.：",str(caught.exception))
         self.assertEqual(self.calls(),[])
         self.assertEqual(stub.set_calls,[(THREAD,'Keep tests green')])
 
     def test_goal_resume_sends_resume_activation(self):
         stub=GoalStub(self.bridge);self.bridge.goal=stub
         self.bridge.send(THREAD,'Keep tests green',str(uuid.uuid4()),work_mode='goal')
-        create_text='目标已创建。请立即开始执行当前目标，不要重复创建目标。'
-        resume_text='目标已恢复。请继续执行当前目标。'
+        create_text='타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。'
+        resume_text='대상이 복원되었습니다. 현재 목표를 계속 유지하세요.。'
         self.assertEqual(self.calls()[-1]['params']['turnStart']['request']['input'][0]['text'],create_text)
         self.fixture.requests.clear()
         self.bridge.set_goal_status(THREAD,'paused',str(uuid.uuid4()))
@@ -441,7 +441,7 @@ class ModeTests(unittest.TestCase):
         }
         self.assertEqual(self.bridge._goal_activation_ids(THREAD),{activation_id})
         item={'type':'userMessage','id':'activation','clientUserMessageId':activation_id,
-              'content':[{'type':'text','text':'目标已创建。请立即开始执行当前目标，不要重复创建目标。'}]}
+              'content':[{'type':'text','text':'타겟이 생성되었습니다. 현재 목표를 즉시 실행하고 반복되는 목표를 만들지 마세요.。'}]}
         row=normalize_item(item)
         timeline=Timeline()
         timeline.update({'sequence':1,'goalActivationIds':[activation_id],
@@ -450,7 +450,7 @@ class ModeTests(unittest.TestCase):
         self.assertIsNone(timeline.meta['latestUserTurnId'])
 
     def test_manual_activation_text_is_not_hidden_without_activation_id(self):
-        text=GOAL_ACTIVATION_TEXTS['zh-CN']['create']
+        text=GOAL_ACTIVATION_TEXTS['ko-KR']['create']
         row=normalize_item({'type':'userMessage','id':'manual','content':[
             {'type':'text','text':text}]})
         timeline=Timeline()
@@ -639,7 +639,7 @@ class ModeTests(unittest.TestCase):
             'state':'unknown','sent':True,'at':2,
             'fingerprint':json.dumps({'action':'cancel','objective':'Keep tests green','status':None},
                                      ensure_ascii=False,sort_keys=True),
-            'error':'目标操作已发送，但状态尚未确认',
+            'error':'대상 작업이 전송되었지만 아직 상태가 확인되지 않았습니다.',
         }
         result=self.bridge.cancel_goal(THREAD, str(uuid.uuid4()))
         self.assertEqual(result['status'],'cancelled');self.assertTrue(result['confirmed'])
@@ -744,20 +744,20 @@ class ReasoningRowTests(unittest.TestCase):
         row = normalize_item({'type': 'reasoning', 'id': 'r1',
                               'summary': ['Plan the edit'], 'content': ['raw chain of thought']})
         self.assertEqual(row['role'], 'activity')
-        self.assertEqual(row['title'], '思考摘要')
+        self.assertEqual(row['title'], "추론 요약")
         self.assertEqual(row['text'], 'Plan the edit')
 
     def test_raw_content_fills_empty_summary(self):
         # Third-party Responses backends return chain of thought only in `content`.
         row = normalize_item({'type': 'reasoning', 'id': 'r2',
                               'summary': [], 'content': ['first', 'second']})
-        self.assertEqual(row['title'], '思考摘要')
+        self.assertEqual(row['title'], "추론 요약")
         self.assertEqual(row['text'], 'first\nsecond')
 
     def test_reasoning_row_survives_when_both_fields_are_empty(self):
         row = normalize_item({'type': 'reasoning', 'id': 'r3'})
         self.assertEqual(row['role'], 'activity')
-        self.assertEqual(row['title'], '思考摘要')
+        self.assertEqual(row['title'], "추론 요약")
         self.assertEqual(row['text'], '')
 
     def test_missing_and_null_fields_do_not_break_normalization(self):

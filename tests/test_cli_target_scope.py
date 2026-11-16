@@ -60,7 +60,7 @@ class LinuxControlTransportTests(unittest.TestCase):
 
     def test_closed_endpoint_read_stays_a_bounded_control_error(self):
         control = LinuxCliControl(lambda:'/srv/custom', Mock(side_effect=IPCError('endpoint closed')))
-        with self.assertRaisesRegex(ValueError,'不会重发'):
+        with self.assertRaisesRegex(ValueError,"목표\\ 생애주기\\ 이전\\ 결과는\\ 아직\\ 검증되지\\ 않았습니다\\.\\ 작업이\\ 재발행되지\\ 않습니다\\."):
             control.inspect()
         self.assertIsNone(control.cached())
 
@@ -172,7 +172,7 @@ class TargetScopeTests(CliForceFixture):
         old = self.waiting()
         preview = self.preview()
         self.value['generation']['pid'] += 1
-        with self.assertRaisesRegex(ValueError,'重新预览'):
+        with self.assertRaisesRegex(ValueError,"대상\\ 호스트,\\ 프로세스,\\ 구성\\ 또는\\ 연결이\\ 변경되었습니다\\.\\ 다시\\ 미리보세요\\."):
             self.scope.force(self.thread_id,'remote-key',str(uuid.uuid4()),preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record(),old)
         self.control.dispatch.assert_not_called()
@@ -182,7 +182,7 @@ class TargetScopeTests(CliForceFixture):
         self.pending.return_value = True
         self.scope.release(self.thread_id,'remote-key',operation,preview['generation'])
         self.value['configuration']['auth.json'] = 'changed'
-        with self.assertRaisesRegex(ValueError,'重新预览'):
+        with self.assertRaisesRegex(ValueError,"대상\\ 호스트,\\ 프로세스,\\ 구성\\ 또는\\ 연결이\\ 변경되었습니다\\.\\ 다시\\ 미리보세요\\."):
             self.scope.release(self.thread_id,'remote-key',operation,preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'],'failed')
         self.assertTrue(self.preview()['canRelease'])
@@ -198,7 +198,7 @@ class TargetScopeTests(CliForceFixture):
                 self.scope.cancel(operation)
             return copy.deepcopy(self.value)
         self.control.inspect.side_effect = inspect
-        with self.assertRaisesRegex(ValueError,'取消'):
+        with self.assertRaisesRegex(ValueError,'취소'):
             self.scope.release(self.thread_id,'remote-key',operation,preview['generation'])
         self.control.dispatch.assert_not_called()
 
@@ -228,7 +228,7 @@ class TargetScopeTests(CliForceFixture):
             self.assertIsNone(self.bridge._recover_cli_environment(self.thread_id,follow_account=True))
         record['phase'] = 'draining'
         private_json(self.bridge.data_dir/'cli-daemon-recovery.json',record)
-        with self.assertRaisesRegex(IPCError,'待核验'):
+        with self.assertRaisesRegex(IPCError,"목표\\ CLI\\ 릴리스를\\ 기다리는\\ 중이거나\\ 확인을\\ 기다리는\\ 중입니다\\.\\ 대기를\\ 취소하거나\\ 결과를\\ 확인하거나\\ 명시적으로\\ 해제를\\ 강제하십시오\\.\\ 작업이\\ 전송되지\\ 않았습니다\\.。"):
             self.bridge._recover_cli_environment(self.thread_id,follow_account=True)
 
     def test_disconnected_and_restarted_unknown_submission_blocks_default_scope(self):

@@ -33,14 +33,14 @@ class ModelResponseTests(unittest.TestCase):
             {'slug': '../invalid model'}, {'slug': 'gpt-5.5'}]}), ['gpt-5.5'])
 
     def test_empty_cc_switch_catalog_explains_no_available_models(self):
-        with self.assertRaisesRegex(ValueError, '未返回可用模型'):
+        with self.assertRaisesRegex(ValueError, "공급자가\\ 사용\\ 가능한\\ 모델을\\ 반환하지\\ 않았습니다\\.\\ 모델\\ ID를\\ 수동으로\\ 입력하세요\\."):
             self.read({'models': []})
 
     def test_existing_formats_keep_id_semantics(self):
         self.assertEqual(self.read([{'id': 'array-model'}]), ['array-model'])
         self.assertEqual(self.read({'data': [{'id': 'openai-model'}],
                                     'models': [{'slug': 'native-model'}]}), ['openai-model'])
-        with self.assertRaisesRegex(ValueError, '未返回可用模型'):
+        with self.assertRaisesRegex(ValueError, "공급자가\\ 사용\\ 가능한\\ 모델을\\ 반환하지\\ 않았습니다\\.\\ 모델\\ ID를\\ 수동으로\\ 입력하세요\\."):
             self.read({'data': [], 'models': [{'slug': 'native-model'}]})
 
 
@@ -182,10 +182,10 @@ class ApiCatalogTests(unittest.TestCase):
             if method=='account/read':return {'account':{'type':'apiKey'}}
             if method=='model/list':raise CatalogError('runtime has no catalog')
             raise AssertionError(method)
-        with patch('bridge.clients.codex.catalog.model_catalog',side_effect=ValueError('无法连接上游，请检查 API 地址、网络和证书后重试')):
+        with patch('bridge.clients.codex.catalog.model_catalog',side_effect=ValueError("공급자에게 연결할 수 없습니다. API URL, 네트워크 및 인증서를 확인하세요.")):
             result = self.reader.read_models(request,str(self.home),'bridge_api')
         self.assertEqual(result['models'],[])
-        self.assertEqual(result['modelSource'],'api');self.assertIn('无法连接上游',result['modelError'])
+        self.assertEqual(result['modelSource'],'api');self.assertIn("공급자에게 연결할 수 없습니다. API URL, 네트워크 및 인증서를 확인하세요.",result['modelError'])
         self.assertNotIn('model/list',[method for method,_ in self.calls])
 
     def test_official_account_retains_native_catalog(self):
@@ -249,7 +249,7 @@ class ApiCatalogTests(unittest.TestCase):
                 upstream.assert_not_called()
                 self.assertEqual(result['modelSource'],'api')
                 self.assertEqual(result['models'],[])
-                self.assertIn('额外认证',result['modelError'])
+                self.assertIn("이 API 연결은 추가 인증 설정을 사용합니다. 모델 ID를 수동으로 입력합니다.",result['modelError'])
 
     def test_missing_env_key_and_extra_auth_do_not_send_partial_credentials(self):
         for definition in ({'env_key':'CMB_ABSENT_FIXTURE_KEY'}, {'env_http_headers':{'private':'CMB_ABSENT_FIXTURE_HEADER'}}):
@@ -557,7 +557,7 @@ for line in sys.stdin:
             (self.home/'auth.json').write_text(json.dumps({'OPENAI_API_KEY': 'new-key'}))
             return {'models': [{'model': 'old-account'}]}
         with patch.object(self.reader, '_fetch', side_effect=switched):
-            with self.assertRaisesRegex(CatalogError, '接入已变化'):
+            with self.assertRaisesRegex(CatalogError, "모델\\ 액세스\\ 권한이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
                 self.reader.get_kind('models', str(self.home), provider='openai')
         self.assertIsNone(self.reader.model_store.read(old_identity))
 

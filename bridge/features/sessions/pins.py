@@ -18,7 +18,7 @@ class SessionPins:
         except FileNotFoundError:
             return {}
         if not isinstance(value, dict):
-            raise ValueError('聊天置顶记录无效')
+            raise ValueError('채팅 최고 기록이 잘못되었습니다.')
         return value
 
     def identifiers(self):
@@ -27,17 +27,17 @@ class SessionPins:
 
     def set(self, identifier, pinned, client_id=None, revision=None):
         if not isinstance(identifier, str) or not identifier or len(identifier) > 512:
-            raise ValueError('会话标识无效')
+            raise ValueError("잘못된 세션 식별자")
         if (client_id is None) != (revision is None):
-            raise ValueError('聊天置顶同步标识无效')
+            raise ValueError('채팅 상단 동기화 플래그가 잘못되었습니다.')
         if client_id is not None:
             if not isinstance(client_id, str):
-                raise ValueError('聊天置顶同步标识无效')
+                raise ValueError('채팅 상단 동기화 플래그가 잘못되었습니다.')
             client_id = str(uuid.UUID(client_id))
             if not isinstance(revision, int) or isinstance(revision, bool) or not 0 < revision <= 9007199254740991:
-                raise ValueError('聊天置顶同步版本无效')
+                raise ValueError('채팅 핀의 동기화된 버전이 잘못되었습니다.')
         if not isinstance(pinned, bool):
-            raise ValueError('聊天置顶开关无效')
+            raise ValueError('채팅 상단 스위치가 잘못되었습니다.')
         with self.lock:
             value = self._read()
             identifiers = set(value.get(self.environment, []))

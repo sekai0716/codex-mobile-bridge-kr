@@ -180,7 +180,7 @@ class MessageManagementTests(unittest.TestCase):
                                   skills=[{'id':'skill','name':'Same skill','path':'/same/skill'}],permissions={'mode':'same'})
         original=copy.deepcopy(b.submissions[key]);order=list(b.submissions)
         edit_id=str(uuid.uuid4());before=b.message_management(self.thread)
-        request={'action':'edit','id':identifier,'text':'edited正文','editId':edit_id,
+        request={'action':'edit','id':identifier,'text':'edited텍스트','editId':edit_id,
                  'version':before['version'],'expectedAccount':'account-a'}
         result=b.manage_messages(self.thread,request)
         self.assertEqual(list(b.submissions),order)
@@ -188,7 +188,7 @@ class MessageManagementTests(unittest.TestCase):
         with self.assertRaises(ValueError):b.manage_messages(self.thread,request)
         b.submissions=json.loads(b.ledger_path.read_text(encoding='utf-8'))
         self.assertEqual(b.message_management(self.thread,[identifier])['receipts'][0]['edit'],
-                         {'id':edit_id,'text':'edited正文','status':'applied'})
+                         {'id':edit_id,'text':'edited텍스트','status':'applied'})
         session=b.live[self.thread];session.runtime='desktop';session.state['latestModel']='same-model'
         b.uploads=SimpleNamespace(resolve=Mock(return_value=[]));b._call=Mock(return_value={})
         b._dispatch=Bridge._dispatch.__get__(b)
@@ -196,7 +196,7 @@ class MessageManagementTests(unittest.TestCase):
         first=self.thread+':'+self.ids[0];b._send_queued(session,first,b.submissions[first])
         b._send_queued(session,key,original)
         request_body=b._call.call_args.args[2]['turnStart']['request']
-        self.assertEqual(request_body['input'][0]['text'],'edited正文')
+        self.assertEqual(request_body['input'][0]['text'],'edited텍스트')
         self.assertEqual(request_body['clientUserMessageId'],identifier)
         self.assertEqual(request_body['input'][1]['path'],'/same/skill')
         b.uploads.resolve.assert_called_with(self.thread,['upload'])
@@ -217,7 +217,7 @@ class MessageManagementTests(unittest.TestCase):
         b.receipts[key]['entry']['target']={'cwd':'/original','modelProvider':'openai'}
         b.receipts[key]['entry']['attachments']=[]
         b.receipts[key]['entry'].update(skills=[],workMode=None,goalActivation=None)
-        self.action(b,'edit',id=identifier,text='new WSL正文',editId=edit_id)
+        self.action(b,'edit',id=identifier,text='new WSL텍스트',editId=edit_id)
         self.assertEqual(list(b.receipts),order)
         b.receipts=json.loads(b.receipts_path.read_text(encoding='utf-8'));b.data_dir=Path(self.temp.name)
         b.uploads=SimpleNamespace(resolve=Mock(return_value=[]));b._resolve_skills=Mock(return_value=[])
@@ -230,10 +230,10 @@ class MessageManagementTests(unittest.TestCase):
         runtime.request.assert_not_called()
         b._dispatch_queued(self.thread)
         b.read.assert_called_once()
-        self.assertEqual(runtime.request.call_args.args[1]['input'][0]['text'],'new WSL正文')
+        self.assertEqual(runtime.request.call_args.args[1]['input'][0]['text'],'new WSL텍스트')
         self.assertEqual(b.receipts[key]['result']['status'],'accepted')
         receipt=b.message_management(self.thread,[identifier])['receipts'][0]
-        self.assertEqual(receipt['edit'],{'id':edit_id,'text':'new WSL正文','status':'applied'})
+        self.assertEqual(receipt['edit'],{'id':edit_id,'text':'new WSL텍스트','status':'applied'})
         with self.assertRaises(ValueError):self.action(b,'edit',id=identifier,text='late',editId=str(uuid.uuid4()))
 
     def test_edit_racing_dispatch_rejects_without_requeue_or_overwriting(self):

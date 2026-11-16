@@ -64,7 +64,7 @@ for line in sys.stdin:
                 process = subprocess.run([sys.executable, '-I', '-S', '-B', '-'], input=source,
                                          text=True, capture_output=True, cwd=folder, env=env, timeout=10)
                 if process.returncode:
-                    raise RemoteUnavailable('SSH 读取失败，请检查电脑上该主机的 SSH 连接') from RuntimeError(process.stderr)
+                    raise RemoteUnavailable('SSH 읽지 못했습니다. 컴퓨터의 호스트를 확인하세요. SSH 연결') from RuntimeError(process.stderr)
                 return json.loads(process.stdout)
             with patch('bridge.clients.codex.remote.ssh_read', side_effect=read):
                 models = reader.get_kind('models', folder)

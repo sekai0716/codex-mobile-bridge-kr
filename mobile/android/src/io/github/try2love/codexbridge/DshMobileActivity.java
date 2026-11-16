@@ -22,20 +22,20 @@ public final class DshMobileActivity extends Activity {
   ContextThemeWrapper themed=new ContextThemeWrapper(this,0);themed.applyOverrideConfiguration(configuration);themed.setTheme(getResources().getIdentifier("SettingsTheme","style",getPackageName()));
   SettingsUi ui=new SettingsUi(themed);LinearLayout root=ui.column();root.setBackgroundColor(ui.page);
   LinearLayout bar=new LinearLayout(ui.context);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(ui.dp(8),0,ui.dp(8),0);
-  ImageButton close=toolbarButton(ui,"ic_menu_monitor","我的电脑",this::finish);bar.addView(close,new LinearLayout.LayoutParams(ui.dp(48),ui.dp(48)));
+  ImageButton close=toolbarButton(ui,"ic_menu_monitor","내 컴퓨터",this::finish);bar.addView(close,new LinearLayout.LayoutParams(ui.dp(48),ui.dp(48)));
   TextView title=ui.text("DSH Mobile",17,ui.text);title.setTypeface(null,android.graphics.Typeface.BOLD);title.setGravity(Gravity.CENTER);title.setSingleLine();title.setEllipsize(android.text.TextUtils.TruncateAt.END);bar.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-  ImageButton reload=toolbarButton(ui,"ic_menu_refresh_cw","刷新",()->web.reload());bar.addView(reload,new LinearLayout.LayoutParams(ui.dp(48),ui.dp(48)));root.addView(bar,new LinearLayout.LayoutParams(-1,ui.dp(56)));
+  ImageButton reload=toolbarButton(ui,"ic_menu_refresh_cw","새로 고치다",()->web.reload());bar.addView(reload,new LinearLayout.LayoutParams(ui.dp(48),ui.dp(48)));root.addView(bar,new LinearLayout.LayoutParams(-1,ui.dp(56)));
   web=new WebView(ui.context);web.setBackgroundColor(ui.page);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
   new SystemBars(this,root,()->{}).update(ui.page,ui.page);
   WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
   web.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
     String target=request.getUrl().toString();if(DshMobileURL.sameOrigin(target,entry))return false;
-    if(request.isForMainFrame()&&request.hasGesture()&&("https".equals(request.getUrl().getScheme())||"http".equals(request.getUrl().getScheme())))new AlertDialog.Builder(ui.context).setMessage(MobileStrings.text(DshMobileActivity.this,"在浏览器打开外部链接？\n")+request.getUrl().getHost()).setPositiveButton(MobileStrings.text(DshMobileActivity.this,"打开"),(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,request.getUrl()));}catch(ActivityNotFoundException ignored){}}).setNegativeButton(MobileStrings.text(DshMobileActivity.this,"取消"),null).show();return true;
+    if(request.isForMainFrame()&&request.hasGesture()&&("https".equals(request.getUrl().getScheme())||"http".equals(request.getUrl().getScheme())))new AlertDialog.Builder(ui.context).setMessage(MobileStrings.text(DshMobileActivity.this,"브라우저에서 외부 링크를 열까요? \n")+request.getUrl().getHost()).setPositiveButton(MobileStrings.text(DshMobileActivity.this,"열기"),(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,request.getUrl()));}catch(ActivityNotFoundException ignored){}}).setNegativeButton(MobileStrings.text(DshMobileActivity.this,"취소"),null).show();return true;
    }
    @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){if(files!=null){files.onReceiveValue(null);files=null;}}
    @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();}
-   @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame())Toast.makeText(DshMobileActivity.this,MobileStrings.text(DshMobileActivity.this,"连接失败，请刷新重试"),Toast.LENGTH_LONG).show();}
+   @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame())Toast.makeText(DshMobileActivity.this,MobileStrings.text(DshMobileActivity.this,"연결에 실패했습니다. 다시 시도하려면 새로고침하세요."),Toast.LENGTH_LONG).show();}
   });
   web.setWebChromeClient(new WebChromeClient(){
    @Override public boolean onShowFileChooser(WebView view,ValueCallback<Uri[]> callback,FileChooserParams params){

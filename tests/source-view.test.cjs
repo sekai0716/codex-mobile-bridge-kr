@@ -13,7 +13,7 @@ class Element {
   addEventListener() {}
 }
 const elements = [], events = new Map();
-const context = {window:{}, BridgeI18n:{language:()=> 'zh', t:text=>text}, AbortController, document:{createElement:tag=>{const element=new Element(tag);elements.push(element);return element;},createTextNode:text=>({textContent:text}),addEventListener:(name,fn)=>events.set(name,fn),querySelectorAll:selector=>elements.filter(element=>selector==='.wb-source-wrap'&&element.className==='wb-source-wrap')}};
+const context = {window:{}, BridgeI18n:{language:()=> 'ko', t:text=>text}, AbortController, document:{createElement:tag=>{const element=new Element(tag);elements.push(element);return element;},createTextNode:text=>({textContent:text}),addEventListener:(name,fn)=>events.set(name,fn),querySelectorAll:selector=>elements.filter(element=>selector==='.wb-source-wrap'&&element.className==='wb-source-wrap')}};
 vm.createContext(context);
 for (const file of ['web/vendor/prism/source-view.min.js', 'web/shared/code-syntax.js', 'web/features/workspace/source-view.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, {filename:file});
@@ -28,13 +28,13 @@ test('bundled grammars cover the supported source types', () => {
     const language = sourceView.languageFor(name);
     assert.ok(language, name);
     assert.ok(context.window.Prism.languages[language], name);
-    assert.match(context.window.Prism.highlight('const value = "中文"', context.window.Prism.languages[language], language), /token|const/);
+    assert.match(context.window.Prism.highlight('const value = "중국어"', context.window.Prism.languages[language], language), /token|const/);
   }
   assert.equal(sourceView.languageFor('README.unknown'), null);
 });
 
 test('highlighted code preserves every source character and keeps line numbers separate', () => {
-  const original = 'const 中文 = "<&>\u00a0";\r\n\tconsole.log(中文);\r\n';
+  const original = 'const 중국어 = "<&>\u00a0";\r\n\tconsole.log(중국어);\r\n';
   const view = sourceView.create({name:'sample.js', text:original});
   const {gutter,code} = parts(view);
   assert.deepEqual(gutter.children.map(row=>row.textContent), ['1','2','3']);
@@ -48,7 +48,7 @@ test('highlighted code preserves every source character and keeps line numbers s
 });
 
 test('all bundled grammars preserve CRLF, lone CR, NBSP, tabs and hostile markup as text', () => {
-  const original = '<script>\u00a0中文\t</script>\r\nnext\rline';
+  const original = '<script>\u00a0중국어\t</script>\r\nnext\rline';
   for (const name of ['x.py','x.js','x.ts','x.jsx','x.tsx','x.json','x.yaml','x.toml','x.html','x.css','x.sh','x.ps1','x.cmd']) {
     const code = parts(sourceView.create({name, text:original})).code;
     assert.equal(code.textContent, original, name);
@@ -57,8 +57,8 @@ test('all bundled grammars preserve CRLF, lone CR, NBSP, tabs and hostile markup
 });
 
 test('unknown or expensive source falls back to original text', () => {
-  const unknown = sourceView.create({name:'opaque.xyz', text:'\t中文\n\nend'});
-  assert.equal(parts(unknown).code.textContent, '\t中文\n\nend');
+  const unknown = sourceView.create({name:'opaque.xyz', text:'\t중국어\n\nend'});
+  assert.equal(parts(unknown).code.textContent, '\t중국어\n\nend');
   assert.deepEqual(parts(unknown).gutter.children.map(row=>row.textContent), ['1','2','3']);
   const big = 'print("x")\n'.repeat(7000);
   const view = sourceView.create({name:'big.py', text:big});
@@ -77,17 +77,17 @@ test('line numbers follow LF, CRLF and CR without normalizing source', () => {
 });
 
 test('wrap toggle preserves original line rows, highlighting and source text across CRLF tokens', () => {
-  const original = '/* 多行\r\n注释 */\r\nconst long = "' + 'x'.repeat(240) + '";\t// end\r\n';
+  const original = '/* 여러 줄\r\n논평 */\r\nconst long = "' + 'x'.repeat(240) + '";\t// end\r\n';
   const view = sourceView.create({name:'sample.js', text:original}), toggle=view.children[0], {gutter,code}=parts(view);
-  assert.equal(toggle.textContent, '自动换行');assert.equal(view.dataset.wrap, 'false');
+  assert.equal(toggle.textContent, '자동 줄 바꿈');assert.equal(view.dataset.wrap, 'false');
   assert.deepEqual(gutter.children.map(row=>row.style.gridRow), ['1','2','3','4']);
   assert.ok(tokens(code).some(node=>node.className?.includes('token comment')));
-  toggle.onclick();assert.equal(view.dataset.wrap, 'true');assert.equal(toggle.attributes['aria-pressed'], 'true');assert.equal(toggle.textContent, '原始行宽');
+  toggle.onclick();assert.equal(view.dataset.wrap, 'true');assert.equal(toggle.attributes['aria-pressed'], 'true');assert.equal(toggle.textContent, '원래 선 너비');
   assert.equal(code.textContent, original);
   toggle.onclick();assert.equal(view.dataset.wrap, 'false');assert.equal(code.textContent, original);
   context.BridgeI18n.language=()=> 'en';events.get('bridge-language')();assert.equal(toggle.textContent, 'Wrap lines');
   toggle.onclick();assert.equal(toggle.textContent, 'Original line width');assert.equal(code.textContent, original);
-  context.BridgeI18n.language=()=> 'zh';
+  context.BridgeI18n.language=()=> 'ko';
 });
 
 test('a CRLF split across Prism tokens still creates one numbered source line', () => {
@@ -103,7 +103,7 @@ test('a CRLF split across Prism tokens still creates one numbered source line', 
 });
 
 test('file preview copies the original source rather than rendered tokens or line numbers', async () => {
-  context.BridgeI18n = {language:()=> 'zh', t:text=>text};
+  context.BridgeI18n = {language:()=> 'ko', t:text=>text};
   const copied = [];
   context.window.BridgeClipboard = {copyWithFeedback:async getText=>copied.push(await getText())};
   vm.runInContext(fs.readFileSync(path.join(root, 'web/features/workspace/workbench.js'), 'utf8'), context);

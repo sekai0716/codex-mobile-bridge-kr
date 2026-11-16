@@ -80,7 +80,7 @@ class AdapterLifecycleTests(unittest.TestCase):
                    'parent': 1, 'birth': [1, 2], 'started': [3, 4], 'uid': 501, 'ruid': 501}
         record['runtime'].update({key: current[key] for key in ('birth', 'started', 'uid', 'ruid')})
         with patch.object(runtime, 'process_identity', return_value=current):
-            with self.assertRaisesRegex(ValueError, '尚未退出'):
+            with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."):
                 runtime.require_inactive(record)
 
     def test_failed_start_is_cleaned_only_after_native_normal_exit(self):
@@ -203,7 +203,7 @@ class TransportCapacityTests(unittest.TestCase):
 
     def test_native_advertised_frame_cap_is_used_with_complete_json_message(self):
         transport, writer = self.websocket()
-        message = {'id': 4, 'method': 'test', 'params': {'text': '附件' * 30}}
+        message = {'id': 4, 'method': 'test', 'params': {'text': '충수' * 30}}
         transport.send(message)
         frames = self.frames(writer.getvalue())
         self.assertGreater(len(frames), 1)

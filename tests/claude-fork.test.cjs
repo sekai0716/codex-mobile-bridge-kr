@@ -13,16 +13,16 @@ async function fixture({fork=true}={}){
 test('Claude branches only using a fresh native assistant UUID and never replays an operation',async()=>{
  const ui=await fixture();
  assert.ok(ui.status().surfaces.code.includes('mobileFork'));assert.equal(ui.status().surfaces.cowork.includes('mobileFork'),false);
- assert.match((await ui.invoke('code','sdk-id')).error,/原消息已不可用/);assert.equal(ui.calls.length,0);
- assert.match((await ui.invoke('code','native-row-uuid:text:0')).error,/原消息已不可用/);assert.equal(ui.calls.length,0);
+ assert.match((await ui.invoke('code','sdk-id')).error,/원본 메시지를 더 이상 사용할 수 없습니다./);assert.equal(ui.calls.length,0);
+ assert.match((await ui.invoke('code','native-row-uuid:text:0')).error,/원본 메시지를 더 이상 사용할 수 없습니다./);assert.equal(ui.calls.length,0);
  const result=await ui.invoke('code','native-row-uuid');assert.equal(result.result.sessionId,'local_11111111-1111-4111-8111-111111111111');
  assert.deepEqual(ui.calls,[['parent','local_11111111-1111-4111-8111-111111111111','native-row-uuid']]);
- assert.match((await ui.invoke('code','native-row-uuid',undefined,true)).error,/不会重复执行/);assert.equal(ui.calls.length,1);
- ui.rows([{type:'assistant',uuid:'native-row-uuid',isSidechain:true}]);assert.match((await ui.invoke('code','native-row-uuid')).error,/原消息已不可用/);assert.equal(ui.calls.length,1);
- assert.match((await ui.invoke('cowork','native-row-uuid')).error,/不支持/);assert.equal(ui.calls.length,1);
+ assert.match((await ui.invoke('code','native-row-uuid',undefined,true)).error,/반복되지 않습니다/);assert.equal(ui.calls.length,1);
+ ui.rows([{type:'assistant',uuid:'native-row-uuid',isSidechain:true}]);assert.match((await ui.invoke('code','native-row-uuid')).error,/원본 메시지를 더 이상 사용할 수 없습니다./);assert.equal(ui.calls.length,1);
+ assert.match((await ui.invoke('cowork','native-row-uuid')).error,/지원되지 않는 데스크톱 작업/);assert.equal(ui.calls.length,1);
 });
 test('an older Claude native API has no advertised or callable mobile fork',async()=>{
- const ui=await fixture({fork:false});assert.equal(ui.status().surfaces.code.includes('mobileFork'),false);assert.match((await ui.invoke('code','native-row-uuid')).error,/不支持/);assert.equal(ui.calls.length,0);
+ const ui=await fixture({fork:false});assert.equal(ui.status().surfaces.code.includes('mobileFork'),false);assert.match((await ui.invoke('code','native-row-uuid')).error,/지원되지 않는 데스크톱 작업/);assert.equal(ui.calls.length,0);
 });
 test('Claude connector preserves the complete native trust category suffix for the shared refusal classifier',async()=>{
  const error="Error invoking remote method '$eipc_message$_5c55def3-2e9e-44fa-af10-a18b58800855_$_claude.web_$_LocalSessions_$_start': WorkspaceTrustError: Workspace requires trust approval before starting a session. [ccdErrorCategory:trust_required]";

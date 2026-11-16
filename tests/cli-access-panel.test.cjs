@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../web/features/accounts/api-editor.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'../web/features/accounts/cli-access.js'),'utf8');
-const context={crypto:require('node:crypto').webcrypto,BridgeI18n:{t:key=>({'正在读取…':'Loading…','正在保存…':'Saving…','请填写有效 API Key':'Enter a valid API key.'}[key]||key)}};
+const context={crypto:require('node:crypto').webcrypto,BridgeI18n:{t:key=>({'로드 중…':'Loading…','절약…':'Saving…','유효한 API 키를 입력하세요.':'Enter a valid API key.'}[key]||key)}};
 vm.createContext(context);vm.runInContext(source+'\nglobalThis.CliAccessPanel=CliAccessPanel;',context);
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 function panel(){
@@ -25,7 +25,7 @@ test('closing during save ignores its late result and translates a later error',
   instance.request=()=>pending.promise;
   const saving=instance.perform(request);instance.clear();pending.resolve({savedId:'stale'});await saving;
   assert.equal(instance.value,null);assert.equal(instance.key.input.value,'');assert.equal(request.apiKey,'');
-  instance.request=async()=>{throw Error('请填写有效 API Key');};
+  instance.request=async()=>{throw Error('유효한 API 키를 입력하세요.');};
   await instance.perform({provider:'claude',action:'saveApi'});
   assert.equal(instance.error.textContent,'Enter a valid API key.');assert.equal(instance.busy,false);
 });
@@ -54,14 +54,14 @@ function renderedPanel(){
 }
 test('rendered CLI connectivity success and failure remain visible without catalog cache',async()=>{
   const {instance,row,result}=renderedPanel();instance.request=async()=>result({modelCount:1,models:null});
-  await instance.probe(row,'test');assert.match(instance.rows.textContent,/模型接口连接成功/);
+  await instance.probe(row,'test');assert.match(instance.rows.textContent,/모델 엔드포인트가 연결되었습니다\. 채팅 요청이 전송되지 않았습니다\./);
   instance.request=async()=>{throw Error('Connection failed');};await instance.probe(row,'test');assert.match(instance.rows.textContent,/Connection failed/);
 });
 test('rendered CLI model refresh shows retained rows, timestamp, and backend modelError',async()=>{
   const {instance,row,result}=renderedPanel(),cache={identity:row.modelCatalogIdentity,updatedAt:1000,state:'fresh'};
-  instance.request=async()=>result({models:['model-a'],cache});await instance.probe(row,'models');assert.match(instance.rows.textContent,/更新于：/);
-  instance.request=async()=>result({models:['model-a'],cache:{...cache,state:'stale'},modelError:'模型目录刷新失败，已保留上次结果'});await instance.probe(row,'models',true);
-  assert.match(instance.rows.textContent,/model-a/);assert.match(instance.rows.textContent,/模型目录刷新失败，已保留上次结果/);assert.match(instance.rows.textContent,/更新于：/);
+  instance.request=async()=>result({models:['model-a'],cache});await instance.probe(row,'models');assert.match(instance.rows.textContent,/업데이트 날짜:/);
+  instance.request=async()=>result({models:['model-a'],cache:{...cache,state:'stale'},modelError:'모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.'});await instance.probe(row,'models',true);
+  assert.match(instance.rows.textContent,/model-a/);assert.match(instance.rows.textContent,/모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다./);assert.match(instance.rows.textContent,/업데이트 날짜:/);
 });
 
 test('unified Codex editor suppresses duplicate inventory while retaining model probe feedback',async()=>{
@@ -91,7 +91,7 @@ test('URL or key changes invalidate draft models without allowing an old respons
  ui.key.input.value='new-key';ui.clearDraftModels();assert.equal(ui.model.input.value,'');assert.equal(ui.modelSelect.hidden,true);
 });
 test('empty or failed model lookup keeps manual entry available and never saves',async()=>{
- const ui=draftPanel();ui.request=async()=>({models:[]});await ui.discoverModels();assert.match(ui.modelFeedback.textContent,/手动填写/);assert.equal(ui.modelSelect.hidden,true);assert.equal(ui.save.disabled,false);
+ const ui=draftPanel();ui.request=async()=>({models:[]});await ui.discoverModels();assert.match(ui.modelFeedback.textContent,/수동으로 입력/);assert.equal(ui.modelSelect.hidden,true);assert.equal(ui.save.disabled,false);
  ui.request=async()=>{throw Error('Offline');};await ui.discoverModels();assert.equal(ui.modelFeedback.textContent,'Offline');assert.equal(ui.save.disabled,false);
 });
 
@@ -105,7 +105,7 @@ test('Codex shared auth confirmation retains a request identifier through unknow
  instance.perform=value=>calls.push(value);
  instance.switchTo('codex','saved',{sharedWithDesktop:true});
  let dialog=nodes.at(-1),submit=dialog.children.at(-2);
- assert.match(dialog.children[0].textContent,/同步共享认证/);
+ assert.match(dialog.children[0].textContent,/이 액세스는 이 컴퓨터에도 사용됩니다\. Codex CLI。전환하면 공유 인증이 동기화됩니다\. 필요할 때만 다시 시작 Codex Desktop。/);
  submit.onclick();assert.equal(calls.length,0);
  fields.slice(-2).forEach(field=>field.input.checked=true);submit.onclick();
  const first=calls[0];assert.equal(first.tasksConfirmed,true);assert.equal(first.desktopRestartConfirmed,true);

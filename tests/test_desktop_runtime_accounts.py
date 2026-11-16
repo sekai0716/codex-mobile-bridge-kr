@@ -253,17 +253,17 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
 
     def test_requires_confirmation_and_rejects_independent_or_other_platform(self):
         for key in ('confirmed', 'tasksConfirmed'):
-            with self.assertRaisesRegex(ValueError, '确认'):
+            with self.assertRaisesRegex(ValueError, '확인'):
                 self.manager.control({**self.value, key: False})
-        with self.assertRaisesRegex(ValueError, '标识'):
+        with self.assertRaisesRegex(ValueError, "잘못된\\ 초기화\\ 요청\\ ID"):
             self.manager.control({**self.value, 'requestId': 'invalid'})
         self.bridge.host = 'codex:independent'
-        with self.assertRaisesRegex(ValueError, '独立配置'):
+        with self.assertRaisesRegex(ValueError, "독립\\ 실행형\\ 구성은\\ 기본값을\\ 관리하지\\ 않습니다\\.\\ Codex\\ Desktop"):
             self.manager.control(self.value)
         self.assertFalse(self.manager.desktop_runtime_status()['supported'])
         self.bridge.host = 'local'
         with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')):
-            with self.assertRaisesRegex(ValueError, '不支持'):
+            with self.assertRaisesRegex(ValueError, "이\\ 항목은\\ Codex\\ 네이티브\\ 연결\\ 초기화를\\ 지원하지\\ 않습니다\\."):
                 self.manager.control(self.value)
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
@@ -330,7 +330,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['stop'].assert_not_called()
 
     def test_unavailable_confirmation_requires_failed_audit_and_never_skips_busy_tasks(self):
-        with self.assertRaisesRegex(ValueError, '核验'):
+        with self.assertRaisesRegex(ValueError, "계속\\ 진행할지\\ 결정하기\\ 전에\\ 네이티브\\ 연결\\ 초기화에\\ 영향을\\ 받는\\ 작업\\ 상태를\\ 확인하세요\\."):
             self.manager.control({**self.value, 'acknowledgeUnavailable': True})
         self.bridge.assert_desktop_idle.side_effect = TaskStateUnavailable('tasks unavailable')
         self.run_initialization()
@@ -470,7 +470,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.manager.phase('starting', operation='desktopRuntime', requestId=self.value['requestId'])
         restarted = accounts_module.Accounts(self.bridge)
         self.assertEqual(restarted.state['phase'], 'failed')
-        self.assertIn('重新初始化', restarted.state['error'])
+        self.assertIn('다시 초기화', restarted.state['error'])
         restarted.assert_editable()
         self.mocks['stop'].assert_not_called()
         self.app.start.assert_not_called()
@@ -479,7 +479,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['inspect'].side_effect = None
         self.mocks['inspect'].return_value = {**self.running, 'mainPids': [41, 42]}
         self.run_initialization()
-        self.assertIn('唯一', self.manager.state['error'])
+        self.assertIn("단일 Codex 데스크톱 프로세스를 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도하세요.", self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
@@ -487,7 +487,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         changed = {**self.identity, 'birth': [101, 1]}
         self.mocks['identity'].side_effect = [self.identity, self.identity, changed, changed]
         self.run_initialization()
-        self.assertIn('进程已变化', self.manager.state['error'])
+        self.assertIn('프로세스가 변경되었습니다.', self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
@@ -511,14 +511,14 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
                 self.mocks['inspect'].return_value = self.running
                 self.mocks['environment'].return_value = environment, None
                 self.run_initialization()
-                self.assertIn('其他配置目录', self.manager.state['error'])
+                self.assertIn("실행 중인 Codex는 다른 구성 디렉터리를 사용합니다. 이 연결을 초기화할 수 없습니다.", self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
     def test_user_data_dir_argument_or_unreadable_environment_cannot_quit_native_app(self):
         self.mocks['commands'].return_value = {41: str(self.app.executable)+' "--user-data-dir=/fixture/isolated"'}
         self.run_initialization()
-        self.assertIn('其他配置目录', self.manager.state['error'])
+        self.assertIn("실행 중인 Codex는 다른 구성 디렉터리를 사용합니다. 이 연결을 초기화할 수 없습니다.", self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.value['requestId'] = str(uuid.uuid4())
         self.mocks['commands'].return_value = {41: str(self.app.executable)}
@@ -551,7 +551,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         status = self.manager.desktop_runtime_status()
         self.assertTrue(status['supported'])
         self.assertFalse(status['configured'])
-        self.assertIn('无法读取', status['error'])
+        self.assertIn("공유 연결 설정을 읽을 수 없습니다. 연결을 다시 초기화하십시오.", status['error'])
         self.mocks['connect'].assert_not_called()
 
     def test_switch_lock_conflict_does_not_change_accounts_or_exit(self):
@@ -592,7 +592,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.manager.index['accounts'] = [row]
         self.manager.info.current = Mock(return_value={'id': None})
         def apply(selected, app):
-            with self.assertRaisesRegex(ValueError, '共享接入仍在使用或退出中'):
+            with self.assertRaisesRegex(ValueError, '공유 액세스가 아직 사용 중이거나 종료되었습니다.'):
                 with self.real_initialization_lock(self.home):
                     pass
             self.manager.phase('complete')

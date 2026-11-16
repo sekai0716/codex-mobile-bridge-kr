@@ -7,7 +7,7 @@ async function runWorkbenchSplitTests(){
  const plus=wb.strip.querySelector('.wb-add').getBoundingClientRect(),split=wb.splitButton.getBoundingClientRect();
  check(plus.y===split.y&&plus.width===split.width&&plus.height===split.height,'Add and split icons have aligned equal-size controls');
  const draft=document.querySelector('#message');draft.value='main split draft';panel.input.value='side split draft';
- wb.unsplit();const tab=[...wb.tabs.children].find(n=>n.textContent.includes(BridgeI18n.t('侧边聊天'))),data=new DataTransfer();
+ wb.unsplit();const tab=[...wb.tabs.children].find(n=>n.textContent.includes(BridgeI18n.t('보조 채팅'))),data=new DataTransfer();
  tab.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));
  check(wb.layout.classList.contains('wb-dragging'),'Dragging a workbench tab exposes the right drop target');
  wb.dropZone.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:data}));await frame();

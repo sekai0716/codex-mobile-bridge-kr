@@ -24,5 +24,5 @@ test('Windows holder redacts callback errors and rejects malformed dispatch fram
  io.child.stdout.write(encode({type:'request',id:'not-a-request',request:{}}));await new Promise(setImmediate);assert.equal(stop.alive(),false);assert.equal(calls,1);
 });
 test('a failed Windows holder fails closed without terminating its desktop parent',async()=>{
- const io=fixture(false);await assert.rejects(serveWindowsLocal('profile','zcode-official',()=>{}, {executable:'missing.exe'},{launch:io.launch}),/本机控制接口/);assert.equal(io.child.stdin.writableEnded,true);
+ const io=fixture(false);await assert.rejects(serveWindowsLocal('profile','zcode-official',()=>{}, {executable:'missing.exe'},{launch:io.launch}),/로컬 제어 인터페이스/);assert.equal(io.child.stdin.writableEnded,true);
 });

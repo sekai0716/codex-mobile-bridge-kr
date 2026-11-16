@@ -12,7 +12,7 @@ test('native attached chats use standard identity, navigation and lifecycle',asy
   document.getElementById('app').hidden=false;document.getElementById('chat').hidden=false;
   document.getElementById('login').hidden=true;document.getElementById('sessions').hidden=true;
   document.getElementById('app').classList.add('chat-open');document.getElementById('welcome').hidden=true;
-  document.getElementById('chat-title').textContent='原生父聊天';BridgeI18n.setLanguage('zh');
+  document.getElementById('chat-title').textContent='네이티브 학부모 채팅';BridgeI18n.setLanguage('ko');
  });
  await page.evaluate(readFileSync(path.join(__dirname,'side-chat-ui.browser.js'),'utf8'));
  const result=await page.evaluate(()=>runSideChatTests());

@@ -21,7 +21,7 @@ class WorkspaceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir=support.ROOT / '.tmp')
         self.root = Path(self.temp.name) / 'project'; self.root.mkdir()
         self.work = Workspace(self.root)
-        (self.root / 'folder').mkdir(); (self.root / 'hello.txt').write_bytes('你好\nworkspace🙂'.encode('utf-8'))
+        (self.root / 'folder').mkdir(); (self.root / 'hello.txt').write_bytes('안녕하세요\nworkspace🙂'.encode('utf-8'))
         (self.root / '.hidden').write_text('hidden')
 
     def test_references_resolve_metadata_without_copying_and_reject_changed_roots(self):
@@ -69,7 +69,7 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(len(self.work.listing(search='page-', offset=page['nextOffset'])['entries']), 5)
 
     def test_read_text_image_binary_and_large_preview(self):
-        self.assertEqual(self.work.read('hello.txt')['text'], '你好\nworkspace🙂')
+        self.assertEqual(self.work.read('hello.txt')['text'], '안녕하세요\nworkspace🙂')
         (self.root / 'image.png').write_bytes(b'\x89PNG\r\n\x1a\nfixture')
         self.assertEqual(self.work.read('image.png')['kind'], 'image')
         (self.root / 'binary').write_bytes(b'\0\xff')
@@ -91,11 +91,11 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(next(x['kind'] for x in self.work.listing()['entries'] if x['name'] == 'link'), 'blocked')
 
     def test_atomic_upload_retry_collision_and_git_boundary(self):
-        data = base64.b64encode('文件🙂'.encode()).decode()
+        data = base64.b64encode('파일🙂'.encode()).decode()
         self.assertFalse(self.work.upload('folder/new.txt', data)['existing'])
         self.assertTrue(self.work.upload('folder/new.txt', data)['existing'])
         with self.assertRaises(ValueError): self.work.upload('folder/new.txt', 'YQ==')
-        self.assertEqual((self.root / 'folder/new.txt').read_text(encoding='utf-8'), '文件🙂')
+        self.assertEqual((self.root / 'folder/new.txt').read_text(encoding='utf-8'), '파일🙂')
         with self.assertRaises(PermissionError): self.work.upload('.git/config', data)
         with patch('bridge.features.workspace.workspace.os.link', side_effect=OSError('disk error')):
             with self.assertRaises(ValueError): operate(str(self.root), 'upload', {'path': 'failed', 'encoded': data})

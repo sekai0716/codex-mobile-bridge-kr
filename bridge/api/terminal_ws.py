@@ -55,16 +55,16 @@ def serve(handler, bridge, thread, owner, identifier, after, csrf, enabled):
             len(protocols) != 2 or protocols[0] != 'terminal.v1' or
             not hmac.compare_digest(protocols[1], csrf) or
             headers.get('Content-Length') or headers.get('Transfer-Encoding')):
-        raise PermissionError('终端连接验证失败')
+        raise PermissionError('단말기 연결 확인 실패')
     try:
         if len(key) != 24 or len(base64.b64decode(key, validate=True)) != 16:
             raise ValueError()
     except ValueError:
-        raise PermissionError('终端连接验证失败') from None
+        raise PermissionError('단말기 연결 확인 실패') from None
     # Validate binding before 101. An unknown or other owner's PTY is never upgraded.
     bridge.terminal(thread, owner, 'poll', {'id': identifier, 'after': after, 'waitMs': 0})
     if not handler.server.terminal_sockets.acquire(blocking=False):
-        handler.output(503, {'error': '终端连接数已满'})
+        handler.output(503, {'error': '터미널 연결 수가 가득 찼습니다.'})
         return
     accept = base64.b64encode(hashlib.sha1((key + GUID).encode('ascii')).digest()).decode('ascii')
     try:

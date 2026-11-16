@@ -25,10 +25,10 @@ class ClaudeRename(unittest.IsolatedAsyncioTestCase):
         for kind in ('code', 'cowork'):
             sid = gateway_id(kind, kind + '-id')
             self.adapter.desktop.call.return_value = {'status': 'confirmed', 'scope': 'native',
-                                                     'result': {'id': kind + '-id', 'title': '新名称'}}
-            result = await self.adapter.dispatch('rename', sid, {'title': ' 新名称 '})
-            self.assertEqual(result['result'], {'id': sid, 'title': '新名称'})
-            self.adapter.desktop.call.assert_awaited_with(kind, 'mobileRename', kind + '-id', {'title': '新名称'})
+                                                     'result': {'id': kind + '-id', 'title': '새 이름'}}
+            result = await self.adapter.dispatch('rename', sid, {'title': ' 새 이름 '})
+            self.assertEqual(result['result'], {'id': sid, 'title': '새 이름'})
+            self.adapter.desktop.call.assert_awaited_with(kind, 'mobileRename', kind + '-id', {'title': '새 이름'})
 
     async def test_missing_capability_or_invalid_title_never_sends(self):
         sid = gateway_id('code', 'code-id')
@@ -37,15 +37,15 @@ class ClaudeRename(unittest.IsolatedAsyncioTestCase):
                 await self.adapter.dispatch('rename', sid, {'title': title})
         self.adapter.desktop.capabilities['code'] = ['updateSession']
         self.assertFalse(self.adapter.session_capabilities('code')['rename'])
-        with self.assertRaisesRegex(ValueError, '原生改名'):
-            await self.adapter.dispatch('rename', sid, {'title': '新名称'})
+        with self.assertRaisesRegex(ValueError, '기본 이름 바꾸기'):
+            await self.adapter.dispatch('rename', sid, {'title': '새 이름'})
         self.adapter.desktop.call.assert_not_awaited()
 
     async def test_unknown_or_wrong_identity_never_replays(self):
         sid = gateway_id('code', 'code-id')
-        for reply in ({'status': 'accepted'}, {'status': 'confirmed', 'result': {'id': 'different', 'title': '新名称'}}):
+        for reply in ({'status': 'accepted'}, {'status': 'confirmed', 'result': {'id': 'different', 'title': '새 이름'}}):
             self.adapter.desktop.call.reset_mock()
             self.adapter.desktop.call.return_value = reply
-            with self.assertRaisesRegex(BridgeUnavailable, '结果待核对'):
-                await self.adapter.dispatch('rename', sid, {'title': '新名称'})
+            with self.assertRaisesRegex(BridgeUnavailable, "이름\\ 변경\\ 결과를\\ 확인해야\\ 합니다\\.\\ 원래\\ 클라이언트를\\ 확인하세요\\.\\ 중복\\ 제출은\\ 되지\\ 않습니다"):
+                await self.adapter.dispatch('rename', sid, {'title': '새 이름'})
             self.assertEqual(self.adapter.desktop.call.await_count, 1)

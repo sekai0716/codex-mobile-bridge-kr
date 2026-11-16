@@ -12,7 +12,7 @@ public class GatewayUpdateDownloadTests {
  public static void main(String[] args)throws Exception {
   new Random(4).nextBytes(payload);StringBuilder digest=new StringBuilder();for(byte b:MessageDigest.getInstance("SHA-256").digest(payload))digest.append(String.format("%02x",b));
   File dir=new File(args[0]);dir.mkdirs();MobileRelease release=new MobileRelease("2.0.3","",payload.length,digest.toString());String identifier=String.join("",Collections.nCopies(64,"a"));
-  HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);String base="http://127.0.0.1:"+server.getAddress().getPort()+"/d/"+String.join("",Collections.nCopies(32,"b"));
+  HttpServer server=FixtureTLS.server();String base="https://127.0.0.1:"+server.getAddress().getPort()+"/d/"+String.join("",Collections.nCopies(32,"b"));
   server.createContext("/redirect",exchange->{redirects++;exchange.sendResponseHeaders(500,-1);exchange.close();});
   server.createContext("/d/",exchange->{try{
    requests++;check("fixture=session".equals(exchange.getRequestHeaders().getFirst("Cookie")),"gateway request authenticated");

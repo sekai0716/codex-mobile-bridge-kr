@@ -5,29 +5,29 @@ class ClientNavigation {
     this.heading=document.querySelector('#sidebar .list-heading');this.sidebar=document.getElementById('sidebar');
     this.footer=document.querySelector('.sidebar-foot');this.footer.classList.add('client-functions');
     this.navigation=document.createElement('div');this.navigation.className='client-navigation';this.sidebar.append(this.navigation);this.navigation.append(this.footer);
-    this.switcher=document.createElement('nav');this.switcher.className='client-switch';this.switcher.dataset.i18nAriaLabel='切换应用';this.switcher.setAttribute('aria-label',BridgeI18n.t('切换应用'));this.switchDock=document.createElement('div');this.switchDock.className='client-switch-dock';this.switchToggle=document.createElement('button');this.switchToggle.type='button';this.switchToggle.className='plain';this.switchToggle.id='client-switch-toggle';this.switcher.id='client-switch';this.switchToggle.setAttribute('aria-controls',this.switcher.id);this.switchToggle.onclick=()=>{if(this.switchToggle.hidden)return;this.preference('switch-collapsed',!this.preference('switch-collapsed',undefined,false));this.paint();document.getElementById('appearance-dialog').close();};this.switchDock.append(this.switcher);this.navigation.append(this.switchDock);
+    this.switcher=document.createElement('nav');this.switcher.className='client-switch';this.switcher.dataset.i18nAriaLabel='앱 전환';this.switcher.setAttribute('aria-label',BridgeI18n.t('앱 전환'));this.switchDock=document.createElement('div');this.switchDock.className='client-switch-dock';this.switchToggle=document.createElement('button');this.switchToggle.type='button';this.switchToggle.className='plain';this.switchToggle.id='client-switch-toggle';this.switcher.id='client-switch';this.switchToggle.setAttribute('aria-controls',this.switcher.id);this.switchToggle.onclick=()=>{if(this.switchToggle.hidden)return;this.preference('switch-collapsed',!this.preference('switch-collapsed',undefined,false));this.paint();document.getElementById('appearance-dialog').close();};this.switchDock.append(this.switcher);this.navigation.append(this.switchDock);
     document.getElementById('harness-open').hidden=true;
     this.footer.querySelector(':scope > span')?.remove();
     const make=(label,action)=>{const b=document.createElement('button');b.type='button';b.className='plain';b.dataset.i18n=label;b.textContent=BridgeI18n.t(label);b.onclick=action;return b;};
-    this.manage=make('应用管理',()=>this.openManager());this.manage.id='clients-button';
-    this.home=document.createElement('a');this.home.className='plain';this.home.dataset.i18n='返回电脑列表';this.home.textContent=BridgeI18n.t('返回电脑列表');this.home.href='#computers';this.home.id='computers-button';this.home.onclick=event=>{if(BridgeHost.hasNativeLayout()){this.home.href='codexbridge://home';return;}event.preventDefault();this.homeDialog();};
+    this.manage=make("앱",()=>this.openManager());this.manage.id='clients-button';
+    this.home=document.createElement('a');this.home.className='plain';this.home.dataset.i18n="컴퓨터 목록으로 돌아가기";this.home.textContent=BridgeI18n.t("컴퓨터 목록으로 돌아가기");this.home.href='#computers';this.home.id='computers-button';this.home.onclick=event=>{if(BridgeHost.hasNativeLayout()){this.home.href='codexbridge://home';return;}event.preventDefault();this.homeDialog();};
     this.footer.append(this.manage,this.home);this.syncHome();new MutationObserver(()=>this.syncHome()).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
     document.getElementById('logout').hidden=true;
     this.badge=document.createElement('span');this.badge.className='client-badge';this.heading.querySelector('h2').append(this.badge);
     this.computer=document.getElementById('connected-computer');this.computerName=document.getElementById('computer-name');
-    const more=this.heading.querySelector('.appearance-button')||make('•••',()=>{});more.textContent='•••';more.className='list-more appearance-button plain';more.dataset.i18nAriaLabel='详细设置';more.setAttribute('aria-label',BridgeI18n.t('详细设置'));more.onclick=()=>{document.getElementById('appearance-dialog').showModal();window.loadNotificationDefaults?.();};this.heading.append(more);
+    const more=this.heading.querySelector('.appearance-button')||make('•••',()=>{});more.textContent='•••';more.className='list-more appearance-button plain';more.dataset.i18nAriaLabel="추가 설정";more.setAttribute('aria-label',BridgeI18n.t("추가 설정"));more.onclick=()=>{document.getElementById('appearance-dialog').showModal();window.loadNotificationDefaults?.();};this.heading.append(more);
     this.heading.addEventListener('click',e=>{if(e.target.closest('#new-chat')&&this.provider!=='codex'){e.preventDefault();e.stopImmediatePropagation();if(this.provider)this.view.create().catch(error=>notify(error.message));}},true);
     const preferences=document.getElementById('appearance-activity').closest('fieldset');
-    for(const [key,label] of [['clients','应用管理']]){const row=document.createElement('label'),box=document.createElement('input');row.className='display-option';box.type='checkbox';box.id='appearance-'+key;box.checked=this.preference(key);box.onchange=()=>{this.preference(key,box.checked);this.paint();};const caption=document.createElement('span');caption.dataset.i18n=label;caption.textContent=BridgeI18n.t(label);row.append(caption,box);preferences.append(row);}
+    for(const [key,label] of [['clients',"앱"]]){const row=document.createElement('label'),box=document.createElement('input');row.className='display-option';box.type='checkbox';box.id='appearance-'+key;box.checked=this.preference(key);box.onchange=()=>{this.preference(key,box.checked);this.paint();};const caption=document.createElement('span');caption.dataset.i18n=label;caption.textContent=BridgeI18n.t(label);row.append(caption,box);preferences.append(row);}
     const oldShortcuts=document.getElementById('appearance-accounts').closest('fieldset');
-    for(const [id,label] of [['appearance-accounts','账号管理'],['appearance-pushplus','通知管理']]){const row=document.getElementById(id).closest('label'),caption=row.querySelector('span');caption.dataset.i18n=label;caption.textContent=BridgeI18n.t(label);preferences.append(row);}
+    for(const [id,label] of [['appearance-accounts',"계정"],['appearance-pushplus',"알림"]]){const row=document.getElementById(id).closest('label'),caption=row.querySelector('span');caption.dataset.i18n=label;caption.textContent=BridgeI18n.t(label);preferences.append(row);}
     oldShortcuts.hidden=true;
     const settings=document.getElementById('appearance-dialog');settings.querySelector('.picker-head').after(this.switchToggle);
-    const switchPreferences=document.createElement('fieldset');switchPreferences.className='appearance-section';const switchTitle=document.createElement('legend');switchTitle.dataset.i18n='底部应用切换';switchTitle.textContent=BridgeI18n.t('底部应用切换');switchPreferences.append(switchTitle);
-    for(const [id,name] of [['codex','Codex'],['claude','Claude'],['deepseek','DeepSeek Harness']]){const row=document.createElement('label'),box=document.createElement('input'),caption=document.createElement('span');row.className='display-option';box.type='checkbox';box.id='appearance-switch-'+id;box.checked=this.preference('switch:'+id);box.onchange=()=>{this.preference('switch:'+id,box.checked);this.paint();};caption.textContent=name;row.append(caption,box);switchPreferences.append(row);}const switchHint=document.createElement('p');switchHint.className='muted';switchHint.dataset.i18n='隐藏图标不关闭应用，仍可在应用管理中打开聊天。';switchHint.textContent=BridgeI18n.t('隐藏图标不关闭应用，仍可在应用管理中打开聊天。');switchPreferences.append(switchHint);preferences.after(switchPreferences);
-    const swipeRow=document.createElement('label'),swipeBox=document.createElement('input'),swipeCaption=document.createElement('span');swipeRow.className='display-option';swipeBox.type='checkbox';swipeBox.id='appearance-swipe-clients';swipeBox.checked=this.preference('swipe-clients',undefined,true);swipeBox.onchange=()=>{this.preference('swipe-clients',swipeBox.checked);this.cancelListSwipe();};swipeCaption.dataset.i18n='左右滑动切换应用';swipeCaption.textContent=BridgeI18n.t('左右滑动切换应用');swipeRow.append(swipeCaption,swipeBox);switchPreferences.append(swipeRow);this.bindListGestures();
+    const switchPreferences=document.createElement('fieldset');switchPreferences.className='appearance-section';const switchTitle=document.createElement('legend');switchTitle.dataset.i18n="하단 앱 전환기";switchTitle.textContent=BridgeI18n.t("하단 앱 전환기");switchPreferences.append(switchTitle);
+    for(const [id,name] of [['codex','Codex'],['claude','Claude'],['deepseek','DeepSeek Harness']]){const row=document.createElement('label'),box=document.createElement('input'),caption=document.createElement('span');row.className='display-option';box.type='checkbox';box.id='appearance-switch-'+id;box.checked=this.preference('switch:'+id);box.onchange=()=>{this.preference('switch:'+id,box.checked);this.paint();};caption.textContent=name;row.append(caption,box);switchPreferences.append(row);}const switchHint=document.createElement('p');switchHint.className='muted';switchHint.dataset.i18n="아이콘을 숨겨도 앱은 중지되지 않습니다. 앱 관리에서 채팅을 엽니다.";switchHint.textContent=BridgeI18n.t("아이콘을 숨겨도 앱은 중지되지 않습니다. 앱 관리에서 채팅을 엽니다.");switchPreferences.append(switchHint);preferences.after(switchPreferences);
+    const swipeRow=document.createElement('label'),swipeBox=document.createElement('input'),swipeCaption=document.createElement('span');swipeRow.className='display-option';swipeBox.type='checkbox';swipeBox.id='appearance-swipe-clients';swipeBox.checked=this.preference('swipe-clients',undefined,true);swipeBox.onchange=()=>{this.preference('swipe-clients',swipeBox.checked);this.cancelListSwipe();};swipeCaption.dataset.i18n="스와이프하여 앱 전환";swipeCaption.textContent=BridgeI18n.t("스와이프하여 앱 전환");swipeRow.append(swipeCaption,swipeBox);switchPreferences.append(swipeRow);this.bindListGestures();
     const language=document.getElementById('language');if(language)preferences.append(language.closest('label'));
-    const applications=make('应用管理',()=>{settings.close();this.openManager();});settings.querySelector('.appearance-actions').insertBefore(applications,document.getElementById('appearance-reset').nextSibling);
+    const applications=make("앱",()=>{settings.close();this.openManager();});settings.querySelector('.appearance-actions').insertBefore(applications,document.getElementById('appearance-reset').nextSibling);
     this.account=document.getElementById('accounts-button');this.notifications=document.getElementById('pushplus-settings');
     // Older native shells move these controls after page load. Keep the new
     // two-row navigation intact while preserving their native home action.
@@ -118,7 +118,7 @@ class ClientNavigation {
           const rows=document.createElement('div');rows.className='sessions client-swipe-rows';
           const cached=next.id==='codex'?null:this.view.providerViews.get(next.id);
           if(next.id==='codex'){const savedCodex=this.copySwipeRows(document.getElementById('sessions'));incoming._rows=savedCodex.clone;incoming._scroll=savedCodex.scroll;incoming.append(savedCodex.clone);}
-          else{for(const row of (cached?.rows||[]).filter(row=>!row.archived).slice(0,30)){const item=document.createElement('div'),label=document.createElement('strong');item.className='session';label.textContent=row.title||BridgeI18n.t('新会话');item.append(label);rows.append(item);}incoming.append(rows);}
+          else{for(const row of (cached?.rows||[]).filter(row=>!row.archived).slice(0,30)){const item=document.createElement('div'),label=document.createElement('strong');item.className='session';label.textContent=row.title||BridgeI18n.t("새 채팅");item.append(label);rows.append(item);}incoming.append(rows);}
         }
       }
       document.body.append(root);currentRows.clone.scrollTop=currentRows.scroll;if(incoming._rows)incoming._rows.scrollTop=incoming._scroll;
@@ -156,7 +156,7 @@ class ClientNavigation {
   async refresh(){
     if(this.loading||this.pending.size||this.choosing||document.getElementById('app').hidden)return;
     this.loading=true;const revision=this.revision;
-    try{const data=await ClientLifecycle.request(signal=>this.request('/api/clients',undefined,signal),{timeout:this.statusTimeout??10000,uncertain:false,message:'客户端状态读取超时，请重试。'});if(revision===this.revision){ClientLifecycle.reconcile(this.operationFailures,data.clients);this.applyClients(data);}}
+    try{const data=await ClientLifecycle.request(signal=>this.request('/api/clients',undefined,signal),{timeout:this.statusTimeout??10000,uncertain:false,message:"클라이언트 상태를 제때 읽을 수 없습니다. 다시 새로고침해 보세요."});if(revision===this.revision){ClientLifecycle.reconcile(this.operationFailures,data.clients);this.applyClients(data);}}
     catch(error){this.notify(error.message);}finally{this.loading=false;this.paint();}
   }
   poll(fast=false){
@@ -192,7 +192,7 @@ class ClientNavigation {
   }
   async openChatLink(hash,openCodex){
     const target=this.chatTarget(hash);if(!target)return false;
-    if(!this.clients.some(client=>client.id===target.provider&&client.enabled)){this.notify('尚未启用应用，请打开应用管理。');return true;}
+    if(!this.clients.some(client=>client.id===target.provider&&client.enabled)){this.notify("활성화된 앱이 없습니다. 시작하려면 앱 관리를 여세요.");return true;}
     const ready=this.choose(target.provider),generation=this.view.generation;await ready;
     if(this.provider!==target.provider||generation!==this.view.generation)return true;
     if(target.provider==='codex')await openCodex(target.id,target.host);else await this.view.open(target.id);
@@ -225,7 +225,7 @@ class ClientNavigation {
   async reconnect(id){
     const client=this.clients.find(row=>row.id===id);if(this.pending.size||id!=='claude'||!client?.reconnectSupported||!client.canReconnect||client.setupStatus==='connecting')return;
     this.pending.add(id);this.reconnecting=id;++this.revision;this.paint();
-    try{const data=await this.request('/api/clients/claude/reconnect',{});this.applyClients(data);const connected=data.clients.find(row=>row.id===id)?.connected;this.notify(connected?'Claude 已连接':'已发起重新连接');if(connected&&this.provider===id)await this.view.refresh();}
+    try{const data=await this.request('/api/clients/claude/reconnect',{});this.applyClients(data);const connected=data.clients.find(row=>row.id===id)?.connected;this.notify(connected?"Claude가 연결됨":"재연결이 요청되었습니다");if(connected&&this.provider===id)await this.view.refresh();}
     finally{this.pending.delete(id);this.reconnecting=null;++this.revision;this.paint();}
   }
   paint(){
@@ -233,19 +233,19 @@ class ClientNavigation {
     const provider=this.provider,row=this.clients.find(c=>c.id===provider);this.badge.replaceChildren();if(provider)this.badge.append(this.icon(provider),document.createTextNode(row?.name||'Codex'));
     const target=provider&&provider!=='codex'?this.view.list:this.sidebar;target.prepend(this.heading);target.append(this.navigation);
     this.account.classList.toggle('navigation-hidden',!provider||(provider==='codex'&&!!window.BridgeSharedRelay));this.notifications.classList.toggle('navigation-hidden',!provider);this.manage.hidden=!this.preference('clients');
-    this.account.textContent=BridgeI18n.t('账号管理');this.account.removeAttribute('data-i18n');this.notifications.textContent=BridgeI18n.t('通知管理');this.notifications.removeAttribute('data-i18n');
-    this.switcher.replaceChildren();const enabled=this.clients.filter(c=>c.enabled),visible=this.visibleClients();const collapsed=this.preference('switch-collapsed',undefined,false);this.switchToggle.hidden=enabled.length<2||!visible.length;this.switchDock.hidden=this.switchToggle.hidden||collapsed;this.navigation.classList.toggle('switch-dock-hidden',this.switchDock.hidden);this.switchToggle.textContent=BridgeI18n.t(collapsed?'显示APP':'隐藏APP');this.switchToggle.setAttribute('aria-expanded',String(!collapsed));this.switchToggle.setAttribute('aria-label',BridgeI18n.t(collapsed?'展开应用图标':'收起应用图标'));this.switchToggle.title=this.switchToggle.getAttribute('aria-label');
+    this.account.textContent=BridgeI18n.t("계정");this.account.removeAttribute('data-i18n');this.notifications.textContent=BridgeI18n.t("알림");this.notifications.removeAttribute('data-i18n');
+    this.switcher.replaceChildren();const enabled=this.clients.filter(c=>c.enabled),visible=this.visibleClients();const collapsed=this.preference('switch-collapsed',undefined,false);this.switchToggle.hidden=enabled.length<2||!visible.length;this.switchDock.hidden=this.switchToggle.hidden||collapsed;this.navigation.classList.toggle('switch-dock-hidden',this.switchDock.hidden);this.switchToggle.textContent=BridgeI18n.t(collapsed?"앱 표시":"앱 숨기기");this.switchToggle.setAttribute('aria-expanded',String(!collapsed));this.switchToggle.setAttribute('aria-label',BridgeI18n.t(collapsed?"앱 아이콘 표시":'앱 아이콘 숨기기'));this.switchToggle.title=this.switchToggle.getAttribute('aria-label');
     for(const client of visible){const button=document.createElement('button');button.type='button';button.append(this.icon(client.id),document.createTextNode(client.name));button.classList.toggle('selected',client.id===provider);button.setAttribute('aria-pressed',String(client.id===provider));button.onclick=()=>this.choose(client.id).catch(e=>this.notify(e.message));this.switcher.append(button);}
     document.getElementById('desktop-backend').hidden=true;
     document.getElementById('new-chat').disabled=!provider;
     this.sidebar.classList.toggle('no-client',!provider);document.getElementById('app').classList.toggle('no-enabled-client',!provider);
-    let empty=this.sidebar.querySelector('.no-client-message');if(!empty){empty=document.createElement('p');empty.className='no-client-message muted';empty.textContent=BridgeI18n.t('尚未启用应用，请打开应用管理。');this.heading.after(empty);}empty.hidden=!!provider;this.renderManager();
+    let empty=this.sidebar.querySelector('.no-client-message');if(!empty){empty=document.createElement('p');empty.className='no-client-message muted';empty.textContent=BridgeI18n.t("활성화된 앱이 없습니다. 시작하려면 앱 관리를 여세요.");this.heading.after(empty);}empty.hidden=!!provider;this.renderManager();
   }
   managementState(client){
-    if(this.operationFailures?.get(client.id)?.uncertain)return '结果待确认';
-    if(this.pending.has(client.id))return this.gatewayRunning===false?'正在保存…':client.enabled?'开启中…':this.pendingForceDesktop?'正在后台强制结束…':this.pendingQuitDesktop?'正在退出应用…':'正在停用接入…';
-    if(this.gatewayRunning===false)return client.enabled?'已选择，下次启动生效':'未选择，下次启动生效';
-    return client.enabled?'已启用':'未启用';
+    if(this.operationFailures?.get(client.id)?.uncertain)return "확인되지 않은 결과";
+    if(this.pending.has(client.id))return this.gatewayRunning===false?"저장 중…":client.enabled?"켜는 중…":this.pendingForceDesktop?"백그라운드에서 강제 종료 중…":this.pendingQuitDesktop?"앱을 종료하는 중…":"액세스를 비활성화하는 중…";
+    if(this.gatewayRunning===false)return client.enabled?"다음 시작을 위해 선택됨":"다음 시작을 위해 꺼짐";
+    return client.enabled?"사용 중":"사용 안 함";
   }
   runtimeState(client){
     return this.connection(client).label;
@@ -258,29 +258,29 @@ class ClientNavigation {
       const text=document.createElement('span'),name=document.createElement('strong'),status=document.createElement('small'),reason=document.createElement('small'),control=document.createElement('span'),label=document.createElement('span'),toggle=document.createElement('button');
       const state=this.connection(client),failure=this.operationFailures?.get(client.id),message=failure?ClientLifecycle.failureMessage(failure):state.reason;name.textContent=client.name;status.textContent=BridgeI18n.t(state.label);status.setAttribute('role','status');status.setAttribute('aria-busy',String(state.waiting));status.classList.toggle('client-connection-waiting',state.waiting);reason.textContent=BridgeI18n.t(message);reason.hidden=!message||reason.textContent===status.textContent;text.append(name,status,reason);
       control.className='client-management-control';label.className='client-toggle-status';label.setAttribute('role','status');label.textContent=BridgeI18n.t(this.managementState(client));
-      toggle.type='button';toggle.className='client-management-switch';toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(client.enabled));toggle.setAttribute('aria-label',BridgeI18n.t('启用')+' '+client.name);toggle.setAttribute('aria-busy',String(this.pending.has(client.id)));toggle.disabled=(!client.enabled&&!(client.selectable??client.configured))||this.pending.size>0||!!this.choosing||this.hasUncertain();
+      toggle.type='button';toggle.className='client-management-switch';toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(client.enabled));toggle.setAttribute('aria-label',BridgeI18n.t("할 수 있게 하다")+' '+client.name);toggle.setAttribute('aria-busy',String(this.pending.has(client.id)));toggle.disabled=(!client.enabled&&!(client.selectable??client.configured))||this.pending.size>0||!!this.choosing||this.hasUncertain();
       toggle.append(document.createElement('span'));control.append(toggle,label);row.append(this.icon(client.id),text,control);list.append(row);
       toggle.onclick=()=>this.toggle(client.id,!client.enabled).catch(error=>this.notify(error.message));
-      if(!client.enabled&&client.running&&this.gatewayRunning!==false){const quit=document.createElement('button');quit.type='button';quit.textContent=BridgeI18n.t('关闭电脑 App…');quit.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();quit.onclick=()=>this.toggle(client.id,false).catch(error=>this.notify(error.message));control.append(quit);}
-      if(client.enabled){const open=document.createElement('button');open.type='button';open.textContent=BridgeI18n.t('查看聊天');open.onclick=()=>{manager.dialog.close();this.choose(client.id).catch(error=>this.notify(error.message));};control.append(open);}
-      if(failure){const retry=document.createElement('button');retry.type='button';retry.textContent=BridgeI18n.t(failure.uncertain?'刷新状态':ClientLifecycle.retryLabel(failure.action));retry.disabled=this.pending.size>0||!!this.choosing||!!this.loading||(!failure.uncertain&&this.hasUncertain());retry.onclick=()=>Promise.resolve(failure.uncertain?this.refresh():this.retryOperation(client.id)).catch(error=>this.notify(error.message));control.append(retry);}
-      if(!failure&&state.retryable&&this.gatewayRunning!==false){const retry=document.createElement('button');retry.type='button';retry.textContent=BridgeI18n.t('重试连接');retry.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();retry.onclick=()=>this.toggle(client.id,true).catch(error=>this.notify(error.message));control.append(retry);}
-      if(!failure&&state.canInitialize&&this.gatewayRunning!==false){const initialize=document.createElement('button');initialize.type='button';initialize.textContent=BridgeI18n.t('初始化连接');initialize.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();initialize.onclick=()=>this.initialize(client.id).catch(error=>this.notify(error.message));control.append(initialize);}
+      if(!client.enabled&&client.running&&this.gatewayRunning!==false){const quit=document.createElement('button');quit.type='button';quit.textContent=BridgeI18n.t("데스크톱 앱 닫기…");quit.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();quit.onclick=()=>this.toggle(client.id,false).catch(error=>this.notify(error.message));control.append(quit);}
+      if(client.enabled){const open=document.createElement('button');open.type='button';open.textContent=BridgeI18n.t('채팅 보기');open.onclick=()=>{manager.dialog.close();this.choose(client.id).catch(error=>this.notify(error.message));};control.append(open);}
+      if(failure){const retry=document.createElement('button');retry.type='button';retry.textContent=BridgeI18n.t(failure.uncertain?"상태 새로고침":ClientLifecycle.retryLabel(failure.action));retry.disabled=this.pending.size>0||!!this.choosing||!!this.loading||(!failure.uncertain&&this.hasUncertain());retry.onclick=()=>Promise.resolve(failure.uncertain?this.refresh():this.retryOperation(client.id)).catch(error=>this.notify(error.message));control.append(retry);}
+      if(!failure&&state.retryable&&this.gatewayRunning!==false){const retry=document.createElement('button');retry.type='button';retry.textContent=BridgeI18n.t('연결 재시도');retry.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();retry.onclick=()=>this.toggle(client.id,true).catch(error=>this.notify(error.message));control.append(retry);}
+      if(!failure&&state.canInitialize&&this.gatewayRunning!==false){const initialize=document.createElement('button');initialize.type='button';initialize.textContent=BridgeI18n.t('연결 초기화');initialize.disabled=this.pending.size>0||!!this.choosing||this.hasUncertain();initialize.onclick=()=>this.initialize(client.id).catch(error=>this.notify(error.message));control.append(initialize);}
     }
-    note.textContent=BridgeI18n.t(this.gatewayRunning===false?'网关未启动，开关仅保存下次启动时的选择，不会打开或退出应用。':'安装和登录请在电脑端完成。关闭接入可保留或退出电脑 App。macOS Claude 默认后台启动并尝试恢复已有连接；“初始化连接”经确认后使用电脑前台。Windows 优先尝试后台初始化。')+' '+BridgeI18n.t(ClientLifecycle.sessionNotice(this.windowsSession));
+    note.textContent=BridgeI18n.t(this.gatewayRunning===false?"게이트웨이가 중지되었습니다. 이 스위치는 앱을 열거나 종료하지 않고도 다음 시작에 대한 기본 설정을 저장합니다.":"컴퓨터에 설치하고 로그인합니다. 접근을 비활성화할 때 데스크톱 앱을 유지할지, 종료할지 선택하세요. macOS에서 Claude는 백그라운드에서 시작되어 기존 연결을 복원하려고 시도합니다. 초기화 연결은 확인 후에만 포그라운드를 사용합니다. Windows는 먼저 백그라운드 초기화를 시도합니다.")+' '+BridgeI18n.t(ClientLifecycle.sessionNotice(this.windowsSession));
   }
   openManager(){
     if(this.manager?.dialog.open)return;
-    const dialog=this.view.dialog('应用管理'),list=document.createElement('div'),note=document.createElement('p');note.className='muted';dialog.append(list,note);this.manager={dialog,list,note};
+    const dialog=this.view.dialog("앱"),list=document.createElement('div'),note=document.createElement('p');note.className='muted';dialog.append(list,note);this.manager={dialog,list,note};
     dialog.addEventListener('close',()=>{if(this.manager?.dialog===dialog)this.manager=null;});dialog.showModal();this.renderManager();this.refresh();
   }
 
   homeDialog(){
     if(BridgeHost.hasNativeLayout()){location.href='codexbridge://home';return;}
     // Web gateways do not share cookies; remember only explicit gateway URLs.
-    const dialog=this.view.dialog('电脑列表'),current=document.createElement('p');current.textContent=this.computerName.textContent||location.host;dialog.append(current);
-    const input=document.createElement('input');input.type='url';input.placeholder=BridgeI18n.t('https://你的网关地址');input.setAttribute('aria-label',BridgeI18n.t('电脑网关地址'));
-    const button=this.view.button('连接电脑',()=>{let url;try{url=new URL(input.value);}catch{throw Error('请输入完整的网关地址');}if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('请输入 HTTP 或 HTTPS 网关地址');location.assign(url.href);});
-    const logout=this.view.button('退出当前登录',()=>{dialog.close();document.getElementById('logout').click();});dialog.append(input,button,logout);dialog.showModal();
+    const dialog=this.view.dialog("컴퓨터"),current=document.createElement('p');current.textContent=this.computerName.textContent||location.host;dialog.append(current);
+    const input=document.createElement('input');input.type='url';input.placeholder=BridgeI18n.t("https://your-gateway-address");input.setAttribute('aria-label',BridgeI18n.t('컴퓨터 게이트웨이 주소'));
+    const button=this.view.button('컴퓨터에 연결',()=>{let url;try{url=new URL(input.value);}catch{throw Error('전체 게이트웨이 주소를 입력하세요.');}if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error("HTTP 또는 HTTPS 게이트웨이 주소를 입력하세요.");location.assign(url.href);});
+    const logout=this.view.button("로그아웃",()=>{dialog.close();document.getElementById('logout').click();});dialog.append(input,button,logout);dialog.showModal();
   }
 }

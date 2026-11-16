@@ -63,7 +63,7 @@ class DshWindowsQuitTests(unittest.TestCase):
                      self.arguments['host']+['--user-data-dir='+str(self.profile)]):
             with self.subTest(args=args):
                 self.arguments['host'] = args
-                with self.assertRaisesRegex(ValueError, '数据目录'):
+                with self.assertRaisesRegex(ValueError, "실행\\ 중인\\ Harness\\ 인스턴스의\\ 데이터\\ 디렉터리를\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하고\\ 다시\\ 시도하세요\\."):
                     self.command()
 
     def test_unsupported_flag_or_foreground_before_handoff_fails_closed(self):
@@ -71,13 +71,13 @@ class DshWindowsQuitTests(unittest.TestCase):
                        SOURCE.replace('if (isDesktopInstallerQuitRequest(argv, process.platform))',
                                       'runtime.show(); if (isDesktopInstallerQuitRequest(argv, process.platform))')):
             (self.folder/'lib/main.js').write_text(source)
-            with self.assertRaisesRegex(ValueError, '后台退出通道'):
+            with self.assertRaisesRegex(ValueError, "이\\ Harness\\ 버전에는\\ 검증\\ 가능한\\ 백그라운드\\ 종료\\ 방법이\\ 없습니다\\.\\ 데스크톱\\ 앱을\\ 업데이트하고\\ 다시\\ 시도하세요\\."):
                 self.command()
 
     def test_unrelated_package_and_escaping_main_are_rejected(self):
         for package in ({**self.package, 'name': 'unrelated'}, {**self.package, 'main': '../outside.js'}):
             (self.folder/'package.json').write_text(json.dumps(package))
-            with self.assertRaisesRegex(ValueError, '后台退出通道'):
+            with self.assertRaisesRegex(ValueError, "이\\ Harness\\ 버전에는\\ 검증\\ 가능한\\ 백그라운드\\ 종료\\ 방법이\\ 없습니다\\.\\ 데스크톱\\ 앱을\\ 업데이트하고\\ 다시\\ 시도하세요\\."):
                 self.command()
 
     def test_asar_packaging_is_inspected_without_extracting_files(self):

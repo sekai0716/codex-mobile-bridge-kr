@@ -146,7 +146,7 @@ class LoginSecurityTests(unittest.TestCase):
     def test_security_block_fans_out_to_named_webhooks(self):
         from bridge.features.notifications.channels import save_webhook_endpoint
         save_settings(self.directory, {'webhookEnabled': True, 'webhookUrl': 'https://receiver.example/legacy'})
-        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': '飞书',
+        save_webhook_endpoint(self.directory, {'action': 'upsert', 'webhookName': 'Feishu',
             'webhookEnabled': True, 'webhookUrl': 'https://open.feishu.cn/open-apis/bot/v2/hook/one'})
         self.block()
         with patch('bridge.features.notifications.security.publish_webhook') as webhook:

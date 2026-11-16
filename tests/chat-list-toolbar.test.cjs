@@ -12,5 +12,5 @@ test('list filters follow the selected label and language',()=>{
   vm.runInContext('bindChatListToolbar(toolbar)',Object.assign(context,{toolbar}));
   assert.equal(mode.style.width,'78px');assert.equal(surface.style.width,'54px');
   mode.selectedOptions[0].textContent='Project';events.change();assert.equal(mode.style.width,'86px');
-  mode.selectedOptions[0].textContent='按项目';documentEvents['bridge-language']();assert.equal(mode.style.width,'54px');
+  mode.selectedOptions[0].textContent='프로젝트';documentEvents['bridge-language']();assert.equal(mode.style.width,'62px');
 });

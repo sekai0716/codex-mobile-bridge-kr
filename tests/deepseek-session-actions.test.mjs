@@ -36,18 +36,18 @@ test('native metadata actions preserve cwd and never resume a cold session',asyn
     assert.equal(calls.length,0);
     sessions.set(row.sessionId,{id:row.sessionId});
     listing=await request('list');assert.equal(listing.sessions[0].capabilities.rename,true);
-    const renamed=await request('rename',{title:'  新名称  '});
-    assert.deepEqual(renamed.result,{id:row.sessionId,title:'新名称'});assert.equal(renamed.status,'confirmed');
+    const renamed=await request('rename',{title:'  새 이름  '});
+    assert.deepEqual(renamed.result,{id:row.sessionId,title:'새 이름'});assert.equal(renamed.status,'confirmed');
     assert.equal(agents.size,0,'A native metadata change never creates an Agent');
     for(const title of [null,{},'', 'x'.repeat(121),'a\nb','a\u0000b'])assert.equal((await request('rename',{title})).status,400);
     assert.equal(calls.length,1);
-    for(const title of ['two  spaces','a\u0080b','a\u200bb','测'.repeat(11)])assert.equal((await request('rename',{title})).notSent,true);
+    for(const title of ['two  spaces','a\u0080b','a\u200bb','\u6d4b'.repeat(11)])assert.equal((await request('rename',{title})).notSent,true);
     assert.equal(calls.length,1,'Native normalization limits are checked before writing');
     delete titles.config.maxTitleBytes;
     assert.equal((await request('rename',{title:'No limit'})).notSent,true);
     titles.config.maxTitleBytes=32;
     ignoreRename=true;
-    assert.match((await request('rename',{title:'Unconfirmed'})).error,/结果待核对/);
+    assert.match((await request('rename',{title:'Unconfirmed'})).error,/(?:이름 변경 결과를 확인해야 합니다\. 원래 클라이언트를 확인하세요\. 중복 제출은 되지 않습니다|확인되지 않은 결과)/);
     assert.equal(calls.length,2,'A failed readback never retries the mutation');
     const info=await request('organization');
     assert.deepEqual(info.projects,[{id:'same',title:'same'}]);assert.equal(info.projectId,null);
@@ -61,7 +61,7 @@ test('native metadata actions preserve cwd and never resume a cold session',asyn
     const detached=await request('organization',{operation:'set-project',projectId:null});
     assert.equal(detached.status,'confirmed');assert.equal(detached.projectId,null);
     ignoreAttach=true;
-    assert.match((await request('organization',{operation:'set-project',projectId:'same'})).error,/结果待核对/);
+    assert.match((await request('organization',{operation:'set-project',projectId:'same'})).error,/프로젝트 수정 결과를 확인해야 합니다\. 원래 클라이언트를 확인하세요\. 반복 제출은 이루어지지 않습니다\./);
     assert.equal(calls.length,5,'Unknown attach does not replay');
     assert.equal(row.cwd,cwd);
   }finally{for(const dispose of disposers.reverse())await dispose();await rm(folder,{recursive:true,force:true});}

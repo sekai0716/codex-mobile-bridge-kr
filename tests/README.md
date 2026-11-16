@@ -1,10 +1,10 @@
-# 验证入口
+# 검증입력
 
-测试应匹配改动的功能和平台。源码测试不等于已经编译、安装或在三个系统上完成真实客户端联调。
+테스트는 변경된 기능 및 플랫폼과 일치해야 합니다. 소스 코드 테스트는 세 시스템에서 실제 클라이언트 공동 디버깅이 컴파일, 설치 또는 완료되었음을 의미하지 않습니다.。
 
-## Python 后端
+## Python 후방
 
-从仓库根目录，使用已有项目环境运行：
+웨어하우스 루트 디렉터리에서 기존 프로젝트 환경을 이용하여 실행：
 
 ```sh
 python -B scripts/test-backend.py --source-only
@@ -13,25 +13,25 @@ python -B scripts/test-backend.py --source-only -p 'test_platform_architecture.p
 python -B scripts/test-backend.py --source-only -p 'test_resource_layout.py'
 ```
 
-`--source-only` 明确跳过六个原生夹具类：Claude 的 Swift Console 选择器、macOS 桌面会话检查、Windows 窗口选择器，以及 Windows Codex 退出、强制退出和 Explorer 启动器验证。这些夹具可能编译或执行原生程序；纯 Python 的平台模拟与安全检查仍运行。省略该选项与完整 unittest discovery 等价，会按当前系统和环境运行原生测试。平台、可选依赖和原生 SDK 的跳过项会在结果中列出。现有 CI 保留各平台完整 discovery。
+`--source-only` 6개의 기본 픽스처 클래스를 명시적으로 건너뛰기：Claude 의 Swift Console 선택자、macOS 데스크톱 세션 확인、Windows 창 선택기 및 Windows Codex 종료, 강제 종료 및 Explorer 런처 검증. 이러한 픽스처는 기본 프로그램을 컴파일하거나 실행할 수 있습니다. 순수한 Python 플랫폼 시뮬레이션과 보안 점검은 계속 진행 중입니다. 이 옵션을 생략하고 완료하세요. unittest discovery 마찬가지로, 현재 시스템 및 환경에 따라 기본 테스트가 실행됩니다. 플랫폼, 선택적 종속성 및 기본 SDK 건너뛴 항목이 결과에 나열됩니다. 기존의 CI 각 플랫폼을 그대로 유지 discovery。
 
-HTTP、中继、IPC、mailbox 等测试使用本机隔离监听和合成数据，需要允许测试进程绑定 loopback/Unix socket。受限执行环境的 EPERM 不是功能通过，也不能隐藏为产品跳过。共享中继测试需要现有 `requirements-relay.txt` 环境；测试脚本自身不安装依赖。
+HTTP、계전기、IPC、mailbox 테스트가 기본 격리 수신 및 합성 데이터를 사용하는 경우 테스트 프로세스 바인딩을 허용해야 합니다. loopback/Unix socket。제한된 실행 환경 EPERM 기능 패스도 아니고 제품 스킵으로 숨길 수도 없습니다. 공유 트렁크 테스트에는 기존이 필요합니다. `requirements-relay.txt` 환경; 테스트 스크립트 자체는 종속성을 설치하지 않습니다.。
 
-| 修改范围 | 主要测试文件前缀 |
+| 범위 수정 | 기본 테스트 파일 접두사 |
 | --- | --- |
-| 账号、额度、模型 | `test_account*`、`test_api_catalog*`、`test_saved_account*`、`test_remote_catalog.py` |
-| 客户端发现/启停 | `test_client_*`、`test_desktop_discovery*`、`test_desktop_idle*` |
+| 계정, 할당량, 모델 | `test_account*`、`test_api_catalog*`、`test_saved_account*`、`test_remote_catalog.py` |
+| 클라이언트 검색/시작 및 중지 | `test_client_*`、`test_desktop_discovery*`、`test_desktop_idle*` |
 | Claude/DSH | `test_claude_*`、`test_deepseek_*`、`test_desktop_sessions*` |
-| 认证/配对/网络 | `test_auth*`、`test_pairing*`、`test_login_security*`、`test_shared_relay*`、`test_network*`、`test_http_proxy.py` |
-| 会话与发送/授权 | `test_bridge*`、`test_cli_bridge_integration.py`、`test_codex_app_server.py`、`test_codex_cli_session.py`、`test_desktop_*`、`test_goal_*`、`test_permissions*`、`test_timeline*` |
-| 文件/终端 | `test_workspace*`、`test_download_ranges*`、`test_*terminal*` |
-| 目录与资源边界 | `test_platform_architecture.py`、`test_resource_layout.py`、`test_web_assets.py` |
+| 인증/쌍/회로망 | `test_auth*`、`test_pairing*`、`test_login_security*`、`test_shared_relay*`、`test_network*`、`test_http_proxy.py` |
+| 대화 및 전송/승인하다 | `test_bridge*`、`test_cli_bridge_integration.py`、`test_codex_app_server.py`、`test_codex_cli_session.py`、`test_desktop_*`、`test_goal_*`、`test_permissions*`、`test_timeline*` |
+| 파일/단말기 | `test_workspace*`、`test_download_ranges*`、`test_*terminal*` |
+| 디렉터리 및 리소스 경계 | `test_platform_architecture.py`、`test_resource_layout.py`、`test_web_assets.py` |
 
-测试名仍保持在 `tests/` 顶层，方便按前缀发现并复用既有夹具。平台测试的模拟结果不能替代对应操作系统的实机结果。
+테스트 이름은 그대로 유지됩니다. `tests/` 최상위 레이어를 사용하면 접두어로 기존 고정 장치를 쉽게 검색하고 재사용할 수 있습니다. 플랫폼 테스트의 시뮬레이션 결과는 해당 운영 체제의 실제 결과를 대체할 수 없습니다.。
 
-Windows 打包时会校验并携带微软 ConPTY 与配套 OpenConsole，以支持 Windows 10 的终端鼠标/触摸事件；不替换系统组件。源码验收可先运行 `python scripts/bundle-conpty.py`，再运行 `python -B -m unittest discover -s tests -p test_windows_terminal.py -v`。未准备组件的源码环境沿用系统 ConPTY，鼠标专项用例会明确跳过。指定 `CMB_TEST_RUNTIME` 为打包网关 EXE 后，同组测试会加载它旁边 `_internal/conpty` 的组件，验证鼠标模式、点击坐标、VT 输入与中文，以及原有目录、尺寸、Ctrl+C、重连和关闭行为。
+Windows 포장 시 Microsoft가 검증 및 운반됩니다. ConPTY 일치하는 OpenConsole，지원하다 Windows 10 터미널 마우스/터치 이벤트; 시스템 구성 요소를 교체하지 않습니다. 소스 코드 승인이 먼저 실행될 수 있습니다. `python scripts/bundle-conpty.py`，다시 실행 `python -B -m unittest discover -s tests -p test_windows_terminal.py -v`。준비되지 않은 구성 요소의 소스 코드 환경은 시스템을 상속받습니다. ConPTY，마우스 관련 사용 사례는 명시적으로 건너뜁니다. 지정하다 `CMB_TEST_RUNTIME` 패키징 게이트웨이용 EXE 그 후에는 동일한 테스트 세트가 옆에 로드됩니다. `_internal/conpty` 구성 요소, 마우스 모드 확인, 좌표 클릭、VT 입력 및 중국어는 물론 원본 디렉토리와 크기까지、Ctrl+C、다시 연결 및 종료 동작。
 
-## Node 与浏览器
+## Node 브라우저로
 
 ```sh
 npm run test:desktop
@@ -40,44 +40,44 @@ npm run test:boundaries
 npm run test:browser
 ```
 
-`test:desktop` 通过 `scripts/test-frontend.cjs` 自动递归发现 `tests/` 和 `mobile/tests/` 中 `*.test.js`、`*.test.cjs`、`*.test.mjs`。新增 Node 用例不需编辑长命令清单；资源路径检查包含在该入口。
+`test:desktop` 통해 `scripts/test-frontend.cjs` 자동 재귀 검색 `tests/` 및 `mobile/tests/` 가운데 `*.test.js`、`*.test.cjs`、`*.test.mjs`。새로운 Node 사용 사례에서는 긴 명령 목록을 편집할 필요가 없습니다. 이 항목에는 리소스 경로 확인이 포함되어 있습니다.。
 
-宿主与宽窄布局变更可先运行 `node --test tests/host-environment.test.cjs tests/layouts.test.cjs tests/frontend-assets.test.cjs mobile/tests/resources.test.cjs`。这些检查覆盖宿主识别与晚注入、容器分屏边界、样式顺序和原生资源清单，不启动或编译手机 App。布局的真实渲染和窗口变化后状态保留仍需浏览器夹具验证。
+호스트 및 너비/좁은 레이아웃 변경이 먼저 실행될 수 있습니다. `node --test tests/host-environment.test.cjs tests/layouts.test.cjs tests/frontend-assets.test.cjs mobile/tests/resources.test.cjs`。이러한 검사에는 호스트 식별 및 지연 주입, 컨테이너 분할 화면 경계, 스타일 순서 및 기본 리소스 목록이 포함되며 전화를 시작하거나 컴파일하지 않습니다. App。창 변경 후 레이아웃 및 상태 유지의 실제 렌더링은 여전히 ​​브라우저 고정 장치를 통해 확인되어야 합니다.。
 
-[浏览器夹具](browser/README.md) 位于 `tests/browser/*.browser.js`，依赖真实 DOM 或隔离服务，应由相应驱动调用。其中有些文件只定义测试函数，单独加载不会执行断言。本轮将它们与 Node 分开，避免虚增通过计数。
+[브라우저 고정 장치](browser/README.md) 누워있다 `tests/browser/*.browser.js`，진실에 의지하다 DOM 또는 해당 드라이버가 호출해야 하는 격리 서비스입니다. 이러한 파일 중 일부는 테스트 함수만 정의하며 개별적으로 로드하면 어설션이 수행되지 않습니다. 이번 라운드에서는 다음과 같이 결합합니다. Node 부풀려진 패스 수를 피하기 위해 별도로 분리。
 
-`test:browser` 自动调用启动恢复、聊天历史、草稿隔离、API 表单、输入引用及 Claude/DSH 项目弹窗检查，包含 Chromium/WebKit、1280 px/390 px 四种组合。发送反馈与模型设置回归还覆盖 Claude Code/Cowork、DSH、慢响应、手动输入和真实聊天背景的明暗主题。首次安装开发依赖后运行 `PLAYWRIGHT_BROWSERS_PATH=.local/tools/playwright npx playwright install chromium webkit`；Linux CI 加 `--with-deps`。Windows 可用 PowerShell 设置同名环境变量；配置默认也使用项目内的该目录。Chromium 官方下载暂不可用时，可用本机已有 Chrome：`CMB_CHROMIUM_CHANNEL=chrome npm run test:browser`，报告中注明浏览器来源；CI 默认使用锁定版本运行时。
+`test:browser` 시작 복구, 채팅 기록, 초안 격리 자동 호출、API 양식, 입력 참조 및 Claude/DSH 프로젝트 팝업 체크 등 Chromium/WebKit、1280 px/390 px 네 가지 조합. 모델 설정 회귀를 통한 피드백 보내기도 다룹니다. Claude Code/Cowork、DSH、느린 응답, 수동 입력 및 실제 채팅 배경을 위한 밝은 테마와 어두운 테마. 처음으로 개발 종속성을 설치한 후 실행 `PLAYWRIGHT_BROWSERS_PATH=.local/tools/playwright npx playwright install chromium webkit`；Linux CI 추가하다 `--with-deps`。Windows 사용 가능 PowerShell 동일한 이름으로 환경 변수를 설정하십시오. 또한 구성은 기본적으로 프로젝트 내의 디렉터리를 사용합니다.。Chromium 공식 다운로드를 일시적으로 사용할 수 없는 경우 이 컴퓨터에서 사용할 수 있습니다. Chrome：`CMB_CHROMIUM_CHANNEL=chrome npm run test:browser`，보고서에 브라우저 소스를 표시하세요.；CI 기본적으로 잠긴 버전 런타임 사용。
 
-服务固定绑定隔离 loopback 端口 18279，拒绝复用已占用端口；浏览器请求不访问外部 origin。输出位于 `.tmp/browser-results/`，失败时包含截图和 trace。合成页面检查不替代真实登录后端、客户端协议或手机 WebView 验收。
+서비스 고정 바인딩 격리 loopback 포트 18279，점유된 포트의 재사용을 거부합니다. 브라우저 요청은 외부에 액세스하지 않습니다 origin。출력은 `.tmp/browser-results/`，실패 시 스크린샷과 trace。합성 페이지 검사는 실제 로그인 백엔드, 클라이언트 프로토콜 또는 휴대폰을 대체하지 않습니다. WebView 수락。
 
-纳入 [PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88) 后，WebKit 连续资源失败恢复必须通过完整断言，不再保留 `known-baseline` 预期失败豁免。常规检查还覆盖无来源错误、非启动依赖脚本的异常和 Promise 拒绝、可缓存的错误脚本响应；真实必需脚本错误仍须停止依赖执行。详细边界见[启动错误归属记录](../.agents/notes/implemented/bug-fix/2026-10-27-startup-error-attribution-and-cache-retry.md)。
+포함하다 [PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88) 뒤쪽에，WebKit 지속적인 리소스 오류 복구는 전체 어설션을 통과해야 하며 더 이상 유지되지 않습니다. `known-baseline` 저장 실패가 예상됩니다. 일반 검사에는 소스가 지정되지 않은 오류, 비시작 종속 스크립트의 예외도 포함됩니다. Promise 거부, 캐시 가능한 오류 스크립트 응답; true 필수 스크립트 오류는 여전히 종속 실행을 중지해야 합니다. 자세한 경계는 다음을 참조하세요.[오류 원인 기록 시작](../.agents/notes/implemented/bug-fix/2026-10-27-startup-error-attribution-and-cache-retry.md)。
 
-`test_module_boundaries.py` 自动运行 AST 依赖检查，也可用 `python3 -B scripts/check-boundaries.py` 单独运行（Windows 可用 `python`）。[历史例外](../docs/architecture/dependency-exceptions.json) 精确到文件和符号，禁止通配放行；移除旧依赖必须删除对应例外。检查不执行应用，无法推断变量拼接的动态 import；原有平台选择、资源路径及共享脚本测试继续保留。
+`test_module_boundaries.py` 자동으로 실행 AST 종속성 검사도 가능합니다. `python3 -B scripts/check-boundaries.py` 혼자 달리다（Windows 사용 가능 `python`）。[역사적 예외](../docs/architecture/dependency-exceptions.json) 파일 및 기호에 따라 정확하며 와일드카드 릴리스는 금지됩니다. 이전 종속성을 제거하려면 해당 예외를 삭제해야 합니다. 검사는 애플리케이션을 실행하지 않으며 가변 접합의 역학을 추론할 수 없습니다. import；원래 플랫폼 선택, 리소스 경로 및 공유 스크립트 테스트는 계속 유지됩니다.。
 
-`scripts/smoke-*` 中部分入口启动真实应用或依赖打包产物；运行前先看其头部与 fixture，不把它们作为无副作用的常规单元测试。
+`scripts/smoke-*` 항목의 중간 부분은 실제 애플리케이션을 시작하거나 패키지 제품에 의존합니다. 실행하기 전에 헤더를 살펴보고 fixture，부작용이 없는 일반 단위 테스트로 취급하지 마세요.。
 
-原生侧边聊天使用 `test_native_side_chat.py`、`test_store.py` 和浏览器的 `native-side-chat.spec.cjs` 验证持久化创建、父子归属、标准聊天路由与关闭视图不删除。旧 `test_side_chat.py` 中保留临时运行时回归，仅保护升级前已打开的旧页面；新增侧边聊天不再使用该运行时。独立侧边输入区和附件 UI 夹具已移除，现复用标准会话的相应用例。
+기본 사이드 채팅 사용 `test_native_side_chat.py`、`test_store.py` 및 브라우저 `native-side-chat.spec.cjs` 영구 생성, 상위-하위 소유권, 표준 채팅 라우팅 및 종료 보기가 삭제되지 않았는지 확인합니다. 오래된 `test_side_chat.py` 임시 런타임은 유지되며 업그레이드 전에 열렸던 이전 페이지만 보호됩니다. 새로운 사이드 채팅에서는 더 이상 이 런타임을 사용하지 않습니다. 독립된 측면 입력 영역 및 액세서리 UI 고정 장치가 제거되었으며 이제 표준 세션의 해당 사용 사례가 재사용됩니다.。
 
-`node scripts/smoke-wsl-app-ui.cjs` 在独立 Edge 配置目录中加载真实 Web 页面和合成 API，实际执行 `tests/browser/codex-entries.browser.js`，检查独立应用管理、列表隔离、Magpie 模型名称、草稿保留，以及 WSL 手机新建独立聊天、目录浏览器、选择父目录新建文件夹、新建项目和显式翻页。默认使用 Windows Edge，也可用 `CMB_BROWSER` 指定 Chromium 可执行文件；只启动自己的浏览器进程，截图和结果放在 `.tmp/`，不连接真实网关或 Codex。原生共享服务的隔离验证仍由 `scripts/smoke-wsl-shared-server.py --codex <明确的 Linux 运行时>` 单独执行。
+`node scripts/smoke-wsl-app-ui.cjs` 독립하여 Edge 실제 구성 디렉터리 로드 Web 페이지 및 작곡 API，실제 실행 `tests/browser/codex-entries.browser.js`，독립적인 애플리케이션 관리, 목록 격리 확인、Magpie 모델명, 초안 보존 및 WSL 휴대폰은 새로운 독립 채팅, 디렉터리 브라우저를 만들고, 상위 디렉터리를 선택하여 새 폴더를 만들고, 새 프로젝트를 만들고, 명시적으로 페이지를 넘길 수 있습니다. 기본적으로 사용됨 Windows Edge，또한 사용 가능 `CMB_BROWSER` 지정하다 Chromium 실행 파일; 자체 브라우저 프로세스만 시작하고 스크린샷과 결과는 `.tmp/`，실제 게이트웨이에 연결되지 않거나 Codex。기본 공유 서비스를 위한 SegWit은 계속해서 제공됩니다. `scripts/smoke-wsl-shared-server.py --codex <분명한 Linux 실행 시간>` 혼자 실행。
 
-## 手机与打包
+## 휴대폰 및 포장
 
-`mobile/tests/` 中 Java/Swift 用例由相应 `scripts/test-mobile-*`、`scripts/test-ios-*` 驱动，可能编译测试程序；只在本次任务允许且环境具备时执行。Web 资源验证不代替 Android WebView 或 iOS WKWebView 的原生交互验证。
+`mobile/tests/` 가운데 Java/Swift 사용 사례는 해당 항목으로 구성됩니다. `scripts/test-mobile-*`、`scripts/test-ios-*` 드라이버, 테스트 프로그램을 컴파일할 수 있습니다. 이 작업이 허용되고 환경이 사용 가능한 경우에만 실행됩니다.。Web 리소스 확인은 대체되지 않습니다. Android WebView 또는 iOS WKWebView 기본 대화형 검증。
 
-`scripts/gateway-resources.json` 与源路径测试保证清单一致，但冻结导入、签名、安装和更新必须在获准打包后、目标系统上另外验证。不要根据 macOS 单机测试宣称 Windows/Linux 已实机通过。
+`scripts/gateway-resources.json` 소스 경로 테스트 보장 체크리스트와 일치하지만, 고정된 가져오기, 서명, 설치 및 업데이트는 패키징이 승인된 후 대상 시스템에서 추가로 확인되어야 합니다. 그것을 기반으로하지 마십시오 macOS 단일 기계 테스트 청구 Windows/Linux 실제 기계를 통과。
 
-PR 的 `change-scope` 使用 `scripts/ci-test-scope.py` 分别选择后端、UI 资源、Node、浏览器、Android、iOS 和移动更新检查；纯 CSS 不运行后端、桌面逻辑或原生编译。未知路径、依赖、工作流与公共清单保守全量。`desktop-tests` 只负责显式汇总所选结果，不将失败、取消或意外跳过当作通过。主分支推送、版本标签与手动触发保持完整检查；普通分支推送由 PR 事件覆盖，避免重复全量。Android 可选 FCM 配置及通知真机行为仍单独验收。
+PR 의 `change-scope` 사용 `scripts/ci-test-scope.py` 백엔드를 개별적으로 선택、UI 의지、Node、브라우저、Android、iOS 모바일 업데이트 확인; 순수한 CSS 백엔드, 데스크톱 로직 또는 기본 컴파일이 실행되지 않습니다. 알 수 없는 경로, 종속성, 워크플로 및 공개 목록은 그대로 유지됩니다.。`desktop-tests` 선택한 결과를 명시적으로 집계하는 역할만 담당하며 실패, 취소 또는 예상치 못한 건너뛰기를 통과로 계산하지 않습니다. 마스터 브랜치 푸시, 버전 라벨 및 수동 트리거링이 완전히 확인된 상태로 유지됩니다. 일반적인 분기 푸시는 다음과 같이 수행됩니다. PR 전체 중복을 피하기 위한 이벤트 적용 범위。Android 선택 과목 FCM 실제 기계 동작의 구성 및 알림은 여전히 ​​별도의 승인을 받습니다.。
 
-Android 后台通知定向验证：`python scripts/test-mobile-events.py` 通过真实 JSON 和回环 HTTP 覆盖增量读取、服务重建续收、事件去重、流重置、登录/删除竞态、多电脑隔离与暂停，以及四地址来源选择、禁用时在途响应、重新开启的历史基线；首次运行下载并校验固定版本的 JVM JSON 测试依赖。`python scripts/test-mobile-notification-permissions.py --android-only` 验证 Android 通知权限、手动后台开关与启动失败回退。两者读取 `JAVA_HOME`。系统服务、锁屏通知、点击跳转与电池行为在 Android 设备或模拟器上另行验收。
+Android 백그라운드 알림 지시 검증：`python scripts/test-mobile-events.py` 진실을 통해 JSON 그리고 루프백 HTTP 증분 읽기, 서비스 재구성 및 갱신, 이벤트 중복 제거, 스트림 재설정 및 로그인을 다룹니다./경쟁 조건, 다중 컴퓨터 격리 및 일시 중단, 4개 주소 소스 선택의 기록 기준, 비활성화 시 전송 중 응답 및 다시 열기를 삭제합니다. 처음으로 수정된 버전을 다운로드하고 확인하세요. JVM JSON 테스트 종속성。`python scripts/test-mobile-notification-permissions.py --android-only` 검증 Android 알림 권한, 수동 백그라운드 전환 및 시작 실패 대체. 둘 다 읽었다 `JAVA_HOME`。시스템 서비스, 잠금 화면 알림, 클릭하여 점프 및 배터리 동작은 Android 장치 또는 시뮬레이터에서 별도 승인。
 
-`python scripts/test-android-task-notifications.py` 复用已准备的 JVM JSON 依赖，编译生产通知呈现器并用系统服务替身验证不同事件独立保留、重试去重、点击路由及清理边界；不代表 Android 厂商通知分组或真机点击体验已通过。
+`python scripts/test-android-task-notifications.py` 재사용 준비 JVM JSON 종속성, 프로덕션 알림 렌더러를 컴파일하고 시스템 서비스 이중을 사용하여 다양한 이벤트가 독립적으로 유지되는지 확인하고 중복 제거를 다시 시도하고 라우팅을 클릭하고 경계를 정리합니다. 대표하지 않는다 Android 제조업체는 그룹 또는 실제 장치 클릭 경험이 통과되었음을 알립니다.。
 
-`python scripts/test-mobile-urls.py --android-only` 编译并执行 Android URL 与通知页面复用的边界验证；完整双平台入口还需 macOS 的 Swift 工具链。
+`python scripts/test-mobile-urls.py --android-only` 컴파일 및 실행 Android URL 알림 페이지로 재사용을 위한 경계 검증; 완전한 이중 플랫폼 입구는 여전히 필요합니다. macOS 의 Swift 도구 체인。
 
-iOS 通知回归在 macOS 上运行 `scripts/test-ios-events.py`、`scripts/test-ios-notification-routing.py`、`scripts/test-ios-notification-source.py` 和 `scripts/test-ios-notification-sources.py`，并进入现有移动端 CI 作业。分别覆盖真实 HTTP 的多电脑隔离与生命周期、场景与通知点击去重、来源图标文件在提交通知时仍可读，以及按地址选择提醒、在途回调失效和重新开启的基线。后两项的通知系统类型使用替身，系统授权与实际送达仍需 iPhone 验收。
+iOS 알림 반환 시간 macOS 계속되다 `scripts/test-ios-events.py`、`scripts/test-ios-notification-routing.py`、`scripts/test-ios-notification-source.py` 및 `scripts/test-ios-notification-sources.py`，기존 모바일 단말기에 들어가셔서 CI 작업. 진짜를 덮어라 HTTP 다중 컴퓨터 격리 및 수명 주기, 장면 및 알림 클릭 중복 제거, 알림 제출 시 계속 읽을 수 있는 소스 아이콘 파일, 주소별 미리 알림 선택, 기내 콜백 무효화 및 다시 열기를 위한 기준. 마지막 두 가지 알림 시스템 유형은 대리자를 사용하며 시스템 승인 및 실제 전달에는 여전히 필요합니다. iPhone 수락。
 
-Android 设置页资源合约：`node --test mobile/tests/settings.test.cjs mobile/tests/resources.test.cjs` 检查浅深色资源对齐、文字对比度及两种宿主的配置声明。原生交互另外验收整行与开关点击、后台服务启停、权限返回刷新、设置页主题作用域、主题持久化与跟随系统、提示吐司、翻译、返回原聊天，以及窄屏和大字体布局。
+Android 페이지 리소스 계약 설정：`node --test mobile/tests/settings.test.cjs mobile/tests/resources.test.cjs` 두 호스트 모두에 대해 밝은 리소스와 어두운 리소스 정렬, 텍스트 대비 및 구성 선언을 확인합니다. 기본 상호 작용은 전체 행 및 스위치 클릭, 백그라운드 서비스 시작 및 중지, 권한 반환 새로 고침, 설정 페이지 테마 범위, 테마 지속성 및 시스템 따르기, 프롬프트 알림, 번역, 원래 채팅으로 돌아가기, 좁은 화면 및 큰 글꼴 레이아웃도 허용합니다.。
 
-Android 原生电脑选项菜单：`python3 scripts/test-android-gateway-menu.py --adb <已有adb路径> --serial emulator-5556 --apk <本轮Test包> --keystore <同签名密钥> --application-id <Test应用标识>`。签名密码由 `CMB_ANDROID_STORE_PASSWORD` 传入。仅对明确可丢弃的模拟器运行，会清空该模拟器中 Test 的偏好、保存合成连接并授予通知权限；拒绝真机序列号。使用生产 Activity/WebView 检查页面颜色、原生主题回退、系统和逐级返回、晚回调取消、导航与生命周期清理、草稿保留以及通知来源偏好。结果位于 `.tmp/android-gateway-menu-tests/`，不等于真机或真实客户端会话验收。
+Android 기본 PC 옵션 메뉴：`python3 scripts/test-android-gateway-menu.py --adb <이미adb길> --serial emulator-5556 --apk <이번 라운드Test가방> --keystore <동일한 서명 키> --application-id <Test애플리케이션 ID>`。서명 비밀번호는 다음과 같습니다. `CMB_ANDROID_STORE_PASSWORD` 들어오는. 명시적으로 삭제할 수 있는 에뮬레이터에서만 실행되어 에뮬레이터의 콘텐츠를 지웁니다. Test 기본 설정, 합성 연결 저장 및 알림 권한 부여 실제 장치 일련번호를 거부합니다. 사용 생산 Activity/WebView 페이지 색상, 기본 테마 대체, 시스템 및 단계별 롤백, 늦은 콜백 취소, 탐색 및 수명 주기 정리, 초안 보존, 알림 소스 기본 설정을 확인하세요. 결과는 다음 위치에 있습니다. `.tmp/android-gateway-menu-tests/`，실제 시스템 또는 실제 클라이언트 세션 승인과 동일하지 않음。
 
-设置页动效另外检查进入和返回、开关与权限布局、主题弹层及浅深色交叉淡化的中间帧；同时覆盖快速反向操作、系统动画时长为零时的直接呈现，以及关闭窗口后的动画和临时画面清理。
+설정 페이지 애니메이션은 또한 진입 및 복귀, 스위치 및 권한 레이아웃, 테마 팝업 레이어, 라이트 및 다크 크로스페이드의 중간 프레임을 확인합니다. 또한 빠른 역방향 작업, 시스템 애니메이션 지속 시간이 0일 때 직접 프레젠테이션, 창을 닫은 후 애니메이션 및 임시 화면 정리를 다룹니다.。

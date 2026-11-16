@@ -128,18 +128,18 @@ def display_absolute_path(path):
 class Workspace:
     def __init__(self, root):
         if not root or not Path(root).is_absolute():
-            raise ValueError('此聊天尚未关联项目目录')
+            raise ValueError('이 채팅은 프로젝트 디렉터리와 연결되지 않았습니다.')
         self.root = Path(root).resolve(strict=True)
         if not self.root.is_dir():
-            raise ValueError('项目目录不可用')
+            raise ValueError('프로젝트 디렉터리를 사용할 수 없습니다.')
 
     @staticmethod
     def parts(path):
         if not isinstance(path, str) or len(path) > 4096 or any(ord(c) < 32 for c in path) or '\\' in path or ':' in path:
-            raise ValueError('文件路径无效')
+            raise ValueError('잘못된 파일 경로')
         parts = path.split('/') if path else []
         if any(p in ('', '.', '..') for p in parts):
-            raise PermissionError('只能访问当前项目内的文件')
+            raise PermissionError('현재 프로젝트 내의 파일에만 접근 가능')
         return parts
 
     @contextmanager
@@ -160,11 +160,11 @@ class Workspace:
             for part in parts:
                 path = path / part
                 if path.is_symlink() or getattr(path, 'is_junction', lambda: False)() or _windows_reparse_point(path):
-                    raise PermissionError('暂不支持通过符号链接访问文件')
+                    raise PermissionError('심볼릭 링크를 통한 파일 액세스는 현재 지원되지 않습니다.')
                 if not path.exists():
-                    raise FileNotFoundError('目录不存在')
+                    raise FileNotFoundError('디렉토리가 존재하지 않습니다')
                 if not path.is_dir():
-                    raise NotADirectoryError('路径不是目录')
+                    raise NotADirectoryError('경로가 디렉터리가 아닙니다.')
             yield path, None
 
     @staticmethod
@@ -173,13 +173,13 @@ class Workspace:
             return os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, mode, dir_fd=fd)
         path = directory / name
         if path.is_symlink() or _windows_reparse_point(path):
-            raise PermissionError('暂不支持通过符号链接访问文件')
+            raise PermissionError('심볼릭 링크를 통한 파일 액세스는 현재 지원되지 않습니다.')
         return os.open(path, flags | getattr(os, 'O_BINARY', 0), mode)
 
     def listing(self, path='', hidden=False, search='', offset=0):
         parts = self.parts(path)
         if not isinstance(search, str) or len(search) > 200 or not isinstance(offset, int) or offset < 0:
-            raise ValueError('目录查询无效')
+            raise ValueError('디렉터리 쿼리가 잘못되었습니다.')
         rows = []
         with self.directory(parts) as (directory, fd):
             with os.scandir(fd if fd is not None else directory) as entries:
@@ -202,7 +202,7 @@ class Workspace:
 
     def info(self, path):
         parts = self.parts(path)
-        if not parts: raise ValueError('请选择文件')
+        if not parts: raise ValueError('파일을 선택해주세요')
         with self.directory(parts[:-1]) as (directory, fd):
             info = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False) if fd is not None else (directory / parts[-1]).lstat()
             if stat.S_ISDIR(info.st_mode):
@@ -213,23 +213,23 @@ class Workspace:
             handle = self.open_file(directory, fd, parts[-1], os.O_RDONLY)
             with os.fdopen(handle, 'rb') as stream:
                 info = os.fstat(stream.fileno())
-                if not stat.S_ISREG(info.st_mode): raise ValueError('仅支持普通文件')
+                if not stat.S_ISREG(info.st_mode): raise ValueError('일반 파일만 지원')
                 return {'name': parts[-1], 'path': path, 'size': info.st_size, 'kind': 'file',
                         'absolutePath': display_absolute_path(str(self.root.joinpath(*parts)))}
 
     def references(self, references):
         """Resolve metadata only, against this session's current project boundary."""
         if not isinstance(references, list) or len(references) > 10:
-            raise ValueError('每条消息最多添加 10 个不同附件')
+            raise ValueError("메시지당 최대 10개의 파일 첨부")
         result, seen = [], set()
         for reference in references:
             if not isinstance(reference, dict) or set(reference) != {'path', 'absolutePath'}:
-                raise ValueError('项目文件引用无效，请重新选择')
+                raise ValueError('프로젝트 파일 참조가 잘못되었습니다. 다시 선택하세요.')
             info = self.info(reference['path'])
             if info['absolutePath'] != reference['absolutePath']:
-                raise ValueError('项目目录已变化，请重新选择引用文件')
+                raise ValueError('프로젝트 디렉터리가 변경되었습니다. 참조 파일을 다시 선택하세요.')
             if info['absolutePath'] in seen:
-                raise ValueError('不能重复引用同一文件或目录')
+                raise ValueError('동일한 파일이나 디렉터리를 반복적으로 참조할 수 없습니다.')
             seen.add(info['absolutePath'])
             result.append({'name': info['name'], 'path': info['absolutePath'],
                            'kind': info['kind'], 'size': info['size'], 'image': None})
@@ -246,7 +246,7 @@ class Workspace:
     def _archive_snapshot(self, path):
         """Snapshot ZIP64 members on disk, without following links."""
         parts = self.parts(path)
-        if not parts: raise ValueError('请选择文件夹')
+        if not parts: raise ValueError('폴더를 선택해주세요')
         with tempfile.TemporaryFile(prefix='bridge-archive-') as snapshot:
             with zipfile.ZipFile(snapshot, 'w', compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
                 def walk(current, archive_path):
@@ -260,14 +260,14 @@ class Workspace:
                             target = directory / name
                             info = os.stat(name, dir_fd=fd, follow_symlinks=False) if fd is not None else target.lstat()
                             if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400) or getattr(target, 'is_junction', lambda: False)():
-                                raise PermissionError('文件夹含链接或特殊文件，无法下载')
+                                raise PermissionError('폴더에 링크나 특수 파일이 포함되어 있어 다운로드할 수 없습니다.')
                             if stat.S_ISDIR(info.st_mode):
                                 walk(current + [name], archive_path + '/' + name)
                             elif stat.S_ISREG(info.st_mode):
                                 handle = self.open_file(directory, fd, name, os.O_RDONLY)
                                 with os.fdopen(handle, 'rb') as source:
                                     before = os.fstat(source.fileno())
-                                    if not stat.S_ISREG(before.st_mode): raise PermissionError('文件类型已变化')
+                                    if not stat.S_ISREG(before.st_mode): raise PermissionError('파일 형식이 변경되었습니다.')
                                     with archive.open(archive_path + '/' + name, 'w', force_zip64=True) as destination:
                                         while True:
                                             chunk = source.read(65536)
@@ -275,8 +275,8 @@ class Workspace:
                                             destination.write(chunk)
                                     after = os.fstat(source.fileno())
                                     if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-                                        raise ValueError('源文件已变化，请重新下载。')
-                            else: raise PermissionError('文件夹含链接或特殊文件，无法下载')
+                                        raise ValueError("소스 파일이 변경되었습니다. 다운로드를 다시 시작하세요.")
+                            else: raise PermissionError('폴더에 링크나 특수 파일이 포함되어 있어 다운로드할 수 없습니다.')
                 walk(parts, parts[-1])
             size = snapshot.tell(); snapshot.seek(0)
             digest = hashlib.sha256()
@@ -289,18 +289,18 @@ class Workspace:
 
     def read(self, path, download=False):
         parts = self.parts(path)
-        if not parts: raise ValueError('请选择文件')
+        if not parts: raise ValueError('파일을 선택해주세요')
         with self.directory(parts[:-1]) as (directory, fd):
             handle = self.open_file(directory, fd, parts[-1], os.O_RDONLY)
             with os.fdopen(handle, 'rb') as stream:
                 info = os.fstat(stream.fileno())
-                if not stat.S_ISREG(info.st_mode): raise ValueError('仅支持普通文件')
-                if download and info.st_size > MAX_TRANSFER: raise ValueError('文件超过 20 MB 下载限制')
+                if not stat.S_ISREG(info.st_mode): raise ValueError('일반 파일만 지원')
+                if download and info.st_size > MAX_TRANSFER: raise ValueError('파일이 초과되었습니다. 20 MB 다운로드 제한')
                 limit = MAX_TRANSFER if download or Path(path).suffix.lower() in IMAGES else MAX_PREVIEW
                 data = stream.read(limit + 1)
         result = {'name': parts[-1], 'path': path, 'size': info.st_size, 'modified': info.st_mtime, 'kind': 'binary'}
         if len(data) > limit:
-            if download: raise ValueError('文件超过 20 MB 下载限制')
+            if download: raise ValueError('파일이 초과되었습니다. 20 MB 다운로드 제한')
             return result
         if download:
             return {**result, 'data': base64.b64encode(data).decode()}
@@ -319,13 +319,13 @@ class Workspace:
             # Large local files are hashed once, then served from their immutable
             # disk snapshot. Revalidate path/type/version before every range.
             parts = self.parts(path)
-            if not parts: raise ValueError('请选择文件')
+            if not parts: raise ValueError('파일을 선택해주세요')
             with self.directory(parts[:-1]) as (directory, fd):
                 handle = self.open_file(directory, fd, parts[-1], os.O_RDONLY)
                 try: info = os.fstat(handle)
                 finally: os.close(handle)
-            if not stat.S_ISREG(info.st_mode): raise ValueError('仅支持普通文件')
-            if limit is not None and info.st_size > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
+            if not stat.S_ISREG(info.st_mode): raise ValueError('일반 파일만 지원')
+            if limit is not None and info.st_size > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
             if info.st_size > MAX_TRANSFER:
                 stamp = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
                 with _cached_transfer(('file', str(self.root), path, stamp), lambda: self._download(path, '', '', limit), range_header, if_range) as value:
@@ -336,12 +336,12 @@ class Workspace:
         except PermissionError:
             raise
         except OSError as error:
-            raise ValueError('文件不可访问，请刷新目录后重试') from error
+            raise ValueError('파일에 액세스할 수 없습니다. 디렉터리를 새로 고친 후 다시 시도하세요.') from error
 
     @contextmanager
     def _download(self, path, range_header, if_range, limit):
         parts = self.parts(path)
-        if not parts: raise ValueError('请选择文件')
+        if not parts: raise ValueError('파일을 선택해주세요')
         # A private disk snapshot binds the validator to exactly the bytes sent,
         # even if an editor replaces or writes the source during the response.
         with tempfile.TemporaryFile(prefix='bridge-download-') as snapshot:
@@ -349,8 +349,8 @@ class Workspace:
                 handle = self.open_file(directory, fd, parts[-1], os.O_RDONLY)
                 with os.fdopen(handle, 'rb') as stream:
                     before = os.fstat(stream.fileno())
-                    if not stat.S_ISREG(before.st_mode): raise ValueError('仅支持普通文件')
-                    if limit is not None and before.st_size > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
+                    if not stat.S_ISREG(before.st_mode): raise ValueError('일반 파일만 지원')
+                    if limit is not None and before.st_size > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
                     def copy_range(selection):
                         digest, size = hashlib.sha256(), 0
                         stream.seek(0); snapshot.seek(0); snapshot.truncate()
@@ -358,7 +358,7 @@ class Workspace:
                             chunk = stream.read(65536)
                             if not chunk: break
                             end = size + len(chunk)
-                            if limit is not None and end > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
+                            if limit is not None and end > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
                             digest.update(chunk)
                             left = max(size, selection['offset'])
                             right = min(end, selection['offset'] + selection['length'])
@@ -367,7 +367,7 @@ class Workspace:
                         after = os.fstat(stream.fileno())
                         if ((before.st_size, before.st_mtime_ns, before.st_ctime_ns) !=
                                 (after.st_size, after.st_mtime_ns, after.st_ctime_ns) or size != before.st_size):
-                            raise ValueError('文件正在变化，请稍后重新下载')
+                            raise ValueError('파일이 변경 중입니다. 나중에 다시 다운로드하세요.')
                         return '"sha256-' + digest.hexdigest() + '"'
                     # Hash all bytes, but normally retain only the requested
                     # chunk. No file-sized allocation or repeated full snapshot.
@@ -383,10 +383,10 @@ class Workspace:
     def upload(self, path, encoded):
         parts = self.parts(path)
         protected_parts = [part.rstrip(' .').casefold() for part in parts] if os.name == 'nt' else parts
-        if not parts or '.git' in protected_parts: raise PermissionError('请选择项目内的普通文件位置')
+        if not parts or '.git' in protected_parts: raise PermissionError('프로젝트 내의 일반 파일 위치를 선택하세요.')
         try: data = base64.b64decode(encoded, validate=True)
-        except (ValueError, TypeError): raise ValueError('上传内容无效') from None
-        if len(data) > MAX_TRANSFER: raise ValueError('每个文件不能超过 20 MB')
+        except (ValueError, TypeError): raise ValueError('잘못된 업로드 콘텐츠') from None
+        if len(data) > MAX_TRANSFER: raise ValueError('각 파일은 다음을 초과할 수 없습니다. 20 MB')
         with self.directory(parts[:-1]) as (directory, fd):
             temporary = '.bridge-upload-' + uuid.uuid4().hex
             handle = self.open_file(directory, fd, temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
@@ -401,7 +401,7 @@ class Workspace:
                     existing = self.read(path, download=True)
                     if existing['data'] == encoded:
                         return {'name': parts[-1], 'path': path, 'size': len(data), 'existing': True}
-                    raise ValueError('同名文件已存在，请修改上传文件名') from None
+                    raise ValueError('동일한 이름의 파일이 이미 존재합니다. 업로드한 파일의 이름을 변경하세요.') from None
             finally:
                 if fd is not None: os.unlink(temporary, dir_fd=fd)
                 else: (directory / temporary).unlink()
@@ -421,7 +421,7 @@ class GitWorkspace:
                               '-c', 'protocol.allow=never', '-c', 'gc.auto=0']
         # Status may otherwise run a repository's clean/process filter on dirty files.
         code, keys, truncated = self.run(['config', '--name-only', '--get-regexp', r'^filter\..*\.(clean|process|required)$'])
-        if code not in (0, 1) or truncated: raise ValueError('无法读取 Git 配置，请在电脑上检查仓库')
+        if code not in (0, 1) or truncated: raise ValueError('읽을 수 없음 Git 구성, 컴퓨터의 창고를 확인하세요.')
         for key in keys.decode('utf-8', 'replace').splitlines():
             self.command += ['-c', key + ('=false' if key.endswith('.required') else '=')]
 
@@ -432,7 +432,7 @@ class GitWorkspace:
             process = subprocess.Popen((self.write_command if write else self.command) + args, cwd=self.workspace.root, env=self.environment,
                                        stdin=source if source else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
-            raise ValueError('此电脑或 SSH 服务器未安装 Git') from None
+            raise ValueError('이 컴퓨터나 SSH 서버가 설치되지 않았습니다 Git') from None
         finally:
             if source: source.close()
         expired = threading.Event()
@@ -446,7 +446,7 @@ class GitWorkspace:
             truncated = len(data) > limit
             if truncated: process.kill()
             code = process.wait()
-            if expired.is_set(): raise ValueError('Git 操作结果未确认，请刷新状态和历史后再决定是否重试' if write else 'Git 读取超时，请在电脑上检查仓库后重试')
+            if expired.is_set(): raise ValueError('Git 작업 결과가 확인되지 않았습니다. 다시 시도할지 결정하기 전에 상태와 기록을 새로 고치세요.' if write else 'Git 읽기 시간이 초과되었습니다. 컴퓨터에서 창고를 확인한 후 다시 시도해 주세요.')
             return code, data[:limit], truncated
         finally:
             timer.cancel(); process.stdout.close()
@@ -454,16 +454,16 @@ class GitWorkspace:
 
     def status(self):
         code, top, _ = self.run(['rev-parse', '--show-toplevel'])
-        if code: return {'available': False, 'message': '当前项目不是 Git 工作区，或仓库不可访问'}
+        if code: return {'available': False, 'message': '현재 프로젝트는 아님 Git 작업 공간 또는 창고에 접근할 수 없습니다.'}
         repository = Path(os.fsdecode(top.rstrip(b'\n'))).resolve()
         code, gitdir, _ = self.run(['rev-parse', '--absolute-git-dir'])
-        if code: raise ValueError('无法读取 Git 仓库位置')
+        if code: raise ValueError('읽을 수 없음 Git 창고 위치')
         self.gitdir = Path(os.fsdecode(gitdir.rstrip(b'\n')))
         prefix = self.workspace.root.relative_to(repository).as_posix()
         self.prefix = '' if prefix == '.' else prefix + '/'
         code, raw, truncated = self.run(['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all',
                                           '--renames', '--ignore-submodules=dirty', '--', '.'])
-        if code or truncated: raise ValueError('Git 变更列表过大或不可读取，请在电脑上检查仓库')
+        if code or truncated: raise ValueError('Git 변경 목록이 너무 크거나 읽을 수 없습니다. 컴퓨터의 저장소를 확인하세요.')
         headers, entries = {}, []
         records = iter(raw.decode('utf-8', 'surrogateescape').split('\0'))
         for record in records:
@@ -501,7 +501,7 @@ class GitWorkspace:
     def blob(self, spec):
         code, data, truncated = self.run(['cat-file', 'blob', spec], MAX_PREVIEW)
         if truncated: return None
-        if code: raise ValueError('文件状态已变化或 Git 对象不可用，请刷新 Git 面板')
+        if code: raise ValueError('파일 상태가 변경되었거나 Git 개체를 사용할 수 없습니다. 새로고침하세요. Git 패널')
         return data
 
     def working(self, path):
@@ -509,19 +509,19 @@ class GitWorkspace:
         with self.workspace.directory(parts[:-1]) as (directory, fd):
             handle = self.workspace.open_file(directory, fd, parts[-1], os.O_RDONLY)
             with os.fdopen(handle, 'rb') as stream:
-                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode): raise ValueError('此文件类型暂不支持差异预览')
+                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode): raise ValueError('이 파일 형식은 현재 차이점 미리보기를 지원하지 않습니다.')
                 data = stream.read(MAX_PREVIEW + 1)
                 return data if len(data) <= MAX_PREVIEW else None
 
     def diff(self, path, section):
         self.workspace.parts(path)
-        if section not in ('staged', 'unstaged', 'untracked', 'conflict'): raise ValueError('Git 差异类型无效')
+        if section not in ('staged', 'unstaged', 'untracked', 'conflict'): raise ValueError('Git 잘못된 차이 유형')
         state = self.status()
         entry = next((item for item in state.get('entries', []) if item['path'] == path), None)
-        if not entry: raise ValueError('文件状态已变化，请刷新 Git 面板')
+        if not entry: raise ValueError('파일 상태가 변경되었습니다. 새로고침하세요. Git 패널')
         valid = ('conflict' if entry['conflict'] else 'untracked' if entry['untracked'] else None)
         if (valid and section != valid) or (not valid and (section not in ('staged', 'unstaged') or entry['index' if section == 'staged' else 'worktree'] == '.')):
-            raise ValueError('文件状态已变化，请刷新 Git 面板')
+            raise ValueError('파일 상태가 변경되었습니다. 새로고침하세요. Git 패널')
         result = {'path': path, 'section': section, 'oldPath': entry['oldPath'], 'kind': 'diff'}
         if entry['submodule']: return {**result, 'kind': 'submodule'}
         if section in ('untracked', 'conflict'):
@@ -558,19 +558,19 @@ class GitWorkspace:
     @staticmethod
     def revision(value):
         if not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', value):
-            raise ValueError('提交标识无效，请刷新历史')
+            raise ValueError('제출 ID가 잘못되었습니다. 기록을 새로고침하세요.')
         return value
 
     def history(self, limit=40, ref='all'):
         state = self.require_repository()
         if not isinstance(limit, int) or not 1 <= limit <= 1000 or ref not in ('all', 'current'):
-            raise ValueError('历史查询无效')
+            raise ValueError('기록 쿼리가 잘못되었습니다.')
         revisions = ['--all'] if ref == 'all' else []
         if state['commit'] != '(initial)': revisions.append('HEAD')
         elif ref == 'current': return {'commits': [], 'hasMore': False}
         code, raw, truncated = self.run(['log', '--topo-order', '-n', str(limit + 1),
             '--format=%H%x00%P%x00%an%x00%aI%x00%s%x00%D', '-z', *revisions, '--'])
-        if code or truncated: raise ValueError('历史记录不可读取或过大，请在电脑上检查仓库')
+        if code or truncated: raise ValueError('기록 레코드를 읽을 수 없거나 너무 큽니다. 컴퓨터의 저장소를 확인하세요.')
         fields = raw.decode('utf-8', 'replace').split('\0')
         if fields[-1] == '': fields.pop()
         commits = []
@@ -583,12 +583,12 @@ class GitWorkspace:
     def commit_detail(self, revision):
         self.require_repository(); self.revision(revision)
         code, raw, truncated = self.run(['show', '-s', '--format=%H%x00%P%x00%an%x00%aI%x00%B', revision, '--'], MAX_PREVIEW)
-        if code or truncated: raise ValueError('提交详情不可读取')
+        if code or truncated: raise ValueError('제출 세부정보를 읽을 수 없습니다.')
         oid, parents, author, date, message = raw.decode('utf-8', 'replace').split('\0', 4)
         parents = parents.split()
         comparison = [parents[0], oid] if parents else ['--root', oid]
         code, raw, truncated = self.run(['diff-tree', '--no-commit-id', '--raw', '--no-abbrev', '-z', '-r', '-M', *comparison, '--', '.'])
-        if code or truncated: raise ValueError('此提交的文件列表过大或不可读取')
+        if code or truncated: raise ValueError('이 커밋의 파일 목록이 너무 크거나 읽을 수 없습니다.')
         tokens = iter(raw.decode('utf-8', 'replace').split('\0')); entries = []
         for header in tokens:
             if not header: continue
@@ -605,7 +605,7 @@ class GitWorkspace:
         self.workspace.parts(path)
         detail = self.commit_detail(revision)
         entry = next((entry for entry in detail['entries'] if entry['path'] == path), None)
-        if not entry: raise ValueError('文件不属于此提交的项目变更')
+        if not entry: raise ValueError('파일은 이 커밋의 프로젝트 변경 사항에 속하지 않습니다.')
         result = {'path': path, 'oldPath': entry['oldPath'], 'kind': 'diff'}
         if entry['submodule']: return {**result, 'kind': 'submodule'}
         before = b'' if set(entry['oldId']) == {'0'} else self.blob(entry['oldId'])
@@ -615,7 +615,7 @@ class GitWorkspace:
     def branches(self):
         state = self.require_repository()
         code, raw, truncated = self.run(['for-each-ref', '--sort=refname', '--format=%(refname:short)%00%(objectname)%00%(upstream:short)', 'refs/heads/'])
-        if code or truncated: raise ValueError('无法读取分支列表')
+        if code or truncated: raise ValueError('분기 목록을 읽을 수 없습니다.')
         entries = []
         for line in raw.decode('utf-8', 'replace').splitlines():
             name, oid, upstream = line.split('\0')
@@ -630,11 +630,11 @@ class GitWorkspace:
                 import msvcrt
                 lock.seek(0); lock.write(b'0'); lock.flush(); lock.seek(0)
                 try: msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-                except OSError: raise ValueError('另一个 Git 操作正在执行，请稍后刷新') from None
+                except OSError: raise ValueError('또 다른 Git 작업이 실행 중입니다. 나중에 새로고침하세요.') from None
             else:
                 import fcntl
                 try: fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except OSError: raise ValueError('另一个 Git 操作正在执行，请稍后刷新') from None
+                except OSError: raise ValueError('또 다른 Git 작업이 실행 중입니다. 나중에 새로고침하세요.') from None
             try: yield
             finally:
                 if os.name == 'nt': lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
@@ -642,20 +642,20 @@ class GitWorkspace:
 
     def mutate(self, action, version, path='', branch='', message=''):
         allowed = ('stage', 'unstage', 'stage-all', 'unstage-all', 'commit', 'create-branch', 'switch-branch', 'merge', 'abort-merge')
-        if action not in allowed: raise ValueError('不支持此 Git 操作')
+        if action not in allowed: raise ValueError('이는 지원되지 않습니다. Git 작동하다')
         self.require_repository()
         with self.mutation_lock():
             state = self.require_repository()
             if not isinstance(version, str) or version != state['version']:
-                raise ValueError('仓库已发生变化，请刷新并核对后重新操作')
-            if state['operation'] == 'other': raise ValueError('仓库正在变基或拣选，请先在电脑上完成该操作')
+                raise ValueError('창고가 변경되었습니다. 새로고침 후 확인 후 다시 운영하시기 바랍니다.')
+            if state['operation'] == 'other': raise ValueError('창고가 리베이스 또는 피킹 중입니다. 먼저 컴퓨터에서 작업을 완료하십시오.')
             if action in ('commit', 'create-branch', 'switch-branch', 'merge', 'abort-merge') and state['scope'] != '.':
-                raise ValueError('此操作影响整个仓库，请在仓库根目录对应的聊天中操作')
+                raise ValueError('이 작업은 전체 창고에 영향을 미칩니다. 창고의 루트디렉토리에 해당하는 채팅에서 작업해주세요.')
             if action in ('stage', 'unstage'):
                 parts = self.workspace.parts(path)
-                if not parts or '.git' in parts: raise ValueError('请选择项目中的变更文件')
+                if not parts or '.git' in parts: raise ValueError('프로젝트에서 변경 파일을 선택하세요.')
                 entry = next((e for e in state['entries'] if e['path'] == path), None)
-                if not entry or entry['submodule']: raise ValueError('文件状态已变化或为子模块，请刷新后在电脑上处理')
+                if not entry or entry['submodule']: raise ValueError('파일 상태가 변경되었거나 하위 모듈입니다. 컴퓨터에서 새로고침하여 처리하세요.')
                 # Existing parent components must not redirect staging outside the project.
                 if action == 'stage':
                     try:
@@ -672,62 +672,62 @@ class GitWorkspace:
                 # worktree files edited again after their first staging.
                 command = ['restore', '--staged', '--source=HEAD', '--', *paths] if state['commit'] != '(initial)' else ['rm', '-r', '-f', '--cached', '--ignore-unmatch', '--', *paths]
             elif action == 'commit':
-                if state['branch'] == '(detached)': raise ValueError('当前为分离 HEAD，请先创建分支再提交')
-                if any(e['conflict'] for e in state['entries']): raise ValueError('请先解决冲突并暂存文件')
-                if state['operation'] != 'merge' and not any(not e['untracked'] and e['index'] != '.' for e in state['entries']): raise ValueError('请先暂存需要提交的文件')
+                if state['branch'] == '(detached)': raise ValueError('현재 별거 중 HEAD，제출하기 전에 지점을 만드십시오.')
+                if any(e['conflict'] for e in state['entries']): raise ValueError('충돌을 해결하고 먼저 파일을 준비하십시오.')
+                if state['operation'] != 'merge' and not any(not e['untracked'] and e['index'] != '.' for e in state['entries']): raise ValueError('먼저 제출해야 할 서류를 임시로 저장해주세요.')
                 if not isinstance(message, str) or not message.strip() or len(message.encode('utf-8')) > 16000 or '\0' in message:
-                    raise ValueError('请填写提交说明（最多 16 KB）')
+                    raise ValueError('제출 지침을 작성하십시오（최대 16 KB）')
                 command = ['commit', '--file=-']
             elif action == 'abort-merge':
-                if state['operation'] != 'merge': raise ValueError('当前没有可中止的合并')
+                if state['operation'] != 'merge': raise ValueError('현재 중단할 병합이 없습니다.')
                 command = ['merge', '--abort']
             else:
-                if state['operation']: raise ValueError('请先完成或中止当前合并')
-                if state['entries']: raise ValueError('请先提交或在电脑上保存未提交的改动，再操作分支')
+                if state['operation']: raise ValueError('먼저 현재 병합을 완료하거나 중단하십시오.')
+                if state['entries']: raise ValueError('지점을 운영하기 전에 커밋되지 않은 변경 사항을 컴퓨터에 제출하거나 저장하세요.')
                 if not isinstance(branch, str) or not branch or len(branch) > 200 or branch.startswith('-'):
-                    raise ValueError('分支名称无效')
+                    raise ValueError('지점 이름이 잘못되었습니다.')
                 code, normalized, _ = self.run(['check-ref-format', '--branch', branch])
-                if code or normalized.decode('utf-8', 'replace').strip() != branch: raise ValueError('分支名称无效')
+                if code or normalized.decode('utf-8', 'replace').strip() != branch: raise ValueError('지점 이름이 잘못되었습니다.')
                 names = {entry['name'] for entry in self.branches()['branches']}
                 if action == 'create-branch':
-                    if branch in names: raise ValueError('同名分支已存在')
+                    if branch in names: raise ValueError('같은 이름의 분기가 이미 존재합니다.')
                     command = ['switch', '-c', branch]
                 else:
-                    if branch not in names or branch == state['branch']: raise ValueError('请选择另一个已存在的本地分支')
+                    if branch not in names or branch == state['branch']: raise ValueError('다른 기존 지역 지점을 선택하세요.')
                     command = ['switch', '--no-guess', branch] if action == 'switch-branch' else ['merge', '--no-edit', '--no-stat', '--no-autostash', 'refs/heads/' + branch]
             code, _, truncated = self.run(command, write=True, message=message if action == 'commit' else None)
             result = self.status()
             if code or truncated:
                 if action == 'merge' and result.get('operation') == 'merge':
                     return {'outcome': 'conflict' if any(e['conflict'] for e in result['entries']) else 'merge-pending',
-                            'message': '合并尚未完成，请检查变更；可解决冲突后提交，或中止本次合并。', 'state': result}
-                raise ValueError('Git 操作未完成或结果未确认。请刷新状态和历史；如无变化，请在电脑上检查 Git 身份、签名、hooks 或仓库锁后重试。')
-            labels = {'stage': '已暂存文件', 'unstage': '已取消暂存', 'stage-all': '已暂存项目变更', 'unstage-all': '已取消项目暂存',
-                      'commit': '已提交到本地分支', 'create-branch': '已创建并切换分支', 'switch-branch': '已切换分支', 'merge': '分支已合并', 'abort-merge': '已中止合并'}
+                            'message': '병합이 아직 완료되지 않았습니다. 변경 사항을 확인하세요. 충돌을 해결하고 이 병합을 제출하거나 중단할 수 있습니다.。', 'state': result}
+                raise ValueError('Git 작업이 완료되지 않았거나 결과가 확인되지 않았습니다. 상태와 기록을 새로 고치십시오. 변경 사항이 없으면 컴퓨터에서 확인하세요. Git 신원, 서명、hooks 아니면 창고를 잠근 후 다시 시도해 보세요.。')
+            labels = {'stage': '파일 스테이징됨', 'unstage': '취소', 'stage-all': '프로젝트 변경 단계', 'unstage-all': '프로젝트 저장이 취소되었습니다.',
+                      'commit': '현지 지사에 제출', 'create-branch': "분기 생성 및 전환", 'switch-branch': '지점 전환', 'merge': '지점이 병합되었습니다.', 'abort-merge': '병합이 중단되었습니다.'}
             return {'outcome': 'success', 'message': labels[action], 'state': result}
 
 
 def host_operation(root, action, params, history_path=None):
     """Explicit read-only host navigation; project writes keep their old root."""
     if action not in ('list', 'info', 'preview', 'download', 'download-stream', 'archive-stream'):
-        raise PermissionError('宿主机文件浏览仅支持读取')
+        raise PermissionError("호스트 파일 탐색은 읽기 전용입니다.")
     params = dict(params)
     params.pop('scope')
     value = params.pop('path', '')
     if not isinstance(value, str) or len(value) > 4096 or any(ord(c) < 32 for c in value):
-        raise ValueError('文件路径无效')
+        raise ValueError('잘못된 파일 경로')
     project = Path(root).resolve() if root and Path(root).is_absolute() else None
     start = project or (Path(history_path).parent.resolve() if history_path and Path(history_path).is_absolute() else None)
     path = Path(value) if value else start
     if path is None:
-        raise ValueError('此聊天的记录目录暂不可用')
+        raise ValueError("이 채팅의 기록 디렉터리는 현재 사용할 수 없습니다.")
     if not path.is_absolute():
         if start is None or path.drive:
-            raise ValueError('请输入完整目录路径')
+            raise ValueError('전체 디렉터리 경로를 입력하세요.')
         path = start/path
     if (os.name == 'nt' and display_absolute_path(path.anchor).startswith('\\\\')
             and (project is None or display_absolute_path(path.anchor).casefold() != display_absolute_path(project.anchor).casefold())):
-        raise PermissionError('只能浏览本机磁盘或当前项目的共享目录')
+        raise PermissionError("로컬 디스크 또는 현재 프로젝트의 네트워크 공유 찾아보기")
     anchor = Path(path.anchor)
     relative = path.relative_to(anchor).as_posix() if path != anchor else ''
     Workspace.parts(relative)  # Do not normalize away traversal or follow links.
@@ -774,8 +774,8 @@ def operate(root, action, params, history_path=None):
         if action == 'download': return workspace.read(params['path'], download=True)
         if action == 'download-stream': return workspace.download(**params)
         if action == 'upload': return workspace.upload(**params)
-        raise ValueError('不支持的文件操作')
+        raise ValueError('지원되지 않는 파일 작업')
     except PermissionError:
         raise
     except OSError as error:
-        raise ValueError('文件不可访问，请刷新目录后重试') from error
+        raise ValueError('파일에 액세스할 수 없습니다. 디렉터리를 새로 고친 후 다시 시도하세요.') from error

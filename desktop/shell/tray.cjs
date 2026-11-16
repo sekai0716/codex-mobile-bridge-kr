@@ -21,20 +21,20 @@ function createTray({Tray,Menu,icon,show,worker,open,copy,quit,onError,t=text=>t
   function render(){
     if(disposed)return;
     const running=Boolean(snapshot?.running),url=snapshot?.url;
-    const status=!snapshot?'正在读取状态':running?'网关运行中':snapshot.portOccupied?'端口已占用':'网关未启动';
+    const status=!snapshot?'상태 불러오는 중':running?'게이트웨이 실행 중':snapshot.portOccupied?'사용 중인 포트':'게이트웨이 중지됨';
     const signature=JSON.stringify([running,url,status,busy]);
     if(signature===rendered)return;
     rendered=signature;
-    tray.setToolTip(t('Codex 手机网关')+' · '+t(status));
+    tray.setToolTip(t('Codex 모바일 Bridge')+' · '+t(status));
     tray.setContextMenu(Menu.buildFromTemplate([
-      {label:'打开控制面板',click:show},
+      {label:'제어판 열기',click:show},
       {label:status,enabled:false},
       {type:'separator'},
-      {label:'打开手机访问地址',enabled:Boolean(url)&&!busy,click:()=>action(()=>open(url))},
-      {label:'复制手机访问地址',enabled:Boolean(url)&&!busy,click:()=>action(()=>copy(url))},
+      {label:'휴대폰 접속 주소 열기',enabled:Boolean(url)&&!busy,click:()=>action(()=>open(url))},
+      {label:'휴대폰 접속 주소 복사',enabled:Boolean(url)&&!busy,click:()=>action(()=>copy(url))},
       {type:'separator'},
-      {label:'停止网关并退出',enabled:running&&!busy,click:()=>action(async()=>{await worker('stop');quit();})},
-      {label:'退出控制面板（保留网关）',enabled:!busy,click:quit},
+      {label:'게이트웨이 중지 후 종료',enabled:running&&!busy,click:()=>action(async()=>{await worker('stop');quit();})},
+      {label:'제어판 종료(게이트웨이 유지)',enabled:!busy,click:quit},
     ].map(item=>item.label?{...item,label:t(item.label)}:item)));
   }
   function observe(value){

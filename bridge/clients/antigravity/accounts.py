@@ -15,18 +15,18 @@ from .credentials import NativeCredentials
 
 TOKEN_FILES = ('jetski-standalone-oauth-token', 'antigravity-cli/antigravity-oauth-token',
                'antigravity/antigravity-oauth-token')
-SCOPE_HINT = ('APP、CLI、IDE 共用此电脑的 Google 登录。请先在原客户端登录，正常退出全部三类入口后保存；'
-              '应用后重新打开验证登录。使用同一系统登录的自定义入口也会受影响；自定义目录的独立凭据、GCP、WIF 和 API 配置请在原客户端管理。')
+SCOPE_HINT = ('APP、CLI、IDE 이 컴퓨터와 공유됨 Google 로그인하세요. 원본 클라이언트로 먼저 로그인하신 후, 3가지 종류의 출입구를 모두 정상적으로 종료하신 후 저장하시기 바랍니다.；'
+              '신청 후, 인증 로그인을 다시 열어주세요. 동일한 시스템을 사용하여 로그인한 사용자 정의 포털도 영향을 받습니다. 사용자 정의 디렉토리에 대한 별도의 자격 증명、GCP、WIF 및 API 원래 클라이언트 관리에서 구성을 구성하세요.。')
 
 
 def require_stopped():
     if login_processes():
-        raise ValueError('请先正常退出此电脑的 Antigravity APP、CLI、IDE，再保存或应用账号')
+        raise ValueError('먼저 이 컴퓨터에서 정상적으로 로그아웃하세요. Antigravity APP、CLI、IDE，계정을 다시 저장하거나 적용하세요')
 
 
 def safe(path):
     if any(item.is_symlink() for item in (path, *path.parents)):
-        raise ValueError('Antigravity 账号路径不能是符号链接')
+        raise ValueError('Antigravity 계정 경로는 심볼릭 링크일 수 없습니다.')
 
 
 def read(path):
@@ -54,7 +54,7 @@ def identity(raw):
             raise ValueError
         return email.strip()
     except (ValueError, TypeError, AttributeError):
-        raise ValueError('未识别到受支持的默认 Google 登录，请先在 Antigravity 原客户端完成登录') from None
+        raise ValueError('지원되는 기본값이 인식되지 않습니다. Google 로그인하려면 먼저 Antigravity 원래 클라이언트가 로그인을 완료합니다.') from None
 
 
 class AntigravityAccounts:
@@ -67,7 +67,7 @@ class AntigravityAccounts:
 
     def _check(self, *, stopped=True):
         if not self.supported():
-            raise ValueError('仅支持默认用户目录的 Antigravity 账号；自定义目录请在原客户端管理')
+            raise ValueError('기본 사용자 디렉터리만 지원 Antigravity 계정; 원래 클라이언트에서 사용자 정의 디렉토리를 관리하십시오')
         safe(self.directory)
         for name in TOKEN_FILES:
             safe(self.home/'.gemini'/name)
@@ -79,15 +79,15 @@ class AntigravityAccounts:
         rows = json.loads(raw)['accounts'] if raw is not None else []
         if not isinstance(rows, list) or any(not isinstance(row, dict) or
                 not isinstance(row.get('id'), str) or not re.fullmatch('[0-9a-f]{32}', row['id']) for row in rows):
-            raise ValueError('已保存的 Antigravity 账号索引无效')
+            raise ValueError('저장됨 Antigravity 계정 색인이 잘못되었습니다.')
         return rows
 
     def _row(self, identifier):
         if not isinstance(identifier, str) or not re.fullmatch('[0-9a-f]{32}', identifier):
-            raise ValueError('已保存的 Antigravity 账号标识无效')
+            raise ValueError('저장됨 Antigravity 계정 ID가 유효하지 않습니다.')
         row = next((item for item in self._index() if item['id'] == identifier), None)
         if row is None:
-            raise ValueError('保存的 Antigravity 账号不存在')
+            raise ValueError('저장됨 Antigravity 계정이 존재하지 않습니다')
         return row
 
     def public(self, *, native=None):
@@ -113,7 +113,7 @@ class AntigravityAccounts:
                     'activeId': active[0] if active else None,
                     'readOnly': not supported, 'canImport': supported, 'canSwitch': supported,
                     'enrollmentHint': SCOPE_HINT,
-                    'switchConfirmation': '将更新此电脑 APP、CLI、IDE 共用的 Google 登录，使用同一系统登录的自定义入口也会受影响；其他电脑不变。已核验空闲的单个 APP 或 IDE 会正常退出并重新打开；独立 CLI、其他实例或无法核验的入口需要先手动退出。聊天、配置和草稿保留。确认应用？',
+                    'switchConfirmation': '이 컴퓨터는 업데이트됩니다 APP、CLI、IDE 공유됨 Google 로그인, 동일한 시스템을 사용하여 로그인하는 사용자 지정 포털도 영향을 받습니다. 다른 컴퓨터는 변경되지 않습니다. 검증된 무료 싱글 APP 또는 IDE 정상적으로 종료되고 다시 열립니다. 독립적인 CLI、다른 인스턴스나 확인할 수 없는 항목은 먼저 수동으로 종료해야 합니다. 채팅, 구성 및 초안 보존. 신청 확인？',
                     'capabilities': {'addApi': False, 'quota': False, 'switchRequiresStopped': True}}
 
     def _snapshot(self, vault):
@@ -122,13 +122,13 @@ class AntigravityAccounts:
     def _validate(self, value):
         if (not isinstance(value, dict) or set(value) != {'keyring', 'files'}
                 or not isinstance(value['files'], dict) or set(value['files']) != set(TOKEN_FILES)):
-            raise ValueError('Antigravity 登录快照格式无效')
+            raise ValueError('Antigravity 로그인 스냅샷 형식이 잘못되었습니다.')
         values = [value['keyring'], *value['files'].values()]
         emails = {identity(raw) for raw in values if raw is not None}
         if not emails:
-            raise ValueError('请先在 Antigravity 原客户端登录，再保存当前接入')
+            raise ValueError('먼저 부탁드립니다 Antigravity 원래 클라이언트로 로그인하고 현재 액세스를 저장하세요.')
         if len(emails) != 1:
-            raise ValueError('默认入口的登录身份不一致，请先在原客户端统一登录后保存')
+            raise ValueError('기본 포털의 로그인 ID가 일치하지 않습니다. 먼저 원본 클라이언트로 로그인 후 저장해주세요.')
         return next(iter(emails))
 
     def validate_saved(self, identifier):
@@ -138,12 +138,12 @@ class AntigravityAccounts:
             row = self._row(identifier)
             value = json.loads(read(self.directory/(identifier+'.json')) or '{}')
             if self._validate(value) != row['email'] or fingerprint(value) != row['fingerprint']:
-                raise ValueError('已保存的登录快照不完整，请重新保存')
+                raise ValueError('저장된 로그인 스냅샷이 불완전합니다. 다시 저장하세요.')
             return row['email']
 
     def import_current(self, name=''):
         if not isinstance(name, str) or len(name.strip()) > 100:
-            raise ValueError('名称长度不能超过 100 字')
+            raise ValueError('이름은 다음보다 길 수 없습니다. 100 성격')
         with self.lock:
             self._check()
             with profile_lease(self.home/'.gemini/.bridge-account.lock'):
@@ -152,7 +152,7 @@ class AntigravityAccounts:
                 email = self._validate(snapshot)
                 self._check()
                 if self._snapshot(vault) != snapshot:
-                    raise ValueError('原生登录正在变化，请稍后重新保存')
+                    raise ValueError('기본 로그인이 변경 중입니다. 나중에 다시 저장하세요.')
                 rows = self._index()
                 # A new private snapshot replaces the prior entry only after both writes succeed.
                 identifier = uuid.uuid4().hex
@@ -185,7 +185,7 @@ class AntigravityAccounts:
             selected = json.loads(read(self.directory/(row['id']+'.json')) or 'null')
             self._validate(selected)
             if fingerprint(selected) != row['fingerprint']:
-                raise ValueError('保存的 Antigravity 登录快照已变化')
+                raise ValueError('저장됨 Antigravity 로그인 스냅샷이 변경되었습니다.')
             # Retain the saved list if post-commit discovery fails, but never
             # carry the previous native login identity across a switch.
             result = self.public(native={'accounts': []})
@@ -198,19 +198,19 @@ class AntigravityAccounts:
                 try:
                     self._check()
                     if self._snapshot(vault) != before:
-                        raise ValueError('原生登录正在变化')
+                        raise ValueError('기본 로그인이 변경됩니다')
                     for name in TOKEN_FILES:
                         if read(self.home/'.gemini'/name) != before['files'][name]:
-                            raise ValueError('原生登录文件正在变化')
+                            raise ValueError('기본 로그인 파일이 변경 중입니다.')
                         written.append(name)
                         self._write_file(name, selected['files'][name])
                     if vault.read() != before['keyring']:
-                        raise ValueError('系统登录凭据正在变化')
+                        raise ValueError('시스템 로그인 자격 증명이 변경 중입니다.')
                     written.append('keyring')
                     vault.write(selected['keyring'])
                     self._check()
                     if self._snapshot(vault) != selected:
-                        raise ValueError('原生登录配置写入未确认')
+                        raise ValueError('기본 로그인 구성 쓰기가 확인되지 않았습니다.')
                 except Exception:
                     complete = True
                     try:
@@ -232,7 +232,7 @@ class AntigravityAccounts:
                         complete = False
                     if complete:
                         backup.unlink(missing_ok=True)
-                    raise ValueError('账号应用未完成；'+('已恢复原配置' if complete else '未覆盖外部变化，恢复备份已保留，请在电脑端检查')) from None
+                    raise ValueError('계정 신청이 완료되지 않았습니다.；'+('원래 구성을 복원했습니다.' if complete else '외부 변경 사항은 다루지 않았습니다. 복구 백업이 유지되었습니다. 컴퓨터에서 확인해주세요.')) from None
                 try:
                     backup.unlink(missing_ok=True)
                 except OSError:
@@ -243,7 +243,7 @@ class AntigravityAccounts:
                     result = self.public()
                 except (OSError, ValueError, BridgeUnavailable):
                     pass
-                return {**result, 'message': '登录配置已应用，尚未验证登录；请重新打开原客户端后刷新。'}
+                return {**result, 'message': '로그인 구성이 적용되었지만 로그인이 확인되지 않았습니다. 원래 클라이언트를 다시 열고 새로고침하세요.。'}
 
     def edit(self, identifier):
         row = self._row(identifier)
@@ -251,7 +251,7 @@ class AntigravityAccounts:
 
     def rename(self, identifier, name):
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100:
-            raise ValueError('名称长度应为 1–100 字')
+            raise ValueError('이름 길이는 다음과 같아야 합니다. 1–100 성격')
         with self.lock:
             self._row(identifier)
             rows = self._index()

@@ -78,7 +78,7 @@ class CodexDirectoryIdentity(unittest.TestCase):
             (self.home/'config.toml').write_text('model_provider="changed"')
             return raw
         with patch.object(self.reader, '_fetch', side_effect=changed):
-            with self.assertRaisesRegex(CatalogError, '接入已变化'):
+            with self.assertRaisesRegex(CatalogError, "모델\\ 액세스\\ 권한이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
                 self.reader.get_kind('models', self.project)
         self.assertIsNone(self.reader.model_identity(self.project, None, require_verified=True))
 

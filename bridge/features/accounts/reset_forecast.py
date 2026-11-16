@@ -179,7 +179,7 @@ class ResetForecast:
 
     def _read_announcement(self, opener, signal):
         try:
-            request = Request(SOURCE + 'api/feed?locale=zh', headers={'User-Agent': USER_AGENT, 'Accept': 'application/json'})
+            request = Request(SOURCE + 'api/feed?locale=ko', headers={'User-Agent': USER_AGENT, 'Accept': 'application/json'})
             with opener.open(request, timeout=10) as response:
                 raw = response.read(262145)
                 if len(raw) > 262144:
@@ -201,7 +201,7 @@ class ResetForecast:
                     signal['text'] = text
                     translated = tweet.get('localized_text')
                     if tweet.get('translation_status') == 'translated' and isinstance(translated, str) and translated.strip():
-                        signal['translation'] = {'locale': 'zh', 'text': translated}
+                        signal['translation'] = {'locale': 'ko', 'text': translated}
                 return
         except Exception as error:
             # An optional post read must preserve the valid forecast and its labelled source summary.

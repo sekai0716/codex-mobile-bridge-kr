@@ -27,7 +27,7 @@ test('standalone bundle preserves instance identity and refuses duplicate writer
     if(process.platform!=='win32')assert.equal((await stat(join(directory,'connection.json'))).mode&0o777,0o600);
     const response=await fetch(`http://127.0.0.1:${endpoint.port}/mobile`,{method:'POST',headers:{Authorization:'Bearer '+connection.token},body:JSON.stringify({action:'status'})});
     const status=await response.json();assert.equal(status.bridgeRevision,11);assert.deepEqual(status.plugin,binding.plugin);assert.equal(status.plugin.version,'0.2.1');
-    await assert.rejects(apply(ctx),/已有 Bridge 接入/);
+    await assert.rejects(apply(ctx),/이 파일은 이미 존재합니다\. Bridge 접속, 먼저 서신을 종료해 주세요 Harness 예/);
     assert.deepEqual(await json('endpoint.json'),endpoint);
     await disposers.pop()();
     await apply(ctx);
@@ -36,7 +36,7 @@ test('standalone bundle preserves instance identity and refuses duplicate writer
     assert.notEqual((await json('endpoint.json')).generation,endpoint.generation);
     await disposers.pop()();
     await writeFile(join(directory,'connection.json'),JSON.stringify({...connection,endpoint:'/other/endpoint.json'}),{mode:0o600});
-    await assert.rejects(apply(ctx),/配置不匹配/);
+    await assert.rejects(apply(ctx),/구성 불일치/);
     await assert.rejects(apply({...ctx,profileContext:{}}),/profileContext/);
   }finally{for(const dispose of disposers.reverse())await dispose();await rm(root,{recursive:true,force:true});}
 });

@@ -5,7 +5,7 @@ function runI18nTests(){
   const originalWorkbench=workbench.current,originalCatalogStarted=catalogStarted;
   const messageContent=()=>[...$('messages').querySelectorAll('.message-body')].map(n=>n.innerHTML).join('');
   const content=messageContent(),originalFetch=window.fetch;let requests=0;
-  const fixture={host:'local',connected:true,status:'idle',historyComplete:true,title:'中文聊天内容',cwd:'/test',requests:[{id:'i18n-question',supported:true,method:'item/tool/requestUserInput',params:{questions:[{id:'choice',question:'原问题保持',options:[{label:'原选项保持'}]},{id:'text',question:'原自由输入问题'}]}}]};
+  const fixture={host:'local',connected:true,status:'idle',historyComplete:true,title:'중국어 채팅 콘텐츠',cwd:'/test',requests:[{id:'i18n-question',supported:true,method:'item/tool/requestUserInput',params:{questions:[{id:'choice',question:'원래의 질문은 남아있다',options:[{label:'원래 옵션 유지'}]},{id:'text',question:'원래 자유 입력 질문'}]}}]};
   const change=language=>{$('phone-language').value=language;$('phone-language').dispatchEvent(new Event('change'));};
   let fixtureWorkbench;
   try{
@@ -14,18 +14,18 @@ function runI18nTests(){
     window.fetch=()=>{requests++;throw Error('Language change must not send a request');};
     renderState(fixture);
     const select=$('approvals').querySelector('select');select.value='__custom__';select.dispatchEvent(new Event('change'));
-    const fields=$('approvals').querySelectorAll('textarea');fields[0].value='保留自定义输入';fields[1].value='保留自由输入';$('message').value='保留消息草稿';
+    const fields=$('approvals').querySelectorAll('textarea');fields[0].value='맞춤 입력 유지';fields[1].value='자유로운 입력 유지';$('message').value='메시지 초안 보관';
     change('en');
     check($('approvals').querySelector('h3').textContent==='Codex needs your reply','Approval controls switch to English');
     check($('approvals').querySelector('select').value==='__custom__','Custom selection survives');
     check(!$('approvals').querySelector('textarea').hidden,'Custom answer stays visible');
-    check([...$('approvals').querySelectorAll('textarea')].map(n=>n.value).join('|')==='保留自定义输入|保留自由输入','Both answers survive');
-    check($('chat-title').textContent==='中文聊天内容'&&$('approvals').textContent.includes('原问题保持'),'Chat title and question are not translated');
-    check($('message').value==='保留消息草稿','Message draft survives');
+    check([...$('approvals').querySelectorAll('textarea')].map(n=>n.value).join('|')==='맞춤 입력 유지|자유로운 입력 유지','Both answers survive');
+    check($('chat-title').textContent==='중국어 채팅 콘텐츠'&&$('approvals').textContent.includes('원래의 질문은 남아있다'),'Chat title and question are not translated');
+    check($('message').value==='메시지 초안 보관','Message draft survives');
     check(messageContent()===content,'Markdown and formulas are not rerendered');
-    submittedRequestIds.add('i18n-question');change('zh');
+    submittedRequestIds.add('i18n-question');change('ko');
     check(BridgeI18n.t('')==='', 'Empty UI text stays empty');
-    check($('approvals').querySelector('h3').textContent==='Codex 需要你的回复','Controls switch back to Chinese');
+    check($('approvals').querySelector('h3').textContent==='Codex 당신의 답장이 필요해요','Controls switch back to Chinese');
     check($('approvals').querySelector('button').disabled,'Submitted approval stays disabled after language change');
     check(requests===0,'Switching languages sends no requests');
   }finally{

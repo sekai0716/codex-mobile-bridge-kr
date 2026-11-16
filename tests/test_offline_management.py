@@ -111,7 +111,7 @@ class OfflineManagement(unittest.TestCase):
         (self.root/'gateway-control.json').write_text('{"accountsManagement":true}')
         with patch.object(self.desktop, 'status', return_value={'running': False}), \
                 patch.object(self.desktop, 'local_services') as create:
-            with self.assertRaisesRegex(ValueError, '状态暂不可用'):
+            with self.assertRaisesRegex(ValueError, "게이트웨이\\ 상태를\\ 사용할\\ 수\\ 없습니다\\.\\ 곧\\ 새로고침하세요\\."):
                 self.desktop.accounts({'action': 'list'})
             create.assert_not_called()
 
@@ -121,13 +121,13 @@ class OfflineManagement(unittest.TestCase):
         with patch.object(self.desktop, 'status', return_value={'running': False}), \
                 patch('bridge.app.desktop.subprocess.Popen') as launch:
             owner.accounts.enrollment = {'phase': 'waiting'}
-            with self.assertRaisesRegex(ValueError, '登录'):
+            with self.assertRaisesRegex(ValueError, '로그인'):
                 self.desktop.start()
             self.assertIs(self.desktop.local_bridge, owner)
             self.assertFalse(owner.closed.is_set())
             owner.accounts.enrollment = None
             owner.accounts.state['phase'] = 'applying'
-            with self.assertRaisesRegex(ValueError, '切换'):
+            with self.assertRaisesRegex(ValueError, "계정\\ 전환\\ 또는\\ 복구가\\ 보류\\ 중입니다\\.\\ 채팅\\ 작업이\\ 일시적으로\\ 일시\\ 중지되었습니다\\."):
                 self.desktop.start()
             self.assertIs(self.desktop.local_bridge, owner)
             launch.assert_not_called()

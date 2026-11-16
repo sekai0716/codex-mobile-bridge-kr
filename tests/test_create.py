@@ -46,7 +46,7 @@ class CreationTests(unittest.TestCase):
         project = self.bridge.register_project(str(self.root.resolve()), kind='cli')
         self.bridge.directory_projects.rows[project['key']]['directoryIdentity']['inode'] += 1
         with patch.object(self.bridge.cli_sessions, 'create') as create:
-            with self.assertRaisesRegex(ValueError, '已变化'):
+            with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 디렉터리를\\ 다시\\ 선택하세요\\."):
                 self.bridge.create_chat(project['key'], 'Changed CLI', str(uuid.uuid4()), kind='cli')
             create.assert_not_called()
 
@@ -73,7 +73,7 @@ class CreationTests(unittest.TestCase):
         request = str(uuid.uuid4())
         with patch('bridge.app.service.ssh_read') as preflight, \
              patch.object(cached.cli_sessions, 'create') as create:
-            with self.assertRaisesRegex(ValueError, 'SSH 主机配置已变化'):
+            with self.assertRaisesRegex(ValueError, 'SSH 호스트 구성이 변경되었습니다.'):
                 self.bridge.create_chat(project['key'], 'New host project', request, kind='cli')
             preflight.assert_not_called()
             create.assert_not_called()
@@ -91,11 +91,11 @@ class CreationTests(unittest.TestCase):
         child = project_directory_listing(str(root), name='new folder', identity=listing['identity'])
         self.assertEqual(Path(child['path']), root/'new folder')
         self.assertEqual(child['parent'], str(root))
-        with self.assertRaisesRegex(ValueError, '已存在'):
+        with self.assertRaisesRegex(ValueError, '이미 존재합니다'):
             project_directory_listing(str(root), name='folder', identity=listing['identity'])
         for name in ('../outside', 'bad/name', 'bad\\name', '..'):
             with self.assertRaises(ValueError): project_directory_listing(str(root), name=name, identity=listing['identity'])
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "현재\\ 디렉터리가\\ 변경되었습니다\\.\\ 새로고침하여\\ 새\\ 디렉터리를\\ 만드세요\\."):
             project_directory_listing(str(root), name='never-created', identity={})
         self.assertFalse((root/'never-created').exists())
         self.assertEqual((root/'file.txt').read_text(), 'keep')
@@ -129,14 +129,14 @@ class CreationTests(unittest.TestCase):
         self.assertEqual(file.read_text(), 'preserved')
         for value in ('relative/path', 'x\x00y', str(file.resolve())):
             with self.assertRaises(ValueError): project_directory(value, True)
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 디렉터리를\\ 다시\\ 선택하세요\\."):
             project_directory(str(path.resolve()), expected={**identity, 'inode': identity['inode']+1})
 
     def test_changed_registered_directory_aborts_before_native_creation(self):
         project = self.bridge.register_project(str(self.root.resolve()))
         self.bridge.directory_projects.rows[project['key']]['directoryIdentity']['inode'] += 1
         with patch('bridge.app.service.create_empty') as create:
-            with self.assertRaisesRegex(ValueError, '已变化'):
+            with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 디렉터리를\\ 다시\\ 선택하세요\\."):
                 self.bridge.create_chat(project['key'], 'Changed path', str(uuid.uuid4()))
             create.assert_not_called()
 
@@ -210,9 +210,9 @@ class CreationTests(unittest.TestCase):
             self.bridge.create_chat('local|p', 'Model test', request, model_options=selected)
             self.assertEqual(create.call_count, 1)
             self.assertEqual(create.call_args.kwargs['model'], 'fixture-model'); self.assertEqual(create.call_args.kwargs['effort'], 'low')
-            with self.assertRaisesRegex(ValueError, '不同内容'):
+            with self.assertRaisesRegex(ValueError, "동일한\\ 생성\\ 요청을\\ 다른\\ 콘텐츠에\\ 사용할\\ 수\\ 없습니다\\."):
                 self.bridge.create_chat('local|p', 'Model test', request, model_options={**selected, 'effort': 'high'})
-            with self.assertRaisesRegex(ValueError, '账号或运行环境'):
+            with self.assertRaisesRegex(ValueError, "계정이나\\ 운영\\ 환경이\\ 변경되었습니다\\.\\ 새\\ 채팅의\\ 모델\\ 목록을\\ 새로고침해주세요\\."):
                 self.bridge.create_chat('local|p', 'Changed account', str(uuid.uuid4()), model_options={**selected, 'modelCatalogIdentity': 'other'})
             self.assertEqual(create.call_count, 1)
 
@@ -246,7 +246,7 @@ class CreationTests(unittest.TestCase):
         request = str(uuid.uuid4())
         with patch('bridge.app.service.create_empty', side_effect=CreationError('timeout')) as create:
             with self.assertRaises(CreationError):self.bridge.create_chat('local|p', 'Test', request)
-            with self.assertRaisesRegex(CreationError, '避免重复'):self.bridge.create_chat('local|p', 'Test', request)
+            with self.assertRaisesRegex(CreationError, "마지막\\ 생성\\ 결과가\\ 불확실합니다\\.\\ 채팅\\ 목록을\\ 새로고침한\\ 후\\ 컴퓨터를\\ 먼저\\ 확인해\\ 주세요\\.\\ App，중복\\ 생성\\ 방지"):self.bridge.create_chat('local|p', 'Test', request)
             self.assertEqual(create.call_count, 1)
             self.assertNotIn('id', json.loads(self.bridge.creations_path.read_text())[request])
 
@@ -259,7 +259,7 @@ class CreationTests(unittest.TestCase):
     def test_blocked_desktop_open_reuses_created_id_after_retry_and_gateway_restart(self):
         request = str(uuid.uuid4())
         with patch('bridge.app.service.create_empty', return_value=self.tid) as create, \
-             patch('bridge.app.service.open_in_desktop', side_effect=CreationError('桌面暂不可交互')) as opened:
+             patch('bridge.app.service.open_in_desktop', side_effect=CreationError('데스크톱을 일시적으로 상호 작용할 수 없습니다.')) as opened:
             for _ in range(2):
                 result = self.bridge.create_chat('local|p', 'Test', request)
                 self.assertEqual(result['id'], self.tid)

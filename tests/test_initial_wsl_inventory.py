@@ -174,7 +174,7 @@ class InitialWslInventoryTests(unittest.TestCase):
         self.process.side_effect = unavailable
         value = self.inventory()
         self.assertEqual(value['clients'][0]['entries'][1]['kind'], 'wsl-cli')
-        self.assertEqual(value['errors'], [{'distribution': 'Ubuntu', 'error': '未找到可读取的 Claude Code 环境或 Python'}])
+        self.assertEqual(value['errors'], [{'distribution': 'Ubuntu', 'error': '읽을 수 있는 항목이 없습니다. Claude Code 환경이나 Python'}])
         self.assertEqual(self.inventory()['errors'], value['errors'])
         self.assertEqual(self.process.call_count, 2)
 

@@ -105,8 +105,9 @@ class DaemonRecoveryBoundaryTests(unittest.TestCase):
             owner = Path(directory)
             home = owner/'.codex'
             state = home/'app-server-daemon'
-            state.mkdir(parents=True)
+            state.mkdir(parents=True, mode=0o700)
             (state/'daemon.pid').write_text('{"pid":4321}')
+            (state/'daemon.pid').chmod(0o600)
             with patch('bridge.platforms.codex_daemon_env.sys.platform', 'darwin'), \
                     patch('bridge.platforms.macos.codex_daemon_env.read_process_environment') as observed:
                 observed.return_value = ({'HOME': str(owner)}, (4321, 'fixture'))

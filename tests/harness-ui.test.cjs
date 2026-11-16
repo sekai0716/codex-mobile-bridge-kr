@@ -29,7 +29,7 @@ test('Harness running state disables edits and duplicate starts, permits stop an
  await f.panel.action('open');assert.deepEqual(f.calls,['harness']);
 });
 test('unsaved configuration cannot start; save uses only Harness fields',async()=>{
- const f=fixture();f.panel.dirty=true;await f.panel.action('start');assert.equal(f.calls.length,0);assert.match(f.errors[0],/保存/);
+ const f=fixture();f.panel.dirty=true;await f.panel.action('start');assert.equal(f.calls.length,0);assert.match(f.errors[0],/저장/);
  await f.panel.action('save');assert.deepEqual(f.calls,[{action:'save',config:f.value.config}]);assert.equal(f.panel.dirty,false);
 });
 test('pending mutation ignores repeated clicks and protects edits',async()=>{

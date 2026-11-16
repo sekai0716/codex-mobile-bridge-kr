@@ -12,13 +12,13 @@ function fixture(){
 }
 test('compact uses selected host and shares the existing context control',async()=>{
  const f=fixture();assert.equal(await f.control.options.onCompact(),true);
- assert.equal(f.calls[0].path,'/remote/original/compact');assert.equal(f.messages[0],'已提交上下文压缩');
+ assert.equal(f.calls[0].path,'/remote/original/compact');assert.equal(f.messages[0],'컨텍스트 압축이 제출되었습니다.');
  await f.control.options.onCompact();assert.notEqual(f.calls[0].body.id,f.calls[1].body.id);
 });
 test('unknown receipt retries only the same request identity',async()=>{
- const f=fixture();f.reply(async()=>({status:'unknown',message:'请核对原客户端'}));
+ const f=fixture();f.reply(async()=>({status:'unknown',message:'원래 클라이언트를 확인하세요'}));
  assert.equal(await f.control.options.onCompact(),false);assert.equal(await f.control.options.onCompact(),false);
- assert.equal(f.calls[0].body.id,f.calls[1].body.id);assert.equal(f.messages[0],'请核对原客户端');
+ assert.equal(f.calls[0].body.id,f.calls[1].body.id);assert.equal(f.messages[0],'원래 클라이언트를 확인하세요');
 });
 test('inflight compaction is single-flight and late reply cannot update another chat',async()=>{
  const f=fixture();let finish;f.reply(()=>new Promise(resolve=>{finish=resolve;}));

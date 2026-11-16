@@ -11,8 +11,8 @@ window.runComposerQuoteLayoutChecks=async function(Quotes=ComposerQuotes){
   const marker=document.createComment('composer test');original.replaceWith(marker);
   const form=original.cloneNode(true);form.querySelectorAll('.composer-quotes,.composer-quote-actions,.composer-quote-selection').forEach(node=>node.remove());
   const tools=form.querySelector('.composer-tools');for(const button of tools.children)button.hidden=false;
-  const reminder=tools.querySelector('#notify-button');if(reminder)reminder.textContent='提醒已开';
-  const permission=tools.querySelector('#permissions-button')||tools.children[2];permission.textContent='帮我批准';
+  const reminder=tools.querySelector('#notify-button');if(reminder)reminder.textContent='알림이 켜져 있습니다';
+  const permission=tools.querySelector('#permissions-button')||tools.children[2];permission.textContent='나를 위한 승인';
   const model=tools.querySelector('#model-name,.ds-model-name');model.textContent=provider==='codex'?'gpt-6-astra':'Claude Opus 4.6';
   const effort=tools.querySelector('#model-effort,.ds-model-effort');effort.textContent=' · xhigh';effort.hidden=false;
   const input=form.querySelector('textarea'),container=input.parentElement;input.value='Existing draft';

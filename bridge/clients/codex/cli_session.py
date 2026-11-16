@@ -168,7 +168,7 @@ class CliSessions:
         with self.lock:
             return [{'key': self.metadata[sid]['connectionToken'], 'sessionId': sid, 'provider': 'codex',
                      'title': self.states.get(sid, {}).get('title') or sid, 'host': self.alias or 'local',
-                     'location': self.alias or '本机 CLI',
+                     'location': self.alias or '로컬 머신 CLI',
                      '_release': lambda stop, sid=sid, token=self.metadata[sid]['connectionToken']: self.release_connection(sid, token, stop),
                      '_check': lambda sid=sid, token=self.metadata[sid]['connectionToken'], process=process: self.check_release_connection(sid, token, process)}
                     for sid, process in self.joined.items() if process is self.client.process
@@ -178,7 +178,7 @@ class CliSessions:
         from bridge.clients.codex.release import release_thread, unsubscribe_thread
         from bridge.clients.codex.daemon_network import graceful_restart_supported
         if token in self.drained_connections:
-            return {'status': 'released', 'notice': '原生空闲服务已正常退出，原连接已释放'}
+            return {'status': 'released', 'notice': '기본 유휴 서비스가 정상적으로 종료되었으며 원래 연결이 해제되었습니다.'}
         with self.lock:
             guard = self.attach_locks.setdefault(identifier, threading.Lock())
         with guard:
@@ -187,14 +187,14 @@ class CliSessions:
                 with self.lock:
                     if (process is None or self.client.process is not process or self.joined.get(identifier) is not process
                             or self.metadata.get(identifier, {}).get('connectionToken') != token):
-                        raise AppServerUnavailable('原 CLI 连接已变化；未操作新的连接')
+                        raise AppServerUnavailable('기존 CLI 연결이 변경되었습니다. 새로운 연결이 작동되지 않음')
                 return self.client.request(method, params, replay_safe=method in (
                     'thread/read', 'thread/backgroundTerminals/list', 'thread/goal/get', 'thread/turns/list'))
             cleanup_only = self.metadata.get(identifier, {}).get('cleanupOnly')
             result = unsubscribe_thread(request, identifier) if cleanup_only else release_thread(
                 request, identifier, stop, allow_terminal_error=graceful_restart_supported(self.client.server_info or {}))
             if cleanup_only:
-                result['notice'] = '已撤销待核对接入的订阅；未停止其他执行器的任务。' + result.get('notice', '')
+                result['notice'] = '보류 중인 액세스에 대한 구독이 취소되었습니다. 다른 실행자의 작업은 중지되지 않았습니다.。' + result.get('notice', '')
             if result['status'] in ('released', 'detached'):
                 self.release_receipts[token] = process
                 self._invalidate(identifier, process)
@@ -203,12 +203,12 @@ class CliSessions:
     def check_release_connection(self, identifier, token, process):
         from bridge.clients.codex.release import check_release
         if token in self.drained_connections:
-            return {'status': 'released', 'notice': '原生空闲服务已正常退出，原连接已释放'}
+            return {'status': 'released', 'notice': '기본 유휴 서비스가 정상적으로 종료되었으며 원래 연결이 해제되었습니다.'}
         def guard():
             with self.lock:
                 current = self.metadata.get(identifier, {}).get('connectionToken')
                 if process is None or self.client.process is not process or current not in (None, token):
-                    raise AppServerUnavailable('原 CLI 连接已变化，无法核对此前释放结果；未操作新的连接')
+                    raise AppServerUnavailable('기존 CLI 연결이 변경되어 이전 릴리스 결과를 확인할 수 없습니다. 새로운 연결이 작동되지 않았습니다.')
         def request(method, params):
             guard()
             result = self.client.request(method, params, replay_safe=True)
@@ -267,7 +267,7 @@ class CliSessions:
     def create(self, cwd, title, on_start=None, on_created=None, model=None, effort=None):
         """An explicit new CLI chat; no turn is started."""
         if not isinstance(cwd, str) or not cwd or (self.alias is None and not Path(cwd).is_dir()):
-            raise AppServerUnavailable('CLI 项目目录不存在')
+            raise AppServerUnavailable('CLI 프로젝트 디렉토리가 존재하지 않습니다')
         from bridge.features.sessions.create import model_overrides, save_new_thread
         overrides = model_overrides(model, effort)
         info = self._connect_explicit()
@@ -284,7 +284,7 @@ class CliSessions:
         if on_created is not None:
             on_created(thread_id)
         if model is not None and (result.get('model') != model or effort is not None and result.get('reasoningEffort') != effort):
-            raise AppServerUnsupported('新聊天已创建，但模型或思考强度未确认；请检查原会话，不要重复创建')
+            raise AppServerUnsupported('새로운 채팅이 생성되었지만 모델이나 사고 강도가 확인되지 않았습니다. 원본 대화를 확인하고 중복을 만들지 마세요.')
         with self.lock:
             self.joined[thread_id] = self.client.process
             self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'cwd': cwd, 'modelProvider': thread['modelProvider'],
@@ -306,16 +306,16 @@ class CliSessions:
             check_archive_runtime(lambda method, params: self.client.request(method, params, replay_safe=True), identifiers)
         with self.lock:
             if not disconnect and any(identifier in self.requests and self.requests[identifier] for identifier in identifiers):
-                raise ValueError('聊天有等待确认的请求，请先在原客户端处理')
+                raise ValueError("이 채팅에는 대기 중인 요청이 있습니다. 원래 클라이언트를 먼저 확인하세요.")
         process = self.client.process
         def call():
             if self.client.process is not process:
                 from bridge.features.sessions.create import ArchiveNotSent
-                raise ArchiveNotSent('原运行时连接已变化，未停止或归档')
+                raise ArchiveNotSent("원래 런타임 연결이 변경되었습니다. 아무것도 중지되거나 보관되지 않았습니다.")
             if disconnect:
                 def request(method, params):
                     if self.client.process is not process:
-                        raise AppServerUnavailable('原运行时连接已变化，尚未发送归档请求')
+                        raise AppServerUnavailable("원래 런타임 연결이 변경되었습니다. 보관 요청이 전송되지 않았습니다.")
                     return self.client.request(method, params)
                 stop_archive_runtime(request, identifiers)
                 if check_scope:
@@ -334,15 +334,15 @@ class CliSessions:
         def call():
             def request(method, params):
                 if self.client.process is not process:
-                    raise AppServerUnavailable('原运行时连接已变化，删除结果待核对')
+                    raise AppServerUnavailable('원래의 런타임 연결이 변경되어 삭제 결과를 확인해야 합니다.')
                 try:
                     return self.client.request(method, params, replay_safe=method.endswith(('/read', '/list')))
                 except AppServerUnsupported as exc:
                     if method == 'thread/delete':
-                        raise DeleteRejected('当前原生运行时不支持永久删除，请在原客户端操作') from exc
+                        raise DeleteRejected('현재 네이티브 런타임은 영구 삭제를 지원하지 않습니다. 원래 클라이언트에서 작업하세요.') from exc
                     raise
             if self.client.process is not process:
-                raise DeleteNotSent('原运行时连接已变化，未发送删除')
+                raise DeleteNotSent('원래 런타임 연결이 변경되었으며 삭제가 전송되지 않았습니다.')
             return delete_native(request, snapshot, recheck)
         return call
 
@@ -456,7 +456,7 @@ class CliSessions:
         if result.returncode:
             if ('daemon executable not found' in result.stderr or
                     'this CLI has no complete local package' in result.stderr):
-                raise AppServerUnavailable('此 Codex CLI 缺少完整的后台运行组件。请安装或修复完整的 Codex CLI 后重试。')
+                raise AppServerUnavailable('이 Codex CLI 완전한 백그라운드 실행 구성 요소가 부족합니다. 전체를 설치하거나 수리하십시오. Codex CLI 나중에 다시 시도해 보세요。')
             raise AppServerUnavailable('Installed Codex CLI daemon could not start')
         try:
             report = json.loads(result.stdout)
@@ -474,7 +474,7 @@ class CliSessions:
             if thread_id in self.joined:
                 self._require_joined(thread_id)
                 if target_provider is not None and self.metadata[thread_id]['modelProvider'] != target_provider:
-                    raise AppServerUnsupported('目标会话仍被原生加载，请先明确确认 CLI 服务维护；未迁移提供商。')
+                    raise AppServerUnsupported('대상 세션이 여전히 기본적으로 로드되어 있습니다. 먼저 명시적으로 확인하세요. CLI 서비스 유지관리 공급자가 마이그레이션되지 않았습니다.。')
                 return copy.deepcopy(self.states[thread_id])
         process = self.client.process
         try:
@@ -498,13 +498,13 @@ class CliSessions:
             if (self.alias is not None or not isinstance(expected_identity, dict) or expected_identity.get('id') != thread_id
                     or expected_identity.get('modelProvider') != retained
                     or not same_cwd(expected_identity.get('cwd'), before.get('cwd'), os.name == 'nt')):
-                raise AppServerUnsupported('原会话身份或已确认的目标接入已变化；未迁移提供商。')
+                raise AppServerUnsupported('원래 세션 ID 또는 확인된 대상 액세스가 변경되었습니다. 공급자가 마이그레이션되지 않았습니다.。')
         if target_provider is not None:
             if not isinstance(target_provider, str) or not target_provider:
-                raise AppServerUnsupported('已确认的目标提供商不可用；未迁移提供商。')
+                raise AppServerUnsupported('확인된 대상 제공자를 사용할 수 없습니다. 공급자가 마이그레이션되지 않았습니다.。')
         if target_provider is not None or before_resume is not None:
             if loaded or before.get('status', {}).get('type') != 'notLoaded':
-                raise AppServerUnsupported('目标会话仍被原生加载，请先明确确认 CLI 服务维护；未迁移提供商。')
+                raise AppServerUnsupported('대상 세션이 여전히 기본적으로 로드되어 있습니다. 먼저 명시적으로 확인하세요. CLI 서비스 유지관리 공급자가 마이그레이션되지 않았습니다.。')
         # Ordinary resume retains all native settings. A separately confirmed
         # cold migration changes only the provider, after checking the source.
         with self.lock:
@@ -528,7 +528,7 @@ class CliSessions:
                                                'modelProvider': target_provider or before.get('modelProvider')}
             reason = (getattr(error, 'rpc_error', {}).get('data') or {}).get('type')
             if reason in ('modelProviderMismatch', 'modelProviderNotConfigured', 'modelProviderPolicyConflict'):
-                raise AppServerUnsupported('原会话的提供商与当前可用接入不一致或受到策略限制；请恢复原提供商配置，或在电脑端使用当前接入新建聊天。未迁移原会话。') from error
+                raise AppServerUnsupported('원래 세션 제공자가 현재 사용 가능한 액세스 권한과 일치하지 않거나 정책 제한이 적용됩니다. 원래 공급자 구성을 복원하거나 컴퓨터의 현재 액세스를 사용하여 새 채팅을 만드십시오. 원래 세션이 마이그레이션되지 않았습니다.。') from error
             raise
         after = resumed.get('thread') or {}
         expected_provider = target_provider or retained or before.get('modelProvider')
@@ -672,7 +672,7 @@ class CliSessions:
             state = self.refresh(thread_id)
             if (state.get('threadRuntimeStatus', {}).get('type') != 'idle' or state.get('requests') or
                     any(turn.get('status') == 'inProgress' for turn in state.get('turns', []))):
-                raise AppServerUnavailable('请等待当前 Codex 任务结束后再压缩上下文')
+                raise AppServerUnavailable('현재를 기다려주세요 Codex 작업이 완료된 후 컨텍스트를 압축합니다.')
             result = self.client.request('thread/compact/start', {'threadId': thread_id}, timeout=timeout)
             self._queue_refresh(thread_id)
             return result
@@ -813,8 +813,8 @@ class CliSessions:
         options = linux_permissions.permission_options(facts, {'fullAccess': True},
             linux_permissions.current_mode(state), native=False)
         native_reasons = {
-            linux_permissions.UNKNOWN: '无法确认当前 CLI 的权限能力，请检查 CLI 运行时与策略后刷新。',
-            linux_permissions.PROFILE_UNAVAILABLE: '当前 CLI 运行时未提供此权限配置，请更新 Codex CLI 后刷新。',
+            linux_permissions.UNKNOWN: "CLI 권한 기능을 확인할 수 없습니다. CLI 런타임 및 정책을 확인한 후 새로 고치세요.",
+            linux_permissions.PROFILE_UNAVAILABLE: "이 권한 프로필은 CLI 런타임에서는 사용할 수 없습니다. Codex CLI를 업데이트한 후 새로고침하세요.",
         }
         for option in options['options']:
             option['reason'] = native_reasons.get(option['reason'], option['reason'])
@@ -915,7 +915,7 @@ class CliSessions:
             except DaemonEnvironmentUnavailable:
                 return {'kind': 'models', 'models': [], 'modelSource': 'api',
                         'fastMode': {'allowed': False},
-                        'modelError': '无法核验当前 CLI 后台服务的启动环境，请重新连接后刷新模型列表',
+                        'modelError': '현재를 확인할 수 없습니다 CLI 백그라운드 서비스 시작 환경은 재접속 후 모델 목록을 새로고침해주세요.',
                         'currentModel': state.get('latestModel'),
                         'currentEffort': state.get('latestReasoningEffort')}
             catalog = reader.read_models(
@@ -966,7 +966,7 @@ class CliSessions:
                 provider = self.metadata[thread_id]['modelProvider']
             return self.model_catalog(cwd, provider, state)
         if kind != 'skills':
-            raise ValueError('未知目录类型')
+            raise ValueError("알 수 없는 카탈로그 유형")
         rows, errors = self._native_skills(thread_id, force_reload=bool(refresh))
         ids = set(ids or [])
         selected = [row for row in rows if row['id'] in ids]
@@ -996,7 +996,7 @@ class CliSessions:
         rows, _ = self._native_skills(thread_id, force_reload=True)
         indexed = {row['id']: row for row in rows}
         if any(identifier not in indexed for identifier in ids):
-            raise ValueError('Skill 不可用，请刷新列表')
+            raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
         return [indexed[identifier] for identifier in ids]
 
     def _goal_request(self, thread_id, method, params, *, read=False):
@@ -1005,11 +1005,11 @@ class CliSessions:
             return self.client.request(method, {'threadId': thread_id, **params},
                                        replay_safe=read)
         except AppServerUnsupported as exc:
-            raise GoalUnsupported('当前 CLI runtime 不支持原生目标') from exc
+            raise GoalUnsupported("이 CLI 런타임은 네이티브 목표를 지원하지 않습니다.") from exc
         except (AppServerUnavailable, AppServerUnknownResult) as exc:
-            raise GoalUnavailable('CLI runtime 目标操作结果未知，请刷新后确认') from exc
+            raise GoalUnavailable("CLI 목표 결과를 알 수 없습니다. 상태를 확인하려면 새로고침하세요.") from exc
         except AppServerError as exc:
-            raise GoalError('CLI runtime 目标操作未完成') from exc
+            raise GoalError("CLI 목표 작업이 완료되지 않았습니다.") from exc
 
     def supports_goal(self, thread_id):
         try:
@@ -1027,7 +1027,7 @@ class CliSessions:
 
     def set_goal_status(self, thread_id, status):
         if status not in ('active', 'paused'):
-            raise ValueError('目标状态无效')
+            raise ValueError('대상 상태가 잘못되었습니다.')
         return normalize_goal_result(self._goal_request(thread_id, 'thread/goal/set', {'status': status}))
 
     def edit_goal(self, thread_id, objective, token_budget=None):
@@ -1074,7 +1074,7 @@ class CliSessions:
             if turn.get('model'):
                 row['params'] = {'model': turn['model'], 'effort': turn.get('reasoningEffort')}
             turns.append(row)
-        state = {'id': thread['id'], 'title': thread.get('name') or thread.get('preview') or '未命名聊天',
+        state = {'id': thread['id'], 'title': thread.get('name') or thread.get('preview') or '이름없는 채팅',
                 'cwd': thread.get('cwd') or metadata['cwd'],
                 'modelProvider': metadata['modelProvider'] if metadata.get('historicalProvider') is not None else
                                  thread.get('modelProvider') or metadata['modelProvider'],
@@ -1100,7 +1100,7 @@ class CliSessions:
             if self.joined.get(thread_id) is not self.client.process or self.client.process is None:
                 raise AppServerUnavailable('CLI thread is not joined on this connection')
             if self.metadata.get(thread_id, {}).get('cleanupOnly'):
-                raise AppServerUnavailable('此前 CLI 接入结果待核对，请先释放该连接；未重复恢复或发送任务')
+                raise AppServerUnavailable('이전에 CLI 접속 결과를 확인해야 합니다. 먼저 연결을 해제하십시오. 반복적인 복구나 전송 작업이 필요하지 않습니다.')
 
     def _check_identity(self, thread_id):
         result = self.client.request('thread/read', {'threadId': thread_id,

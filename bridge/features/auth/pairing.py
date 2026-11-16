@@ -9,17 +9,17 @@ from urllib.parse import urlsplit
 
 def phone_origin(value):
     if not isinstance(value, str):
-        raise ValueError('地址不可用')
+        raise ValueError("사용할 수 없는 주소입니다")
     url = urlsplit(value)
     if url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in ('', '/'):
-        raise ValueError('地址不可用')
+        raise ValueError("사용할 수 없는 주소입니다")
     host = url.hostname.lower()
     try:
         loopback = ipaddress.ip_address(host).is_loopback
     except ValueError:
         loopback = host == 'localhost' or host.endswith('.localhost')
     if loopback:
-        raise ValueError('回环地址不能用于手机扫码，请开启局域网或外网连接')
+        raise ValueError('휴대폰에서는 루프백 주소를 사용할 수 없습니다. LAN 또는 공개 접속 경로를 활성화하세요.')
     return url.scheme + '://' + url.netloc
 
 
@@ -41,7 +41,7 @@ class Pairing:
             if action == 'create':
                 origin = phone_origin(value.get('url'))
                 if origin not in self.origins:
-                    raise ValueError('地址不可用')
+                    raise ValueError("사용할 수 없는 주소입니다")
                 # One current grant per entry. Refresh revokes the preceding QR.
                 self.grants = {k: v for k, v in self.grants.items() if v['origin'] != origin}
                 token, identifier = secrets.token_urlsafe(32), secrets.token_hex(16)
@@ -59,11 +59,11 @@ class Pairing:
                 return {'states': {key: ('expired' if key not in self.grants or self.grants[key]['expires'] <= now else 'used' if self.grants[key]['used'] else 'active') for key in ids if isinstance(key, str)}}
             if action == 'status':
                 return {'state': 'expired' if not grant or grant['expires'] <= now else 'used' if grant['used'] else 'active'}
-            raise ValueError('未知操作')
+            raise ValueError("알 수 없는 작업입니다.")
 
     def exchange(self, token, origin, address, user_agent='', client=None):
         if not isinstance(token, str) or len(token) != 43:
-            raise PermissionError('二维码已失效或已使用，请在电脑上刷新二维码，或使用账号密码登录')
+            raise PermissionError("이 QR 코드는 만료되었거나 이미 사용되었습니다. 컴퓨터에서 새로 고치거나 사용자 이름과 비밀번호로 로그인하세요.")
         digest = hashlib.sha256(token.encode()).digest()
         with self.lock:
             now = time.time()
@@ -71,11 +71,11 @@ class Pairing:
             recent = [t for t in self.failures.get(address, []) if now - t < 300]
             self.failures[address] = recent
             if len(recent) >= 8:
-                raise PermissionError('尝试次数过多，请 5 分钟后再试')
+                raise PermissionError("시도 횟수가 너무 많습니다. 5분 후에 다시 시도하세요.")
             recent.append(now)
             for grant in self.grants.values():
                 if secrets.compare_digest(grant['digest'], digest) and grant['origin'] == origin and grant['expires'] > now and not grant['used']:
                     grant['used'] = True
                     self.failures.pop(address, None)
                     return self.auth.new_session(address, user_agent, client)
-        raise PermissionError('二维码已失效或已使用，请在电脑上刷新二维码，或使用账号密码登录')
+        raise PermissionError("이 QR 코드는 만료되었거나 이미 사용되었습니다. 컴퓨터에서 새로 고치거나 사용자 이름과 비밀번호로 로그인하세요.")

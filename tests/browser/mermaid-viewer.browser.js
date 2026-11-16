@@ -3,7 +3,7 @@ async function runMermaidViewerTests() {
   const checks = [], check = (value, label) => { if (!value) throw Error(label); checks.push(label); };
   const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const wait = async fn => { for (let i = 0; i < 100; i++) { if (fn()) return; await new Promise(r => setTimeout(r, 20)); } throw Error('Mermaid viewer did not settle'); };
-  const source = 'flowchart TD\n  A["<script>中文</script>"] --> B\n' + '  B --> A\n'.repeat(120);
+  const source = 'flowchart TD\n  A["<script>중국어</script>"] --> B\n' + '  B --> A\n'.repeat(120);
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="white"/><text x="30" y="80">Mermaid fixture</text></svg>';
   const url = 'data:image/svg+xml;base64,' + btoa(svg);
   const opener = document.createElement('button'); opener.textContent = 'Open diagram'; document.body.append(opener);

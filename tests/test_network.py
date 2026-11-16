@@ -59,7 +59,7 @@ class SelectionTests(unittest.TestCase):
                     patch('bridge.app.desktop.socket.socket') as sock, \
                     patch('bridge.app.desktop.subprocess.Popen') as spawn:
                 sock.return_value.bind.side_effect = OSError('address unavailable')
-                with self.assertRaisesRegex(ValueError, '不会自动开放'):
+                with self.assertRaisesRegex(ValueError, '자동으로 열리지 않습니다'):
                     desktop.start()
                 spawn.assert_not_called()
             with patch('bridge.app.desktop.interfaces.enumerate_interfaces', return_value=[]), \
@@ -74,7 +74,7 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(desktop.preferences()['lanAddresses'], ['192.0.2.7'])
             desktop.status = lambda: {'running': True}
             value['preferences']['localAccess'] = True
-            with self.assertRaisesRegex(ValueError, '先停止'):
+            with self.assertRaisesRegex(ValueError, "현재\\ 연결이\\ 끊어지지\\ 않도록\\ 네트워크\\ 설정이나\\ 런타임\\ 경로를\\ 변경하기\\ 전에\\ 게이트웨이를\\ 중지하세요\\."):
                 desktop.save(value)
 
 

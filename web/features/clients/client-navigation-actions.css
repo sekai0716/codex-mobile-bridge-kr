@@ -35,5 +35,5 @@
 .channel-option small[data-latency=very-high]{color:var(--error)}
 .channel-glyph{color:var(--muted);text-align:center}
 .bridge-route-down #status,.bridge-route-down .ds-connection{font-size:0}
-.bridge-route-down #status::after,.bridge-route-down .ds-connection::after{content:"重新连接";font-size:12px}
+.bridge-route-down #status::after,.bridge-route-down .ds-connection::after{content:"다시 연결";font-size:12px}
 html[lang^=en].bridge-route-down #status::after,html[lang^=en].bridge-route-down .ds-connection::after{content:"Reconnecting"}

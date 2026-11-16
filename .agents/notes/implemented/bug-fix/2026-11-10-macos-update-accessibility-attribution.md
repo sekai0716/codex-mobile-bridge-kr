@@ -1,81 +1,81 @@
-# Agent Note: macOS 更新后 Claude 辅助功能仍归属旧安装
+# Agent Note: macOS 업데이트 후 Claude 접근성 기능은 여전히 ​​이전 설치에 속합니다.
 
 Status: implemented
 
-## 问题
+## 문제
 
-macOS 正式 2.2.0 已在系统设置授予网关 App 辅助功能权限，Claude 准备页仍返回 `needs-permission`。用户报告此前版本没有这一问题。通过当前网关既有管理接口执行 `requestPermission:false`，实际 helper 同样返回未授权，因此不能只归因于准备页缓存或授权后没有自动刷新。
+macOS 공식적인 2.2.0 시스템 설정에서 게이트웨이가 부여되었습니다. App 접근성 권한，Claude 준비 페이지가 여전히 반환됩니다. `needs-permission`。사용자들은 이전 버전에서는 이 문제가 발생하지 않았다고 보고했습니다. 현재 게이트웨이의 기존 관리 인터페이스를 통해 실행됨 `requestPermission:false`，실제 helper 또한 Unauthorized를 반환하므로 페이지 캐시 준비 또는 승인 후 자동 새로 고침이 이루어지지 않은 것만으로 간주할 수 없습니다.。
 
-本记录保留已确认的直接原因与代码历史。修复只改变 macOS 更新启动交接，不修改系统授权数据库。Windows [issue #155](https://github.com/try2love/codex-mobile-bridge/issues/155) 的 `staging.pending` 更新反馈属于另一问题，不能套用本篇的 macOS TCC 根因。
+이 기록에는 확인된 즉각적인 원인과 코드 이력이 유지됩니다. 변경 사항만 복구 macOS 시스템 인증 데이터베이스를 수정하지 않고 시동 핸드오버 업데이트。Windows [issue #155](https://github.com/try2love/codex-mobile-bridge/issues/155) 의 `staging.pending` 업데이트 피드백은 다른 문제에 속하므로 이 문서에 적용할 수 없습니다. macOS TCC 근본 원인。
 
-## 决策
+## 결정
 
-新版 macOS GUI 在打开窗口、单例锁和网关 worker 前，校验既有更新事务，再用 `process.execve` 将旧助手监控的 PID 替换为原生启动监督器。监督器通过 Launch Services 创建实际 GUI，核验应用包路径并记录新 GUI PID。新 GUI 的交接同时核对原监督 PID、实际 GUI PID、安装、版本、数据目录和 token。GUI 启动原先运行的网关，确认其 `runtime.running` 后才写原有 ACK；原先停止的网关保持停止。旧助手随后发起的 start 是同实例的幂等检查。
+새 버전 macOS GUI 열린 창, 싱글톤 잠금 장치 및 게이트웨이 worker 이전에 기존 업데이트 트랜잭션을 확인한 후 사용하세요. `process.execve` 이전 어시스턴트 모니터링 PID 기본 실행 감독자로 대체되었습니다. 감독관 합격 Launch Services 실제 생성 GUI，애플리케이션 패키지 경로를 확인하고 새 항목을 기록합니다. GUI PID。새로운 GUI 인수인계는 원래 감독도 확인합니다. PID、실제 GUI PID、설치, 버전, 데이터 디렉토리 및 token。GUI 이전에 실행 중인 게이트웨이를 시작하고 확인합니다. `runtime.running` 나중에 원본을 썼어요 ACK；이전에 중지된 게이트웨이는 중지된 상태로 유지됩니다. 이전 조수가 이후에 시작했습니다. start 동일한 인스턴스에 대한 멱등성 검사입니다.。
 
-保留原 PID 是为兼容旧版更新助手发起的第一次升级。失败回滚时，监督器只向这一实际 GUI 提交正常退出，确认它已退出后才结束，让旧助手继续恢复备份。GUI 拒绝退出时继续等待，不强制关闭、不提前覆盖程序。更新完成后退出监督器；后续更新清除已失效的启动标记。Windows 和 Linux 的启动协议不变。
+원본 유지 PID 이는 이전 버전의 업데이트 도우미와의 호환성을 위해 시작된 첫 번째 업그레이드입니다. 실패 롤백 시 감독자는 이 실제 사용자에게만 보고합니다. GUI 정상적인 종료를 제출하고 종료하기 전에 종료되었는지 확인하여 이전 어시스턴트가 계속해서 백업을 복원할 수 있도록 합니다.。GUI 종료를 거부할 경우 계속 기다리시고, 강제로 종료하지 마시고, 프로그램을 미리 덮어쓰지 마세요. 업데이트가 완료된 후 감독자를 종료합니다. 후속 업데이트는 만료된 시작 플래그를 지웁니다.。Windows 및 Linux 시작 프로토콜은 변경되지 않습니다.。
 
-系统启动需要 `createsNewApplicationInstance`，否则已 execve 但仍登记的旧 PID 会被错误复用；监督器须推进主 RunLoop，才能刷新 `NSRunningApplication.isTerminated`。两项均由真实 Electron 隔离失败复现后修正，不能用进程列表或静态自检替代。
+시스템 시작 요구 사항 `createsNewApplicationInstance`，그렇지 않으면 execve 하지만 여전히 오래된 것으로 등록되어 있습니다. PID 실수로 재사용됩니다. 감독자는 주요 업무를 진행해야 합니다. RunLoop，새로 고치다 `NSRunningApplication.isTerminated`。두 항목 모두 사실입니다. Electron 격리 실패가 다시 나타난 후 수정하세요. 프로세스 목록이나 정적 자체 테스트로 대체할 수 없습니다.。
 
-## 已确认的直接原因
+## 직접 원인 확인
 
-2026-11-10 两次独立只读核验得到一致结果：TCC 正在核验旧备份 App 的代码身份，而非当前已获授权的正式 App 身份。
+2026-11-10 두 개의 독립적인 읽기 전용 검증으로 일관된 결과가 나왔습니다.：TCC 이전 백업 확인 중 App 현재 승인된 공무원이 아닌 코드 ID App 신원。
 
-- 实际运行 helper 的 `binary_path` 是 `/Applications/Codex Mobile Bridge.app/Contents/Resources/gateway/_internal/client-helpers/claude-bridge-helper`。
-- 同一请求的 `responsible_path` 却是 `/Applications/.cmb-update-lf93f0gz/previous/Contents/MacOS/Codex Mobile Bridge`，即升级留下的 2.2.0-preview.3 GUI。
-- TCC subject 仍是正式 bundle ID `io.github.try2love.codexmobilebridge`。现有授权要求的 CDHash 为正式 2.2.0 的 `6dde44c167b6554d40f9e9e13ea72248539d010a`；实际被比较的旧 preview.3 身份为 `d01cd1f48236c0de5f7d5b365faabe325237230f`。
-- 日志明确记录 `SecStaticCodeCheckValidity` 返回 `-67050`，随后为 `Failed to match existing code requirement`，服务为 `kTCCServiceAccessibility`。
+- 실제 작동 helper 의 `binary_path` 예 `/Applications/Codex Mobile Bridge.app/Contents/Resources/gateway/_internal/client-helpers/claude-bridge-helper`。
+- 같은 요청 `responsible_path` 하지만 그것은 `/Applications/.cmb-update-lf93f0gz/previous/Contents/MacOS/Codex Mobile Bridge`，즉, 업그레이드 후에 남은 것은 2.2.0-preview.3 GUI。
+- TCC subject 아직 공식적인 bundle ID `io.github.try2love.codexmobilebridge`。기존 승인 요구 사항 CDHash 공식적으로 2.2.0 의 `6dde44c167b6554d40f9e9e13ea72248539d010a`；실제 오래된 비교 preview.3 아이덴티티는 `d01cd1f48236c0de5f7d5b365faabe325237230f`。
+- 로그는 명확하게 기록됩니다. `SecStaticCodeCheckValidity` 뒤로 `-67050`，이어서 `Failed to match existing code requirement`，서비스 `kTCCServiceAccessibility`。
 
-因此，“当前 App 已授权”与“当前 helper 实际请求被拒绝”并不矛盾：授权记录匹配当前正式 App，运行链的责任身份却仍指向旧安装。只看进程当前路径、父 PID 已为 1、App 显示名称或设置页勾选状态，都不能替代 TCC 的实际归属核验。
+그러므로，“현재 App 인정 받은”및“현재 helper 실제 요청이 거부되었습니다.”불일치하지 않음: 승인 기록이 현재 공식 기록과 일치합니다. App，실행 체인의 책임 있는 ID는 여전히 이전 설치를 가리킵니다. 현재 경로와 프로세스의 상위 경로만 살펴보세요. PID 이미 1、App 표시 이름이나 설정 페이지의 확인 상태는 대체할 수 없습니다. TCC 실제 소유권 확인。
 
-本地证据位于 `.tmp/claude-accessibility-20261110/tcc-filtered.log`、同目录的 `tcc-key-evidence.log`，以及 `.local/desktop-update.log`。这些文件保持忽略，不把日志、账号、令牌、私钥或聊天数据复制进笔记或提交。
+현지 증거는 다음 위치에 있습니다. `.tmp/claude-accessibility-20261110/tcc-filtered.log`、같은 디렉토리에 `tcc-key-evidence.log`，게다가 `.local/desktop-update.log`。이러한 파일은 무시된 상태로 유지되며 로그, 계정, 토큰, 개인 키 또는 채팅 데이터는 메모나 커밋에 복사되지 않습니다.。
 
-## 提交追溯与置信边界
+## 역추적 및 신뢰한계 커밋
 
-日期均为 UTC+08:00。正式发布源码以 `76acf47b91ab3ae41f57fc7a8664da1c9224d206` 为准；本地旧 `v2.2.0` 标签仍解引用为 `c797f6ffd028d206401c0c2ea78d6382075e3184`，不能用它代替正式发布提交做比较。旧 preview.3 对照为 `064834540a1960150887d3d4368e306ec87603bb`。
+날짜는 모두 UTC+08:00。공식적으로 소스 코드를 공개합니다. `76acf47b91ab3ae41f57fc7a8664da1c9224d206` 승리할 것이다; 지역의 오래된 `v2.2.0` 태그는 여전히 다음과 같이 역참조됩니다. `c797f6ffd028d206401c0c2ea78d6382075e3184`，비교를 위해 공식 릴리스 제출을 대신할 수 없습니다. 오래된 preview.3 컨트롤은 `064834540a1960150887d3d4368e306ec87603bb`。
 
-| 提交 | 已核实的改动 | 可据此得出的结论 |
+| 제출하다 | 확인된 변경사항 | 이것으로부터 얻을 수 있는 결론 |
 | --- | --- | --- |
-| `f73dca2a1ccad2aa4a0075e47d14a723742e1f29`，2026-10-02 02:12:54 | 首次加入应用内更新链：从旧网关复制更新 helper，将旧 App 移至 `previous`，由 helper 直接 `Popen` 新 GUI，并直接执行新网关 `start` 恢复运行 | 与当前旧责任身份相符的启动链最早在此引入，不是 2.2.0 才新增的 `Popen` |
-| `4e281ac011e98b9834c869a6dfe557287b422f87`，2026-10-09 03:12:28 | 加入 Claude 原生 AX helper 及其 ad-hoc 构建签名 | 更新链与 Claude 辅助功能依赖从此叠加；不能据此证明当时已经出现本次故障 |
-| `311852ce2c0da01b768f3aaa230c829ef46d44a6`，2026-11-08 16:13:47 | 正式包新增 `afterSign`，重签网关 broker、ZCode 启动器和外层 App；并不重签 Claude helper | 是正式 2.2.0 的签名流程变化，但不是已单独确证的致因提交 |
+| `f73dca2a1ccad2aa4a0075e47d14a723742e1f29`，2026-10-02 02:12:54 | 인앱 업데이트 체인에 처음으로 참여: 이전 게이트웨이에서 업데이트 복사 helper，늙을 것이다 App 다음으로 이동 `previous`，의존하다 helper 직접 `Popen` 새로운 GUI，새로운 게이트웨이를 직접 실행 `start` 작업 재개 | 현재의 레거시 책임 정체성과 일치하는 출시 체인이 여기에 처음 도입되었습니다. 2.2.0 방금 추가됨 `Popen` |
+| `4e281ac011e98b9834c869a6dfe557287b422f87`，2026-10-09 03:12:28 | 가입하다 Claude 네이티브 AX helper 그리고 ad-hoc 서명 작성 | 다음으로 체인 업데이트 Claude 그 이후로 보조 기능 종속성이 추가되었습니다. 이는 해당 결함이 해당 시점에 이미 발생했음을 증명하는 데 사용할 수 없습니다. |
+| `311852ce2c0da01b768f3aaa230c829ef46d44a6`，2026-11-08 16:13:47 | 공식 패키지가 추가되었습니다. `afterSign`，게이트웨이 재서명 broker、ZCode 스타터 및 외부 레이어 App；재서명되지 않음 Claude helper | 형식적이다 2.2.0 서명 프로세스가 변경되었으나 별도로 입증된 원인 제출은 아님 |
 
-在正式 `76acf47b` 中，`bridge/features/updates/gateway.py:259–268` 复制旧 helper 并记录 `previous`；`:302–321` 直接启动新 GUI 和新网关；`:458–468` 完成目录替换后执行这两次启动。原始 `f73dca2a` 的对应代码位于当时的 `bridge/updater.py:157–166,207–217,302–312`。
+형식적으로 `76acf47b` 가운데，`bridge/features/updates/gateway.py:259–268` 오래된 것을 복사하다 helper 그리고 녹음하다 `previous`；`:302–321` 직접 새로 시작하기 GUI 그리고 새로운 게이트웨이；`:458–468` 디렉터리 교체를 완료한 후 이 두 가지 시작을 수행하십시오. 원래의 `f73dca2a` 해당 코드는 다음 위치에 있습니다. `bridge/updater.py:157–166,207–217,302–312`。
 
-精确比较 preview.3 `06483454` 到正式 `76acf47b`，`bridge/features/updates/gateway.py`、`bridge/clients/claude/setup.py`、`bridge/platforms/macos/claude-helper.swift`、`scripts/build-client-helpers.py`、`desktop/shared/controller.cjs` 五个文件全部无差异。较早的 2.1.7 源码 `d65a610ab7ce799325d284b5d982476e14b788e3` 到正式 2.2.0，更新器与 Claude Swift 也无差异；Claude setup 的改动仅涉及 Windows profile，helper 构建命令只是扩展为 Claude/ZCode 循环。
+정확한 비교 preview.3 `06483454` 형식적으로 `76acf47b`，`bridge/features/updates/gateway.py`、`bridge/clients/claude/setup.py`、`bridge/platforms/macos/claude-helper.swift`、`scripts/build-client-helpers.py`、`desktop/shared/controller.cjs` 5개 파일 모두 차이가 없습니다. 더 일찍 2.1.7 소스 코드 `d65a610ab7ce799325d284b5d982476e14b788e3` 형식적으로 2.2.0，업데이터 Claude Swift 차이 없음；Claude setup 변경 사항은 다음과 같습니다. Windows profile，helper 빌드 명령은 단순히 다음으로 확장됩니다. Claude/ZCode 주기。
 
-**确认范围**是当前实际拒绝由旧责任身份与新授权要求不匹配造成，且相关更新启动链可追溯至 `f73dca2a`。**未确认范围**是为何此前升级未触发、此次升级首次被用户观察到的具体条件。修复后的独立验证见下文；它不反推当年所有升级的结果。不能将首次观察时间等同于首次代码引入时间，也不能仅因 `311852ce` 接近正式发布时间就将其写成已经证实的唯一回归提交。
+**범위 확인**현재의 실제 거부는 이전 책임 신원과 새로운 인증 요구 사항 간의 불일치로 인해 발생하며 관련 업데이트 실행 체인을 다시 추적할 수 있다는 것입니다. `f73dca2a`。**확인되지 않은 범위**이전 업그레이드가 트리거되지 않았고 사용자가 처음으로 이 업그레이드를 관찰한 구체적인 조건입니다. 수정 사항에 대한 독립적인 검증은 아래와 같습니다. 해당 연도의 모든 업그레이드 결과가 취소되지는 않습니다. 첫 번째 관찰 시간은 첫 번째 코드 도입 시간과 동일할 수도 없고 동일할 수도 없습니다. `311852ce` 유일하게 확인된 반환 커밋으로 공식 릴리스에 가깝게 작성되었습니다.。
 
-## 既有记录核对
+## 기존 기록 확인
 
-已检索 proposed、implemented 中的 Claude、辅助功能、TCC、更新交接与 macOS 签名记录；当前没有 rejected 目录或相同主题提案。
+검색됨 proposed、implemented ～에 Claude、접근성、TCC、다음으로 핸드오버 업데이트 macOS 서명 기록; 현재 없음 rejected 카탈로그 또는 동일 주제 제안。
 
-- [桌面更新交接范围](../../implemented/bug-fix/2026-11-03-desktop-update-handoff-scope.md)部分重叠，保留并在本篇关联：它约束目标安装与更新环境变量，不证明 TCC 责任身份已切换。
-- [正式包 ZCode 发布身份](../../implemented/architecture/2026-11-07-zcode-production-local-identity.md)部分重叠，保留并在本篇关联：它证明组件来源与私有 peer 身份，不代替 Claude 辅助功能验收。
-- [ZCode 私有启动器打包](../../implemented/architecture/2026-11-03-zcode-private-launcher-packaging.md)仅涉及相关签名拓扑，保留原决定；[POSIX 父进程退出](../../implemented/bug-fix/2026-11-10-desktop-update-parent-exit.md)和 [Windows 安装占用预检](../../implemented/bug-fix/2026-11-10-windows-update-zcode-holder-preflight.md)处理不同更新失败，不由本提案取代。
-- Claude 控制台回读与签名回执就绪时机处理连接建立后的不同阶段；Android 更新和手动钥匙串访问也不解释此处的 TCC 责任身份，保留现有记录，不合并根因。
+- [데스크탑 업데이트 인계 범위](../../implemented/bug-fix/2026-11-03-desktop-update-handoff-scope.md)이 문서에서 부분적으로 중복되고 유지되며 관련되어 있습니다. 이는 대상 설치 및 업데이트 환경 변수를 제한하며 증명하지 않습니다. TCC 담당 ID가 변경되었습니다.。
+- [정장 가방 ZCode 신원 공개](../../implemented/architecture/2026-11-07-zcode-production-local-identity.md)이 기사에서 부분적으로 중복되고 유지되며 관련되어 있습니다. 이는 구성 요소의 출처와 비공개임을 증명합니다. peer 대체가 아닌 정체성 Claude 접근성 수용。
+- [ZCode 개인 런처 패키징](../../implemented/architecture/2026-11-03-zcode-private-launcher-packaging.md)관련 서명 토폴로지만 포함되며 원래 결정은 유지됩니다.；[POSIX 상위 프로세스 종료](../../implemented/bug-fix/2026-11-10-desktop-update-parent-exit.md)및 [Windows 설치 점유율 사전 확인](../../implemented/bug-fix/2026-11-10-windows-update-zcode-holder-preflight.md)다른 업데이트를 처리하지 못했으며 이 제안으로 대체되지 않습니다.。
+- Claude 콘솔 리드백 및 서명된 수신 준비 타이밍은 연결 설정 후 다양한 단계를 처리합니다.；Android 업데이트 및 수동 키체인 액세스도 여기에 설명되지 않습니다. TCC 책임 있는 신원, 기존 기록 유지, 근본 원인 병합 금지。
 
-## 备选方案
+## 대안
 
-仅刷新准备页能消除界面陈旧，改动小；但当前管理接口和实际 AX 检查均返回未授权，刷新不能修复已观测的 TCC 身份错配。界面状态刷新应与底层问题分开验证。
+준비 페이지를 새로 고치는 것만으로 인터페이스의 노후화를 제거할 수 있으며 변경 사항도 적습니다. 그러나 현재 관리 인터페이스는 실제 관리 인터페이스와 다릅니다. AX 모든 확인은 무단으로 반환되며 새로 고침하면 관찰된 내용을 복구할 수 없습니다. TCC 신원 불일치. 인터페이스 상태 새로 고침은 기본 문제와 별도로 확인되어야 합니다.。
 
-移除后重新添加当前 App 的授权通常可以重建其权限记录；本机当前记录已经对应正式 App 的 CDHash，实际责任身份却来自旧备份。因此不能循环让用户重授权，不能把授权独立 helper 或扩大系统权限作为未查明归属时的默认恢复办法。
+현재를 제거하고 다시 추가하십시오. App 권한 부여는 일반적으로 권한 기록을 재구성할 수 있습니다. 이 기계의 현재 기록은 이미 공식 기록과 일치합니다. App 의 CDHash，책임자의 실제 신원은 이전 백업에서 나왔습니다. 따라서 사용자는 재인증을 순환할 수 없으며 인증은 독립적일 수 없습니다. helper 또는 소유권이 식별되지 않는 경우 기본 복구 방법으로 시스템 권한을 확장합니다.。
 
-只调整新包签名可以改善未来身份管理，但当前更新 helper 来自旧安装，单改新包不等于能修复旧启动链负责执行的首次升级。签名调整与启动交接需分别建立因果证据，不能以 bundle ID 相同或签名完整性通过替代授权匹配。
+새 패키지 서명만 조정하면 향후 ID 관리가 향상될 수 있지만 현재 업데이트는 helper 이전 설치에서 단순히 새 패키지를 변경한다고 해서 이전 부트 체인이 첫 번째 업그레이드를 수행한다는 의미는 아닙니다. 서명 조정 및 핸드오버 개시에는 별도의 인과관계 증거가 필요하며, 이는 bundle ID 대체 인증을 통한 동일 또는 서명 무결성 일치。
 
-## 验证
+## 검증
 
-第三轮隔离打包 Electron 使用真实 `execve`、NSWorkspace、生产 Claude helper 无提示权限检查，证明新 GUI PID 与监督 PID 不同。TCC 日志的责任主体对应新 GUI 的当前安装路径。正常退出被拒绝时监督器继续运行；允许正常退出后监督器退出码为零。隔离 App 未获系统授权，其 `needs-permission` 是预期结果，不能据此声称授权能力已通过。
+3차 검역포장 Electron 진짜를 사용하다 `execve`、NSWorkspace、생산 Claude helper 자동 권한 확인, 신규 증명 GUI PID 및 감독 PID 다른。TCC 로그 책임자는 새로운 로그에 해당합니다. GUI 현재 설치 경로입니다. 일반 종료가 거부되면 감독자는 계속 실행됩니다. 일반 종료가 허용되면 감독자 종료 코드는 0입니다. 격리 App 시스템에서 승인되지 않은 `needs-permission` 이는 예상된 결과이며 승인된 능력이 통과되었다고 주장할 수 없습니다.。
 
-定向 Node 检查 40 项通过、1 项平台跳过；Python 更新/资源/架构检查 39 项通过、1 项沙箱跳过。覆盖旧 helper 交接契约、原运行/停止网关、失效回执拒绝、错误 PID/token、打包资源及回滚约束。
+정위 Node 조사하다 40 항목이 통과됨、1 아이템 플랫폼을 건너뛰었습니다.；Python 고쳐 쓰다/의지/스키마 확인 39 항목이 통과됨、1 항목 샌드박스를 건너뛰었습니다. 오래된 덮어쓰기 helper 양도 계약, 원래 운영/게이트웨이 중지, 잘못된 영수증 거부, 오류 PID/token、패키징 리소스 및 롤백 제약 조건。
 
-冻结的 `.6` Test 包与实际 `.5` 旧包完成完整本地升级事务。夹具沿用基线 `0d4c394e` 的旧更新助手，仅替换 Test 名称常量：真实执行校验、解包、签名检查、旧面板退出、目录替换、新 GUI 启动、ACK 和网关恢复。原网关运行时一次升级至 `.6` 并恢复；原网关停止时升级后仍停止；新 GUI 已 ACK 后注入失败时，正常退出候选并恢复 `.5` 和原网关。配置逐项摘要一致，原先运行的两组场景均验证既有手机 Cookie 仍能认证。停止场景未建立手机绑定，不将其当作手机认证覆盖。此验证不含 GitHub 发布源、实际更新下载按钮或正式签名升级。
+언 `.6` Test 패키지와 현실 `.5` 이전 패키지는 완전한 로컬 업그레이드 트랜잭션을 완료합니다. 고정 장치가 기준선을 따릅니다. `0d4c394e` 이전 업데이트 도우미는 대체만 가능합니다. Test 이름 상수: 실제 실행 검증, 언패킹, 서명 확인, 기존 패널 종료, 디렉토리 교체, 신규 GUI 시작하다、ACK 및 게이트웨이 복구. 원래 게이트웨이를 다음으로 업그레이드하세요. `.6` 복원되었습니다. 원래 게이트웨이가 중지되면 업그레이드 후에도 여전히 중지됩니다. 새로운 GUI 이미 ACK 사후 주입에 실패하면 정상적으로 후보자를 종료하고 회복하십시오. `.5` 그리고 원래 게이트웨이. 구성 항목별 요약은 일관성이 있으며, 원래 실행된 두 세트의 시나리오는 기존 휴대폰을 검증했습니다. Cookie 아직 인증 가능합니다. 정지 장면은 휴대폰 바인딩을 설정하지 않으며 휴대폰 인증이 적용되지 않습니다. 이 검증에는 다음이 포함되어 있지 않습니다. GitHub 릴리스 소스, 실제 업데이트 다운로드 버튼 또는 공식적으로 서명된 업그레이드。
 
-另一次完整升级加载真实 Claude 安装元数据，由实际新网关调用生产权限助手。TCC 责任主体为新 GUI PID `28116` 的当前安装路径，未指向旧备份或监督器。该隔离副本未获授权，返回 `needs-permission` 符合预期；责任身份正确不等于已获授权。
+실제 탑재된 또 다른 완전한 업그레이드 Claude 실제 신규 게이트웨이에서 호출되는 설치 메타데이터, 제작 권한 도우미。TCC 담당주체가 새로워졌습니다 GUI PID `28116` 의 현재 설치 경로는 이전 백업이나 감독자를 가리키지 않습니다. 격리된 사본은 인증되지 않았습니다. 반환하세요. `needs-permission` 기대에 부응합니다. 책임자의 신원이 정확하다고 해서 승인을 의미하는 것은 아닙니다.。
 
-安装后的 `.6` Test 已正常打开并启动 8788；原 Test 与其 ZCode 正常退出，无强杀。替换时 13 个配置与状态文件摘要一致，浏览器原登录仍有效，4 份草稿摘要一致。实际 Claude 权限请求归属当前 GUI PID `31004`；用户在系统设置授予新版 Test 权限后，从同一实际网关执行 `requestPermission:false` 返回 `ready` / “辅助功能已授权”。核验没有通过 root 进程直接运行助手来替代网关请求，没有代改钥匙串或 TCC 数据库。此结果是权限识别通过，不代表 Claude 已建立会话连接。
+설치 후 `.6` Test 정상적으로 열리고 시작되었습니다. 8788；기존 Test 대신에 ZCode 강제 종료 없이 정상적으로 종료됩니다. 교체시 13 구성은 상태 파일 요약과 일치하며 원래 브라우저 로그인은 여전히 ​​유효합니다.，4 두 초안의 초록은 일관됩니다. 실제 Claude 권한 요청은 현재에 속합니다. GUI PID `31004`；사용자가 시스템 설정에서 새 버전을 부여합니다. Test 권한 후 동일한 실제 게이트웨이에서 실행 `requestPermission:false` 뒤로 `ready` / “접근성 승인됨”。확인 실패 root 프로세스는 키체인을 수정하지 않고 도우미를 직접 실행하여 게이트웨이 요청을 대체합니다. TCC 데이터 베이스. 이 결과는 권한 식별이 통과되었음을 나타냅니다. Claude 세션 연결이 설정되었습니다.。
 
-本轮证据存于 `.tmp/claude-update-20261114/`。2026-11-14 修改前，运行中的 .5 Test 经其实际网关执行无提示权限检查为 ready，保留为交付前后对照。正式版不在本次停止或替换范围内。
+이 증거는 다음에 존재합니다. `.tmp/claude-update-20261114/`。2026-11-14 수정하기 전에 실행 중입니다. .5 Test 실제 게이트웨이를 통해 자동 권한 확인을 수행하는 것은 ready，배송 전후에 보관됩니다. 공식 버전은 이 중지 또는 교체 범위에 포함되지 않습니다.。
 
-## 影响
+## 영향
 
-真实升级和重启会改变当前运行状态，隔离夹具不能自动授权操作用户正式安装。当前仍保留此前升级首次触发条件的不确定性。新签名身份若需要系统重新授权，应由用户正常处理；修复权限归属不等于能绕过授权。新增的原生监督器增加一个打包组件及短期更新进程，作为兼容旧更新助手并保持安全回滚的代价。
+실제 업그레이드 및 재시작은 현재 실행 상태를 변경하며 절연 고정 장치는 사용자가 공식적으로 설치하도록 자동으로 승인할 수 없습니다. 이전 업그레이드의 첫 번째 트리거 조건에 대해서는 여전히 불확실성이 있습니다. 새 서명 ID에 시스템의 재인증이 필요한 경우 사용자가 정상적으로 처리해야 합니다. 권한 소유권을 복구한다고 해서 권한 부여가 우회될 수 있다는 의미는 아닙니다. 새로운 기본 감독자는 기존 업데이트 지원과의 호환성 및 안전한 롤백 유지를 위한 가격으로 패키징 구성 요소와 단기 ​​업데이트 프로세스를 추가합니다.。

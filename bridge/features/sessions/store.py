@@ -200,7 +200,7 @@ class SessionStore:
 
     def __init__(self, codex_home, source='all'):
         if source not in ('all', 'desktop', 'cli', 'ide'):
-            raise ValueError('未知会话来源')
+            raise ValueError('알 수 없는 세션 소스')
         self.source = source
         self.home = Path(codex_home).resolve()
         self.history_cache = OrderedDict()
@@ -257,7 +257,7 @@ class SessionStore:
         try:
             databases = sorted(self.home.glob("state_*.sqlite"), key=lambda p: p.stat().st_mtime, reverse=True)
             if not databases:
-                raise StoreUnavailable("暂时找不到 Codex 会话数据库，请打开电脑 Codex 后重试。")
+                raise StoreUnavailable("Codex 채팅 데이터베이스를 일시적으로 사용할 수 없습니다. 데스크톱 Codex를 열고 다시 시도하세요.")
             database = databases[0]
             with ExitStack() as stack:
                 target = database
@@ -275,10 +275,10 @@ class SessionStore:
                     folder = stack.enter_context(tempfile.TemporaryDirectory(prefix='codex-mobile-history-'))
                     target = Path(folder) / 'history.sqlite'
                     if wal.exists():
-                        raise StoreUnavailable("Codex 会话数据库正在更新，请稍后重试。")
+                        raise StoreUnavailable("Codex가 채팅 데이터베이스를 업데이트 중입니다. 잠시 후 다시 시도해 주세요.")
                     shutil.copyfile(database, target)
                     if wal.exists() or fingerprint() != before:
-                        raise StoreUnavailable("Codex 会话数据库正在更新，请稍后重试。")
+                        raise StoreUnavailable("Codex가 채팅 데이터베이스를 업데이트 중입니다. 잠시 후 다시 시도해 주세요.")
                 mode = 'ro' if target == database else 'rw'
                 conn = stack.enter_context(closing(sqlite3.connect(target.as_uri() + '?mode=' + mode, uri=True, timeout=3)))
                 conn.row_factory = sqlite3.Row
@@ -288,11 +288,11 @@ class SessionStore:
                 database, getattr(exc, 'sqlite_errorname', type(exc).__name__),
                 bool(database and Path(str(database) + '-wal').exists()),
                 bool(database and Path(str(database) + '-shm').exists()), exc)
-            raise StoreUnavailable("暂时无法读取 Codex 会话数据库，请稍后重试或重新打开电脑 Codex。") from exc
+            raise StoreUnavailable("지금은 Codex 채팅 데이터베이스를 읽을 수 없습니다. 잠시 다시 시도하거나 데스크톱 Codex를 다시 열어보세요.") from exc
 
     def list(self, query="", limit=100, offset=0, archived=False, source='all', pinned_ids=(), exclude_sources=()):
         if source not in ('all', 'desktop', 'cli', 'ide'):
-            raise ValueError('不支持的会话来源')
+            raise ValueError('지원되지 않는 세션 소스')
         labels, matches = self._cli_inputs(query)
         with self._connect() as conn:
             columns = {r[1] for r in conn.execute("PRAGMA table_info(threads)")}
@@ -311,7 +311,7 @@ class SessionStore:
                 where.append(self._source_filter(columns, source))
             for excluded in exclude_sources:
                 if excluded not in ('desktop', 'cli', 'ide'):
-                    raise ValueError('不支持的会话来源')
+                    raise ValueError('지원되지 않는 세션 소스')
                 where.append('NOT (' + self._source_filter(columns, excluded) + ')')
             if 'attached_thread_parent_id' in columns:
                 # Only the native attachment relation hides a child. A normal
@@ -443,7 +443,7 @@ class SessionStore:
             rows = [dict(row) for row in conn.execute('SELECT ' + ','.join(fields) + ' FROM threads')]
         if root_id is not None:
             if not any(row['id'] == root_id for row in rows):
-                raise KeyError('找不到这个 Codex 会话')
+                raise KeyError('이것을 찾을 수 없습니다 Codex 대화')
             roots = {root_id}
         elif self.source == 'all':
             roots = {row['id'] for row in rows if
@@ -484,7 +484,7 @@ class SessionStore:
             source = self.get(parent)
         except KeyError:
             return {'id': parent, 'available': False}
-        return {'id': parent, 'available': True, 'title': source.get('name') or source.get('title') or '未命名聊天'}
+        return {'id': parent, 'available': True, 'title': source.get('name') or source.get('title') or '이름없는 채팅'}
 
     def existing_ids(self, identifiers):
         """Metadata receipts for an already authorized lifecycle scope."""
@@ -503,7 +503,7 @@ class SessionStore:
             flags = {row['id']: bool(row['archived']) for row in conn.execute('SELECT id, archived FROM threads')
                      if row['id'] in identifiers}
         if flags.keys() != identifiers:
-            raise StoreUnavailable('无法完整核验聊天和子智能体的归档状态')
+            raise StoreUnavailable("이 채팅 및 해당 하위 에이전트의 보관 상태를 완전히 확인할 수 없습니다.")
         return flags
 
     def recencies(self, identifiers):
@@ -519,13 +519,13 @@ class SessionStore:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM threads WHERE id = ?", (thread_id,)).fetchone()
             if not row:
-                raise KeyError("找不到这个 Codex 会话")
+                raise KeyError("이것을 찾을 수 없습니다 Codex 대화")
             result = dict(row)
             origin = self._origin(result)
             if origin not in ('desktop', 'cli', 'ide'):
-                raise KeyError("不是可访问的 Codex 会话")
+                raise KeyError("접근 불가 Codex 대화")
             if not self._matches(result):
-                raise KeyError("不是可访问的 Codex 会话")
+                raise KeyError("접근 불가 Codex 대화")
             if self.source == 'cli':
                 origin = 'cli'
                 labels, _ = self._cli_inputs()
@@ -744,7 +744,7 @@ class SessionStore:
                     if spawn.get('parent_thread_id') != parent or meta['id'] in seen: continue
                     seen.add(meta['id']); pending.append(meta['id'])
                     result.append({'id': meta['id'], 'parentId': parent,
-                                   'title': meta.get('name') or meta.get('title') or '子智能体',
+                                   'title': meta.get('name') or meta.get('title') or '하위 에이전트',
                                    'nickname': meta.get('agent_nickname') or spawn.get('agent_nickname'),
                                    'role': meta.get('agent_role') or spawn.get('agent_role'),
                                    'path': meta.get('agent_path') or spawn.get('agent_path'),
@@ -757,15 +757,15 @@ class SessionStore:
         with self._connect() as conn:
             current = agent_id; seen = set(); target = None
             while current != thread_id:
-                if current in seen or len(seen) >= 32: raise KeyError('子智能体不属于此聊天')
+                if current in seen or len(seen) >= 32: raise KeyError('하위 에이전트는 이 채팅에 속하지 않습니다.')
                 seen.add(current)
                 row = conn.execute('SELECT * FROM threads WHERE id = ?', (current,)).fetchone()
-                if not row: raise KeyError('子智能体不存在')
+                if not row: raise KeyError('하위 에이전트가 존재하지 않습니다.')
                 meta = dict(row)
                 if target is None: target = meta
                 current = self._agent_source(meta).get('parent_thread_id')
-                if not current: raise KeyError('子智能体不属于此聊天')
-        if target is None: raise KeyError('请选择子智能体')
+                if not current: raise KeyError('하위 에이전트는 이 채팅에 속하지 않습니다.')
+        if target is None: raise KeyError('하위 에이전트를 선택하세요.')
         return self._history(agent_id, target, 10)
 
     def _history(self, thread_id, meta, turn_limit=None):
@@ -773,7 +773,7 @@ class SessionStore:
         # The file path must be an actual rollout in this user's Codex home.
         resolved = path.resolve()
         if not self._rollout_in_home(resolved):
-            raise ValueError("会话记录路径不在 Codex 数据目录中")
+            raise ValueError("세션 레코드 경로가 다음 위치에 없습니다. Codex 데이터 디렉토리에")
         stat = resolved.stat()
         cache_key = (str(resolved), stat.st_ino, stat.st_size, stat.st_mtime_ns, turn_limit)
         with self.history_lock:

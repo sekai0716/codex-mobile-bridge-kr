@@ -32,11 +32,11 @@ class DesktopRuntimeTests(unittest.TestCase):
                  patch('bridge.platforms.windows.discovery_ext.application_execution_alias', return_value=root/'alias.exe') as alias:
                 self.assertEqual(runtime.launcher_settings(application), {'launcher': str((root/'gateway.exe').resolve()), 'sandboxFamily': 'OpenAI.Codex_fixture'})
                 alias.return_value = None
-                with self.assertRaisesRegex(ValueError, '启动别名'): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 앱\\ 실행\\ 별칭\\ 기본\\ 연결\\ 설정이\\ 아직\\ 변경되지\\ 않았습니다"): runtime.launcher_settings(application)
                 identity.return_value = ''
-                with self.assertRaisesRegex(ValueError, '安装包身份'): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 패키지\\ ID\\ 기본\\ 연결\\ 설정이\\ 변경되지\\ 않았습니다\\."): runtime.launcher_settings(application)
             with patch.object(runtime, 'sys', SimpleNamespace(platform='win32', frozen=False)):
-                with self.assertRaisesRegex(ValueError, '已编译'): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, '컴파일된'): runtime.launcher_settings(application)
 
     def test_windows_exited_generation_does_not_require_a_live_image_query(self):
         with patch.object(runtime, 'sys', SimpleNamespace(platform='win32')), \
@@ -82,12 +82,12 @@ class DesktopRuntimeTests(unittest.TestCase):
         with patch.object(runtime.subprocess, 'run', return_value=SimpleNamespace(stdout='--stdio')):
             with self.assertRaises(ValueError): runtime.validate_runtime(self.cli)
         with patch.object(runtime.subprocess, 'run', side_effect=subprocess.TimeoutExpired('help', 10)):
-            with self.assertRaisesRegex(ValueError, '原 App 保持不变'): runtime.validate_runtime(self.cli)
+            with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 공유\\ 액세스\\ 기능\\ 원래의\\ App\\ 변함없이\\ 남아있다"): runtime.validate_runtime(self.cli)
 
     @unittest.skipIf(os.name == 'nt', 'POSIX private lock')
     def test_initializers_and_runtime_generations_have_distinct_exclusive_locks(self):
         with runtime.initialization_lock(self.home):
-            with self.assertRaisesRegex(ValueError, '共享接入'):
+            with self.assertRaisesRegex(ValueError, '공유 액세스'):
                 with runtime.initialization_lock(self.home): pass
             with runtime.exclusive_lock(self.home, 'runtime'): pass
 
@@ -113,16 +113,16 @@ class DesktopRuntimeTests(unittest.TestCase):
 
     def test_exit_wait_is_bounded_and_does_not_clear_unknown_or_live_writer(self):
         with runtime.exclusive_lock(self.home, 'runtime'):
-            with self.assertRaisesRegex(ValueError, '退出中'):
+            with self.assertRaisesRegex(ValueError, '종료'):
                 runtime.wait_stopped(self.home, timeout=.01)
         active = self.root / 'active.json'
         runtime._write(active, json.dumps({'ready': False, 'runtime': None}))
-        with self.assertRaisesRegex(ValueError, '启动结果待核对'):
+        with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임\\ 시작\\ 결과를\\ 확인해야\\ 합니다\\.\\ 컴퓨터에서\\ 확인하시기\\ 바랍니다\\.\\ 반복적으로\\ 시작되지\\ 않습니다\\."):
             runtime.wait_stopped(self.home)
         self.assertTrue(active.exists())
         runtime._write(active, json.dumps({'ready': True, 'runtime': {'pid': 3}}))
         with patch.object(runtime, 'runtime_alive', return_value=True):
-            with self.assertRaisesRegex(ValueError, '尚未退出'):
+            with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."):
                 runtime.wait_stopped(self.home)
         self.assertTrue(active.exists())
 
@@ -238,13 +238,13 @@ class DesktopRuntimeTests(unittest.TestCase):
             self.assertFalse(runtime.runtime_alive(identity))
 
     def test_starting_reservation_blocks_unknown_or_execed_child(self):
-        with self.assertRaisesRegex(ValueError, '启动结果待核对'):
+        with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임\\ 시작\\ 결과를\\ 확인해야\\ 합니다\\.\\ 컴퓨터에서\\ 확인하시기\\ 바랍니다\\.\\ 반복적으로\\ 시작되지\\ 않습니다\\."):
             runtime.require_inactive({'ready': False, 'runtime': None})
         identity = {'pid': 123, 'birth': [1, 2], 'started': [3, 4],
                     'image': '/bin/sh', 'uid': 501, 'ruid': 501}
         record = {'ready': False, 'runtime': identity}
         with patch.object(runtime, 'process_identity', return_value={**identity, 'image': '/native/codex', 'birth': [1, 3]}):
-            with self.assertRaisesRegex(ValueError, '尚未退出'): runtime.require_inactive(record)
+            with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."): runtime.require_inactive(record)
         with patch.object(runtime, 'process_identity', side_effect=ProcessLookupError):
             runtime.require_inactive(record)
 
@@ -304,7 +304,7 @@ class MetadataRoutingTests(unittest.TestCase):
              patch.object(runtime, 'connect', return_value=None), \
              patch('bridge.features.sessions.create._runtime_operation') as spawn:
             operation = Mock()
-            with self.assertRaisesRegex(CreationUnavailable, '自动完成'):
+            with self.assertRaisesRegex(CreationUnavailable, "기본\\ 사이드\\ 채팅\\ 연결이\\ 준비되기를\\ 기다리고\\ 있습니다\\.\\ 데스크톱\\ 작업이\\ 완료되고\\ 유휴\\ 상태가\\ 확인되면\\ 자동으로\\ 완료됩니다\\.\\ 계정\\ 관리에서\\ 준비\\ 상태를\\ 확인할\\ 수도\\ 있습니다\\.\\ 사이드\\ 채팅이\\ 아직\\ 생성되지\\ 않았습니다"):
                 self.call(operation, require_shared=True)
             operation.assert_not_called()
             spawn.assert_not_called()
@@ -329,7 +329,7 @@ class MetadataRoutingTests(unittest.TestCase):
              patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
              patch.object(runtime, 'connect', return_value=None), \
              patch('bridge.features.sessions.create._runtime_operation') as spawn:
-            with self.assertRaisesRegex(CreationUnavailable, '自动完成'):
+            with self.assertRaisesRegex(CreationUnavailable, "기본\\ 사이드\\ 채팅\\ 연결이\\ 준비되기를\\ 기다리고\\ 있습니다\\.\\ 데스크톱\\ 작업이\\ 완료되고\\ 유휴\\ 상태가\\ 확인되면\\ 자동으로\\ 완료됩니다\\.\\ 계정\\ 관리에서\\ 준비\\ 상태를\\ 확인할\\ 수도\\ 있습니다\\.\\ 사이드\\ 채팅이\\ 아직\\ 생성되지\\ 않았습니다"):
                 self.call(Mock(), require_shared=True)
             spawn.assert_not_called()
 

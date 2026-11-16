@@ -21,9 +21,9 @@ SURFACE_LABELS = {
 # These reserve shared composer positions, never authorize native operations.
 COMPOSER_PRESENTATION = dict.fromkeys(('models', 'skills', 'permissions', 'attachments', 'plan', 'goal'), True)
 PERMISSION_OPTIONS = [
-    {'value': 'desktop', 'label': '电脑端处理'},
-    {'value': 'mobile-ask', 'label': '手机端审批'},
-    {'value': 'auto-allow', 'label': '自动允许'},
+    {'value': 'desktop', 'label': 'PC 처리'},
+    {'value': 'mobile-ask', 'label': '모바일 앱 승인'},
+    {'value': 'auto-allow', 'label': '자동으로 허용'},
 ]
 
 
@@ -78,7 +78,7 @@ def _diff_preview(target, replacement):
 def summarize_tool_title(tool_call):
     """Produce a concise native-style summary title (e.g. 'Ran ...', 'Read ...', 'Edited ...')."""
     if not isinstance(tool_call, dict):
-        return '工具调用'
+        return '도구 호출'
     name = str(tool_call.get('name') or 'tool')
     args = _clean_args(tool_call.get('args'))
     if name == 'run_command':
@@ -126,11 +126,11 @@ def format_tool_call(tool_call):
         path = args.get('Path') or args.get('TargetFile') or ''
         diff = _diff_preview(args.get('Target') or args.get('TargetContent', ''),
                              args.get('Replacement') or args.get('ReplacementContent', ''))
-        return f'文件：{path}\n{diff}'.strip()
+        return f'파일：{path}\n{diff}'.strip()
     if name == 'multi_replace_file_content':
         path = args.get('TargetFile') or args.get('Path') or ''
         chunks = args.get('ReplacementChunks') or []
-        parts = [f'文件：{path}']
+        parts = [f'파일：{path}']
         if isinstance(chunks, list):
             for chunk in chunks[:10]:
                 if isinstance(chunk, dict):
@@ -142,7 +142,7 @@ def format_tool_call(tool_call):
         preview = '\n'.join(content.splitlines()[:40])
         if len(content.splitlines()) > 40:
             preview += '\n…'
-        return f'写入文件：{path}\n{preview}'.strip()
+        return f'파일 쓰기：{path}\n{preview}'.strip()
     try:
         return json.dumps(args, ensure_ascii=False, indent=2)
     except (TypeError, ValueError):
@@ -160,7 +160,7 @@ def _step_error_text(step, default_text):
     if not text:
         text = str(step.get('error_message') or step.get('message') or step.get('content') or '').strip()
     if len(text) > 4000:
-        text = text[:4000] + '\n…（已截断）'
+        text = text[:4000] + '\n…（잘림）'
     return text or default_text
 
 
@@ -270,7 +270,7 @@ def normalize_steps(steps, *, session_active=False):
                 }
             thinking = step.get('thinking')
             if isinstance(thinking, str) and thinking.strip():
-                think_title = '思考'
+                think_title = '생각하다'
                 msg = {
                     'id': f'step-{step_index}-thinking',
                     'role': 'reasoning', 'timestamp': step_ts,
@@ -310,7 +310,7 @@ def normalize_steps(steps, *, session_active=False):
                     'id': f'step-{step_index}-error',
                     'role': 'error',
                     'timestamp': step_ts,
-                    'text': _step_error_text(step, '模型步骤执行异常'),
+                    'text': _step_error_text(step, '모델 단계 실행 예외'),
                 }
                 messages.append(msg)
                 turn['messages'].append(msg)
@@ -321,7 +321,7 @@ def normalize_steps(steps, *, session_active=False):
             if not preview and step_status in ('ERROR', 'FAILED'):
                 preview = _step_error_text(step, '')
             if len(preview) > 4000:
-                preview = preview[:4000] + '\n…（已截断）'
+                preview = preview[:4000] + '\n…（잘림）'
             attachments = _media_attachments(step_index, step.get('media'))
             if preview or attachments:
                 if pending_tool_msgs:
@@ -334,7 +334,7 @@ def normalize_steps(steps, *, session_active=False):
                     msg = {
                         'id': f'step-{step_index}-output',
                         'role': 'activity', 'timestamp': step_ts,
-                        'title': '工具输出',
+                        'title': '도구 출력',
                         'text': preview,
                     }
                     if attachments:
@@ -347,7 +347,7 @@ def normalize_steps(steps, *, session_active=False):
                 'id': f'step-{step_index}-error',
                 'role': 'error',
                 'timestamp': step_ts,
-                'text': _step_error_text(step, '执行出错'),
+                'text': _step_error_text(step, '실행 오류'),
             }
             messages.append(msg)
             turn['messages'].append(msg)
@@ -358,7 +358,7 @@ def normalize_steps(steps, *, session_active=False):
                 msg = {
                     'id': f'step-{step_index}-checkpoint',
                     'role': 'activity', 'timestamp': step_ts,
-                    'title': '检查点',
+                    'title': '검문소',
                     'text': content.strip(),
                 }
                 messages.append(msg)

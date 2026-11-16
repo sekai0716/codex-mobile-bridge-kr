@@ -57,7 +57,7 @@ class AccountsHttpTests(unittest.TestCase):
         self.assertEqual(self.request('POST', path, {**value, 'alias': 'arbitrary'}, headers)[0], 400)
         self.assertEqual(self.request('POST', path, value, headers)[0], 202)
         self.server.bridge.retry_ssh.assert_called_once_with('remote:fixture')
-        self.server.bridge.retry_ssh.side_effect = ValueError('请选择已登记的 SSH 主机')
+        self.server.bridge.retry_ssh.side_effect = ValueError('등록된 항목을 선택하세요. SSH 주인')
         self.assertEqual(self.request('POST', path, {'host': 'unknown'}, headers)[0], 400)
 
     def test_runtime_initialization_requires_authenticated_default_desktop_scope(self):

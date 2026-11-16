@@ -224,14 +224,14 @@ def launch_windows_desktop(executable, *, cancelled=None, require_environment=Fa
     """Preserve direct-launch environments, falling back for protected Store apps."""
     def check_cancelled():
         if cancelled is not None and cancelled.is_set():
-            raise ValueError('已取消桌面程序启动')
+            raise ValueError('데스크톱 프로그램 시작이 취소되었습니다.')
     check_cancelled()
     if require_environment:
         launcher = executable
         if any((folder/'AppxManifest.xml').is_file() for folder in Path(executable).parents):
             launcher = application_execution_alias(executable)
             if launcher is None:
-                raise ValueError('无法核验应用启动别名，尚未启动；请检查应用安装与执行别名设置')
+                raise ValueError('애플리케이션 시작 별명을 확인할 수 없으며 아직 시작되지 않았습니다. 애플리케이션 설치 및 실행 별칭 설정을 확인하세요.')
         check_cancelled()
         # Activate through the alias without making it argv[0]: the native shell
         # uses that name for its window profile and single-instance identity.

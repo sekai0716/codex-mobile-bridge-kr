@@ -63,7 +63,7 @@ class DirectoryReferenceTests(unittest.TestCase):
     def test_app_directory_is_locatable_but_not_an_ordinary_download(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as directory:
             root = Path(directory); target = root / 'Gateway Preview.app'; target.mkdir()
-            text = '[macOS网关APP](<' + str(target) + '>)'
+            text = '[macOS게이트웨이APP](<' + str(target) + '>)'
             files = artifact_paths({'cwd': str(root), 'turns': [{'items': [{'type': 'agentMessage', 'text': text}]}]}, None)
             self.assertEqual(len(files), 1)
             self.assertEqual(next(iter(files.values()))['kind'], 'directory')

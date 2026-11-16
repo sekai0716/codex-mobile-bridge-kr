@@ -27,19 +27,19 @@ class WslAccounts:
         elif provider == 'claude':
             registry = getattr(getattr(self.bridge, 'desktop_sessions', None), 'claude_wsl', None)
         else:
-            raise ValueError('WSL 客户端无效')
+            raise ValueError('WSL 잘못된 클라이언트')
         if registry is None:
-            raise ValueError('此网关不支持 WSL 账号')
+            raise ValueError('이 게이트웨이는 지원하지 않습니다 WSL 계정')
         return registry
 
     def _row(self, provider, identifier, *, enabled=False):
         pattern = r'wsl:[0-9a-f]{32}' if provider == 'codex' else r'wsl-claude:[0-9a-f]{32}'
         if not isinstance(identifier, str) or not re.fullmatch(pattern, identifier):
-            raise ValueError('WSL 入口身份无效')
+            raise ValueError('WSL 잘못된 포털 ID')
         registry = self._registry(provider)
         row = next((dict(row) for row in registry.entries if row.get('id') == identifier), None)
         if row is None or (enabled and not row.get('enabled', True)):
-            raise ValueError('WSL 入口未登记或已关闭')
+            raise ValueError('WSL 입구가 등록되지 않았거나 닫혔습니다.')
         # Registration files are not an authorization to retarget another path.
         if provider == 'codex':
             from bridge.features.endpoints.registry import entry_id
@@ -48,7 +48,7 @@ class WslAccounts:
             from bridge.clients.claude.wsl import entry_id
             expected = entry_id(row['distribution'], row['user'], row['configDir'])
         if expected != identifier:
-            raise ValueError('WSL 登记身份已变化')
+            raise ValueError('WSL 등록 상태가 변경되었습니다.')
         return row
 
     @staticmethod
@@ -90,18 +90,18 @@ class WslAccounts:
     def read(self, provider, entry):
         with self.lock:
             if self.closed:
-                raise ValueError('网关正在停止')
+                raise ValueError('게이트웨이가 중지 중입니다.')
             registry = self._registry(provider)
             with registry.lock:
                 row = self._row(provider, entry)
                 if row['distribution'] not in wsl.running_distributions():
                     return self._public(provider, row, {'available': False, 'identity': None, 'accounts': [],
-                        'activeId': None, 'blockers': ['WSL 已停止，请在电脑端启动后查看账号'],
+                        'activeId': None, 'blockers': ["WSL가 중지되었습니다. 계정을 보려면 이 컴퓨터에서 시작하세요."],
                         'capabilities': {'connect': row.get('enabled', True), 'save': False, 'import': False,
                                          'switch': False, 'restore': False, 'models': False}})
                 value = self._call(provider, row, {'action': 'read'})
                 if not row.get('enabled', True):
-                    value['blockers'].append('此 WSL 入口已关闭')
+                    value['blockers'].append('이 WSL 입구가 폐쇄되었습니다')
                     value['capabilities'] = {key: False for key in value['capabilities']}
                     return self._public(provider, row, value)
             # Do not hold registration while waiting for the Claude manager.
@@ -110,7 +110,7 @@ class WslAccounts:
                 with self._change_scope(provider, entry, 'inspect-switch') as release:
                     current = self._row(provider, entry, enabled=True)
                     if self._target(current) != self._target(row):
-                        raise ValueError('WSL 登记身份已变化')
+                        raise ValueError('WSL 등록 상태가 변경되었습니다.')
                     if provider != 'codex' or release is None:
                         with self._guard(provider, current):
                             pass
@@ -127,10 +127,10 @@ class WslAccounts:
                                 value['draftContinuations'] = release.after_switch(value['identity'])
                             except Exception:
                                 value['continuationPending'] = True
-                                value['continuationError'] = '账号配置已切换，原会话续接尚未核验；请刷新检查，不要重复提交切换'
+                                value['continuationError'] = "계정 구성이 전환되었지만 아직 채팅 연속성이 확인되지 않았습니다. 확인하려면 새로고침하세요. 스위치를 다시 제출하지 마십시오."
                         else:
                             value['continuationPending'] = True
-                            value['continuationError'] = '原会话续接记录与当前账号不符，请检查原 WSL 配置'
+                            value['continuationError'] = "채팅 연속 기록이 현재 계정과 일치하지 않습니다. 원래 WSL 구성을 확인하십시오."
                     if (provider == 'claude' and release is not None and release.releasable and
                             value.get('runtimeReleaseCandidate') is True):
                         # An attempt is permitted, not proof of safe switching:
@@ -142,11 +142,11 @@ class WslAccounts:
                             value['capabilities']['attemptRestore'] = True
             except ValueError as error:
                 value['blockers'].append(str(error) if type(error) is ValueError else
-                    '无法核验 WSL 切换条件，请刷新并检查运行状态及操作记录')
+                    "WSL 전환 조건을 확인할 수 없습니다. 실행 중인 클라이언트와 보류 중인 작업을 새로 고치고 확인합니다.")
                 value['capabilities'].update(switch=False, restore=False)
             except Exception:
                 # Failed verification is not evidence that the target is busy.
-                value['blockers'].append('无法核验 WSL 切换条件，请刷新并检查运行状态及操作记录')
+                value['blockers'].append("WSL 전환 조건을 확인할 수 없습니다. 실행 중인 클라이언트와 보류 중인 작업을 새로 고치고 확인합니다.")
                 value['capabilities'].update(switch=False, restore=False)
             if provider == 'codex':
                 path = Path(registry.directory)/row['id'][4:]/'account-restart.json'
@@ -155,12 +155,12 @@ class WslAccounts:
                         pending = json.loads(path.read_text(encoding='utf-8'))
                         expected = pending.get('appliedIdentity') or pending.get('beforeIdentity')
                         if pending.get('phase') in ('prepared', 'stopped', 'applied'):
-                            value.update(restartPending=True, restartError='WSL 共享服务恢复尚未核验，请检查并恢复原服务')
+                            value.update(restartPending=True, restartError="WSL 공유 서비스 복구가 확인되지 않았습니다. 원래 서비스를 확인하고 복구하세요.")
                             committed = (pending.get('plannedIdentity') == value.get('identity') and
                                          pending.get('selectedAccount') == value.get('activeId'))
                             value['capabilities']['recoverRestart'] = bool(committed or expected and expected == value.get('identity'))
                     except (OSError, ValueError, TypeError):
-                        value['blockers'].append('WSL 共享服务恢复记录无法核验')
+                        value['blockers'].append("WSL 공유 서비스 복구 레코드를 확인할 수 없습니다.")
             return self._public(provider, row, value)
 
     @contextlib.contextmanager
@@ -174,18 +174,18 @@ class WslAccounts:
                     locks.enter_context(endpoint.lock)
                     if any(receipt.get('result', {}).get('status') in ('queued', 'unknown', 'pending')
                            for receipt in endpoint.receipts.values()):
-                        raise ValueError('此 WSL 接入存在排队或结果待核对的操作')
+                        raise ValueError("이 WSL 프로필에는 대기 중인 작업이나 확인되지 않은 결과가 있습니다.")
                     if endpoint.server is not None and not endpoint.server.closed:
-                        raise ValueError('此 WSL 共享服务仍连接，无法保证重新载入认证；请先退出原服务')
+                        raise ValueError('이 WSL 공유 서비스는 여전히 연결되어 있으며 인증 다시 로드를 보장할 수 없습니다. 먼저 원래 서비스를 종료해 주세요')
                     for session in endpoint.live.values():
                         if session.activating or session.refreshing or session.loading:
-                            raise ValueError('此 WSL 会话状态尚未核验')
+                            raise ValueError('이 WSL 세션 상태가 확인되지 않았습니다.')
                 # Persisted unresolved writes also block after a gateway restart.
                 path = Path(registry.directory)/row['id'][4:]/'operations.json'
                 if path.exists():
                     receipts = json.loads(path.read_text(encoding='utf-8'))
                     if any(item.get('result', {}).get('status') in ('queued', 'unknown', 'pending') for item in receipts.values()):
-                        raise ValueError('此 WSL 接入存在排队或结果待核对的操作')
+                        raise ValueError("이 WSL 프로필에는 대기 중인 작업이나 확인되지 않은 결과가 있습니다.")
             hook = getattr(self.bridge, 'wsl_account_guard', None)
             if hook and provider == 'codex':
                 locks.enter_context(hook(provider, row))
@@ -201,7 +201,7 @@ class WslAccounts:
                     row = self._row(provider, entry, enabled=True)
                 hook = getattr(self.bridge, 'wsl_account_guard', None)
                 if hook is None:
-                    raise ValueError('WSL Claude Code 操作记录保护尚不可用')
+                    raise ValueError("WSL Claude Code 작업 기록 가드는 아직 사용할 수 없습니다.")
                 # Manager mutation lock precedes registry/remote locks, matching
                 # normal Claude sends. The hook rechecks target registration.
                 release = locks.enter_context(hook(provider, row, read_only=True, release_idle=True) if action == 'inspect-switch'
@@ -220,25 +220,25 @@ class WslAccounts:
 
     def change(self, value, desktop=False):
         if not isinstance(value, dict):
-            raise ValueError('WSL 账号请求无效')
+            raise ValueError('WSL 잘못된 계정 요청')
         allowed = {'provider', 'entry', 'action', 'id', 'name', 'baseUrl', 'model', 'apiKey', 'authScheme',
                    'expectedIdentity', 'sourceId', 'sourceIdentity', 'refresh'}
         if set(value)-allowed:
-            raise ValueError('WSL 账号请求包含未知字段')
+            raise ValueError('WSL 계정 요청에 알 수 없는 필드가 포함되어 있습니다.')
         provider, entry, action = value.get('provider'), value.get('entry'), value.get('action')
         if action not in ('read', 'connect', 'save-api', 'import-api', 'import-current', 'import-sources', 'switch', 'delete', 'rename', 'models', 'recover-restart'):
-            raise ValueError('WSL 账号操作不支持')
+            raise ValueError('WSL 계정 작업은 지원되지 않습니다')
         if action == 'connect' and set(value) != {'provider', 'entry', 'action'}:
-            raise ValueError('WSL 启动请求字段无效')
+            raise ValueError('WSL 잘못된 시작 요청 필드')
         if action == 'models':
             return self.model_catalog.get(value)
         with self.lock:
             if self.closed:
-                raise ValueError('网关正在停止')
+                raise ValueError('게이트웨이가 중지 중입니다.')
             if action == 'read':
                 return self.read(provider, entry)
             if action == 'recover-restart' and provider != 'codex':
-                raise ValueError('仅 WSL Codex 支持恢复共享服务')
+                raise ValueError("Codex WSL만 공유 서비스 복구를 지원합니다.")
             registry = self._registry(provider)
             if action == 'connect':
                 with registry.lock:
@@ -254,13 +254,13 @@ class WslAccounts:
                 if action == 'import-sources':
                     return self._public(provider, row, {'sources': self.bridge.wsl_account_sources(provider)})
                 if row['distribution'] not in wsl.running_distributions():
-                    raise ValueError('WSL 已停止，请在电脑端启动后操作')
+                    raise ValueError('WSL 중지되었습니다. 계속하기 전에 컴퓨터에서 시작하세요.')
                 if action == 'recover-restart':
                     if release is None:
-                        raise ValueError('此网关无法核验 WSL 共享服务恢复')
+                        raise ValueError('이 게이트웨이를 확인할 수 없습니다. WSL 공유 서비스 복구')
                     current = self._call(provider, row, {'action': 'read'})
                     if not value.get('expectedIdentity') or current.get('identity') != value['expectedIdentity']:
-                        raise ValueError('WSL 账号身份已变化，请刷新')
+                        raise ValueError('WSL 계정 ID가 변경되었습니다. 새로고침하세요.')
                     release.observe(current)
                     current['draftContinuations'] = release.restore(current['identity'])
                     restarted = bool(release.record.get('daemon'))
@@ -274,13 +274,13 @@ class WslAccounts:
                     current = self._call(provider, row, {'action': 'read'})
                     if (not value.get('expectedIdentity') or current.get('identity') != value['expectedIdentity'] or
                             not any(account.get('id') == value.get('id') for account in current.get('accounts', []))):
-                        raise ValueError('WSL 账号配置已变化，请刷新后重新选择')
+                        raise ValueError("WSL 계정 구성이 변경되었습니다. 프로필을 새로 고치고 다시 선택하세요.")
                     if value.get('id') != 'native' and current.get('configurationBlockers'):
                         raise ValueError(current['configurationBlockers'][0])
                     if value.get('id') == 'native' and not current.get('activeId'):
-                        raise ValueError('原生配置已被外部修改，请使用原工具处理')
+                        raise ValueError("네이티브 구성이 외부적으로 수정되었습니다. 원래 도구에서 해결하세요.")
                     if release.releasable and current.get('runtimeReleaseCandidate') is not True:
-                        raise ValueError((current.get('runtimeBlockers') or ['无法核验 WSL 执行器释放条件'])[0])
+                        raise ValueError((current.get('runtimeBlockers') or ['확인할 수 없습니다 WSL 액추에이터 해제 조건'])[0])
                     release.identity = current['identity']
                     if provider == 'codex' and release.record is not None:
                         release.intent = self._call(provider, row, {'action': 'preview-switch', 'id': value['id'],
@@ -313,11 +313,11 @@ class WslAccounts:
                             result['restartRequired'] = bool(release.restartRequired)
                     except Exception:
                         if provider == 'codex':
-                            result.update(restartPending=True, restartError='账号配置已切换，原共享服务恢复尚未核验；请检查并恢复服务，不要重复切换')
+                            result.update(restartPending=True, restartError="계정 구성이 전환되었으나 원래 공유 서비스 복구가 확인되지 않았습니다. 서비스를 확인하고 복구하십시오. 다시는 계정을 전환하지 마세요.")
                             result['capabilities']['recoverRestart'] = True
                         else:
                             result['continuationPending'] = True
-                            result['continuationError'] = '账号配置已切换，原会话续接尚未核验；请刷新检查，不要重复提交切换'
+                            result['continuationError'] = "계정 구성이 전환되었지만 아직 채팅 연속성이 확인되지 않았습니다. 확인하려면 새로고침하세요. 스위치를 다시 제출하지 마십시오."
                 return self._public(provider, row, result)
 
     def close(self):

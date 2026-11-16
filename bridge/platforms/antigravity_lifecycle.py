@@ -9,8 +9,8 @@ from bridge.platforms import desktop
 from bridge.platforms.antigravity import _identity, _file_identity, _candidates, _flag, installation, login_processes
 
 
-CHANGED = 'Antigravity 进程或安装已变化，尚未切换账号，请重新检查'
-UNSCOPED = '请先正常退出独立的 Antigravity CLI、其他实例或自定义入口，再切换账号'
+CHANGED = 'Antigravity 프로세스 또는 설치가 변경되었으며 계정이 전환되지 않았습니다. 다시 확인해 주세요.'
+UNSCOPED = '먼저 독립 실행형을 정상적으로 종료하십시오. Antigravity CLI、다른 인스턴스 또는 사용자 정의 포털을 사용한 후 계정 전환'
 
 
 def identity(pid):
@@ -107,7 +107,7 @@ def stop(plan):
         finally:
             binder.close(handle)
     else:
-        raise ValueError('当前系统不支持 Antigravity 正常退出')
+        raise ValueError('현재 시스템에서는 지원하지 않습니다. Antigravity 정상적으로 종료')
     deadline = time.monotonic() + 12
     while True:
         remaining = set(login_processes())
@@ -119,7 +119,7 @@ def stop(plan):
             if identity(current) != plan['processes'][current]:
                 raise ValueError(CHANGED)
         if time.monotonic() >= deadline:
-            raise ValueError('Antigravity 尚未正常退出，账号未修改；请处理原客户端的保存或退出提示后重试')
+            raise ValueError('Antigravity 정상적으로 종료되지 않았으며 계정이 수정되지 않았습니다. 원래 클라이언트의 저장 또는 종료 프롬프트를 처리하고 다시 시도하십시오.')
         time.sleep(.2)
 
 

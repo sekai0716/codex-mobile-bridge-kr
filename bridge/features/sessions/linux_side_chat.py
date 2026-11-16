@@ -53,7 +53,7 @@ class LinuxSideChat(SideChat):
     def _permission_options(self):
         view = self.view()
         if not view['connected']:
-            raise SideChatError('侧边聊天已失效，请关闭后新建')
+            raise SideChatError("보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.")
         facts = read_permission_facts(
             lambda method, params: self.runtime.request(method, params, timeout=5), view['cwd'])
         preferences = desktop_permission_preferences(self.home)
@@ -65,9 +65,9 @@ class LinuxSideChat(SideChat):
 
     def permissions(self, preset, confirmed=False):
         if preset not in ('ask', 'auto-review', 'full-access'):
-            raise ValueError('权限设置无效')
+            raise ValueError('잘못된 권한 설정')
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError('请确认完全访问权限')
+            raise ValueError("전체 액세스 확인")
         with self.actions:
             facts, options = self._permission_options()
             require_permission(options, preset)
@@ -83,5 +83,5 @@ class LinuxSideChat(SideChat):
                     timeout=PERMISSION_CONFIRM_TIMEOUT)
                 if (self.error or self.closed or self.permission_revision <= revision
                         or self.view()['permissionMode'] != preset):
-                    raise SideChatError('权限设置尚未获运行时确认，请刷新状态后重试。')
+                    raise SideChatError("런타임이 권한 변경을 확인하지 않았습니다. 다시 시도하기 전에 상태를 새로 고치세요.")
                 return self.view()

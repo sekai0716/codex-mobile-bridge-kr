@@ -133,7 +133,7 @@ class SwitchTests(unittest.TestCase):
     def test_restart_failure_keeps_applied_snapshot_without_replay(self):
         self.native.restart.side_effect = OSError('launch refused')
         result = self.run_switch()
-        self.assertIn('未确认', result['message'])
+        self.assertIn("로그인 구성이 적용되었지만 원래 클라이언트가 다시 열리는지 확인되지 않았습니다. 컴퓨터에서 확인해주세요. 반복되는 시작 없음, 롤백 없음 또는 구성 지우기 없음。", result['message'])
         self.store.restore.assert_called_once_with('saved')
         self.native.restart.assert_called_once_with(self.plan)
         self.assertEqual(result['activeIds'], [])
@@ -146,9 +146,9 @@ class SwitchTests(unittest.TestCase):
         self.store.restore.assert_called_once()
 
     def test_new_login_only_confirmed_by_native_metadata(self):
-        self.assertIn('尚未确认', self.run_switch()['message'])
+        self.assertIn("로그인 구성이 적용되었으며 원래 클라이언트를 다시 열도록 요청되었습니다. 로그인이 확인되지 않았습니다. 나중에 계정 상태를 새로 고치십시오.。", self.run_switch()['message'])
         self.store.public.return_value = {'accounts': [], 'activeIds': ['saved']}
-        self.assertIn('确认当前登录', self.run_switch()['message'])
+        self.assertIn("원래 클라이언트가 다시 열리고 현재 로그인이 확인되었습니다.。", self.run_switch()['message'])
 
     def test_shared_manager_routes_switch_and_preserves_configuration(self):
         from bridge.clients.manager import DesktopSessions
@@ -194,7 +194,7 @@ class ProcessScopeTests(unittest.TestCase):
         for image in ('agy', 'Antigravity IDE', 'language_server_other'):
             self.rows[43] = {'pid': 43, 'parent': 1, 'image': image, 'birth': 'three'}
             self.pids = [41, 42, 43]
-            with self.subTest(image=image), self.assertRaisesRegex(ValueError, '独立'):
+            with self.subTest(image=image), self.assertRaisesRegex(ValueError, "먼저\\ 독립\\ 실행형을\\ 정상적으로\\ 종료하십시오\\.\\ Antigravity\\ CLI、다른\\ 인스턴스\\ 또는\\ 사용자\\ 정의\\ 포털을\\ 사용한\\ 후\\ 계정\\ 전환"):
                 self.prepare()
         self.platform.quit_process.assert_not_called()
         self.platform.quit_application.assert_not_called()
@@ -213,7 +213,7 @@ class ProcessScopeTests(unittest.TestCase):
         self.rows[43] = {'pid': 43, 'parent': 41, 'image': 'agy', 'birth': 'three'}
         self.pids.append(43)
         plan = self.prepare()
-        with self.assertRaisesRegex(ValueError, '独立'):
+        with self.assertRaisesRegex(ValueError, "먼저\\ 독립\\ 실행형을\\ 정상적으로\\ 종료하십시오\\.\\ Antigravity\\ CLI、다른\\ 인스턴스\\ 또는\\ 사용자\\ 정의\\ 포털을\\ 사용한\\ 후\\ 계정\\ 전환"):
             native.bind_server(plan, {'identity': self.rows[42]})
         self.platform.quit_process.assert_not_called()
 
@@ -242,7 +242,7 @@ class ProcessScopeTests(unittest.TestCase):
     def test_normal_exit_waits_without_helper_kill_or_duplicate_launch(self):
         plan = self.prepare()
         with patch.object(native.sys, 'platform', 'darwin'), patch.object(native.time, 'monotonic', side_effect=[0, 13]):
-            with self.assertRaisesRegex(ValueError, '尚未正常退出'):
+            with self.assertRaisesRegex(ValueError, "Antigravity\\ 정상적으로\\ 종료되지\\ 않았으며\\ 계정이\\ 수정되지\\ 않았습니다\\.\\ 원래\\ 클라이언트의\\ 저장\\ 또는\\ 종료\\ 프롬프트를\\ 처리하고\\ 다시\\ 시도하십시오\\."):
                 native.stop(plan)
         self.platform.quit_application.assert_called_once_with(str(self.exe), pids=[41])
         self.platform.terminate.assert_not_called()

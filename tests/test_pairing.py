@@ -103,7 +103,7 @@ class PairingTests(unittest.TestCase):
         desktop = Desktop(ROOT/'.tmp/pairing-controller-test')
         desktop.snapshot = lambda: {'runtime': {'running': True, 'instanceId': 'expected'}, 'urls': ['https://example.com/']}
         with patch('bridge.features.network.access.read_auth', return_value={'instanceId': 'other'}), patch('bridge.app.desktop.request_pairing') as request:
-            with self.assertRaisesRegex(ValueError, '当前网关'): desktop.pairing({'action': 'create', 'url': 'https://example.com/'})
+            with self.assertRaisesRegex(ValueError, '현재 게이트웨이'): desktop.pairing({'action': 'create', 'url': 'https://example.com/'})
             request.assert_not_called()
         with patch('bridge.features.network.access.read_auth', return_value={'instanceId': 'expected'}), patch('bridge.app.desktop.request_pairing', return_value={}) as request:
             desktop.pairing({'action': 'create', 'url': 'https://example.com/'})
@@ -182,6 +182,7 @@ class PairingHTTPTests(unittest.TestCase):
             expired, row = self.server.auth.new_session('127.0.0.1', 'Legacy mobile browser')
             with patch('bridge.features.auth.auth.time.time', return_value=row['expires'] + 1):
                 self.assertFalse(self.request('/api/auth', cookie=Auth.COOKIE+'='+expired, user_agent=ua)[1]['authenticated'])
+
 
     def test_exchange_cookie_csrf_and_password_path(self):
         self.assertEqual(self.request('/api/sessions')[0], 401)

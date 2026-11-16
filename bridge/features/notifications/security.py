@@ -40,9 +40,9 @@ class SecurityNotifications:
                     break
                 if channels(current).get(channel) != target:
                     continue
-                title = 'Codex Mobile Bridge · IP 已自动封禁'
-                body = (f"{current.get('addressName') or 'Codex Mobile Bridge'}：IP {event['ip']} 连续输错密码 {event['attempts']} 次，已加入黑名单。"
-                        '\n关联登录已撤销。请在电脑网关 App 的“登录设备 → 自动封禁 IP”中查看或解除。')
+                title = 'Codex Mobile Bridge · IP 자동으로 차단됨'
+                body = (f"{current.get('addressName') or 'Codex Mobile Bridge'}：IP {event['ip']} 계속 잘못된 비밀번호를 입력하는 경우 {event['attempts']} 몇번이나 블랙리스트에 추가됐어요。"
+                        '\n관련 로그인이 취소되었습니다. 컴퓨터 게이트웨이로 가주세요 App 의“장치에 로그인 → 자동 금지 IP”보기 또는 취소。')
                 try:
                     if channel == 'webhook' or channel.startswith('webhook:'):
                         publish_webhook(webhook_channel_config(current, channel), title, body, event='security.ip_blocked', event_id=hashlib.sha256(identifier.encode()).hexdigest(),
@@ -52,5 +52,5 @@ class SecurityNotifications:
                     record[target] = {'delivered': True, 'channel': channel, 'time': time.time()}
                 except Exception:
                     record[target] = {'delivered': False, 'channel': channel, 'next': time.time()+30,
-                                      'error': '封禁通知发送失败，将自动重试。'}
+                                      'error': "차단 알림이 실패했습니다. 자동으로 다시 시도됩니다."}
                 write_json(self.path, self.state)

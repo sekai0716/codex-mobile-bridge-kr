@@ -37,7 +37,7 @@ READS = {'list', 'detail', 'catalog', 'projects', 'create-models', 'account', 'a
 WRITES = {'send', 'stop', 'settings', 'respond', 'create', 'access', 'resume', 'fork', 'pin', 'archive', 'rename', 'organization', 'goal', 'compact', 'stop-task', 'edit-message', 'queue-action'}
 
 
-CLAUDE_HISTORY_NOTICE = '客户端尚未提供当前可选模型，历史模型仅供查看'
+CLAUDE_HISTORY_NOTICE = "클라이언트가 선택 가능한 모델을 제공하지 않았습니다. 과거 모델은 참조용으로만 표시됩니다."
 
 LIFECYCLE_GATE_WAIT = 2
 
@@ -52,7 +52,7 @@ def _closing_gate(gate):
         logging.getLogger(__name__).warning(
             'Client lifecycle provider=codex stage=operation-wait outcome=busy elapsed_ms=%.1f',
             (time.monotonic() - started) * 1000)
-        raise ValueError('有 Codex 操作正在进行，尚未执行关闭，请稍后重试')
+        raise ValueError('가지다 Codex 작업이 진행 중이며 종료가 수행되지 않았습니다. 나중에 다시 시도해 주세요.')
     try:
         yield
     finally:
@@ -99,10 +99,10 @@ def _claude_catalog_sources(value, account=None, *, legacy=False):
         if group.get('notice') and group['notice'] not in notices:
             notices.append(group['notice'])
     if 'cached-unverified' in origins:
-        notices.append('列表包含来源尚未核验的旧缓存条目，可刷新模型列表或手动输入。')
+        notices.append("목록에는 소스가 확인되지 않은 오래된 캐시 항목이 포함되어 있습니다. 모델 목록을 새로 고치거나 모델을 수동으로 입력하세요.")
     elif 'session-history' in origins:
         notices.append(CLAUDE_HISTORY_NOTICE if origins == {'session-history'} else
-                       '列表包含当前接入模型及历史模型，历史模型的可用性需由客户端确认。')
+                       "목록에는 현재 연결의 모델과 과거 모델이 포함됩니다. 과거 모델 가용성은 고객이 확인해야 합니다.")
     if notices:
         result['notice'] = '\n'.join(notices)
     else:
@@ -155,7 +155,7 @@ class ClientAdapters(dict):
 class DesktopSessions:
     def __init__(self, directory, bridge=None, *, gateway_running=False, instance=None, instance_owner=None):
         if instance is not None and (bridge is not None or instance_owner is None):
-            raise ValueError('独立桌面配置不能借用默认执行环境')
+            raise ValueError('독립 데스크탑 구성은 기본 실행 환경을 빌릴 수 없습니다.')
         self.instance, self.instance_owner = instance, instance_owner
         self.instances = None
         self.bridge = bridge
@@ -211,7 +211,7 @@ class DesktopSessions:
             bridge.desktop_sessions = self
         self.deepseek_restore_error = None
         if instance is not None and any(key in self.config for key in ('deepseekManualBinding', 'zcodePrototype')):
-            raise ValueError('独立配置不能使用默认或第三方客户端绑定')
+            raise ValueError('독립 실행형 구성은 기본 또는 타사 클라이언트 바인딩을 사용할 수 없습니다.')
         self._zcode_config = None
         self._configure_zcode()
         self._configure_antigravity()
@@ -251,7 +251,7 @@ class DesktopSessions:
                 self.deepseek_restore_error = None
                 return adapter
             except (OSError, ValueError, TypeError, KeyError) as exc:
-                self.deepseek_restore_error = '手动 DSH 绑定无法验证，请重新绑定；不会切换到其他实例'
+                self.deepseek_restore_error = '수동 DSH 바인딩을 확인할 수 없습니다. 다시 바인딩하십시오. 다른 인스턴스로 전환되지 않습니다.'
                 raise BridgeUnavailable(self.deepseek_restore_error) from exc
         adapter = DeepSeek(self.directory/'deepseek',
                            str(self.instance.profile.home) if self.instance else self.config.get('deepseekHome'))
@@ -260,7 +260,7 @@ class DesktopSessions:
                 adapter.use_existing(self.config['deepseekAdapterDirectory'])
                 self.deepseek_restore_error = None
             except (OSError, ValueError, TypeError) as exc:
-                self.deepseek_restore_error = '已有 Harness 接入无法验证，请重新扫描'
+                self.deepseek_restore_error = "저장된 Harness 연결을 확인할 수 없습니다. 다시 스캔하세요."
                 self.config.setdefault('setup', {})['deepseek'] = {'setupStatus': 'failed', 'reason': self.deepseek_restore_error}
                 raise BridgeUnavailable(self.deepseek_restore_error) from exc
         return adapter
@@ -277,7 +277,7 @@ class DesktopSessions:
     def resolve_instance(self, family, entry=None, *, require_enabled=True):
         if self.instance is not None:
             if family != self.instance.family or entry not in (None, self.instance.id):
-                raise ValueError('接入实例与平台不匹配')
+                raise ValueError('액세스 인스턴스가 플랫폼과 일치하지 않습니다.')
             self.instance_owner.registry.resolve(family, self.instance.id, require_enabled=require_enabled)
             return self
         return self.instances.resolve(family, entry, require_enabled)
@@ -287,14 +287,14 @@ class DesktopSessions:
 
     def instance_control(self, value):
         if self.instances is None:
-            raise ValueError('请从网关管理独立接入')
+            raise ValueError('게이트웨이 관리와는 독립적으로 접속하세요.')
         return self.instances.control(value)
 
     def zcode_application_capability(self):
         """Adding ZCode only repairs discovery of the one native default App."""
         capability = {'family': 'zcode', 'kind': 'default-application', 'supported': False}
         if sys.platform not in ('darwin', 'win32', 'linux'):
-            return {**capability, 'reason': '此系统暂不支持 ZCode 客户端'}
+            return {**capability, 'reason': "ZCode는 아직 이 시스템에서 지원되지 않습니다."}
         from bridge.clients.zcode.installation import installation
         row = self.config.get('discovered', {}).get('zcode', {})
         adapter = self.adapters.get('zcode')
@@ -304,11 +304,11 @@ class DesktopSessions:
         for application in dict.fromkeys(path for path in paths if path):
             try:
                 if installation(application):
-                    return {**capability, 'reason': 'ZCode 客户端已存在，请使用已有管理入口'}
+                    return {**capability, 'reason': "ZCode는 이미 사용 가능합니다. 기존 관리 페이지를 사용하세요."}
             except (ValueError, OSError):
                 continue
         if self.enabled('zcode'):
-            return {**capability, 'reason': '请先停用 ZCode 手机接入，再重新选择客户端应用'}
+            return {**capability, 'reason': "다른 애플리케이션을 선택하기 전에 ZCode 모바일 액세스를 비활성화하세요."}
         return {**capability, 'supported': True}
 
     def register_zcode_application(self, application):
@@ -316,10 +316,10 @@ class DesktopSessions:
         from bridge.clients.zcode.installation import installation
         if (not isinstance(application, str) or not application.strip() or
                 any(ord(character) < 32 or ord(character) == 127 for character in application)):
-            raise ValueError('请选择 ZCode 应用的完整路径')
+            raise ValueError("ZCode 애플리케이션의 전체 경로를 선택하십시오.")
         path = Path(application)
         if not path.is_absolute() or sys.platform == 'win32' and path.drive.startswith('\\\\'):
-            raise ValueError('请选择本机 ZCode 应用的完整路径')
+            raise ValueError("로컬 ZCode 애플리케이션의 전체 경로를 선택하십시오.")
         with self.client_lock:
             capability = self.zcode_application_capability()
             if not capability['supported']:
@@ -328,18 +328,18 @@ class DesktopSessions:
             # since it opened, including an App started outside this gateway.
             discovered = discover_clients(self._discovery_preferences())
             if discovered.get('zcode', {}).get('installed'):
-                raise ValueError('ZCode 客户端已存在，请使用已有管理入口')
+                raise ValueError("ZCode는 이미 사용 가능합니다. 기존 관리 페이지를 사용하세요.")
             if self.zcode_pipe and self.zcode_pipe.owner():
-                raise ValueError('ZCode 客户端仍有活动连接，请先停用并正常退出后重试')
+                raise ValueError("ZCode에는 여전히 활성 연결이 있습니다. 다시 시도하기 전에 액세스를 비활성화하고 정상적으로 종료하십시오.")
             if self._zcode_official_status().get('connected'):
-                raise ValueError('ZCode 客户端仍有活动连接，请先停用后重试')
+                raise ValueError("ZCode에는 여전히 활성 연결이 있습니다. 다시 시도하기 전에 액세스를 비활성화하세요.")
             try:
                 path = path.resolve(strict=True)
                 found = installation(path)
             except (ValueError, OSError) as exc:
-                raise ValueError('所选路径不是可用的 ZCode 客户端应用') from exc
+                raise ValueError("선택한 경로는 유효한 ZCode 애플리케이션이 아닙니다.") from exc
             if not found:
-                raise ValueError('所选路径不是可用的 ZCode 客户端应用')
+                raise ValueError("선택한 경로는 유효한 ZCode 애플리케이션이 아닙니다.")
             row = {**found, 'id': 'zcode', 'name': 'ZCode', 'installed': True,
                    'application': str(path), 'dataDirectory': str(Path.home()/'.zcode/v2')}
             updated = {**self.config, 'zcodeApplication': str(path),
@@ -356,23 +356,23 @@ class DesktopSessions:
     def antigravity_application_capability(self):
         supported = sys.platform in ('darwin', 'win32', 'linux') and not self.enabled('antigravity')
         return {'family': 'antigravity', 'kind': 'default-application', 'supported': supported,
-                **({'reason': '请先停用 Antigravity 手机接入，再选择客户端程序'} if not supported else {})}
+                **({'reason': "프로그램을 선택하기 전에 Antigravity 모바일 액세스를 비활성화하세요."} if not supported else {})}
 
     def register_antigravity_application(self, application):
         from bridge.platforms.antigravity import installation
         if (not isinstance(application, str) or not application.strip() or
                 any(ord(character) < 32 or ord(character) == 127 for character in application)):
-            raise ValueError('请选择 Antigravity App、IDE 或 agy 程序的完整路径')
+            raise ValueError("Antigravity 앱, IDE 또는 agy의 전체 경로를 선택하세요.")
         path = Path(application)
         if not path.is_absolute() or str(path).startswith(('\\\\', '//')):
-            raise ValueError('请选择本机 Antigravity 程序的完整路径')
+            raise ValueError("로컬 Antigravity 프로그램의 전체 경로를 선택하세요")
         with self.client_lock:
             capability = self.antigravity_application_capability()
             if not capability['supported']:
                 raise ValueError(capability['reason'])
             found = installation(path)
             if not found:
-                raise ValueError('所选路径不是可核验的 Antigravity App、IDE 或官方 agy 程序')
+                raise ValueError("선택한 경로는 검증된 Antigravity 앱, IDE 또는 공식 agy 프로그램이 아닙니다.")
             self.config.setdefault('antigravityApplications', {})[found['surface']] = found['application']
             # One default provider, with its native App/IDE/CLI installations;
             # selecting a program does not create or relocate a user profile.
@@ -463,7 +463,7 @@ class DesktopSessions:
             return self.db
         if path not in self.receipt_dbs:
             if not path.is_file():
-                raise BridgeUnavailable('此前接入的操作记录不可用，请重新扫描')
+                raise BridgeUnavailable("이전 연결의 작업 기록을 확인할 수 없습니다. 다시 스캔하세요.")
             self.receipt_dbs[path] = sqlite3.connect(path, check_same_thread=False)
         return self.receipt_dbs[path]
 
@@ -496,7 +496,7 @@ class DesktopSessions:
         body = body or {}
         with self.read_lock:
             if self.closed.is_set():
-                raise BridgeUnavailable('客户端连接已关闭')
+                raise BridgeUnavailable('클라이언트 연결이 종료되었습니다.')
             adapter = self.adapters[provider]
             epoch = self.read_epochs[provider]
             binding = self.binding_epochs[provider]
@@ -556,7 +556,7 @@ class DesktopSessions:
         result = _copy_read(future.result())
         with self.read_lock:
             if self.closed.is_set() or self.binding_epochs[provider] != binding or self.adapters.get(provider) is not adapter:
-                raise BridgeUnavailable('客户端状态已变化，请重试')
+                raise BridgeUnavailable('클라이언트 상태가 변경되었습니다. 다시 시도해 주세요.')
         # Consumers may annotate rows. Sharing a result object crosses requests.
         return result
 
@@ -565,7 +565,7 @@ class DesktopSessions:
         if provider == 'antigravity':
             row = adapter.store.resolve_session(sid)
             if row is None:
-                raise ValueError('找不到此 Antigravity 会话')
+                raise ValueError('이것을 찾지 못했습니다 Antigravity 대화')
             return self._account_model_identity(provider, row['surfaceDirKey'])
         if provider in ('deepseek', 'zcode'):
             return self._account_model_identity(provider)
@@ -583,13 +583,13 @@ class DesktopSessions:
             if remote:
                 host = adapter.remote_cli.hosts.hosts().get(remote['host']) if adapter.remote_cli.hosts else None
                 if not host or host['alias'] != remote['alias']:
-                    raise BridgeUnavailable('SSH 主机配置已变化')
+                    raise BridgeUnavailable('SSH 호스트 구성이 변경되었습니다.')
                 scope = ('wsl-cli' if remote.get('runtime') == 'wsl' else 'ssh-cli', remote['host'], remote['alias'], remote['origin'], remote['cwd'],
                          remote.get('projectConfig'))
             elif local:
                 profile = adapter.cli.profile_resolver()
                 if not profile or profile['origin'] != local['origin']:
-                    raise BridgeUnavailable('Claude Code 接入已变化')
+                    raise BridgeUnavailable('Claude Code 액세스가 변경되었습니다.')
                 directory = Path(profile['directory'])
                 paths.extend((directory/'.credentials.json', directory/'settings.json'))
                 paths.extend(Path(profile[key]) for key in ('authPath', 'configPath') if profile.get(key))
@@ -598,7 +598,7 @@ class DesktopSessions:
                          tuple((name, os.environ.get(name)) for name in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN',
                            'CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_CUSTOM_HEADERS')))
             else:
-                raise ValueError('找不到 Claude 会话')
+                raise ValueError("Claude 대화를 찾을 수 없습니다.")
         stamps = []
         for path in paths:
             try:
@@ -659,7 +659,7 @@ class DesktopSessions:
             # and reads get_settings; it does not list models or claim a chat.
             value = self._read('claude', 'catalog', sid, {'section': 'models'})
         if self._model_identity('claude', sid) != identity:
-            raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+            raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
         source = value.get('capabilities', {})
         capabilities = {key: source.get(key) is True for key in ('models', 'effort', 'manualModels', 'manualEffort')}
         with adapter.cli.lock, adapter.remote_cli.lock:
@@ -775,22 +775,22 @@ class DesktopSessions:
 
     def _cached_model_result(self, provider, sid, identity, persisted, *, error=None, unavailable=False):
         if self._model_identity(provider, sid) != identity:
-            raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+            raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
         result = ModelStore.directory(persisted[1])
         live = self._model_live(provider, sid)
         if not live or unavailable:
             result['capabilities'] = {**result.get('capabilities', {}), 'models': False, 'effort': False}
-            result['notice'] = '请先继续这条会话' if provider == 'claude' else '桌面客户端未连接'
+            result['notice'] = '먼저 이 대화를 계속해주세요.' if provider == 'claude' else '데스크톱 클라이언트가 연결되지 않았습니다.'
         elif provider == 'claude':
             result['capabilities'] = self._cli_model_capabilities(sid, identity)
         result['cache'] = {'state': 'stale' if error or time.time()-persisted[0] >= MODEL_REFRESH_SECONDS else 'fresh',
                            'updatedAt': persisted[0], 'identity': identity}
         if error:
             result['modelError'] = error
-            if error.startswith('当前 Claude Code 版本不支持刷新模型目录'):
+            if error.startswith('현재 Claude Code 버전은 모델 디렉터리 새로 고침을 지원하지 않'):
                 result['notice'] = error
         if self._model_identity(provider, sid) != identity:
-            raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+            raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
         return result
 
     def _catalog_models(self, provider, sid, body):
@@ -801,12 +801,12 @@ class DesktopSessions:
                        else self.adapters[provider].index[sid]['backend'] if native_claude else None)
             value = self._desktop_model_directory(provider, surface, refresh=body.get('refresh') is True)
             if self._model_identity(provider, sid) != identity or value.get('cache', {}).get('identity') != identity:
-                raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
             value = {**ModelStore.directory(value), **{key: value[key] for key in
                      ('cache', 'notice', 'modelError') if key in value}}
             if not self._model_live(provider, sid):
                 value['capabilities'] = {'models': False, 'effort': False}
-                value['notice'] = '桌面客户端未连接'
+                value['notice'] = '데스크톱 클라이언트가 연결되지 않았습니다.'
             elif provider == 'antigravity':
                 value['capabilities'] = {'models': True, 'effort': False, 'manualModels': True, 'manualEffort': False}
             elif native_claude:
@@ -840,19 +840,19 @@ class DesktopSessions:
                 value = self._read(provider, 'catalog', sid, body)
             except (OSError, ValueError, BridgeUnavailable) as exc:
                 if persisted:
-                    error = ('当前 Claude Code 版本不支持刷新模型目录，已保留上次结果'
-                             if str(exc) == '当前 Claude Code 版本不支持刷新模型目录' else
-                             '模型目录刷新失败，已保留上次结果')
+                    error = ('현재 Claude Code 버전은 모델 디렉터리 새로 고침을 지원하지 않으며 마지막 결과가 유지되었습니다.'
+                             if str(exc) == '현재 Claude Code 이 버전은 모델 디렉터리 새로 고침을 지원하지 않습니다.' else
+                             '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.')
                     return self._cached_model_result(provider, sid, identity, persisted, error=error)
                 raise
             if self._model_identity(provider, sid) != identity:
-                raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
             if provider == 'claude':
                 self._cli_model_capabilities(sid, identity, value)
             value['cache'] = {'state': 'unavailable', 'updatedAt': None, 'identity': identity}
             if (value.get('modelError') or value.get('capabilities', {}).get('models') is False) and persisted:
                 return self._cached_model_result(provider, sid, identity, persisted,
-                    error=value.get('modelError') or '模型目录刷新失败，已保留上次结果',
+                    error=value.get('modelError') or '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.',
                     unavailable=value.get('capabilities', {}).get('models') is False)
             if isinstance(value.get('models'), list) and value.get('capabilities', {}).get('models') is not False:
                 stable = ModelStore.directory(value)
@@ -863,7 +863,7 @@ class DesktopSessions:
                 except (OSError, sqlite3.DatabaseError):
                     pass
             if self._model_identity(provider, sid) != identity:
-                raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
             return value
 
     def _start_model_refresh(self, provider, sid, identity):
@@ -937,7 +937,7 @@ class DesktopSessions:
             with store.lock:
                 kind, fingerprint, _ = store._current()
             if not fingerprint:
-                raise BridgeUnavailable('无法确认 Claude 当前账号')
+                raise BridgeUnavailable('확인할 수 없습니다 Claude 당좌 계정')
             scope = (str(store.home), str(store.threep), kind, fingerprint)
             paths.append(store.home/'claude_desktop_config.json')
         else:
@@ -976,14 +976,14 @@ class DesktopSessions:
 
     def _account_model_result(self, provider, identity, persisted, error=None, surface=None):
         if self._account_model_identity(provider, surface) != identity:
-            raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+            raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
         value = ModelStore.directory(persisted[1])
         value['cache'] = {'state': 'stale' if error or time.time()-persisted[0] >= MODEL_REFRESH_SECONDS else 'fresh',
                           'updatedAt': persisted[0], 'identity': identity}
         if error:
             value['modelError'] = error
         if self._account_model_identity(provider, surface) != identity:
-            raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+            raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
         return value
 
     def _account_models(self, provider, refresh=False, surface=None):
@@ -1037,23 +1037,23 @@ class DesktopSessions:
                 # restored credentials resolve to the same model identity.
                 with self.read_lock:
                     if self.closed.is_set() or self.binding_epochs[provider] != binding:
-                        raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                        raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
                 if self._account_model_identity(provider, surface) != identity:
-                    raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                    raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
                 if persisted:
-                    return self._account_model_result(provider, identity, persisted, '模型目录刷新失败，已保留上次结果', surface=surface)
-                return {'models': [], 'modelError': '模型目录暂不可用，可手动填写',
+                    return self._account_model_result(provider, identity, persisted, '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.', surface=surface)
+                return {'models': [], 'modelError': '모델 디렉터리는 일시적으로 사용할 수 없으며 수동으로 채울 수 있습니다.',
                         'cache': {'state': 'unavailable', 'updatedAt': None, 'identity': identity}}
             if self._account_model_identity(provider, surface) != identity:
-                raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
             if (value.get('modelError') or value.get('capabilities', {}).get('models') is False
                     or not isinstance(value.get('models'), list)
                     or not value.get('models') and not any(group.get('models') for group in value.get('groups', []) if isinstance(group, dict))):
                 if persisted:
                     return self._account_model_result(provider, identity, persisted,
-                                                      value.get('modelError') or '模型目录刷新失败，已保留上次结果', surface=surface)
+                                                      value.get('modelError') or '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.', surface=surface)
                 if self._account_model_identity(provider, surface) != identity:
-                    raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                    raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
                 return {**value, 'cache': {'state': 'unavailable', 'updatedAt': None, 'identity': identity}}
             try:
                 updated_at = self.model_store.write(identity, ModelStore.directory(value))
@@ -1061,7 +1061,7 @@ class DesktopSessions:
             except (OSError, sqlite3.DatabaseError):
                 updated_at = time.time()
             if self._account_model_identity(provider, surface) != identity:
-                raise BridgeUnavailable('客户端账号或配置已变化，请重试')
+                raise BridgeUnavailable('고객 계정이나 구성이 변경되었습니다. 다시 시도해 주세요.')
             return {**value, 'cache': {'state': 'fresh', 'updatedAt': updated_at, 'identity': identity}}
 
     def _schedule_account_model_refresh(self, provider, identity, updated_at, replace=False, surface=None):
@@ -1115,7 +1115,7 @@ class DesktopSessions:
             self._list_activity(provider, adapter, binding, value.get('sessions', []))
         with self.read_lock:
             if self.binding_epochs[provider] != binding or self.adapters.get(provider) is not adapter:
-                raise BridgeUnavailable('客户端状态已变化，请重试')
+                raise BridgeUnavailable('클라이언트 상태가 변경되었습니다. 다시 시도해 주세요.')
         return value
 
     def _display_scope(self, provider, row):
@@ -1129,7 +1129,7 @@ class DesktopSessions:
         result = self._adapter_call(provider, 'list', None, {})
         row = next((row for row in result.get('sessions', []) if row.get('id') == sid), None)
         if not row:
-            raise ValueError('原会话暂不可读，请刷新列表后重试')
+            raise ValueError('원래 세션을 일시적으로 읽을 수 없습니다. 목록을 새로고침하고 다시 시도하세요.')
         return row
 
     def _session_metadata(self, provider, action, sid, body):
@@ -1146,7 +1146,7 @@ class DesktopSessions:
                         for key in ('id', 'cwd', 'host', 'backend', 'provider', 'modelProvider')}}
                 def dispatch_title(title):
                     if capabilities.get('rename') is not True:
-                        raise OrganizationNotSent('当前会话尚不能原生改名，请先连接原会话；若仍不可用，请在原客户端修改')
+                        raise OrganizationNotSent('현재 세션은 기본적으로 이름을 바꿀 수 없습니다. 먼저 원래 세션에 연결하십시오. 여전히 사용할 수 없다면 원래 클라이언트에서 수정하세요.')
                     try:
                         return self._adapter_call(provider, 'rename', sid, {'title': title, 'id': body['id']})
                     except ResumePreflightBlocked as exc:
@@ -1168,12 +1168,12 @@ class DesktopSessions:
                 self.display_metadata.change(scope, sid, body)
                 return read()
             if body.get('kind') != 'project':
-                raise ValueError('请在原客户端中创建项目')
+                raise ValueError('원래 클라이언트에서 프로젝트를 생성하세요.')
             def dispatch(change):
                 result = self._adapter_call(provider, 'organization', sid,
                     {'operation': 'set-project', 'projectId': change['targetId']})
                 if result.get('notSent') is True:
-                    raise OrganizationNotSent(result.get('message') or '项目设置未发送，请刷新后重试')
+                    raise OrganizationNotSent(result.get('message') or '프로젝트 설정이 전송되지 않았습니다. 새로고침한 후 다시 시도해 주세요.')
                 return read()
             return self.organization_commands.perform(scoped, body, read, dispatch)
 
@@ -1224,7 +1224,7 @@ class DesktopSessions:
     def _project_environments(self, provider, host_id=None):
         if provider == 'zcode':
             scope = hashlib.sha256(self.adapters[provider].account_scope().encode()).hexdigest()[:24]
-            return [{'key': 'desktop|local|'+scope, 'host': 'local', 'hostLabel': '此电脑', 'surface': 'desktop',
+            return [{'key': 'desktop|local|'+scope, 'host': 'local', 'hostLabel': '이 컴퓨터', 'surface': 'desktop',
                      'name': 'ZCode', 'createRequiresMessage': True, 'createTitle': False}]
         adapter = self.adapters[provider]
         scoped = {'host_id': host_id} if host_id is not None and provider == 'claude' else {}
@@ -1252,10 +1252,10 @@ class DesktopSessions:
         self.require_enabled(provider)
         parts = key.split('|', 2) if isinstance(key, str) else []
         if len(parts) != 3:
-            raise ValueError('运行环境或账号已变化，请重新选择项目')
+            raise ValueError('운영 환경이나 계정이 변경되었습니다. 프로젝트를 다시 선택해주세요.')
         selected = next((row for row in self._project_environments(provider, host_id=parts[1]) if row['key'] == key), None)
         if selected is None:
-            raise ValueError('运行环境或账号已变化，请重新选择项目')
+            raise ValueError('운영 환경이나 계정이 변경되었습니다. 프로젝트를 다시 선택해주세요.')
         return selected
 
     def creation_models(self, provider, body):
@@ -1264,7 +1264,7 @@ class DesktopSessions:
         project = self.directory_projects.get(body.get('projectKey'))
         if project:
             if project.get('provider') != provider or project.get('environment') != environment['key']:
-                raise ValueError('项目或运行环境已变化，请重新选择')
+                raise ValueError('프로젝트 또는 운영 환경이 변경되었습니다. 다시 선택해주세요.')
         elif body.get('projectKey'):
             if provider == 'claude':
                 adapter = self.adapters[provider]
@@ -1283,11 +1283,11 @@ class DesktopSessions:
                 rows = self._adapter_call(provider, 'projects', None, {}).get('projects', [])
             project = next((row for row in rows if row['key'] == body['projectKey']), None)
             if not project or project.get('surface', 'desktop') != environment['surface'] or project.get('host', 'local') != environment['host']:
-                raise ValueError('项目或运行环境已变化，请重新选择')
+                raise ValueError('프로젝트 또는 운영 환경이 변경되었습니다. 다시 선택해주세요.')
         elif body.get('path'):
             project = {'cwd': self._project_directory(environment, body['path'])['cwd']}
         else:
-            raise ValueError('请先选择新会话的项目目录')
+            raise ValueError('먼저 새 세션의 프로젝트 디렉터리를 선택하세요.')
         refresh = body.get('refresh') is True
         if provider == 'claude' and environment['surface'] == 'cli':
             adapter = self.adapters[provider]
@@ -1310,11 +1310,11 @@ class DesktopSessions:
             if persisted:
                 return {**_copy_read(persisted[1]), 'cache': {'identity': identity, 'updatedAt': persisted[0],
                         'state': 'stale' if refresh or time.time()-persisted[0]>=MODEL_REFRESH_SECONDS else 'fresh'},
-                        **({'notice': '当前 CLI 未接入，已保留模型缓存；不会为刷新目录占用会话。'} if refresh and not found else {}),
+                        **({'notice': '현재 CLI 연결되지 않았으며 모델 캐시가 유지되었습니다. 디렉터리 새로 고침을 위해 세션이 사용되지 않습니다.。'} if refresh and not found else {}),
                         'capabilities': {'models': True, 'effort': True, 'manualModels': True, 'manualEffort': True}}
             return {'models': [], 'cache': {'identity': identity, 'updatedAt': None, 'state': 'unavailable'},
                     'capabilities': {'models': True, 'effort': True, 'manualModels': True, 'manualEffort': True},
-                    'notice': '此环境尚无可复用模型目录，可手动填写；不会为读取目录启动 CLI 会话。'}
+                    'notice': "이 환경에서는 재사용 가능한 모델 카탈로그가 없습니다. 모델을 수동으로 입력하세요. 이 목록을 읽어도 CLI 세션이 시작되지 않습니다."}
         value = self._desktop_model_directory(provider, environment['surface'], refresh=refresh)
         capabilities = {'models': value.get('capabilities', {}).get('models') is True if provider == 'antigravity' else True,
                         'effort': provider != 'antigravity', 'manualModels': True,
@@ -1325,7 +1325,7 @@ class DesktopSessions:
         hosts = self.bridge.hosts if self.bridge else self.adapters['claude'].hosts
         host = hosts.hosts().get(environment['host']) if hosts else None
         if not host or host['alias'] != environment.get('alias'):
-            raise ValueError('原 SSH 主机配置已变化')
+            raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
         return host['alias']
 
     def _project_directory(self, environment, path, create=False, expected=None):
@@ -1362,11 +1362,11 @@ class DesktopSessions:
 
     def project_trust(self, provider, projectKey, confirmed):
         if type(confirmed) is not bool or not isinstance(projectKey, str) or not projectKey:
-            raise ValueError('工作区确认格式无效')
+            raise ValueError('작업공간 확인 형식이 잘못되었습니다.')
         with self._changing(provider, rebind=False):
             project = self.directory_projects.get(projectKey)
             if not project or project.get('provider') != provider:
-                raise ValueError('请重新选择项目目录')
+                raise ValueError('프로젝트 디렉터리를 다시 선택하세요.')
             environment = self._project_environment(provider, project['environment'])
             self._project_directory(environment, project['cwd'], expected=project['directoryIdentity'])
             return self._adapter_call(provider, 'project-trust', None,
@@ -1376,7 +1376,7 @@ class DesktopSessions:
         if (set(body) not in ({'id', 'archived'}, {'id', 'archived', 'disconnect'}) or
                 not isinstance(body.get('archived'), bool) or not isinstance(body.get('id'), str) or
                 type(body.get('disconnect', False)) is not bool or (body.get('disconnect') and body['archived'] is not True)):
-            raise ValueError('归档请求格式无效')
+            raise ValueError('보관 요청 형식이 잘못되었습니다.')
         uuid.UUID(body['id'])
         with self._changing(provider, rebind=False):
             self.require_enabled(provider)
@@ -1388,14 +1388,14 @@ class DesktopSessions:
                 return self._adapter_call(provider, 'archive-state', sid, {})
             def prepare(state):
                 if not state.get('capabilities', {}).get('archive') or not state.get('capabilities', {}).get('unarchive'):
-                    raise ValueError('当前接入尚未确认原生归档和恢复能力')
+                    raise ValueError("네이티브 아카이브 및 복원 지원은 이 연결에 대해 확인되지 않았습니다.")
                 if (state.get('runtimeKnown') is not True or state.get('status') not in ('idle', 'active') or
                         (not body.get('disconnect') and (not state.get('archiveSafe') or state.get('status') != 'idle' or state.get('requests')))):
-                    raise ValueError('聊天有运行、排队、审批或未知状态，请先在原客户端处理')
+                    raise ValueError('채팅의 상태는 실행 중, 대기 중, 승인됨 또는 알 수 없음입니다. 먼저 원본 클라이언트에서 처리해 주세요.')
                 with self.db_lock:
                     db = self._receipts(adapter)
                     if any(json.loads(row[0]).get('status') in ('unknown', 'queued') for row in db.execute('SELECT result FROM requests')):
-                        raise ValueError('此接入有排队或待核对操作，请先在原客户端处理')
+                        raise ValueError("이 연결에는 대기 중이거나 확인되지 않은 작업이 있습니다. 원래 클라이언트를 먼저 확인하세요.")
                 options = {'archived': body['archived']}
                 if body.get('disconnect'):
                     options['disconnect'] = True
@@ -1412,9 +1412,9 @@ class DesktopSessions:
             del pending[old]
         ticket = pending.get(rid)
         if self.adapters.get(provider) is not adapter or not first and (ticket is None or ticket[0] is not adapter):
-            raise ResumePreflightBlocked('原会话接续已过期，请重新连接。')
+            raise ResumePreflightBlocked("이 재연결 요청이 만료되었습니다. 계속하려면 다시 연결하세요.")
         if first and len(pending) >= 64:
-            raise ResumePreflightBlocked('正在恢复的会话较多，请稍后连接。')
+            raise ResumePreflightBlocked("여러 채팅이 다시 연결되고 있습니다. 잠시 후 다시 시도하세요.")
         result, continuation = adapter.resume_step(sid, rid, None if first else ticket[1])
         if result['status'] == 'pending' and continuation is not None:
             pending[rid] = (adapter, continuation, now)
@@ -1424,18 +1424,18 @@ class DesktopSessions:
 
     def call(self, provider, action, sid=None, body=None):
         if provider not in self.adapters or action not in READS | WRITES:
-            raise ValueError('不支持的桌面操作')
+            raise ValueError('지원되지 않는 데스크톱 작업')
         if provider == 'deepseek' and self.deepseek_restore_error:
             raise BridgeUnavailable(self.deepseek_restore_error)
         if action not in ('list', 'projects', 'create', 'create-models', 'account') and (not isinstance(sid, str) or not sid or len(sid) > 512):
-            raise ValueError('会话标识无效')
+            raise ValueError("잘못된 세션 식별자")
         body = body or {}
         if any(key in body for key in ('directoryProject', 'projectDirectory')):
-            raise ValueError('项目目录必须通过目录选择器登记')
+            raise ValueError('프로젝트 디렉터리는 디렉터리 선택기를 통해 등록되어야 합니다.')
         if action == 'pin':
             self.require_enabled(provider)
             if set(body) not in ({'pinned'}, {'pinned', 'clientId', 'revision'}):
-                raise ValueError('聊天置顶设置无效')
+                raise ValueError('채팅 상단 설정이 잘못되었습니다.')
             return self.session_pins[provider].set(sid, body['pinned'], body.get('clientId'), body.get('revision'))
         adapter = self.adapters[provider]
         if action == 'archive':
@@ -1486,7 +1486,7 @@ class DesktopSessions:
                         raise
                     if provider == 'antigravity':
                         result['modelCatalogIdentity'] = result['draftAccountIdentity'] = ''
-                        result['notice'] = 'Antigravity 账号暂不可读，已保留历史和草稿；请稍后重试模型设置'
+                        result['notice'] = 'Antigravity 계정을 일시적으로 읽을 수 없으며 기록과 초안이 유지되었습니다. 나중에 다시 모델을 설정해 보세요.'
                         return result
                     # History was read from its native owner. Only account-bound
                     # capabilities require the unreadable Desktop fingerprint.
@@ -1495,7 +1495,7 @@ class DesktopSessions:
                     caps = result.get('capabilities') or result['session'].get('capabilities', {})
                     result['capabilities'] = {**caps, 'models': False, 'effort': False,
                                               'manualModels': False, 'manualEffort': False}
-                    result['notice'] = 'Claude 账号暂不可读，模型切换与账号草稿暂不可用'
+                    result['notice'] = "Claude의 계정을 일시적으로 읽을 수 없습니다. 모델 전환 및 계정 초안을 사용할 수 없습니다."
                     return result
                 try:
                     result['draftAccountIdentity'] = self._draft_account_identity(provider, sid, result)
@@ -1514,50 +1514,50 @@ class DesktopSessions:
         progressive = action == 'resume' and body.get('progressive') is True
         if 'progressive' in body and (not progressive or set(body) != {'id', 'progressive'} or
                                       not callable(getattr(type(adapter), 'resume_step', None))):
-            raise ValueError('会话接续请求无效')
+            raise ValueError('잘못된 세션 연결 요청')
         if action == 'compact' and set(body) != {'id'}:
-            raise ValueError('上下文压缩请求无效')
+            raise ValueError('잘못된 컨텍스트 압축 요청')
         if action == 'stop-task' and (set(body) != {'id', 'taskId'} or
                 not isinstance(body.get('taskId'), str) or not 1 <= len(body['taskId']) <= 512):
-            raise ValueError('后台任务标识无效')
+            raise ValueError('잘못된 백그라운드 작업 ID')
         if action == 'queue-action' and (not isinstance(body.get('queueId'), str) or not body['queueId'].strip() or
                 body.get('operation') not in ('steer', 'queue', 'cancel', 'edit')):
-            raise ValueError('排队操作请求无效')
+            raise ValueError('잘못된 대기 작업 요청')
         if action == 'send' and (not isinstance(body.get('text'), str) or
                                  not body['text'].strip() and not (body.get('resolvedImages') or body.get('resolvedFiles') or body.get('references')) or len(body['text']) > 100000):
-            raise ValueError('请输入 1–100000 字的消息')
+            raise ValueError("1~100000자의 메시지를 입력하세요.")
         if action == 'create' and (not isinstance(body.get('title', ''), str) or len(body.get('title', '')) > 120):
-            raise ValueError('聊天名称不能超过 120 字')
+            raise ValueError("채팅 제목은 120자를 초과할 수 없습니다.")
         if action == 'send' and 'workMode' in body:
             if body['workMode'] not in ('default', 'plan', 'goal') or body.get('mode', 'send') != 'send':
-                raise ValueError('工作模式仅用于发送新消息')
+                raise ValueError('작업 모드는 새 메시지 전송에만 사용됩니다.')
             if body['workMode'] == 'goal' and any(body.get(key) for key in ('references', 'resolvedImages', 'resolvedFiles', 'plugins')):
-                raise ValueError('请先发送附件和 Skill，再单独设定目标')
+                raise ValueError('먼저 첨부파일을 보내주시고 Skill，목표를 따로 설정하라')
         if action == 'goal':
             if body.get('operation') not in ('pause', 'resume', 'clear', 'edit') or not isinstance(body.get('expected'), dict):
-                raise ValueError('目标操作无效，请刷新会话后重试')
+                raise ValueError('대상 작업이 잘못되었습니다. 세션을 새로고침하고 다시 시도해 주세요.')
             if body['operation'] == 'edit' and (not isinstance(body.get('objective'), str) or not 1 <= len(body['objective'].strip()) <= 4000):
-                raise ValueError('请输入 1–4000 字的目标')
+                raise ValueError('입력해주세요 1–4000 단어 대상')
         if action == 'edit-message' and (set(body) != {'id', 'messageId', 'text'} or not isinstance(body.get('text'), str) or not 1 <= len(body['text'].strip()) <= 100000):
-            raise ValueError('请输入 1–100000 字的消息')
+            raise ValueError("1~100000자의 메시지를 입력하세요.")
         if action in ('fork', 'edit-message') and (set(body) - {'id', 'messageId', *(['text'] if action == 'edit-message' else [])} or
                                  not isinstance(body.get('messageId'), str) or
                                  not body['messageId'].strip() or len(body['messageId']) > 512):
-            raise ValueError('请选择原会话中可分支的消息')
+            raise ValueError("원래 채팅에서 분기를 지원하는 메시지를 선택하세요.")
         from bridge.features.sessions.creation_models import intent as creation_intent
         fingerprint = hashlib.sha256(json.dumps([provider, action, sid, creation_intent(body) if action == 'create' else body], sort_keys=True).encode()).hexdigest()
         # Normal chat writes keep progress reads available; account/lifecycle
         # operations additionally invalidate the connector binding.
         with self._changing(provider, rebind=False):
             if self.config.get('enabled', {}).get(provider) is False and not (provider == 'claude' and self._wsl_claude_enabled()):
-                raise ValueError('此应用已关闭，请在应用管理中开启')
+                raise ValueError("이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요.")
             native_claude_model_write = (provider == 'claude' and action == 'settings' and
                                          ('model' in body or 'effort' in body) and sid in adapter.index)
             if action == 'settings' and ('modelCatalogIdentity' in body or native_claude_model_write or provider == 'antigravity'):
                 current_identity = self._model_identity(provider, sid)
                 if 'modelCatalogIdentity' in body and (not body['modelCatalogIdentity'] or
                                                        current_identity != body['modelCatalogIdentity']):
-                    raise ValueError('账号已切换，请重新打开模型设置')
+                    raise ValueError("계정이 변경되었습니다. 모델 설정을 다시 엽니다.")
             scope = None
             if provider == 'claude':
                 from bridge.features.accounts.wsl_account_guard import request_scope
@@ -1566,13 +1566,13 @@ class DesktopSessions:
             if action == 'send' and 'references' in body:
                 reference_files = self.workspace_bridge(provider, sid).workspace(sid, 'references', {'references': body['references']})
                 if len(reference_files) + len(body.get('resolvedImages', [])) + len(body.get('resolvedFiles', [])) > 10:
-                    raise ValueError('每条消息最多添加 10 个不同附件')
+                    raise ValueError("메시지당 최대 10개의 파일 첨부")
             cached = None
             with self.db_lock:
                 db = None
                 try:
                     db = self._receipts(adapter)
-                    result = {'status': 'unknown', 'id': rid, 'message': '结果待核对，请检查桌面原会话；相同请求不会重复执行'}
+                    result = {'status': 'unknown', 'id': rid, 'message': "결과 확인이 필요합니다. 원래 데스크톱 세션을 검토합니다. 동일한 요청은 두 번 실행되지 않습니다."}
                     inserted = db.execute('INSERT OR IGNORE INTO requests VALUES (?,?,?)', (rid, fingerprint, json.dumps(result))).rowcount
                     if inserted and reference_files and provider == 'zcode':
                         from bridge.clients.zcode.attachments import remember_project_files
@@ -1584,7 +1584,7 @@ class DesktopSessions:
                     if not inserted:
                         old = db.execute('SELECT fingerprint,result FROM requests WHERE id=?', (rid,)).fetchone()
                         if old[0] != fingerprint:
-                            raise ValueError('相同请求 ID 不能用于不同操作')
+                            raise ValueError("동일한 요청 ID를 다른 작업에 사용할 수 없습니다.")
                         cached = json.loads(old[1])
                         if (provider == 'zcode' and action == 'send' and cached.get('status') == 'unknown'
                                 and type(cached.get('windowReceiptAfter')) is int):
@@ -1599,7 +1599,7 @@ class DesktopSessions:
                     if db is not None:
                         db.rollback()
                     if any(word in str(exc).lower() for word in ('locked', 'busy')):
-                        raise BridgeUnavailable('接入的操作记录正被另一网关占用，请停止旧网关后重试') from None
+                        raise BridgeUnavailable("다른 게이트웨이가 연결 작업 기록을 사용하고 있습니다. 기존 게이트웨이를 중지하고 다시 시도하세요.") from None
                     raise
             try:
                 dispatched = body
@@ -1625,16 +1625,16 @@ class DesktopSessions:
                     detail = self._adapter_call(provider, 'detail', sid, {})
                     caps = detail.get('capabilities', {})
                     if not caps.get('goal' if work_mode == 'goal' else 'plan'):
-                        raise ValueError('当前客户端未提供此原生工作模式')
+                        raise ValueError('이 기본 작업 모드는 현재 클라이언트에서 제공되지 않습니다.')
                     if work_mode == 'goal':
                         if len(dispatched['text']) > 4000:
-                            raise ValueError('目标不能超过 4000 字')
+                            raise ValueError('목표를 초과할 수 없습니다. 4000 성격')
                         result = self._adapter_call(provider, 'goal', sid, {'id': rid, 'operation': 'set', 'objective': dispatched['text']})
                     else:
                         if detail['session'].get('collaborationMode', 'default') != work_mode:
                             mode_result = self._adapter_call(provider, 'work-mode', sid, {'id': str(uuid.uuid5(uuid.UUID(rid), 'work-mode')), 'mode': work_mode})
                             if mode_result.get('status') not in ('accepted', 'ready'):
-                                raise BridgeUnavailable('原生模式未确认，消息未发送')
+                                raise BridgeUnavailable('기본 모드가 확인되지 않아 메시지가 전송되지 않습니다')
                         result = self._adapter_call(provider, action, sid, {key: value for key, value in dispatched.items() if key != 'workMode'})
                 else:
                     result = (self._resume_step(provider, adapter, sid, rid, bool(inserted)) if progressive
@@ -1727,7 +1727,7 @@ class DesktopSessions:
             descriptor = self._descriptor(provider)
             native = inspect_client(descriptor)
             if not native['running']:
-                raise BridgeUnavailable('请先开启此独立配置的原生应用')
+                raise BridgeUnavailable('먼저 독립적으로 구성된 이 기본 애플리케이션을 활성화하세요.')
             require_owned(descriptor, native)
             self.instance_owner.registry.pin_initialized_roots(self.instance.id)
             if provider == 'deepseek':
@@ -1745,10 +1745,10 @@ class DesktopSessions:
             project = body.get('directoryProject') or next((row for row in remote.projects()
                 if row['key'] == body.get('projectKey')), None)
             if not project or not project['host'].startswith('wsl-claude:'):
-                raise ValueError('请选择已开启的 WSL Claude Code 项目')
+                raise ValueError('활성화된 항목을 선택하세요. WSL Claude Code 프로젝트')
             return adapter.create_cli(project, body)
         if not remote.contains(sid):
-            raise ValueError('找不到已开启的 WSL Claude Code 会话')
+            raise ValueError('활성화된 항목을 찾을 수 없습니다. WSL Claude Code 대화')
         return remote.call(action, sid, body)
 
     def navigation_clients(self):
@@ -1790,7 +1790,7 @@ class DesktopSessions:
         if provider == 'deepseek' and self.deepseek_restore_error:
             raise BridgeUnavailable(self.deepseek_restore_error)
         if not self.enabled(provider):
-            raise ValueError('此应用已关闭，请在应用管理中开启')
+            raise ValueError("이 앱은 비활성화되었습니다. 앱 관리에서 활성화하세요.")
 
     @staticmethod
     def _deepseek_endpoint(adapter):
@@ -1856,13 +1856,13 @@ class DesktopSessions:
                         native = inspect_client(row)
                         if native['running'] and not native.get('mainPids'):
                             outcomes[provider] = {'setupStatus': 'failed',
-                                'reason': '检测到残留 Harness 后台实例且无法核对任务状态，请在电脑端退出 Harness 后重试'}
+                                'reason': "남은 Harness 백그라운드 프로세스가 발견되었으며 해당 작업을 확인할 수 없습니다. 컴퓨터에서 Harness를 종료한 후 다시 시도하십시오."}
                         else:
                             outcomes[provider] = {'setupStatus': 'restart-required', 'reason': UPDATE_REASON,
                                                   'requiredBridgeRevision': BRIDGE_REVISION}
                     elif not installed.get('installed'):
                         outcomes[provider] = {'setupStatus': 'discovered',
-                                              'reason': '已发现客户端，启用后随网关启动并接入'}
+                                              'reason': "앱을 찾았습니다. 게이트웨이가 시작될 때 열고 연결하려면 선택하세요."}
             except (ValueError, OSError, subprocess.SubprocessError) as exc:
                 outcomes[provider] = {'setupStatus': 'failed', 'reason': str(exc)}
                 if provider == 'deepseek':
@@ -1899,11 +1899,11 @@ class DesktopSessions:
                     continue  # Discovery cannot replace an explicit plugin binding.
                 row = discovered[provider]
                 if not row['installed']:
-                    outcomes[provider] = {'setupStatus': 'not-installed', 'reason': '尚未安装此客户端'}
+                    outcomes[provider] = {'setupStatus': 'not-installed', 'reason': "이 클라이언트는 설치되지 않았습니다."}
                     continue
                 if inventory_only and not self.native_enabled(provider):
                     if outcomes.get(provider, {}).get('setupStatus') in (None, 'not-installed'):
-                        outcomes[provider] = {'setupStatus': 'discovered', 'reason': '已发现客户端，启用后接入'}
+                        outcomes[provider] = {'setupStatus': 'discovered', 'reason': '클라이언트를 활성화한 후 검색 및 액세스했습니다.'}
                     continue
                 self._prepare_discovered(provider, row)
             private_json(self.config_path, self.config)
@@ -1972,7 +1972,7 @@ class DesktopSessions:
     def _descriptor(self, provider, *, inventory=False):
         if getattr(self, 'instance', None) is not None:
             if provider != self.instance.family:
-                raise ValueError('接入实例与平台不匹配')
+                raise ValueError('액세스 인스턴스가 플랫폼과 일치하지 않습니다.')
             return self.instance_owner.descriptor(self, provider)
         if provider == 'zcode' and provider in self.adapters:
             adapter = self.adapters.get(provider)
@@ -2014,7 +2014,7 @@ class DesktopSessions:
         # time spent finding and launching the original process (mobile timeout: 45s).
         cold_deadline = time.monotonic() + 30 if sys.platform in ('linux', 'win32') else None
         if not descriptor.get('pipeSupported'):
-            raise ValueError('当前安装的 ZCode 不支持此本机实时连接。')
+            raise ValueError("이 ZCode 설치는 이 로컬 라이브 연결을 지원하지 않습니다.")
         existing = self.adapters['zcode']
         config = {'application': existing.config['application'], 'dataDirectory': str(existing.home),
                   'privatePipe': True}
@@ -2022,18 +2022,18 @@ class DesktopSessions:
             existing.directory, config, pipe=self.zcode_pipe)
         state = inspect_client(descriptor)
         if state.get('unknown') or state['running'] and len(state.get('mainPids', [])) != 1:
-            raise ValueError('无法确认唯一的 ZCode 进程，请刷新后重试。')
+            raise ValueError('고유성을 확인할 수 없습니다. ZCode 처리 중입니다. 새로고침한 후 다시 시도해 주세요.。')
         owner = adapter.connection_owner(descriptor['executable'])
         launched = False
         if owner:
             if not state['running'] or state['mainPids'] != [owner['pid']]:
-                raise ValueError('ZCode 进程已变化，请刷新后重试。')
+                raise ValueError('ZCode 프로세스가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.。')
         else:
             if descriptor.get('packageType') == 'appimage' and not descriptor.get('coldStartVerified'):
-                raise ValueError('此 AppImage 的冷启动尚未核验，请先使用已运行原 App 的官方远控连接。')
+                raise ValueError('이 AppImage 콜드 스타트는 아직 확인되지 않았습니다. 원래 실행을 사용하십시오. App 공식 원격 제어 연결。')
             if state['running']:
                 if not initialize:
-                    raise ValueError('请在应用管理中初始化连接，以接入正在运行的 ZCode。')
+                    raise ValueError('실행 중인 앱에 액세스하려면 애플리케이션 관리에서 연결을 초기화하세요. ZCode。')
                 self._stop_client('zcode', descriptor, state, acknowledge_unavailable=acknowledge_unavailable)
             # Recheck after a potentially slow normal quit. An update or a new
             # listener must not inherit the decision made for the previous App.
@@ -2043,17 +2043,17 @@ class DesktopSessions:
                                  if descriptor.get('packageType') == 'appimage' else
                                  fresh['executable'] == descriptor['executable'])
             if not fresh['pipeSupported'] or not same_installation:
-                raise ValueError('ZCode 安装已变化，请刷新后重试。')
+                raise ValueError('ZCode 설치가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.。')
             if state['running'] and adapter.connection_owner(fresh['executable']):
-                raise ValueError('ZCode 进程已变化，请刷新后重试。')
+                raise ValueError('ZCode 프로세스가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.。')
             owner = self.zcode_pipe.start()
             launched = True
             fresh = self._descriptor('zcode')
             state = inspect_client(fresh)
             if state.get('unknown') or len(state.get('mainPids', [])) != 1:
-                raise ValueError('无法确认唯一的 ZCode 进程，请刷新后重试。')
+                raise ValueError('고유성을 확인할 수 없습니다. ZCode 처리 중입니다. 새로고침한 후 다시 시도해 주세요.。')
         if owner and state['mainPids'] != [owner['pid']]:
-            raise ValueError('ZCode 进程已变化，请刷新后重试。')
+            raise ValueError('ZCode 프로세스가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.。')
         if sys.platform in ('win32', 'linux'):
             adapter.start_private_application(owner)
         else:
@@ -2076,9 +2076,9 @@ class DesktopSessions:
         return {key: row.get(key) for key in ('executable', 'dataDirectory')}
 
     def _assert_idle(self, provider, state, *, native_confirmation=False):
-        unknown = '无法确认客户端所有任务均已结束；可选择“仅停用手机接入”保留电脑 App，或在电脑端退出后重试'
+        unknown = "모든 앱 작업이 종료되었는지 확인할 수 없습니다. 데스크톱 앱을 계속 실행하려면 ’전화 액세스만 비활성화’를 선택하거나, 컴퓨터에서 앱을 종료하고 다시 시도하세요."
         if provider == 'deepseek' and len(state.get('runtimePids', [])) > 1:
-            raise ValueError('检测到多个 Harness 后台实例，无法确认全部任务状态；请在电脑上结束多余实例后重试')
+            raise ValueError("여러 Harness 백그라운드 인스턴스가 감지되었습니다. 다시 시도하기 전에 컴퓨터의 추가 인스턴스를 닫으십시오. 모든 작업 상태를 확인할 수 있는 것은 아닙니다.")
         if state.get('unknown') or len(state.get('mainPids', [])) > 1:
             raise ValueError(unknown)
         if provider == 'codex':
@@ -2087,28 +2087,28 @@ class DesktopSessions:
             return
         adapter = self.adapters[provider]
         if provider == 'claude' and self._claude_native_cli_busy():
-            raise ValueError('有 Claude Code 任务运行或等待确认，请先结束任务再关闭客户端')
+            raise ValueError("Claude Code 작업이 실행 중이거나 승인을 기다리고 있습니다. 클라이언트를 닫기 전에 완료하세요.")
         if provider != 'zcode':
             try:
                 status = adapter.call('status') if provider == 'deepseek' else adapter.status()
             except (ValueError, OSError, BridgeUnavailable):
                 raise TaskStateUnavailable(unknown) from None
             if not status.get('connected'):
-                raise TaskStateUnavailable('客户端尚未连接，无法确认任务状态；可选择“仅停用手机接入”，或在电脑端退出 App 后重试')
+                raise TaskStateUnavailable("클라이언트가 연결되어 있지 않아 작업 상태를 확인할 수 없습니다. ’전화 액세스만 비활성화’를 선택하거나 컴퓨터에서 앱을 종료하고 다시 시도하세요.")
         if provider == 'deepseek':
             hosts = state.get('runtimePids', [])
             endpoint = self._deepseek_endpoint(adapter)
             if len(hosts) != 1 or not endpoint or endpoint.get('pid') != hosts[0]:
                 raise ValueError(unknown)
             if status.get('bridgeRevision') not in LIFECYCLE_REVISIONS:
-                raise ValueError('当前 Harness 接入版本无法核对任务状态，请在电脑端退出 Harness 后再连接')
+                raise ValueError("이 Harness 커넥터 버전은 작업 상태를 확인할 수 없습니다. 컴퓨터에서 Harness를 종료한 후 다시 연결하세요.")
         try:
             listing = (adapter.call('list', timeout=8) if native_confirmation else
                        adapter.desktop_listing() if provider == 'claude' else
                        adapter.call('lifecycle'))
         except (ValueError, OSError, BridgeUnavailable):
             if provider == 'zcode':
-                raise TaskStateUnavailable('无法确认任务状态，请确认是否正常退出 ZCode。') from None
+                raise TaskStateUnavailable('작업 상태를 확인할 수 없습니다. 정상적으로 종료할지 확인하세요. ZCode。') from None
             raise TaskStateUnavailable(unknown) from None
         sessions = listing.get('sessions')
         if not isinstance(sessions, list):
@@ -2116,7 +2116,7 @@ class DesktopSessions:
         # An incomplete list may still prove a task busy; check that evidence first.
         if any(isinstance(row, dict) and (row.get('requests') or
                row.get('status') in ('active', 'running', 'waiting', 'busy')) for row in sessions):
-            raise ValueError('有任务运行或等待确认，请先结束任务再关闭或重启客户端')
+            raise ValueError("작업이 실행 중이거나 확인 대기 중입니다. 앱을 닫거나 다시 시작하기 전에 완료하세요.")
         if (listing.get('complete') is not True or
                 provider == 'deepseek' and listing.get('bridgeRevision') not in LIFECYCLE_REVISIONS or
                 any(not isinstance(row, dict) or row.get('status') not in ('idle', 'stopped', 'completed') or
@@ -2183,19 +2183,19 @@ class DesktopSessions:
 
     def _begin_deepseek_connection(self):
         now = time.time()
-        self._deepseek_connection('starting', '正在启动 Harness 桌面应用',
+        self._deepseek_connection('starting', "Harness 데스크톱 앱 시작",
                                   connectionStartedAt=now, connectionDeadline=now + (120 if sys.platform == 'win32' else 60))
 
     def _deepseek_launched(self, result, *, first_launch=False):
         if not result.get('running') and result.get('launched') is not True:
-            raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+            raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
         setup = self.config['setup']['deepseek']
         if first_launch and result.get('running'):
-            reason = 'Harness 已打开，请完成首次设置后点击接入'
+            reason = "Harness가 열려 있습니다. 초기 설정을 완료한 다음 연결을 선택합니다."
             self._deepseek_connection('idle', reason, setupStatus='needs-first-launch', reason=reason)
             return
         phase = 'connecting' if result.get('running') else 'starting'
-        reason = 'Harness 已启动，正在等待桌面连接' if result.get('running') else '正在启动 Harness 桌面应用'
+        reason = "Harness가 시작되었습니다. 데스크톱 연결을 기다리는 중입니다." if result.get('running') else "Harness 데스크톱 앱 시작"
         values = {'pendingFirstLaunch': first_launch}
         if not setup.get('requiredBridgeRevision'):
             values.update(setupStatus=phase, reason=reason)
@@ -2223,7 +2223,7 @@ class DesktopSessions:
             from bridge.clients.instances import prepare_deepseek_profile
             prepare_deepseek_profile(self.instance.profile, row)
         if state['running'] and not state.get('mainPids'):
-            raise ValueError('检测到残留 Harness 后台实例且无法核对任务状态，请在电脑端退出 Harness 后重试')
+            raise ValueError("남은 Harness 백그라운드 프로세스가 발견되었으며 해당 작업을 확인할 수 없습니다. 컴퓨터에서 Harness를 종료한 후 다시 시도하십시오.")
         if not (adapter.home/'profiles/desktop/cordis.patch.yml').is_file():
             self._begin_deepseek_connection()
             result = launch_deepseek(row)
@@ -2256,7 +2256,7 @@ class DesktopSessions:
 
     def connect_deepseek(self, restart=False):
         if self.config.get('deepseekManualBinding'):
-            raise ValueError('请在已绑定的第三方客户端中重新加载插件；网关不会重启它')
+            raise ValueError('바인딩된 타사 클라이언트에서 플러그인을 다시 로드하세요. 게이트웨이가 다시 시작하지 않습니다')
         if not self.gateway_running:
             return self.toggle_client({'provider': 'deepseek', 'enabled': True})
         with self.client_lock, self._changing('deepseek'):
@@ -2266,7 +2266,7 @@ class DesktopSessions:
     def recover_deepseek(self, value):
         """Private desktop control only; web app controls never dispatch here."""
         if self.config.get('deepseekManualBinding'):
-            raise ValueError('手动绑定不管理第三方客户端进程，请在客户端内重启或退出')
+            raise ValueError('수동 바인딩은 타사 클라이언트 프로세스를 관리하지 않습니다. 클라이언트 내에서 다시 시작하거나 종료하세요.')
         from bridge.clients.deepseek.recovery import DeepSeekRecovery
         with self.client_lock, self._changing('deepseek'):
             if not self.config.get('discovered', {}).get('deepseek'):
@@ -2293,10 +2293,10 @@ class DesktopSessions:
                 self.config['deepseekAdapterDirectory'] = str(adapter.directory)
                 private_json(self.config_path, self.config)
                 self.deepseek_restore_error = None
-                self.config.setdefault('setup', {})['deepseek'] = {'setupStatus': 'connecting', 'reason': '正在等待 Harness 连接'}
+                self.config.setdefault('setup', {})['deepseek'] = {'setupStatus': 'connecting', 'reason': "Harness가 연결되기를 기다리는 중"}
                 self._start_deepseek()
             else:
-                self.config.setdefault('setup', {})['deepseek'] = {'setupStatus': 'ready', 'reason': 'Harness 已完整退出'}
+                self.config.setdefault('setup', {})['deepseek'] = {'setupStatus': 'ready', 'reason': "Harness가 완전히 종료되었습니다."}
             # Preserve the user's startup choice if quitting or restarting failed.
             self.config.setdefault('enabled', {})['deepseek'] = restart
             private_json(self.config_path, self.config)
@@ -2316,7 +2316,7 @@ class DesktopSessions:
             if sys.platform != 'win32':
                 result = launch_client(descriptor, allow_native_relaunch=not restart)
                 if not result.get('running'):
-                    raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+                    raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
             self.adapters['claude'].connect()
             return self.clients(refresh=True)
 
@@ -2332,10 +2332,10 @@ class DesktopSessions:
         from bridge.clients.lifecycle import inspect_client
         with self.client_lock, self._changing('claude'):
             if not self.gateway_running:
-                raise ValueError('请先启动网关，再重新连接 Claude')
+                raise ValueError("Claude를 다시 연결하기 전에 게이트웨이를 시작하십시오.")
             self.require_enabled('claude')
             if not self.config.get('enabled', {}).get('claude', False):
-                raise ValueError('Claude Desktop 接入已关闭，请先开启原电脑接入')
+                raise ValueError('Claude Desktop 액세스가 종료되었습니다. 먼저 원래 컴퓨터에서 액세스를 활성화하세요.')
             adapter = self.adapters['claude']
             if adapter.status().get('connected'):
                 try:
@@ -2345,12 +2345,12 @@ class DesktopSessions:
                 else:
                     return self.clients(refresh=True)
             if not self._claude_reconnect_supported():
-                raise ValueError('请先在电脑端配置 Claude 接入，再重新连接')
+                raise ValueError("다시 연결하기 전에 컴퓨터에서 Claude 액세스를 설정하세요.")
             state = inspect_client(self._descriptor('claude'))
             if not state['running'] or not state['mainPids']:
-                raise ValueError('请先在电脑端打开 Claude，再重新连接')
+                raise ValueError("다시 연결하기 전에 컴퓨터에서 Claude를 엽니다.")
             if state['unknown'] or len(state['mainPids']) != 1:
-                raise ValueError('Claude 进程无法确认，请在电脑端检查后重试')
+                raise ValueError("Claude 프로세스를 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도해 보세요.")
             if sys.platform == 'darwin':
                 adapter.reconnect()
             else:
@@ -2365,7 +2365,7 @@ class DesktopSessions:
         try:
             return _snapshot(descriptor)
         except (ValueError, OSError, subprocess.SubprocessError):
-            raise ValueError('Claude 进程已变化，请重新检查后再确认退出') from None
+            raise ValueError("Claude 프로세스가 변경되었습니다. 종료를 확인하기 전에 다시 확인하세요.") from None
 
     def _claude_native_cli_busy(self):
         adapter = self.adapters['claude']
@@ -2413,26 +2413,26 @@ class DesktopSessions:
                 pending = self.claude_quit
                 if (not pending or not isinstance(value.get('token'), str) or
                         not secrets.compare_digest(value['token'], pending['token']) or time.monotonic() >= pending['expires']):
-                    raise ValueError('Claude 退出确认已过期，请重新检查')
+                    raise ValueError("Claude 종료 확인이 만료되었습니다. 다시 확인하세요.")
                 if value.get('confirmed') is not True:
-                    raise ValueError('请确认退出 Claude')
+                    raise ValueError("Claude 종료를 확인하세요.")
                 if sys.platform not in ('darwin', 'win32'):
-                    raise ValueError('请在电脑端退出 Claude；此系统不支持正常退出确认')
+                    raise ValueError("컴퓨터에서 Claude를 종료합니다. 확인된 정상 종료는 이 시스템에서 지원되지 않습니다.")
                 snapshot = self._claude_quit_snapshot(descriptor)
                 if snapshot != pending['snapshot']:
-                    raise ValueError('Claude 进程已变化，请重新检查后再确认退出')
+                    raise ValueError("Claude 프로세스가 변경되었습니다. 종료를 확인하기 전에 다시 확인하세요.")
                 evidence = self._claude_quit_evidence()
                 if evidence['busy']:
-                    raise ValueError('有任务运行或等待确认，请先结束任务再关闭或重启客户端')
+                    raise ValueError("작업이 실행 중이거나 확인 대기 중입니다. 앱을 닫거나 다시 시작하기 전에 완료하세요.")
                 if not pending['allowed']:
-                    raise ValueError('Claude 进程无法确认，请在电脑端检查后重试')
+                    raise ValueError("Claude 프로세스를 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도해 보세요.")
                 if evidence['unknown'] and (not pending['unknown'] or value.get('acknowledgeUnknown') is not True):
-                    raise ValueError('无法核验 Claude 任务状态，请重新检查并明确确认可能中断任务')
+                    raise ValueError("Claude 작업 상태를 확인할 수 없습니다. 다시 확인하고 종료하면 작업이 중단될 수 있음을 명시적으로 인정합니다.")
                 self.claude_quit = None
                 adapter = self.adapters['claude']
                 adapter.cancel(persist=False)
                 if self._claude_quit_snapshot(descriptor) != snapshot:
-                    raise ValueError('Claude 进程已变化，请重新检查后再确认退出')
+                    raise ValueError("Claude 프로세스가 변경되었습니다. 종료를 확인하기 전에 다시 확인하세요.")
                 # stop_client uses macOS quit / Windows CloseMainWindow. Linux
                 # SIGTERM and the Harness runtime termination path are excluded.
                 stop_client(descriptor, state=snapshot['state'])
@@ -2452,14 +2452,14 @@ class DesktopSessions:
         """Called under the provider write gate; changing transport never exits the App."""
         from bridge.clients.zcode.connections import MODES, selected_mode
         if mode not in MODES:
-            raise ValueError('ZCode 连接方式无效')
+            raise ValueError('ZCode 잘못된 연결 방법')
         previous = selected_mode(self.config)
         if mode == 'official-remote':
             official = self._zcode_official_status()
             if not (official.get('configured') or official.get('loginSaved') and (official.get('restoring') or official.get('loginDeferred'))):
-                raise ValueError('请先在电脑网关配置并登录官方远控')
+                raise ValueError('먼저 컴퓨터 게이트웨이를 구성하고 공식 원격 제어에 로그인하십시오.')
         elif not self.zcode_pipe or not self.zcode_pipe.supported():
-            raise ValueError('当前安装暂不能使用本机连接')
+            raise ValueError('현재 설치에서는 로컬 연결을 사용할 수 없습니다.')
         with self._changing('zcode', rebind=previous != mode):
             if previous != mode and previous == 'official-remote':
                 self.adapters['zcode'].disconnect()
@@ -2487,7 +2487,7 @@ class DesktopSessions:
             desktop_installed = False
             cli = getattr(self.bridge, 'cli_sessions', None)
             cli_available = bool(cli and cli.available() is True)
-            reason = '请在电脑端安装 Codex 并配置账号或 API'
+            reason = "Codex를 설치하고 컴퓨터에 계정 또는 API를 구성하세요."
             if self.bridge is not None and not self.native_enabled('codex') and probe != 'codex':
                 # Preserve display knowledge without AccountInfo.current() spawning
                 # another auth/runtime probe. Explicit enable always probes afresh.
@@ -2496,7 +2496,7 @@ class DesktopSessions:
                 ready = (discovered.get('codex', {}).get('installed', True) is not False and
                          bool(previous.get('nativeConfigured', previous.get('configured'))))
                 if ready:
-                    reason = '接入配置已就绪'
+                    reason = "연결 준비됨"
             elif self.bridge is not None:
                 try:
                     from bridge.clients.desktop_app import DesktopApp
@@ -2507,7 +2507,7 @@ class DesktopSessions:
                     ready = bool((cli_available or desktop_installed) and current.get('status') == 'ready' and current.get('kind') in ('chatgpt', 'api'))
                     if ready and current.get('kind') == 'api':
                         ready = bool((accounts.info.identity or {}).get('key') or accounts.active_matches())
-                    reason = '接入配置已就绪' if ready else ('正在检查账号配置' if current.get('status') == 'checking' else reason)
+                    reason = "연결 준비됨" if ready else ('계정 구성 확인 중' if current.get('status') == 'checking' else reason)
                 except (AttributeError, ValueError, OSError):
                     pass
             rows.append({'id': 'codex', 'name': 'Codex', 'installed': discovered.get('codex', {}).get('installed', desktop_installed), 'configured': ready, 'connected': False,
@@ -2523,7 +2523,7 @@ class DesktopSessions:
                 invalid = False
                 status = {}
                 setup = self.config.get('setup', {}).get(provider, {})
-                reason = setup.get('reason') or '请在电脑端连接客户端并配置账号或 API'
+                reason = setup.get('reason') or "데스크톱 클라이언트를 연결하고 계정 또는 API를 구성하세요."
                 setup_status = setup.get('setupStatus', 'not-scanned')
                 adapter = self.adapters.get(provider)
                 try:
@@ -2540,16 +2540,16 @@ class DesktopSessions:
                         if provider == 'deepseek':
                             ready = status.get('configured') is True and not status.get('updateRequired')
                             invalid = status.get('configured') is False
-                            reason = (('已恢复此前的 Harness 接入' if setup.get('setupStatus') == 'recovered' else '接入配置已就绪') if ready else '请在桌面配置账号或 API')
+                            reason = (("이전 Harness 연결이 복구되었습니다." if setup.get('setupStatus') == 'recovered' else "연결 준비됨") if ready else '데스크톱에서 계정을 구성하거나 API')
                         else:
                             sessions = adapter.desktop_listing().get('sessions', [])
                             if sessions:
                                 catalog = self._read(provider, 'catalog', sessions[0]['id'], {'section': 'models'})
                                 ready = bool(catalog.get('models'))
                                 invalid = catalog.get('models') == []
-                            reason = (status.get('reason') if status.get('consoleCleanupPending') else '桌面连接与模型配置可用') if ready else '请在桌面登录并配置模型、创建一个项目会话'
+                            reason = (status.get('reason') if status.get('consoleCleanupPending') else "데스크톱 연결 및 모델 준비") if ready else "데스크톱에 로그인하여 모델을 구성하고 프로젝트 채팅을 만드세요."
                 except (ValueError, OSError, BridgeUnavailable):
-                    reason = setup.get('reason') or '客户端连接不可用，请在电脑端检查'
+                    reason = setup.get('reason') or "클라이언트를 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요."
                 pending_restart = provider == 'deepseek' and self._deepseek_restart_pending(
                     setup, self._deepseek_endpoint(adapter) if connected else None, connected, status.get('bridgeRevision'))
                 if provider == 'deepseek' and (status.get('updateRequired') or setup.get('requiredBridgeRevision') and pending_restart):
@@ -2557,7 +2557,7 @@ class DesktopSessions:
                     setup_status = 'restart-required'
                     reason = UPDATE_REASON
                 elif pending_restart:
-                    reason = setup.get('reason') or '请结束当前任务后重启 Harness 完成接入'
+                    reason = setup.get('reason') or "현재 작업을 완료하고 Harness를 다시 시작하여 연결하세요."
                 elif provider == 'deepseek' and connected:
                     # Transport readiness and account setup are separate. A live
                     # current connector also clears stale restart/failure labels.
@@ -2579,7 +2579,7 @@ class DesktopSessions:
                 if not connected and remembered and setup_status not in (
                         'failed', 'needs-retry', 'needs-unlock', 'needs-desktop', 'needs-developer-mode', 'needs-trust',
                         'needs-permission', 'needs-screen-saver', 'restart-required', 'needs-initialization', 'needs-first-launch', 'starting', 'connecting'):
-                    reason = '客户端已配置，可开启桌面应用'
+                    reason = "앱이 구성되었으며 열 준비가 되었습니다."
                 if provider == 'deepseek' and setup.get('setupStatus') == 'failed' and not connected:
                     setup_status, reason = 'failed', setup.get('reason', reason)
                 rows.append({'id': provider, 'name': name, 'installed': discovered.get(provider, {}).get('installed', connected),
@@ -2608,11 +2608,11 @@ class DesktopSessions:
                 installed = zcode['installed']
                 history_only = status.get('historyAvailable') and not status.get('retryable')
                 rows.append({'id': 'zcode', 'name': 'ZCode', 'installed': installed,
-                             'description': '管理 ZCode 桌面应用与手机接入。',
+                             'description': "ZCode 데스크톱 앱 및 전화 액세스를 관리합니다.",
                              'enabled': enabled, 'configured': installed, 'connected': connected,
                              'setupStatus': ('ready' if connected else 'session-access' if status.get('sessionAccess') else
                                              'history-only' if history_only else 'not-connected'),
-                             'reason': '原生会话已接入' if connected else status.get('reason', ''),
+                             'reason': "네이티브 세션에 연결됨" if connected else status.get('reason', ''),
                              'retryable': status.get('retryable') is True,
                              'confirmTaskState': True, 'historyAvailable': status.get('historyAvailable') is True,
                              'pipeSupported': zcode['pipeSupported'], 'compatibilitySupported': zcode['compatibilitySupported'],
@@ -2642,14 +2642,14 @@ class DesktopSessions:
                     'id': 'antigravity',
                     'name': 'Antigravity',
                     'installed': installed,
-                    'description': '管理 Antigravity App、CLI 和 IDE 的聊天、模型与审批。',
+                    'description': '관리하다 Antigravity App、CLI 및 IDE 채팅, 모델 및 승인。',
                     'enabled': enabled,
                     'configured': installed,
                     'connected': connected,
                     'setupStatus': 'ready' if connected else ('history-only' if status.get('historyAvailable') else 'discovered' if installed else 'not-installed'),
                     'historyAvailable': bool(status.get('historyAvailable') or discovered.get('antigravity', {}).get('historyAvailable')),
-                    'reason': status.get('reason') or ('Antigravity 已接入' if connected else '已发现 Antigravity，启用后可查看本机历史'),
-                    'accountNotice': '账号与登录由原客户端管理',
+                    'reason': status.get('reason') or ('Antigravity 이미 연결됨' if connected else '설립하다 Antigravity，활성화한 후 로컬 기록을 볼 수 있습니다.'),
+                    'accountNotice': '계정 및 로그인은 원래 클라이언트에서 관리됩니다.',
                     'canQuitDesktop': False,
                     'capabilities': {'create': connected, 'accounts': True, 'management': True, 'notifications': True},
                 })
@@ -2682,7 +2682,7 @@ class DesktopSessions:
                                backgroundRunning=False, backgroundCount=0, canForceQuit=False,
                                selectable=True, connectionState='connected' if row['connected'] else 'disconnected')
                     if not row['connected']:
-                        row['reason'] = self.deepseek_restore_error or '请打开已绑定的第三方客户端并加载接入插件'
+                        row['reason'] = self.deepseek_restore_error or '바인딩된 타사 클라이언트를 열고 액세스 플러그인을 로드하세요.'
                     continue
                 row.update(running=False, mainRunning=False, backgroundRunning=False, backgroundCount=0)
                 multi_profile = self.instance is not None or (self.instances is not None and row['id'] in ('claude', 'deepseek')
@@ -2692,7 +2692,7 @@ class DesktopSessions:
                     try:
                         native = native_states.get(row['id'])
                         if native is None:
-                            raise ValueError('客户端进程状态不可用')
+                            raise ValueError('클라이언트 프로세스 상태를 사용할 수 없습니다.')
                         row.update(running=native['running'], mainRunning=bool(native.get('mainPids')),
                                    backgroundRunning=bool(native.get('runtimePids')), backgroundCount=len(native.get('runtimePids', [])))
                         if (self.instance is not None and self.instance.pending_roots and row['connected']
@@ -2703,7 +2703,7 @@ class DesktopSessions:
                         if row['id'] == 'codex':
                             row['connected'] = row['configured'] and native['running']
                         if row['id'] == 'deepseek' and (row['backgroundCount'] > 1 or row['backgroundRunning'] and not row['mainRunning']):
-                            row.update(setupStatus='recovery-required', reason='Harness 存在残留或多个后台实例，请在桌面使用完整退出并重新接入')
+                            row.update(setupStatus='recovery-required', reason="Harness에는 남아 있거나 여러 개의 백그라운드 인스턴스가 있습니다. 데스크탑 게이트웨이에서 완전히 종료를 사용한 후 다시 연결하십시오.")
                     except (ValueError, OSError, subprocess.SubprocessError):
                         pass
                 if row['id'] == 'zcode':
@@ -2732,10 +2732,10 @@ class DesktopSessions:
                         row.update(canStartDesktop=False, canInitializeDesktop=False, canReconnect=False)
                 if not self.gateway_running and row['enabled'] and row['setupStatus'] != 'recovery-required':
                     if row['id'] == 'claude' and sys.platform == 'darwin':
-                        row['reason'] = '已选择，启动网关后在后台打开 Claude 并尝试恢复已有连接；需要初始化时会提示。'
+                        row['reason'] = "선택된. 게이트웨이가 시작되면 Claude가 백그라운드에서 열리고 기존 연결 복원을 시도합니다. 초기화가 필요한지 묻는 메시지가 표시됩니다."
                     else:
-                        row['reason'] = ('已选择，启动网关后在后台启动并连接' if row['id'] == 'claude'
-                                         else '已选择，启动网关后自动接入')
+                        row['reason'] = ("선택된. 게이트웨이가 시작되면 앱이 백그라운드에서 시작되고 연결됩니다." if row['id'] == 'claude'
+                                         else "선택된. 게이트웨이가 시작되면 자동으로 연결됩니다.")
             entries = getattr(self.bridge, 'entries', None)
             if self.instance is None:
                 entries = getattr(self.bridge, 'entries', None)
@@ -2753,7 +2753,7 @@ class DesktopSessions:
                 for field in ('enabled', 'configured', 'selectable', 'installed', 'connected', 'running'):
                     codex[field] = any(entry.get(field) is True for entry in codex_entries)
                 if codex['configured'] and not native['configured']:
-                    codex.update(setupStatus='ready', reason='WSL Codex 接入可用')
+                    codex.update(setupStatus='ready', reason='WSL Codex 이용 가능')
                 claude = next(row for row in rows if row['id'] == 'claude')
                 claude['nativeEnabled'] = self.config.get('enabled', {}).get('claude', False)
                 claude['entries'] = self.claude_wsl.applications() if self.claude_wsl is not None else []
@@ -2779,7 +2779,7 @@ class DesktopSessions:
     def clients_status(self):
         """Return display status without waiting for startup or native inspection."""
         if self.closed.is_set():
-            raise BridgeUnavailable('客户端连接已关闭')
+            raise BridgeUnavailable('클라이언트 연결이 종료되었습니다.')
         cached = None
         if self.client_lock.acquire(blocking=False):
             try:
@@ -2801,7 +2801,7 @@ class DesktopSessions:
             failed = self.client_refresh_error and not self.client_refreshing
         if start:
             threading.Thread(target=self._refresh_clients_status, daemon=True).start()
-        return {**snapshot, 'pending': not failed, **({'refreshError': '客户端状态读取失败，请重试。'} if failed else {})}
+        return {**snapshot, 'pending': not failed, **({'refreshError': '클라이언트 상태를 읽지 못했습니다. 다시 시도해 주세요.。'} if failed else {})}
 
     def _refresh_clients_status(self):
         try:
@@ -2830,7 +2830,7 @@ class DesktopSessions:
                 # outcome; an absent process here is not a failed launch.
                 row['connectionState'] = 'starting'
             elif phase == 'needs-initialization' and native is not None and not native['running']:
-                row.update(connectionState='error', reason='Claude 未运行，请重试后台启动', retryable=True)
+                row.update(connectionState='error', reason="Claude가 실행되고 있지 않습니다. 백그라운드에서 다시 시작해 보세요.", retryable=True)
         elif phase in ('failed', 'needs-retry'):
             row.update(connectionState='error', retryable=True)
         elif phase in ('needs-developer-mode', 'needs-trust', 'needs-permission', 'needs-unlock', 'needs-desktop'):
@@ -2860,24 +2860,24 @@ class DesktopSessions:
                 deadline = time.time() + (120 if sys.platform == 'win32' else 60)
                 self._deepseek_connection(phase, reason, connectionDeadline=deadline)
             if time.time() >= deadline:
-                phase, reason = 'timeout', 'Harness 连接超时，请检查桌面应用后重试接入'
+                phase, reason = 'timeout', "Harness 연결 시간이 초과되었습니다. 데스크톱 앱을 확인한 후 다시 시도하세요."
             elif native is not None and not native['running'] and phase == 'connecting':
-                phase, reason = 'error', 'Harness 已退出，连接未完成，请重试启动'
+                phase, reason = 'error', "연결하기 전에 Harness가 종료되었습니다. 다시 시작해 보세요."
             elif native is not None and native['running']:
                 if setup.get('pendingFirstLaunch'):
-                    reason = 'Harness 已打开，请完成首次设置后点击接入'
+                    reason = "Harness가 열려 있습니다. 초기 설정을 완료한 다음 연결을 선택합니다."
                     self._deepseek_connection('idle', reason, setupStatus='needs-first-launch', reason=reason)
                     row.update(setupStatus='needs-first-launch', reason=reason, retryable=True)
                     return
-                phase, reason = 'connecting', 'Harness 已启动，正在等待桌面连接'
+                phase, reason = 'connecting', "Harness가 시작되었습니다. 데스크톱 연결을 기다리는 중입니다."
             values = {} if setup.get('requiredBridgeRevision') else {
                 'setupStatus': 'failed' if phase == 'error' else phase, 'reason': reason}
             self._deepseek_connection(phase, reason, **values)
             row['setupStatus'] = setup.get('setupStatus', row['setupStatus'])
         elif phase == 'connected':
             phase = 'error'
-            reason = ('Harness 连接已中断，请重试接入' if native is None or native['running']
-                      else 'Harness 未运行，请重试启动')
+            reason = ("Harness 연결이 끊어졌습니다. 연결을 다시 시도하십시오." if native is None or native['running']
+                      else "Harness가 실행되고 있지 않습니다. 다시 시작해 보세요.")
         elif row['setupStatus'] == 'failed':
             phase = 'error'
         if phase in ('starting', 'connecting', 'error', 'timeout'):
@@ -2906,14 +2906,14 @@ class DesktopSessions:
             self.client_cache = None
             return self.clients(refresh=True)
         if self.instance is not None and provider != self.instance.family:
-            raise ValueError('接入实例与平台不匹配')
+            raise ValueError('액세스 인스턴스가 플랫폼과 일치하지 않습니다.')
         if isinstance(provider, str) and provider.startswith('wsl-claude:'):
             if self.claude_wsl is None:
-                raise ValueError('当前电脑不支持 WSL 应用')
+                raise ValueError('현재 컴퓨터는 지원하지 않습니다. WSL 애플리케이션')
             if type(enabled) is not bool or set(value) - {'action', 'provider', 'enabled', 'quitDesktop'}:
-                raise ValueError('WSL Claude Code 应用开关无效')
+                raise ValueError('WSL Claude Code 응용 프로그램 스위치가 잘못되었습니다.')
             if value.get('quitDesktop', False) is not False:
-                raise ValueError('请在原 WSL 终端退出 Claude Code；这里只停用手机访问')
+                raise ValueError('원작대로 해주세요 WSL 터미널 출구 Claude Code；여기서는 모바일 액세스만 비활성화되어 있습니다.')
             with self.client_lock, self._changing('claude'):
                 remote = self.adapters['claude'].remote_cli.wsl
                 with remote.lock:
@@ -2922,7 +2922,7 @@ class DesktopSessions:
                     for owned in active if not enabled else []:
                         with owned.condition:
                             if owned.process.poll() is None and (owned.active or owned.pending):
-                                raise ValueError('WSL Claude Code 有进行中的任务，请先结束任务')
+                                raise ValueError('WSL Claude Code 진행 중인 작업이 있습니다. 먼저 작업을 종료해 주세요.')
                 self.claude_wsl.configure(provider, enabled)
                 if not enabled:
                     with remote.lock:
@@ -2937,32 +2937,32 @@ class DesktopSessions:
         if isinstance(provider, str) and provider.startswith(('wsl:', 'codex:')):
             entries = getattr(self.bridge, 'entries', None)
             if entries is None or type(enabled) is not bool or set(value) - {'action', 'provider', 'enabled', 'quitDesktop'}:
-                raise ValueError('Codex 入口开关无效')
+                raise ValueError('Codex 입구 스위치가 잘못되었습니다.')
             if value.get('quitDesktop', False) is not False:
-                where = '原 WSL 终端' if provider.startswith('wsl:') else '原客户端'
-                raise ValueError(f'请在{where}退出 Codex；应用管理只停用手机访问，不会终止原任务')
+                where = '기존 WSL 단말기' if provider.startswith('wsl:') else '원래 클라이언트'
+                raise ValueError(f'제발{where}종료 Codex；애플리케이션 관리는 휴대폰 액세스만 비활성화하고 원래 작업을 종료하지 않습니다.')
             with self.client_lock:
                 entries.configure(provider, enabled)
                 self.client_cache = None
                 return self.clients(refresh=True)
         if provider not in ('codex', 'claude', 'deepseek', 'zcode', 'antigravity') or type(enabled) is not bool or (
                 provider in ('zcode', 'antigravity') and provider not in self.adapters):
-            raise ValueError('应用开关无效')
+            raise ValueError("잘못된 클라이언트 액세스 설정")
         if 'quitDesktop' in value and (type(value['quitDesktop']) is not bool or enabled):
-            raise ValueError('应用开关无效')
+            raise ValueError("잘못된 클라이언트 액세스 설정")
         if 'forceDesktop' in value and (type(value['forceDesktop']) is not bool or enabled
                 or value.get('quitDesktop') is not True or value.get('forceConfirmed') is not True
                 or sys.platform not in ('darwin', 'win32', 'linux') or not self.gateway_running):
-            raise ValueError('后台强制结束请求无效')
+            raise ValueError('백그라운드 강제 종료 요청이 잘못되었습니다.')
         initialize_zcode = provider == 'zcode' and value.get('initializeDesktop') is True
         if 'connectionMode' in value and (provider != 'zcode' or not enabled or
                 value['connectionMode'] not in ('private-pipe', 'official-remote') or
                 initialize_zcode and value['connectionMode'] != 'private-pipe'):
-            raise ValueError('应用连接方式无效')
+            raise ValueError('애플리케이션 연결 방법이 잘못되었습니다.')
         if 'initializeDesktop' in value and (type(value['initializeDesktop']) is not bool
                 or provider not in ('claude', 'zcode') or not enabled
                 or initialize_zcode and (startup or not self.gateway_running)):
-            raise ValueError('应用初始化请求无效')
+            raise ValueError('잘못된 애플리케이션 초기화 요청')
         acknowledge_unavailable = value.get('acknowledgeUnavailable', False)
         if 'acknowledgeUnavailable' in value and (acknowledge_unavailable is not True or
                 provider not in ('codex', 'zcode') or not initialize_zcode and (enabled or value.get('quitDesktop') is not True) or
@@ -2970,13 +2970,13 @@ class DesktopSessions:
                 sys.platform == 'linux' and provider != 'zcode' or
                 not self.gateway_running or provider == 'codex' and (not self.bridge or
                 not self.bridge.desktop_restart_recommended())):
-            raise ValueError('桌面恢复退出确认无效，请重新检查连接状态')
+            raise ValueError('데스크톱 복구 종료 확인이 잘못되었습니다. 연결 상태를 다시 확인하세요.')
         # Older clients use disabling as native quit. New clients choose explicitly.
         quit_desktop = value.get('quitDesktop', provider not in ('zcode', 'antigravity'))
         if provider == 'antigravity':
             with self.client_lock, self._changing(provider):
                 if not enabled and quit_desktop:
-                    raise ValueError('请在电脑端退出 Antigravity；此处仅停用手机访问')
+                    raise ValueError('컴퓨터에서 종료해 주세요. Antigravity；여기서는 모바일 액세스만 비활성화되어 있습니다.')
                 adapter = self.adapters['antigravity']
                 if enabled:
                     adapter.ensure_plugin()
@@ -2989,7 +2989,7 @@ class DesktopSessions:
         if provider == 'deepseek' and self.config.get('deepseekManualBinding'):
             with self.client_lock, self._changing(provider):
                 if not enabled and quit_desktop:
-                    raise ValueError('手动绑定仅支持停用手机接入；请在第三方客户端退出应用')
+                    raise ValueError('수동 바인딩은 휴대폰 액세스 비활성화만 지원합니다. 타사 클라이언트에서 애플리케이션을 종료하세요.')
                 if enabled:
                     self.adapters[provider]._connection()  # Recheck the declared plugin before granting access.
                 self.config.setdefault('enabled', {})[provider] = enabled
@@ -3045,12 +3045,12 @@ class DesktopSessions:
                 elif provider == 'zcode' and descriptor['officialRemote']:
                     state = inspect_client(descriptor)
                     if state.get('unknown') or len(state.get('mainPids', [])) > 1:
-                        raise ValueError('无法确认唯一的 ZCode 进程，请刷新后重试。')
+                        raise ValueError('고유성을 확인할 수 없습니다. ZCode 처리 중입니다. 새로고침한 후 다시 시도해 주세요.。')
                     launched = False
                     if not state['running']:
                         result = launch_client(descriptor)
                         if not result.get('running'):
-                            raise ValueError('ZCode 尚未启动，请刷新后重试。')
+                            raise ValueError('ZCode 아직 시작되지 않았습니다. 새로고침한 후 다시 시도해 주세요.。')
                         launched = result.get('launched') is True
                     self.adapters[provider].connect_application(None, wait=launched)
                 elif provider == 'zcode' and (initialize_zcode or descriptor['pipeSupported']):
@@ -3070,18 +3070,18 @@ class DesktopSessions:
                     elif sys.platform == 'darwin':
                         result = launch_client(descriptor)
                         if not result.get('running'):
-                            raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+                            raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
                         self.adapters[provider].reconnect()
                     elif sys.platform == 'win32':
                         if self.instance is not None:
                             result = launch_client(descriptor)
                             if not result.get('running'):
-                                raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+                                raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
                             self.adapters[provider].reconnect()
                         else:
                             self.adapters[provider].reconnect(launch=True)
                     else:
-                        raise ValueError('此系统不支持 Claude 桌面连接')
+                        raise ValueError('이 시스템은 지원하지 않습니다 Claude 데스크톱 연결')
                 elif provider == 'codex' and not descriptor['installed'] and row.get('cliAvailable'):
                     pass  # CLI-only access starts its runtime on an explicit chat operation.
                 elif (provider == 'codex' and accounts and sys.platform in ('darwin', 'win32')
@@ -3093,12 +3093,12 @@ class DesktopSessions:
                         adapter = self.adapters[provider]
                         if getattr(adapter, 'sid', None) and adapter.status().get('retryable'):
                             if not adapter.reconnect_existing():
-                                raise ValueError('ZCode 未能恢复原会话，请在聊天中重试连接。')
+                                raise ValueError("ZCode가 원래 세션을 복원할 수 없습니다. 해당 채팅에서 다시 시도하세요.")
                     if not result.get('running'):
-                        raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+                        raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
             else:
                 if provider == 'claude' and self._claude_native_cli_busy():
-                    raise ValueError('有 Claude Code 任务运行或等待确认，请先结束任务再关闭客户端')
+                    raise ValueError("Claude Code 작업이 실행 중이거나 승인을 기다리고 있습니다. 클라이언트를 닫기 전에 완료하세요.")
                 self._stop_client(provider, descriptor, inspect_client(descriptor),
                                   native_confirmation=value.get('quitDesktop') is True,
                                   force=value.get('forceDesktop') is True,
@@ -3120,15 +3120,15 @@ class DesktopSessions:
 
     def _account_store(self, provider):
         if provider == 'deepseek' and self.config.get('deepseekManualBinding'):
-            raise ValueError('手动绑定的账号和 API 请在第三方客户端中管理')
+            raise ValueError('수동으로 바인딩된 계정 및 API 타사 클라이언트에서 관리해 주세요')
         if provider not in self.adapters:
-            raise ValueError('不支持的桌面客户端')
+            raise ValueError('지원되지 않는 데스크톱 클라이언트')
         if provider != 'zcode' and provider not in self.config.get('discovered', {}):
             self.scan(scan_wsl=False, inventory_only=True)
         descriptor = self._descriptor(provider)
         home = descriptor.get('dataDirectory')
         if not home or not descriptor.get('installed'):
-            raise ValueError('尚未安装此客户端')
+            raise ValueError("이 클라이언트는 설치되지 않았습니다.")
         key = (provider, home)
         if provider == 'claude':
             key += (descriptor.get('executable'), descriptor.get('packageFamilyName'),
@@ -3171,7 +3171,7 @@ class DesktopSessions:
                 self.adapters[provider].configure(descriptor['executable'], descriptor['dataDirectory'], explicit_home=True)
         if provider == 'zcode':
             if not launch_client(descriptor).get('running'):
-                raise ValueError('ZCode 尚未启动，请在电脑端检查后重试')
+                raise ValueError('ZCode 아직 시작되지 않았습니다. 컴퓨터에서 확인 후 다시 시도해 주세요.')
         elif provider == 'deepseek':
             self._start_deepseek()
         elif provider == 'claude' and sys.platform == 'win32' and self.instance is None:
@@ -3187,7 +3187,7 @@ class DesktopSessions:
         else:
             result = launch_client(descriptor)
             if not result.get('running'):
-                raise ValueError('客户端尚未启动，请在电脑端检查后重试')
+                raise ValueError("앱이 시작되지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
             if self.gateway_running and self.enabled(provider):
                 self.adapters[provider].reconnect()
 
@@ -3217,22 +3217,22 @@ class DesktopSessions:
                         result = store.remove(value.get('id'))
                     self.client_cache = None
             else:
-                raise ValueError('此 Antigravity 配置请在原客户端管理')
+                raise ValueError('이 Antigravity 원래 클라이언트 관리에서 구성을 구성하세요.')
             return {**result, 'provider': provider, 'gatewayRunning': self.gateway_running}
         if provider == 'deepseek' and self.config.get('deepseekManualBinding'):
             if operation != 'list':
-                raise ValueError('手动绑定的账号和 API 请在第三方客户端中管理')
+                raise ValueError('수동으로 바인딩된 계정 및 API 타사 클라이언트에서 관리해 주세요')
             if self.deepseek_restore_error:
                 raise BridgeUnavailable(self.deepseek_restore_error)
             native = self.adapters[provider].call('account')
             return {**native, 'accounts': [], 'provider': provider, 'gatewayRunning': self.gateway_running,
                     'canImport': False, 'canSwitch': False, 'readOnly': True,
-                    'message': '账号和 API 请在已绑定的第三方客户端中管理'}
+                    'message': "바인딩된 타사 클라이언트에서 계정 및 API를 관리합니다."}
         sync_cli = value.get('syncLocalCli') is True
         if 'syncLocalCli' in value and not isinstance(value['syncLocalCli'], bool):
-            raise ValueError('本机 CLI 同步选项无效')
+            raise ValueError('로컬 머신 CLI 잘못된 동기화 옵션')
         if sync_cli and (provider != 'claude' or operation != 'switch'):
-            raise ValueError('本机 CLI 同步仅支持 Claude Desktop 接入切换')
+            raise ValueError('로컬 머신 CLI 동기화만 지원 Claude Desktop 액세스 전환')
         store = self._account_store(provider)
         if operation == 'list':
             return self._accounts_public(provider, store.public())
@@ -3261,17 +3261,17 @@ class DesktopSessions:
                     result = store.remove(value.get('id'))
                 return self._accounts_public(provider, result)
         if operation not in ('import-current', 'switch'):
-            raise ValueError('不支持的账号操作')
+            raise ValueError("지원되지 않는 계정 작업입니다.")
         from bridge.clients.lifecycle import inspect_client
         with self.client_lock, self._changing(provider):
             if sync_cli:
                 if not self.bridge or not getattr(self.bridge, 'cli_access', None):
-                    raise ValueError('本机 Claude Code CLI 接入管理器不可用')
+                    raise ValueError('로컬 머신 Claude Code CLI 액세스 관리자를 사용할 수 없습니다.')
                 from bridge.features.accounts.cli_sync import LocalCliSync
                 LocalCliSync(self.bridge).preflight('claude')
                 selected = next((row for row in store.public()['accounts'] if row['id'] == value.get('id')), None)
                 if not selected or selected.get('kind') != 'api' or selected.get('saved') is not True:
-                    raise ValueError('官方 Claude Desktop 登录不能同步到本机 CLI')
+                    raise ValueError('공식적인 Claude Desktop 로그인을 이 컴퓨터에 동기화할 수 없습니다 CLI')
             # Harness persists one atomic credential file; saving it does not
             # require the multi-file profile snapshot used by Claude.
             if provider in ('deepseek', 'zcode') and operation == 'import-current':
@@ -3284,9 +3284,9 @@ class DesktopSessions:
             if provider == 'zcode' and operation == 'switch' and restart:
                 # A normal restart cannot verify a changed login through the old
                 # test process. Leave the current login and running app untouched.
-                raise ValueError('请先停用 ZCode 手机接入并退出原 App，再切换已保存账号')
+                raise ValueError("저장된 계정을 전환하기 전에 ZCode 전화 액세스를 비활성화하고 데스크톱 앱을 종료하세요.")
             if state['running'] and not self.gateway_running:
-                raise ValueError('请先退出客户端，再保存或切换账号；也可启动网关后操作')
+                raise ValueError("계정을 저장하거나 전환하기 전에 클라이언트를 종료하거나 계속하려면 게이트웨이를 시작하세요.")
             # Stop only after all tasks and requests are confirmed idle.
             self._stop_client(provider, descriptor, state)
             self.account_operations.add(provider)
@@ -3300,25 +3300,25 @@ class DesktopSessions:
                     result = store.public()
                     active = result.get('activeIds', [result.get('activeId')])
                     if value.get('id') not in active:
-                        raise ValueError('账号配置尚未生效，请重试')
+                        raise ValueError("계정 구성이 적용되지 않았습니다. 다시 시도해 주세요.")
                 if restart:
                     self._launch_account_client(provider, descriptor)
                     if operation == 'switch':
                         result = store.public()
                         active = result.get('activeIds', [result.get('activeId')])
                         if value.get('id') not in active:
-                            raise ValueError('账号配置尚未生效，请重试')
+                            raise ValueError("계정 구성이 적용되지 않았습니다. 다시 시도해 주세요.")
                 if operation == 'switch' and sync_cli:
                     try:
                         imported = self.bridge.cli_access.change({'provider': 'claude', 'action': 'importDesktop',
                                                                    'desktopId': value['id']})
                         saved_id = imported.get('savedId')
                         if not saved_id:
-                            raise ValueError('Claude Code CLI 接入未保存')
+                            raise ValueError('Claude Code CLI 액세스 권한이 저장되지 않았습니다.')
                         selected = self.bridge.cli_access.change({'provider': 'claude', 'action': 'switch',
                                                                    'id': saved_id, 'confirmed': True})
                         if selected.get('claude', {}).get('activeId') != saved_id:
-                            raise ValueError('Claude Code CLI 未确认目标接入')
+                            raise ValueError('Claude Code CLI 대상 액세스가 확인되지 않았습니다.')
                         self.cli_sync_status[provider] = {'status': 'verified'}
                     except Exception as error:
                         self.cli_sync_status[provider] = {'status': 'failed', 'error': str(error),
@@ -3335,7 +3335,7 @@ class DesktopSessions:
                     if state['running']:
                         self._launch_account_client(provider, descriptor)
                 except (ValueError, OSError, subprocess.SubprocessError):
-                    raise ValueError('账号操作未完成，请在电脑端检查；恢复备份已保留') from error
+                    raise ValueError("계정 작업이 완료되지 않았습니다. 데스크톱 앱을 확인하세요. 복구 백업이 보관되었습니다.") from error
                 raise
             else:
                 if rollback is not None and hasattr(store, 'commit'):
@@ -3354,11 +3354,11 @@ class DesktopSessions:
         # Obtain the root from the desktop, never from a browser-supplied path.
         self.require_enabled(provider)
         if not isinstance(sid, str) or not sid or len(sid) > 512:
-            raise ValueError('会话标识无效')
+            raise ValueError("잘못된 세션 식별자")
         with self.read_lock:
             epoch = self.binding_epochs[provider]
             if self.binding_changes[provider]:
-                raise BridgeUnavailable('客户端状态已变化，请重试')
+                raise BridgeUnavailable('클라이언트 상태가 변경되었습니다. 다시 시도해 주세요.')
             cached = self.workspace_roots.get((provider, sid))
             cached = cached if cached and cached[2] == epoch and time.monotonic() - cached[0] < 10 else None
         if cached:
@@ -3367,11 +3367,11 @@ class DesktopSessions:
             rows = self.call(provider, 'list').get('sessions', [])
             row = next((row for row in rows if row.get('id') == sid), None)
             if row is None:
-                raise ValueError('桌面会话不存在')
+                raise ValueError("데스크톱 세션을 찾을 수 없습니다.")
             row = dict(row)
             with self.read_lock:
                 if self.binding_epochs[provider] != epoch or self.binding_changes[provider]:
-                    raise BridgeUnavailable('客户端状态已变化，请重试')
+                    raise BridgeUnavailable('클라이언트 상태가 변경되었습니다. 다시 시도해 주세요.')
                 self.workspace_roots[(provider, sid)] = (time.monotonic(), row, epoch)
         from bridge.features.workspace.workspace import Workspace
         root = row.get('cwd')
@@ -3380,7 +3380,7 @@ class DesktopSessions:
         history_path = None
         if host_files:
             if row.get('host') not in (None, 'local'):
-                raise ValueError('此接入暂不支持宿主机文件浏览')
+                raise ValueError('이 액세스는 현재 호스트 파일 탐색을 지원하지 않습니다.')
             # Cowork's VM cwd is not a directory on the gateway computer.
             if provider == 'claude' and row.get('backend') == 'cowork':
                 root = None
@@ -3388,7 +3388,7 @@ class DesktopSessions:
                 with self.locks[provider]:
                     self.require_enabled(provider)
                     if self.binding_epochs[provider] != epoch or self.binding_changes[provider]:
-                        raise BridgeUnavailable('客户端状态已变化，请重试')
+                        raise BridgeUnavailable('클라이언트 상태가 변경되었습니다. 다시 시도해 주세요.')
                     if '_recordPath' not in row:
                         reader = getattr(self.adapters[provider], 'record_path', None)
                         row['_recordPath'] = reader(sid) if reader else None
@@ -3400,21 +3400,21 @@ class DesktopSessions:
     def antigravity_management(self, value):
         adapter = self.adapters.get('antigravity')
         if adapter is None:
-            raise ValueError('尚未发现 Antigravity')
+            raise ValueError('아직 발견되지 않았습니다 Antigravity')
         operation = value.get('operation', 'list')
         if operation == 'list' and set(value) <= {'action', 'operation'}:
             return {**adapter.management(), 'enabled': self.enabled('antigravity')}
         surface, sid = value.get('surface'), value.get('sessionId')
         row = adapter.store.resolve_session(sid)
         if row is None or surface != row['surfaceDirKey']:
-            raise ValueError('聊天与来源不匹配，请重新选择')
+            raise ValueError('채팅 내용이 출처와 일치하지 않습니다. 다시 선택해 주세요.')
         if operation == 'catalog' and set(value) <= {'action', 'operation', 'surface', 'sessionId', 'refresh'}:
             return self.call('antigravity', 'catalog', sid, {'section': 'models', 'refresh': value.get('refresh') is True})
         fields = {'settings': {'model', 'modelCatalogIdentity'}, 'access': {'mode'}}.get(operation)
         required = {'action', 'operation', 'surface', 'sessionId', 'id', *(fields or ())}
         optional = {'manualModel'} if operation == 'settings' else set()
         if fields is None or not required <= set(value) or set(value) - required - optional:
-            raise ValueError('Antigravity 配置请求无效')
+            raise ValueError('Antigravity 잘못된 구성 요청')
         return self.call('antigravity', operation, sid, {key: value[key] for key in ('id', *fields, *optional) if key in value})
 
     def control(self, value):
@@ -3432,19 +3432,19 @@ class DesktopSessions:
         if self.instance is not None:
             family = value.get('provider')
             if family is not None and family != self.instance.family:
-                raise ValueError('接入实例与平台不匹配')
+                raise ValueError('액세스 인스턴스가 플랫폼과 일치하지 않습니다.')
             allowed = {'accounts', 'account', 'clients', 'status', 'scan', 'toggle-client'}
             allowed.update({'claude-prerequisites', 'claude-quit-preview', 'claude-quit-confirm',
                             'connect-claude', 'restart-claude', 'cancel-claude', 'prepare-claude'}
                            if self.instance.family == 'claude' else {'connect-deepseek', 'restart-deepseek'})
             if action not in allowed:
-                raise ValueError('此操作不适用于独立桌面配置')
+                raise ValueError('이 작업은 독립형 데스크톱 구성에는 적용되지 않습니다.')
         if action == 'preview-deepseek-plugin':
             from bridge.clients.deepseek.manual import ManualDeepSeek
             adapter = ManualDeepSeek(value.get('file', ''))
             status = adapter.call('status')
             if status.get('connected') is not True:
-                raise ValueError('插件尚未连接，请在第三方客户端加载插件')
+                raise ValueError('플러그인이 아직 연결되지 않았습니다. 타사 클라이언트에서 플러그인을 로드하세요.')
             return {'profile': adapter.binding['profile'], 'home': adapter.binding['home'],
                     'instanceId': adapter.binding['instanceId'], 'plugin': adapter.plugin,
                     'file': str(adapter.directory/'binding.json')}
@@ -3454,7 +3454,7 @@ class DesktopSessions:
         if action == 'codex-profiles':
             entries = getattr(self.bridge, 'entries', None)
             if entries is None:
-                raise ValueError('当前网关未提供本机 Codex 配置管理')
+                raise ValueError('현재 게이트웨이는 이 시스템을 제공하지 않습니다. Codex 구성 관리')
             operation = value.get('operation')
             if operation in ('list', 'scan') and set(value) == {'action', 'operation'}:
                 return entries.local_profiles(scan=operation == 'scan')
@@ -3462,7 +3462,7 @@ class DesktopSessions:
                 result = entries.save_local(value['home'], value['label'])
                 self.client_cache = None
                 return result
-            raise ValueError('Codex 配置请求无效')
+            raise ValueError('Codex 잘못된 구성 요청')
         if action == 'scan-wsl':
             return self.scan_wsl()
         if action == 'claude-prerequisites':
@@ -3479,7 +3479,7 @@ class DesktopSessions:
         if action == 'account':
             provider = value.get('provider')
             if provider not in self.adapters:
-                raise ValueError('不支持的桌面客户端')
+                raise ValueError('지원되지 않는 데스크톱 클라이언트')
             return self._account_models(provider, refresh=value.get('refresh') is True)
         if action == 'scan':
             return self.scan(setup=value.get('setup', True) is True, scan_wsl=value.get('inventoryOnly') is not True,
@@ -3499,14 +3499,14 @@ class DesktopSessions:
         if action == 'zcode-official':
             if (set(value) != {'action', 'enabled'} or type(value['enabled']) is not bool or
                     sys.platform not in ('darwin', 'win32', 'linux') or 'zcode' not in self.adapters):
-                raise ValueError('ZCode 官方远控设置无效')
+                raise ValueError('ZCode 공식 원격 제어 설정이 유효하지 않습니다.')
             if value['enabled']:
                 return self.toggle_client({'provider': 'zcode', 'enabled': True, 'connectionMode': 'official-remote'})
             with self.client_lock:
                 self._select_zcode_connection('private-pipe')
             return self.clients(refresh=True)
         if action == 'zcode-compatibility':
-            raise ValueError('本机兼容端口已移除，请选择本机连接或官方远控')
+            raise ValueError('이 기기의 호환 포트가 제거되었습니다. 로컬 연결 또는 공식 원격 제어를 선택하십시오.')
         if action == 'toggle-client':
             return self.toggle_client(value)
         if action == 'status':
@@ -3525,13 +3525,13 @@ class DesktopSessions:
                 return export_package(value.get('destination', ''))
             if action in ('bind-deepseek-plugin', 'unbind-deepseek-plugin'):
                 if self.enabled('deepseek'):
-                    raise ValueError('请先仅停用 DSH 手机接入，再切换或解除绑定')
+                    raise ValueError('먼저만 비활성화하세요. DSH 휴대폰을 연결한 다음 전환하거나 바인딩을 해제하세요.')
                 if action == 'bind-deepseek-plugin':
                     from bridge.clients.deepseek.manual import ManualDeepSeek
                     adapter = ManualDeepSeek(value.get('file', ''), value.get('instanceId'))
                     status = adapter.call('status')
                     if status.get('connected') is not True:
-                        raise ValueError('插件尚未连接，请在第三方客户端加载插件')
+                        raise ValueError('플러그인이 아직 연결되지 않았습니다. 타사 클라이언트에서 플러그인을 로드하세요.')
                     # Independent gateways using this plugin share mutation receipts.
                     with closing(sqlite3.connect(adapter.receipts_path)) as db, db:
                         db.execute('CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, fingerprint TEXT, result TEXT)')
@@ -3551,10 +3551,10 @@ class DesktopSessions:
                 return self.adapters['claude'].prepare()
             if action == 'install-deepseek':
                 if self.config.get('deepseekManualBinding'):
-                    raise ValueError('请先解除手动绑定，再使用官方客户端一键安装')
+                    raise ValueError('먼저 수동으로 바인딩을 해제한 후 공식 클라이언트를 사용하여 한 번의 클릭으로 설치하세요.')
                 home = value.get('home')
                 if not isinstance(home, str) or not Path(home).expanduser().is_dir():
-                    raise ValueError('请选择 Harness 数据目录')
+                    raise ValueError("Harness 데이터 디렉터리를 선택하세요.")
                 adapter = DeepSeek(self.directory/'deepseek', home)
                 result = adapter.install()
                 self.config['deepseekHome'] = str(adapter.home)
@@ -3563,7 +3563,7 @@ class DesktopSessions:
                 return result
             if action == 'remove-deepseek':
                 return self.adapters['deepseek'].uninstall()
-        raise ValueError('不支持的接入操作')
+        raise ValueError("지원되지 않는 연결 작업")
 
     def _scan_wsl_inventory(self):
         # One attempt per manager's first full inventory, including a failed
@@ -3582,7 +3582,7 @@ class DesktopSessions:
     def scan_wsl(self):
         entries = getattr(self.bridge, 'entries', None)
         if entries is None or self.claude_wsl is None:
-            raise ValueError('当前电脑不支持 WSL 应用')
+            raise ValueError('현재 컴퓨터는 지원하지 않습니다. WSL 애플리케이션')
         with self.client_lock:
             self._scan_wsl_inventory()
             return {**self.clients(refresh=True), 'errors': self.wsl_inventory_errors}
@@ -3593,15 +3593,15 @@ class DesktopSessions:
             if any(json.loads(row[0]).get('status') in ('unknown', 'queued', 'pending')
                    for db in (self.db, *self.receipt_dbs.values())
                    for row in db.execute('SELECT result FROM requests')):
-                raise ValueError('此接入有排队或待核对操作，请先在原客户端处理')
+                raise ValueError("이 연결에는 대기 중이거나 확인되지 않은 작업이 있습니다. 원래 클라이언트를 먼저 확인하세요.")
         terminals = getattr(self, 'terminals', None)
         if terminals is not None:
             with terminals.lock:
                 if any(not job.done.is_set() for jobs in (terminals.jobs, terminals.sessions)
                        for job in jobs.values()):
-                    raise ValueError('此客户端仍有网关终端或命令运行，请先关闭终端')
+                    raise ValueError("이 클라이언트에 대해 게이트웨이 터미널 또는 명령이 계속 실행 중입니다. 먼저 닫으세요.")
         if self.instance.family == 'claude' and self._claude_native_cli_busy():
-            raise ValueError('有 Claude Code 任务运行或等待确认，请先结束任务')
+            raise ValueError('가지다 Claude Code 작업이 실행 중이거나 확인 대기 중입니다. 먼저 작업을 종료하십시오.')
 
     def close(self):
         self.closed.set()
@@ -3658,7 +3658,7 @@ class DesktopWorkspace:
 
     def get(self, identifier):
         if identifier != self.identifier:
-            raise ValueError('会话标识不一致')
+            raise ValueError("세션 식별자가 일치하지 않습니다.")
         return {'cwd': self.root}
 
     def workspace(self, sid, action, params):
@@ -3687,7 +3687,7 @@ class WslClaudeWorkspace:
 
     def get(self, identifier):
         if identifier != self.identifier:
-            raise ValueError('会话标识不一致')
+            raise ValueError("세션 식별자가 일치하지 않습니다.")
         return {'cwd': self.row['cwd']}
 
     def workspace(self, sid, action, params):
@@ -3696,7 +3696,7 @@ class WslClaudeWorkspace:
             remote = self.manager.adapters['claude'].remote_cli.wsl
             fresh = remote._get(self.sid)
             if fresh['cwd'] != self.row['cwd'] or fresh['origin'] != self.row.get('origin', fresh['origin']):
-                raise ValueError('WSL Claude Code 工作目录或账号已变化')
+                raise ValueError('WSL Claude Code 작업 디렉터리 또는 계정이 변경되었습니다.')
             source = source_text('features/workspace/workspace.py')
             arguments = payload({'root': fresh['cwd'], 'action': action, 'params': params, 'history_path': fresh.get('path')})
             if action in ('download-stream', 'archive-stream'):
@@ -3721,4 +3721,4 @@ class WslClaudeWorkspace:
                 yield value
 
     def terminal(self, sid, owner, action, params):
-        raise ValueError('WSL Claude Code 暂不提供手机终端')
+        raise ValueError('WSL Claude Code 모바일 단말기는 아직 사용할 수 없습니다')

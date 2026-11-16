@@ -33,23 +33,23 @@ def model_catalog(base_url, key, *, headers=None, query_params=None):
     for name, value in request_headers.items():
         if (not isinstance(name, str) or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name)
                 or not isinstance(value, str) or '\r' in value or '\n' in value):
-            raise ValueError('API 认证请求头格式无效，请检查接入配置')
+            raise ValueError('API 인증 요청 헤더 형식이 잘못되었습니다. 액세스 구성을 확인하세요.')
         try:
             value.encode('latin-1')
         except UnicodeError:
-            raise ValueError('API 认证请求头格式无效，请检查接入配置') from None
+            raise ValueError('API 인증 요청 헤더 형식이 잘못되었습니다. 액세스 구성을 확인하세요.') from None
     request = Request(url, headers=request_headers)
     opener = build_opener(NoRedirect(), HTTPSHandler(context=client_context()))
     try:
         with opener.open(request, timeout=12) as response:
             payload = response.read(1024*1024+1)
         if len(payload) > 1024*1024:
-            raise ValueError('上游模型列表过大，请手动填写模型 ID')
+            raise ValueError("모델 목록이 너무 큽니다. 모델 ID를 수동으로 입력하세요.")
         value = json.loads(payload)
         native = isinstance(value, dict) and 'data' not in value and 'models' in value
         rows = value.get('models' if native else 'data') if isinstance(value, dict) else (value if isinstance(value, list) else None)
         if not isinstance(rows, list):
-            raise ValueError('上游未返回兼容的模型列表，请手动填写模型 ID')
+            raise ValueError("공급자가 지원되지 않는 모델 목록을 반환했습니다. 모델 ID를 수동으로 입력하세요.")
         field = 'slug' if native else 'id'
         result = {}
         for row in rows:
@@ -75,19 +75,19 @@ def model_catalog(base_url, key, *, headers=None, query_params=None):
             result.setdefault(identifier, {'id': identifier, 'name': name if isinstance(name, str) else identifier,
                 'efforts': efforts, 'defaultEffort': default if default in efforts else None})
         if not result:
-            raise ValueError('上游未返回可用模型，请手动填写模型 ID')
+            raise ValueError("공급자가 사용 가능한 모델을 반환하지 않았습니다. 모델 ID를 수동으로 입력하세요.")
         return [result[key] for key in sorted(result)]
     except HTTPError as exc:
         exc.close()
         if exc.code in (401, 403):
-            raise ValueError('上游拒绝访问，请检查 API Key 和模型列表权限') from None
+            raise ValueError("액세스가 거부되었습니다. API 키 및 모델 목록 권한을 확인하세요.") from None
         if 300 <= exc.code < 400:
-            raise ValueError('上游要求跳转，请填写最终 API 地址后重试') from None
-        raise ValueError('上游暂不提供模型列表，请检查 API 地址或手动填写模型 ID') from None
+            raise ValueError("공급자에게 리디렉션이 필요합니다. 마지막 API URL를 입력하고 다시 시도하세요.") from None
+        raise ValueError("모델 목록을 확인할 수 없습니다. API URL를 확인하거나 ID 모델을 수동으로 입력하세요.") from None
     except (URLError, OSError, TimeoutError, HTTPException):
-        raise ValueError('无法连接上游，请检查 API 地址、网络和证书后重试') from None
+        raise ValueError("공급자에게 연결할 수 없습니다. API URL, 네트워크 및 인증서를 확인하세요.") from None
     except (json.JSONDecodeError, UnicodeError):
-        raise ValueError('上游未返回兼容的模型列表，请手动填写模型 ID') from None
+        raise ValueError("공급자가 지원되지 않는 모델 목록을 반환했습니다. 모델 ID를 수동으로 입력하세요.") from None
 
 
 def model_ids(base_url, key, *, headers=None):

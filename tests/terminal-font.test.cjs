@@ -59,8 +59,8 @@ test('stepper changes exactly 1px, disables at 6 and 24, and rejects fractional 
 test('font control omits the visible title while retaining its accessible label',()=>{
   const a=tab(new Map()),control=a.font.control(a.workbench);
   assert.equal(control.label.children.length,3);
-  assert.equal(control.label.title,'所有终端字号');
-  assert.equal(control.label.attributes['aria-label'],'所有终端字号');
+  assert.equal(control.label.title,'모든 터미널 · 글꼴 크기');
+  assert.equal(control.label.attributes['aria-label'],'모든 터미널 · 글꼴 크기');
   assert.deepEqual(control.label.children.map(item=>item.textContent),['−','14px','+']);
 });
 

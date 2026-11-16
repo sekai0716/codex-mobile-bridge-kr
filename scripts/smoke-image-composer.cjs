@@ -5,7 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const root=path.resolve(__dirname,'..'),out=path.join(root,'.tmp/v215-chat-feedback/image-workbench-check');fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(out,'electron-data'));
 const read=file=>fs.readFileSync(path.join(root,file),'utf8'),assets=require('../web/assets.json');
 const style=['/style.css','/presentation.css','/workbench.css','/desktop-sessions.css'].flatMap(url=>assets[url]).map(file=>read('web/'+file)).join('\n');
-const html='<!doctype html><html lang="zh"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+style+'</style><body></body></html>';
+const html='<!doctype html><html lang="ko"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+style+'</style><body></body></html>';
 let writes=0;const server=http.createServer((req,res)=>{if(req.method!=='GET'){writes++;res.writeHead(405);return res.end();}if(req.url.startsWith('/api/')){res.writeHead(200,{'Content-Type':'image/png'});return res.end(fs.readFileSync(path.join(root,'web/icon.png')));}res.writeHead(200,{'Content-Type':'text/html'});res.end(html);});
 app.whenReady().then(async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const window=new BrowserWindow({width:390,height:844,show:false});const errors=[];window.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});window.webContents.setWindowOpenHandler(()=>({action:'deny'}));

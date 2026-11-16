@@ -64,7 +64,7 @@ test('official and API connections have no current-account fallback outside save
  assert.doesNotMatch(desktopHtml,/id="account-(?:details|button|content)"/);
  for(const kind of ['chatgpt','api']){
   const ui=await fixture(r=>r(official),kind);
-  assert.equal(ui.nodes.get('accounts-button').textContent,'账号管理');
+  assert.equal(ui.nodes.get('accounts-button').textContent,'계정');
   for(const id of ['account-status','account-dialog','account-details','account-button','account-content'])assert.equal(ui.nodes.has(id),false,id);
   assert.equal(ui.requests.filter(url=>url==='/api/account').length,0);
   ui.nodes.get('accounts-button').onclick();await new Promise(setImmediate);
@@ -78,7 +78,7 @@ test('saved official card retains its direct reset action without a second quota
  ui.nodes.get('accounts-button').onclick();await new Promise(setImmediate);
  const all=node=>[node,...node.children.flatMap(all)];
  const card=all(ui.nodes.get('accounts-content')).find(node=>node.className==='account-bucket');
- assert.ok(card);assert.ok(all(card).some(node=>node.tagName==='BUTTON'&&node.textContent==='使用重置卡'));
+ assert.ok(card);assert.ok(all(card).some(node=>node.tagName==='BUTTON'&&node.textContent==='재설정 사용'));
  assert.equal(ui.nodes.has('account-details'),false);
  assert.equal(ui.requests.some(url=>url==='/api/account'||url==='/api/account?cached=1'),false);
 });
@@ -90,10 +90,10 @@ test('opening, refreshing and logging out never read the old current-account end
 });
 test('computer approval buttons send precisely the selected persistence and retain their original chat',async()=>{
  const ui=await fixture(r=>r(official));
- for(const [label,persist] of [['始终允许','always'],['允许此对话','session'],['拒绝',undefined]]){
+ for(const [label,persist] of [['항상 허용','always'],['이 대화를 허용하세요','session'],['거부',undefined]]){
   ui.run("currentId='11111111-1111-4111-8111-111111111111';currentHost='local';submittedRequestIds.clear();renderApprovals([{id:'computer-'+Math.random(),method:'mcpServer/elicitation/request',supported:true,params:{computerUse:{app:'Fixture app',persistModes:['session','always']}}}])");
   const all=n=>[n,...n.children.flatMap(all)],card=ui.nodes.get('approvals');
-  assert.equal(all(card).some(n=>n.textContent==='本次允许'),false);
+  assert.equal(all(card).some(n=>n.textContent==='한 번만 허용'),false);
   const button=all(card).find(n=>n.textContent===label);assert.ok(button);
   ui.run("currentId='22222222-2222-4222-8222-222222222222'");await button.onclick();
   const reply=ui.responses.at(-1).response;assert.equal(reply.persist,persist);assert.equal(reply.action,persist?'accept':'decline');
@@ -108,7 +108,7 @@ test('API chat picker shows upstream Gemini models and requires replacing the un
  await ui.nodes.get('model-button').onclick();
  const select=ui.nodes.get('model-select');assert.ok(select.children.some(o=>o.value==='gemini-fixture'));
  assert.equal(select.children.some(o=>o.value.startsWith('gpt')),false);assert.equal(select.value,'');
- assert.match(ui.nodes.get('model-error').textContent,/当前聊天模型不在上游/);assert.equal(ui.nodes.get('model-save').disabled,true);
+ assert.match(ui.nodes.get('model-error').textContent,/현재 채팅 모델이 업스트림 목록에 없습니다\. 사용 가능한 모델을 선택하고 적용하세요\./);assert.equal(ui.nodes.get('model-save').disabled,true);
  assert.equal(ui.responses.length,0);
  const modelChoice=ui.nodes.get('model-options').children.find(row=>row.children[0].value==='gemini-fixture').children[0];
  modelChoice.checked=true;modelChoice.onchange();assert.equal(select.value,'gemini-fixture');
@@ -120,10 +120,10 @@ test('API chat picker shows upstream Gemini models and requires replacing the un
  assert.equal(ui.responses[0].fastMode,undefined);
 });
 test('API model discovery failure shows its error with manual input instead of stale GPT options',async()=>{
- const ui=await fixture(r=>r(official),'api',{models:[],skills:[],modelSource:'api',modelError:'上游拒绝访问，请检查 API Key 和模型列表权限',fastMode:{allowed:false}});
+ const ui=await fixture(r=>r(official),'api',{models:[],skills:[],modelSource:'api',modelError:'액세스가 거부되었습니다. API 키 및 모델 목록 권한을 확인하세요.',fastMode:{allowed:false}});
  ui.run("currentId='11111111-1111-4111-8111-111111111111';state={model:'gpt-old',provider:'openai',connected:true}");
  await ui.nodes.get('model-button').onclick();
- assert.match(ui.nodes.get('model-updated').textContent,/上游拒绝/);assert.equal(ui.nodes.get('custom-model-label').hidden,false);
+ assert.match(ui.nodes.get('model-updated').textContent,/액세스가 거부되었습니다\. API 키 및 모델 목록 권한을 확인하세요\./);assert.equal(ui.nodes.get('custom-model-label').hidden,false);
  assert.equal(ui.nodes.get('model-select').children.some(o=>o.value.startsWith('gpt')),false);
  assert.equal(ui.responses.length,0);
 });
@@ -146,7 +146,7 @@ test('selected skill pills render before the catalog response arrives',async()=>
   const ui=await fixture(r=>r(official));
   ui.run("currentId='11111111-1111-4111-8111-111111111111';currentHost='local';catalogData={models:null,skills:null};selectedSkills=new Set(['fixture-skill']);renderSkillPills()");
   assert.equal(ui.nodes.get('skill-count').textContent,'(1)');
-  assert.equal(ui.nodes.get('skill-pills').children[0].textContent,'已选 Skill ×');
+  assert.equal(ui.nodes.get('skill-pills').children[0].textContent,'선택한 스킬 ×');
 });
 test('cached async model catalog still renders the picker instead of returning raw rows',async()=>{
   const catalog={models:[{id:'fixture-model',name:'Fixture',efforts:['high']}],skills:[],modelSource:'codex',currentModel:'fixture-model',fastMode:{allowed:false}};
@@ -233,10 +233,10 @@ test('a missing selected skill is visibly invalid and blocks submission',async()
   ui.run("currentId='11111111-1111-4111-8111-111111111111';currentHost='local';state={connected:true};selectedSkills=new Set(['available','missing']);attachments.ready=()=>true;attachments.ids=()=>[]");
   await ui.nodes.get('skills-button').onclick();
   assert.equal(ui.nodes.get('skill-count').textContent,'(2)');
-  assert.ok([...ui.nodes.get('skill-pills').children].some(node=>node.textContent==='已失效 Skill ×'));
+  assert.ok([...ui.nodes.get('skill-pills').children].some(node=>node.textContent==='사용할 수 없는 스킬 ×'));
   ui.nodes.get('message').value='fixture';
   await ui.nodes.get('composer').onsubmit({preventDefault(){}});
-  assert.equal(ui.nodes.get('send-error').textContent,'已选 Skill 已失效，请刷新列表后重新选择');
+  assert.equal(ui.nodes.get('send-error').textContent,'선택한 스킬을 사용할 수 없습니다. 새로고침하고 다시 선택하세요.');
   assert.equal(ui.responses.length,0);
 });
 test('a skill selected during pagination is not invalidated by older hydration',async()=>{
@@ -259,7 +259,7 @@ test('Skill failure clears the loading state and refresh can recover',async()=>{
   ui.run("currentId='thread';currentHost='local'");
   ui.failNextSkill();
   await ui.run('openSkills()');
-  assert.equal(ui.nodes.get('skill-list').textContent,'Skill 加载失败，请点击刷新重试');
+  assert.equal(ui.nodes.get('skill-list').textContent,'스킬을 로드할 수 없습니다. 다시 시도하려면 새로 고침을 클릭하세요.');
   assert.equal(ui.nodes.get('skills-error').textContent,'Skill fixture error');
   await ui.run('openSkills(true)');
   assert.equal(ui.run('skillPages.length'),1);
@@ -281,9 +281,9 @@ test('Skill pagination uses actual scroll geometry and keeps complete descriptio
 
 test('entering a gateway follows its language, and manual switching remains available',async()=>{
  const ui=await fixture(r=>r(official),'chatgpt',null,'en');assert.equal(ui.run('BridgeI18n.language()'),'en');
- ui.nodes.get('phone-language').value='zh';ui.nodes.get('phone-language').onchange();assert.equal(ui.run('BridgeI18n.language()'),'zh');
+ ui.nodes.get('phone-language').value='ko';ui.nodes.get('phone-language').onchange();assert.equal(ui.run('BridgeI18n.language()'),'ko');
  await ui.run('start()');assert.equal(ui.run('BridgeI18n.language()'),'en');
- const chinese=await fixture(r=>r(official),'chatgpt',null,'zh');assert.equal(chinese.run('BridgeI18n.language()'),'zh');
+ const chinese=await fixture(r=>r(official),'chatgpt',null,'ko');assert.equal(chinese.run('BridgeI18n.language()'),'ko');
 });
 
 
@@ -363,11 +363,11 @@ test('reopening a failed model query reads the recovered backend result',async()
 test('same chat reopens model rows before a delayed catalog read',async()=>{
  const catalog={models:[{id:'ready',name:'Ready',efforts:['low']}],modelSource:'codex',cache:{identity:'a'.repeat(64),updatedAt:1000}},ui=await fixture(r=>r(official),'chatgpt',catalog);
  ui.run("currentId='11111111-1111-4111-8111-111111111111';state={connected:true,provider:'chatgpt',model:'ready',modelCatalogIdentity:'"+'a'.repeat(64)+"'}");
- await ui.nodes.get('model-button').onclick();assert.match(ui.nodes.get('model-updated').textContent,/更新于：/);
+ await ui.nodes.get('model-button').onclick();assert.match(ui.nodes.get('model-updated').textContent,/업데이트 날짜:/);
  ui.run("var releaseCatalog;const originalApi=api;api=(url,body)=>url.includes('catalog?kind=models')?new Promise(resolve=>releaseCatalog=resolve):originalApi(url,body)");
  const pending=ui.nodes.get('model-button').onclick();assert.ok(ui.nodes.get('model-options').children.some(row=>row.children[0].value==='ready'));
  ui.run("releaseCatalog({models:[{id:'ready',name:'Ready',efforts:['low']}],modelSource:'codex',cache:{identity:'"+'a'.repeat(64)+"',updatedAt:1000}})");await pending;
- assert.match(ui.nodes.get('model-updated').textContent,/更新于：/);
+ assert.match(ui.nodes.get('model-updated').textContent,/업데이트 날짜:/);
 });
 test('a late catalog from another gateway cannot populate the current cache',async()=>{
  const identity='a'.repeat(64),catalog={models:[{id:'ready',efforts:['low']}],cache:{identity,updatedAt:1000}},ui=await fixture(r=>r(official),'chatgpt',catalog);
@@ -507,7 +507,7 @@ test('model identity change is not treated as an editable directory outage',asyn
  const catalog={models:[{id:'old-model',efforts:[]}],cache:{identity:'account-a'}};
  const ui=await fixture(r=>r(official),'chatgpt',catalog);ui.run("currentId='thread';state={connected:true,model:'old-model',modelCatalogIdentity:'account-a'}");
  await ui.nodes.get('model-button').onclick();catalog.cache.identity='account-b';await ui.nodes.get('model-refresh').onclick();
- assert.equal(ui.nodes.get('model-save').disabled,true);assert.match(ui.nodes.get('model-error').textContent,/账号已切换/);assert.doesNotMatch(ui.nodes.get('model-updated').textContent,/手动/);
+ assert.equal(ui.nodes.get('model-save').disabled,true);assert.match(ui.nodes.get('model-error').textContent,/계정이 변경되었습니다\. 모델 설정을 다시 엽니다\./);assert.doesNotMatch(ui.nodes.get('model-updated').textContent,/수동/);
  ui.nodes.get('custom-model').value='old-model';ui.nodes.get('custom-model').oninput();assert.equal(ui.nodes.get('model-save').disabled,true);
  await ui.nodes.get('model-form').onsubmit({preventDefault(){}});assert.equal(ui.responses.length,0);
 });

@@ -1,41 +1,41 @@
-## v2.2.1 · Antigravity 接入、交互图表与原生会话兼容性改进
+## v2.2.1 · Antigravity 액세스, 대화형 그래프 및 기본 세션 호환성 개선
 
-**建议更新以适配最新版 Codex APP 原生连接。**
+**최신 버전에 적응하려면 업데이트하는 것이 좋습니다 Codex APP 기본 연결。**
 
-v2.2.1 新增 Antigravity 接入与聊天内交互图表，完善 CLI 连接管理、模型缓存和文件浏览，并修复新版 Codex 连接、长会话读取及手机连接恢复中的问题。
+v2.2.1 새로운 Antigravity 액세스 및 채팅 내 상호 작용 차트가 개선되었습니다. CLI 연결 관리, 모델 캐싱 및 파일 찾아보기, 새 버전에 대한 수정 사항 Codex 연결 문제, 장시간 세션 읽기 및 모바일 연결 복구 문제。
 
-### 新增与改进
+### 새로운 추가 및 개선 사항
 
-- **Antigravity 远程工作台。** 在手机和 Web 查看 App、IDE、CLI 的本机历史，通过受支持的原生连接继续聊天、新建项目聊天、切换模型、发送附件和处理审批。补充原生问题与等待交互、子任务管理、历史图片预览及添加到草稿；展示原生服务实际提供的模型额度与上下文用量。受支持的默认本机配置可保存账号副本，并在核验空闲后切换。[PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150) · [PR #170](https://github.com/try2love/codex-mobile-bridge/pull/170)
-- **聊天内交互图表。** Codex 回复中的 visualize 内容可直接展示，支持滑块、按钮、主题适配与全屏查看；重新打开聊天时恢复图表已保存的交互状态。图表追问可放入输入框，编辑后由用户发送。[#166](https://github.com/try2love/codex-mobile-bridge/issues/166) · [PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167)
-- **CLI 连接与网络管理。** 按 Agent、运行环境和配置查看连接，支持单条或配置范围释放，并展示共享服务操作的影响范围。增加受支持本机接入的账号、代理变化核验及网络恢复入口；任务、审批或发送结果不明时保留核对流程。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
-- **侧边聊天与宽屏阅读。** 保留原生侧聊的父子关联，提供明确的临时侧聊入口，复用输入、附件、模型和审批界面。宽屏可收起聊天列表，为当前会话腾出更多阅读空间。[#149](https://github.com/try2love/codex-mobile-bridge/issues/149)
-- **文件浏览与聊天操作。** 支持经授权的宿主机目录、完整路径导航和返回项目文件夹，聊天文件链接可定位到目标。增加 `/` 命令入口、可选的新建聊天名称、原生交互时间及授权音视频附件播放，精简提醒入口。[#160](https://github.com/try2love/codex-mobile-bridge/issues/160) · [#154](https://github.com/try2love/codex-mobile-bridge/issues/154) · [#161](https://github.com/try2love/codex-mobile-bridge/issues/161) · [#148](https://github.com/try2love/codex-mobile-bridge/issues/148) · [#158](https://github.com/try2love/codex-mobile-bridge/issues/158) · [#141](https://github.com/try2love/codex-mobile-bridge/issues/141)
-- **网络与桌面体验。** 自有服务器＋SSH 入口支持自定义 HTTPS 端口；macOS 菜单栏使用单色图标。[#145](https://github.com/try2love/codex-mobile-bridge/issues/145) · [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) · [#156](https://github.com/try2love/codex-mobile-bridge/issues/156) · [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)
+- **Antigravity 원격 작업대。** 휴대폰과 Web 확인하다 App、IDE、CLI 기본 기록, 지원되는 기본 연결을 통해 계속 채팅하고, 새 프로젝트에서 채팅하고, 모델을 전환하고, 첨부 파일을 보내고 승인을 처리하세요. 기본 질문 및 대기 상호 작용 보완, 하위 작업 관리, 기록 이미지 미리 보기 및 초안에 추가 기본 서비스에서 제공하는 실제 모델 할당량 및 컨텍스트 사용량을 표시합니다. 지원되는 기본 기본 구성은 가용성을 확인한 후 계정 및 스위치의 복사본을 저장합니다.。[PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150) · [PR #170](https://github.com/try2love/codex-mobile-bridge/pull/170)
+- **채팅 내 상호작용 그래프。** Codex 답장으로 visualize 슬라이더, 버튼, 테마 적용 및 전체 화면 보기를 지원하여 콘텐츠를 직접 표시할 수 있습니다. 채팅을 다시 열면 차트의 저장된 상호 작용 상태가 복원됩니다. 차트 질문은 입력 상자에 입력하고 편집 후 사용자가 보낼 수 있습니다.。[#166](https://github.com/try2love/codex-mobile-bridge/issues/166) · [PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167)
+- **CLI 연결 및 네트워크 관리。** ～에 따르면 Agent、환경 및 구성 보기 연결을 실행하고, 단일 또는 구성 범위 릴리스를 지원하고, 공유 서비스 작업의 영향 범위를 표시합니다. 로컬 액세스, 에이전트 변경 확인 및 네트워크 복구 진입을 지원하는 계정이 추가되었습니다. 업무, 승인, 전송 결과가 불분명할 경우 검증 프로세스를 유지합니다.。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
+- **사이드 채팅 및 와이드스크린 읽기。** 기본 사이드 채팅의 상위-하위 관계를 유지하고 명확한 임시 사이드 채팅 입구를 제공하며 입력, 첨부 파일, 모델 및 승인 인터페이스를 재사용합니다. 와이드 스크린에서는 채팅 목록을 축소하여 현재 대화를 읽을 수 있는 공간을 더 확보할 수 있습니다.。[#149](https://github.com/try2love/codex-mobile-bridge/issues/149)
+- **파일 탐색 및 채팅 작업。** 승인된 호스트 디렉터리, 전체 경로 탐색 및 프로젝트 폴더로 돌아가기를 지원하며 채팅 파일 링크를 대상에 찾을 수 있습니다. 증가하다 `/` 명령 입구, 선택적 새 채팅 이름, 기본 상호 작용 시간 및 인증된 오디오 및 비디오 첨부 파일 재생, 간소화된 알림 입구。[#160](https://github.com/try2love/codex-mobile-bridge/issues/160) · [#154](https://github.com/try2love/codex-mobile-bridge/issues/154) · [#161](https://github.com/try2love/codex-mobile-bridge/issues/161) · [#148](https://github.com/try2love/codex-mobile-bridge/issues/148) · [#158](https://github.com/try2love/codex-mobile-bridge/issues/158) · [#141](https://github.com/try2love/codex-mobile-bridge/issues/141)
+- **웹 및 데스크톱 경험。** 자체 서버＋SSH 입구는 사용자 정의를 지원합니다 HTTPS 포트；macOS 메뉴 표시줄에 단색 아이콘 사용。[#145](https://github.com/try2love/codex-mobile-bridge/issues/145) · [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) · [#156](https://github.com/try2love/codex-mobile-bridge/issues/156) · [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)
 
-- **WSL 状态与启动入口。** 区分发行版停止与状态暂未确认，避免查询失败时误报停止；Codex 和 Claude 的网关及直连应用管理列表提供“启动并连接 WSL”，并修复 WSL Claude 的“查看聊天”跳转失败。
+- **WSL 상태 및 시작 항목。** 쿼리 실패 시 중지에 대한 잘못된 긍정을 방지하려면 릴리스 버전 중지와 확인되지 않은 상태를 구별하세요.；Codex 및 Claude 게이트웨이 및 직접 애플리케이션 관리 목록 제공“시작 및 연결 WSL”，그리고 고치다 WSL Claude 의“채팅 보기”점프 실패。
 
-### 修复与优化
+### 수정 및 최적화
 
-- **恢复新版 Codex 会话连接。** 适配桌面端 v13 同步协议，并对结构兼容的后续版本进行校验后继续同步。无法识别关键任务或审批结构时，保留历史与草稿，暂停控制并提示升级。[#168](https://github.com/try2love/codex-mobile-bridge/issues/168) · [PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169)
-- **修复 Antigravity 运行一段时间后被误判离线。** 日志较大时同时读取头尾端口信息，并限制日志读取量，继续核验端口和目标进程的归属。[PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171)
-- **改善长会话读取。** 限制 Antigravity 单个超长回合进入历史页的数据量；避免 Claude 已持久化的流式历史挤入最近消息页，并保留页外完成状态的关联信息。
-- **模型列表更稳定。** 复用当前账号与接入的模型缓存；列表获取失败时保留明确的手动模型选择与草稿。区分账号变化和临时获取失败，避免错误清空选项或跨账号复用旧列表。
-- **改善连接恢复与应用启动。** 修复 Windows 商店版 Codex 启动和就绪判断、Claude 初始化失败后的重试状态及部分原生运行时兼容问题；改善 DSH 连接器恢复与 ZCode 窗口识别。[#153](https://github.com/try2love/codex-mobile-bridge/issues/153)
-- **修复手机连接与导航。** 改善 iOS 进入电脑、后台恢复和连接页安全区域；Android 在信道探测过程中可返回电脑列表，完善 Cookie 迁移和网关身份保留。[#159](https://github.com/try2love/codex-mobile-bridge/issues/159)
-- **改善更新与界面细节。** macOS 更新后通过系统启动机制重新打开 App，改善辅助功能授权身份衔接；Windows 下载更新前先检查应用占用。修复登录状态提示未完整随中英文切换的问题。
+- **새 버전 복원 Codex 세션 연결。** 데스크탑에 적응 v13 프로토콜을 동기화하고 구조적으로 호환되는 후속 버전을 확인한 후 동기화를 계속합니다. 주요 작업이나 승인 구조를 식별할 수 없는 경우 기록과 초안이 유지되고 제어가 일시 중단되며 업그레이드가 요청됩니다.。[#168](https://github.com/try2love/codex-mobile-bridge/issues/168) · [PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169)
+- **수리하다 Antigravity 일정 시간 동안 실행한 후 오프라인으로 잘못 판단되었습니다.。** 로그가 큰 경우 헤드 및 테일 포트 정보를 동시에 읽고 로그 읽기 양을 제한하며 포트 및 대상 프로세스의 소유권을 계속 확인합니다.。[PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171)
+- **긴 세션 읽기 개선。** 한계 Antigravity 매우 긴 단일 라운드에서 기록 페이지에 입력되는 데이터의 양입니다. 피하다 Claude 지속적인 스트리밍 기록은 최근 메시지 페이지에 표시되며 페이지 외부 완료 상태에 대한 관련 정보를 유지합니다.。
+- **모델 목록이 더 안정적입니다.。** 현재 계정과 액세스된 모델 캐시를 재사용합니다. 목록 획득이 실패할 경우 명확한 수동 모델 선택 및 초안을 유지합니다. 잘못된 청산 옵션을 피하거나 계정 전체에서 이전 목록을 재사용하지 않도록 계정 변경과 임시 획득 실패를 구별하세요.。
+- **연결 복구 및 애플리케이션 시작 개선。** 수리하다 Windows 스토어 버전 Codex 시동 및 준비상태 판단、Claude 초기화 실패 후 재시도 상태 및 일부 기본 런타임 호환성 문제. 개선됨 DSH 커넥터 복구 ZCode 창 인식。[#153](https://github.com/try2love/codex-mobile-bridge/issues/153)
+- **전화 연결 및 탐색 수정。** 개선하다 iOS 컴퓨터, 백그라운드 복구 및 연결 페이지 보안 영역에 들어가십시오.；Android 채널 검색 프로세스 중에 컴퓨터 목록으로 돌아가서 완료할 수 있습니다. Cookie 마이그레이션 및 게이트웨이 ID 보존。[#159](https://github.com/try2love/codex-mobile-bridge/issues/159)
+- **업데이트 및 인터페이스 세부정보 개선。** macOS 업데이트 후 시스템 시작 메커니즘을 통해 다시 열기 App，접근성 인증 ID 연결 개선；Windows 업데이트를 다운로드하기 전에 앱 사용량을 확인하세요. 로그인 상태 프롬프트가 완료되지 않고 중국어와 영어 간에 전환되는 문제를 수정했습니다.。
 
-### 使用说明
+### 사용 지침
 
-**Android 安装说明：** 新版 **Bridge** 与旧版 v2.2.0 App 独立安装，不能直接覆盖旧版。请先安装新版、重新添加电脑并确认连接正常，保留好旧版中需要的草稿后，再卸载旧版。旧版绑定和草稿不会自动迁移。已安装 v2.2.1-preview.1 独立 **Bridge Preview** 的用户可直接覆盖升级，保留该预览 App 的连接和草稿。
+**Android 설치 지침：** 새 버전 **Bridge** 이전 버전으로 v2.2.0 App 독립적으로 설치되며 이전 버전을 직접 덮어쓸 수 없습니다. 먼저 새 버전을 설치한 후 컴퓨터를 다시 추가하고 연결이 정상인지 확인하고 필요한 초안을 이전 버전에 유지한 후 이전 버전을 제거하시기 바랍니다. 레거시 바인딩 및 초안은 자동으로 마이그레이션되지 않습니다. 설치됨 v2.2.1-preview.1 독립적인 **Bridge Preview** 사용자는 업그레이드를 직접 덮어쓰고 미리보기를 유지할 수 있습니다. App 연결 및 초안。
 
-手机原生导航、交互图表与连接恢复改进需要同步更新对应手机 App。iOS 源码和未签名 IPA 仍需自行签名安装。
+휴대폰 기본 내비게이션, 대화형 차트 및 연결 복구 개선 사항을 해당 휴대폰에서 동시에 업데이트해야 합니다. App。iOS 소스 코드 및 서명되지 않음 IPA 여전히 서명하고 직접 설치해야 합니다.。
 
-Antigravity 账号切换、独立客户端及 WSL 相关能力以当前平台和接入支持为准。临时侧聊仅适用于受支持的本机桌面入口，不写入原生历史，网关重启后不会恢复。项目外文件浏览为只读；发送、审批及切换结果不明时，不自动重放操作。
+Antigravity 계정 전환, 독립 클라이언트 및 WSL 관련 기능은 현재 플랫폼 및 액세스 지원에 따라 달라집니다. 임시 사이드 채팅은 지원되는 로컬 데스크톱 포털에만 적용되고 기본 기록을 기록하지 않으며 게이트웨이를 다시 시작한 후에는 복원되지 않습니다. 프로젝트 외부의 파일 탐색은 읽기 전용입니다. 전송, 승인 및 전환 결과를 알 수 없는 경우 작업이 자동으로 재생되지 않습니다.。
 
-### 贡献
+### 기여하다
 
-感谢 [@windowmmk](https://github.com/windowmmk) 在 [PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150)、[PR #170](https://github.com/try2love/codex-mobile-bridge/pull/170) 和 [PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171) 中贡献 Antigravity 接入、账号管理、原生交互与日志发现修复；感谢 [@heiqiu47](https://github.com/heiqiu47) 在 [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146)、[PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)、[PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167) 和 [PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169) 中贡献自定义 HTTPS 端口、菜单栏图标、交互图表和 Codex 协议兼容改进。
+고마워하는 [@windowmmk](https://github.com/windowmmk) 에서 [PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150)、[PR #170](https://github.com/try2love/codex-mobile-bridge/pull/170) 및 [PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171) 기부금 Antigravity 액세스, 계정 관리, 기본 상호 작용 및 로그 검색 복구 감사해요 [@heiqiu47](https://github.com/heiqiu47) 에서 [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146)、[PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)、[PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167) 및 [PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169) 사용자 정의에 기여 HTTPS 포트, 메뉴 표시줄 아이콘, 대화형 다이어그램 및 Codex 프로토콜 호환성 개선。
 
 ---
 
@@ -79,41 +79,41 @@ Thanks to [@windowmmk](https://github.com/windowmmk) for Antigravity contributio
 
 ---
 
-## v2.2.1-preview.1 · Antigravity 接入、CLI 连接管理与会话体验改进
+## v2.2.1-preview.1 · Antigravity 연결、CLI 연결 관리 및 세션 경험 개선
 
-本次预览版新增 Antigravity 接入，重点完善 CLI 连接释放与恢复、侧边聊天和文件浏览，并修复 Windows 客户端启动、手机连接恢复及模型列表读取中的问题。
+이 미리보기 버전의 새로운 기능 Antigravity 접근성, 개선에 집중 CLI 연결 해제 및 복구, 사이드 채팅 및 파일 탐색, 복구 Windows 클라이언트 시작, 휴대폰 연결 복구 및 모델 목록 읽기 문제。
 
-### 新增与改进
+### 새로운 추가 및 개선 사항
 
-- **Antigravity 接入。** 在手机和 Web 查看 Antigravity App、IDE、CLI 的本机历史，使用受支持的原生连接继续聊天、新建项目聊天、切换模型、发送附件和处理审批。增加按来源展示的账号信息，以及受支持默认本机 Google 登录的账号副本管理。[PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150)
-- **CLI 连接管理更清晰。** 按当前 Agent、本机／SSH／WSL 和配置分组，支持单条或配置范围释放。共享服务操作前展示实际影响范围，区分等待任务结束、明确强制释放和结果待核验；改善释放后接回原会话的流程。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
-- **CLI 账号与网络恢复。** 在受支持的本机接入中核验原生账号和代理变化，增加网络恢复入口；需要重建服务时先检查任务与审批，保留未发送内容。SSH 和 WSL 继续使用各自的账号、目录和运行环境。
-- **原生与临时侧聊。** 原生侧聊继续保留在父会话工作台中；恢复明确的临时侧聊入口，复用常规聊天的输入、附件、模型和审批界面。修复子标签错位及 Windows 原生侧聊的运行时连接问题。[#149](https://github.com/try2love/codex-mobile-bridge/issues/149)
-- **更完整的文件浏览。** 文件页支持经权限校验的宿主机目录、完整路径导航和“返回项目文件夹”；聊天中的文件链接可以定位到对应文件。项目外浏览为只读，上传和发送引用仍遵循原项目范围。[#160](https://github.com/try2love/codex-mobile-bridge/issues/160)
-- **共享聊天操作。** 输入框增加 `/` 命令入口，复用当前接入支持的操作；新建聊天名称改为可选，留空时保留原生自动命名行为。[#154](https://github.com/try2love/codex-mobile-bridge/issues/154) · [#161](https://github.com/try2love/codex-mobile-bridge/issues/161)
-- **消息展示与通知。** 展示可读取的原生交互日期和时间，支持授权音视频附件播放，精简会话提醒入口并保留独立通知控制。[#148](https://github.com/try2love/codex-mobile-bridge/issues/148) · [#158](https://github.com/try2love/codex-mobile-bridge/issues/158) · [#141](https://github.com/try2love/codex-mobile-bridge/issues/141)
-- **连接与桌面体验。** 自有服务器＋SSH 入口支持自定义 HTTPS 端口；macOS 菜单栏采用单色图标。[#145](https://github.com/try2love/codex-mobile-bridge/issues/145) · [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) · [#156](https://github.com/try2love/codex-mobile-bridge/issues/156) · [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)
+- **Antigravity 연결。** 휴대폰과 Web 확인하다 Antigravity App、IDE、CLI 기본 기록, 지원되는 기본 연결을 사용하여 계속 채팅하고, 새 프로젝트에 대해 채팅하고, 모델을 전환하고, 첨부 파일을 보내고, 승인을 처리하세요. 소스별로 표시되는 계정 정보를 추가하고 기본 로컬 컴퓨터를 지원합니다. Google 로그인 계정 복사 관리。[PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150)
+- **CLI 연결 관리가 더욱 명확해졌습니다.。** 현재를 누르십시오 Agent、로컬 머신／SSH／WSL 단일 또는 구성 범위 릴리스를 지원하는 구성 그룹화. 공유 서비스를 운영하기 전에 실제 영향 범위를 표시하고, 작업 종료 대기, 강제 해제 해제 및 확인 대기 결과를 구분합니다. 릴리스 후 원래 세션을 재개하는 프로세스 개선。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
+- **CLI 계정 및 네트워크 복구。** 지원되는 로컬 액세스에서 기본 계정 및 에이전트의 변경 사항을 확인하고 네트워크 복구 입구를 추가합니다. 서비스를 재구축해야 하는 경우 먼저 작업 및 승인을 확인하고 전송되지 않은 콘텐츠를 보관해야 합니다.。SSH 및 WSL 각자의 계정, 디렉터리, 운영 환경을 계속해서 사용하세요.。
+- **기본 및 임시 사이드 채팅。** 기본 사이드 채팅은 상위 대화 워크벤치에 계속 남아 있습니다. 명확한 임시 사이드 채팅 입구가 복원되고 일반 채팅의 입력, 첨부 파일, 모델 및 승인 인터페이스가 재사용됩니다. 하위 라벨 정렬 문제를 수정하고 Windows 기본 사이드 채팅의 런타임 연결 문제。[#149](https://github.com/try2love/codex-mobile-bridge/issues/149)
+- **더욱 완벽한 파일 탐색。** 파일 페이지는 권한이 검증된 호스트 디렉터리, 전체 경로 탐색 및“프로젝트 폴더로 돌아가기”；채팅의 파일 링크를 통해 해당 파일을 찾을 수 있습니다. 프로젝트 외부 탐색은 읽기 전용이며 참조 업로드 및 전송은 여전히 ​​원래 프로젝트 범위를 따릅니다.。[#160](https://github.com/try2love/codex-mobile-bridge/issues/160)
+- **채팅 작업 공유。** 입력 상자가 추가되었습니다. `/` 명령 입력은 현재 액세스에서 지원되는 작업을 재사용합니다. 새 채팅 이름은 선택 사항으로 변경되며, 공백으로 두면 기본 자동 이름 지정 동작이 유지됩니다.。[#154](https://github.com/try2love/codex-mobile-bridge/issues/154) · [#161](https://github.com/try2love/codex-mobile-bridge/issues/161)
+- **메시지 표시 및 알림。** 읽을 수 있는 기본 상호 작용 날짜 및 시간 표시, 인증된 오디오 및 비디오 첨부 파일 재생 지원, 대화 알림 항목 간소화 및 독립적인 알림 제어 유지。[#148](https://github.com/try2love/codex-mobile-bridge/issues/148) · [#158](https://github.com/try2love/codex-mobile-bridge/issues/158) · [#141](https://github.com/try2love/codex-mobile-bridge/issues/141)
+- **연결 및 데스크톱 환경。** 자체 서버＋SSH 입구는 사용자 정의를 지원합니다 HTTPS 포트；macOS 메뉴 표시줄은 단색 아이콘을 사용합니다.。[#145](https://github.com/try2love/codex-mobile-bridge/issues/145) · [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) · [#156](https://github.com/try2love/codex-mobile-bridge/issues/156) · [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)
 
-### 修复与优化
+### 수정 및 최적화
 
-- 修复 Windows 商店版 Codex 的启动身份、共享运行环境和就绪判断，改善初始化及冷启动恢复。
-- 改善 Windows Claude、Codex 正常退出时的窗口行为；修复 ZCode 本地连接的窗口路径匹配问题。[#153](https://github.com/try2love/codex-mobile-bridge/issues/153)
-- 改善 DSH 缺失连接器的确认修复及旧连接器兼容，连接器异常时仍可独立核验应用退出。
-- 修复 iOS 进入电脑时长时间停留在连接页、后台中断后不能继续，以及连接页“更多”按钮的安全区域问题；完善 Android Cookie 迁移和网关身份保留。[#159](https://github.com/try2love/codex-mobile-bridge/issues/159)
-- 修复项目目录或历史文件缺失时模型列表不可用的问题；改善独立 CLI 发现、WSL 首次扫描与显式启动。
-- 部分主机读取失败时保留已成功加载的聊天列表，并提供对应错误与重试入口；改善文件页连续返回和迟到响应处理。
-- Windows 更新前先检查影响安装的应用占用，减少下载完成后才发现无法更新的情况。
+- 수리하다 Windows 스토어 버전 Codex 초기화 및 콜드 스타트 ​​복구 개선을 위한 스타트업 ID, 공유 운영 환경 및 준비 상태 판단。
+- 개선하다 Windows Claude、Codex 정상 종료 시 창 동작; 결정된 ZCode 로컬로 연결된 창 경로 일치 문제。[#153](https://github.com/try2love/codex-mobile-bridge/issues/153)
+- 개선하다 DSH 누락된 커넥터의 확인 및 수리 및 기존 커넥터와의 호환성. 커넥터에 이상이 있어도 애플리케이션 종료를 독립적으로 확인할 수 있습니다.。
+- 수리하다 iOS 컴퓨터에 들어갈 때 오랫동안 연결 페이지에 머무르고 백그라운드 중단 후 계속할 수 없으며 연결 페이지“더”버튼의 안전 영역 문제; 개선됨 Android Cookie 마이그레이션 및 게이트웨이 ID 보존。[#159](https://github.com/try2love/codex-mobile-bridge/issues/159)
+- 프로젝트 디렉터리 또는 기록 파일이 누락된 경우 모델 목록을 사용할 수 없는 문제가 수정되었습니다. 향상된 독립성 CLI 발견하다、WSL 첫 번째 스캔과 명시적 시작 비교。
+- 일부 호스트가 읽지 못하는 경우 성공적으로 로드된 채팅 목록이 유지되고 해당 오류 및 재시도 항목이 제공됩니다. 파일 페이지의 연속 반환 및 지연 응답 처리가 개선되었습니다.。
+- Windows 업데이트하기 전에 설치에 영향을 미치는 응용 프로그램의 사용을 확인하여 다운로드가 완료된 후 업데이트할 수 없는 상황을 줄이십시오.。
 
-### 使用范围与升级
+### 사용 및 업그레이드 범위
 
-这是预览版本，欢迎反馈连接恢复、CLI 释放、侧边聊天和 Antigravity 接入的实际体验。桌面和 iOS 覆盖安装时保持原应用标识、签名和数据目录，不要先卸载。Android 本次提供独立的 **Bridge Preview**，与原 App 并存；请保留原 App，并在预览 App 中重新添加电脑连接，原绑定和草稿不会自动迁移。手机原生连接恢复等改动需要更新对应手机 App。
+이것은 미리보기 버전입니다. 연결 복구에 대한 피드백을 환영합니다.、CLI 릴리스, 사이드 채팅 및 Antigravity 실제 액세스 경험. 데스크톱 및 iOS 설치를 덮어쓸 때 원래 애플리케이션 ID, 서명 및 데이터 디렉터리를 유지하십시오. 먼저 제거하지 마십시오.。Android 이번에는 독립된 서비스를 제공합니다. **Bridge Preview**，요하라 App 공존하다; 원본을 보관해주세요 App，그리고 미리보기 App 컴퓨터 연결을 다시 추가하면 원본 바인딩과 초안이 자동으로 마이그레이션되지 않습니다. 휴대폰의 기본 연결 복원과 같은 변경 사항을 적용하려면 해당 휴대폰을 업데이트해야 합니다. App。
 
-Antigravity、独立配置及 WSL 相关能力仍以当前接入实际支持为准。临时侧聊仅适用于受支持的本机桌面入口，不写入原生历史，网关重启后不会恢复；关闭标签与结束临时会话是不同操作。恢复和释放结果不明时，不自动重发消息或重放操作。iOS 源码与未签名 IPA 仍需自行签名安装。
+Antigravity、독립적인 구성 및 WSL 관련 기능은 여전히 ​​현재 액세스의 실제 지원에 따릅니다. 임시 사이드 채팅은 지원되는 로컬 데스크톱 포털에만 적용 가능하고 기본 기록을 쓰지 않으며 게이트웨이를 다시 시작한 후에는 복원되지 않습니다. 탭을 닫는 것과 임시 세션을 종료하는 것은 다른 작업입니다. 복구 및 해제 결과를 알 수 없는 경우 메시지나 작업이 자동으로 재전송되지 않습니다.。iOS 소스 코드 및 서명되지 않음 IPA 여전히 서명하고 직접 설치해야 합니다.。
 
-### 贡献
+### 기여하다
 
 
-感谢 [@windowmmk](https://github.com/windowmmk) 在 [PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150) 中提供的 Antigravity 接入基础，以及 [@heiqiu47](https://github.com/heiqiu47) 在 [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) 和 [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157) 中贡献的自定义 HTTPS 端口与 macOS 菜单栏图标改进。
+고마워하는 [@windowmmk](https://github.com/windowmmk) 에서 [PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150) 에서 제공 Antigravity 기본 사항에 액세스하고 [@heiqiu47](https://github.com/heiqiu47) 에서 [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146) 및 [PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157) 사용자 정의에 기여한 내용 HTTPS 항구 macOS 메뉴바 아이콘 개선。
 
 ---
 
@@ -137,40 +137,40 @@ Thanks to [@windowmmk](https://github.com/windowmmk) for the Antigravity foundat
 
 ---
 
-## v2.2.0 · ZCode 接入、多信道连接与原生会话管理
+## v2.2.0 · ZCode 액세스, 다중 채널 연결 및 기본 세션 관리
 
-v2.2.0 将 ZCode 加入远程工作台，完善手机多信道切换、原生侧边聊天和账号模型管理，并改善连接恢复、通知与后台资源占用。
+v2.2.0 할 것이다 ZCode 휴대폰 다중 채널 전환, 기본 사이드 채팅 및 계정 모델 관리를 개선하고 연결 복구, 알림 및 백그라운드 리소스 사용을 개선하기 위해 원격 워크벤치를 추가했습니다.。
 
-## 新增与改进
+## 새로운 추가 및 개선 사항
 
-- **ZCode 远程工作台。** 在手机和 Web 浏览已保存的历史，继续原生聊天，发送附件、回答问题与处理审批；支持新建项目聊天、模型与思考强度、Skill、分支和原生改名。提供本地连接及官方远控接入，具体方式以平台和安装包支持为准。保存自定义 API，查看并手动刷新官方账号按模型提供的额度。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#116](https://github.com/try2love/codex-mobile-bridge/issues/116) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124) · [#128](https://github.com/try2love/codex-mobile-bridge/issues/128) · [#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
-- **一台电脑，多种连接入口。** 将同一网关的局域网、固定 HTTPS 和临时 HTTPS 整合到一张电脑卡片，支持延迟查看、手动选择与自动切换。改善重新登录后的可信信道恢复，减少可用地址被误判不可达的情况；换线保留聊天、草稿和阅读位置。[#125](https://github.com/try2love/codex-mobile-bridge/issues/125)
-- **原生侧边聊天归回主会话。** 根据 Codex 原生父子关系显示已有侧边聊天，在主会话中以子标签打开，复用常规聊天操作。关闭标签不再等同于删除原生聊天；无法关联到可访问父会话的条目仍保留可访问入口。[#137](https://github.com/try2love/codex-mobile-bridge/issues/137)
-- **Codex 永久删除。** 在支持的本机 Codex 会话中增加永久删除入口，执行前确认主会话及附属聊天范围，核验任务和未确认操作；结果不明时保留核对入口，不自动重复删除。macOS 默认 Codex 可显式初始化共享原生运行时，以支持原 App 持有会话时的创建和数据删除。[#138](https://github.com/try2love/codex-mobile-bridge/issues/138)
-- **新建聊天前选择模型。** Codex、Claude、DSH、ZCode 共用模型与思考强度选择，创建后保留选择。新建入口、账号管理与聊天设置复用同一接入的模型缓存，按电脑、账号和配置隔离。[#131](https://github.com/try2love/codex-mobile-bridge/issues/131)
-- **独立客户端与 CLI 管理。** 可登记独立 Codex 配置及 VS Code 扩展环境，实验性支持独立 Claude、DSH 桌面配置。增加本网关持有的 CLI 连接管理，支持等待任务结束后释放，保留原会话与历史。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106) · [#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
-- **长会话与问题卡片。** 在受支持接入中查看上下文、手动压缩和管理后台任务；Codex 异步问题支持逐题跳过，其他问题的未提交内容保留。跳过状态在 Bridge 手机和 Web 间共享。[#118](https://github.com/try2love/codex-mobile-bridge/issues/118) · [#119](https://github.com/try2love/codex-mobile-bridge/issues/119) · [#121](https://github.com/try2love/codex-mobile-bridge/issues/121)
-- **手机通知与远控入口。** Android 按事件保留通知，同一聊天的待确认与完成提醒不再互相覆盖；重复事件继续去重。增加按电脑配置的 UU 远程入口，可调用已安装的 UU 客户端，实际能力取决于系统及 UU 支持。[#113](https://github.com/try2love/codex-mobile-bridge/issues/113)
+- **ZCode 원격 작업대。** 휴대폰과 Web 저장된 기록을 찾아보고, 기본 채팅을 계속하고, 첨부 파일을 보내고, 질문에 답하고, 승인을 처리하세요. 새로운 프로젝트 채팅, 모델 및 사고 강도 지원、Skill、지점 및 기본 이름이 변경되었습니다. 로컬 연결 및 공식 원격 제어 액세스를 제공합니다. 구체적인 방법은 플랫폼 및 설치 패키지의 지원에 따라 달라집니다. 맞춤설정 저장 API，모델별 공식 계정에서 제공하는 할당량을 확인하고 수동으로 새로고침하세요.。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#116](https://github.com/try2love/codex-mobile-bridge/issues/116) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124) · [#128](https://github.com/try2love/codex-mobile-bridge/issues/128) · [#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
+- **하나의 컴퓨터, 여러 개의 연결 입구。** 동일한 게이트웨이의 LAN을 고정에 연결하십시오. HTTPS 일시적이고 HTTPS 컴퓨터 카드에 통합되어 지연 보기, 수동 선택 및 자동 전환을 지원합니다. 사용 가능한 주소가 도달할 수 없는 것으로 잘못 판단되는 상황을 줄이기 위해 다시 로그인한 후 신뢰할 수 있는 채널 복구를 개선합니다. 채팅, 초안 및 읽기 위치를 유지하기 위해 줄을 변경합니다.。[#125](https://github.com/try2love/codex-mobile-bridge/issues/125)
+- **기본 사이드 채팅이 기본 대화로 돌아갑니다.。** ～에 따르면 Codex 기본 상위-하위 관계는 일반 채팅 작업을 재사용하여 기본 세션의 하위 탭으로 열리는 사이드 채팅이 이미 있음을 보여줍니다. 탭을 닫는 것은 더 이상 기본 채팅을 삭제하는 것과 동일하지 않습니다. 접근 가능한 상위 대화에 연결할 수 없는 항목은 계속 접근 가능한 상태로 유지됩니다.。[#137](https://github.com/try2love/codex-mobile-bridge/issues/137)
+- **Codex 영구 삭제。** 지원되는 컴퓨터에서 Codex 세션에 영구 삭제 항목을 추가하고, 실행 전 기본 세션 및 보조 채팅 범위를 확인하고, 작업 및 확인되지 않은 작업을 확인합니다. 결과를 알 수 없는 경우 확인 항목을 보관하고 자동으로 반복적으로 삭제하지 않습니다.。macOS 기본 Codex 공유 네이티브 런타임은 네이티브를 지원하도록 명시적으로 초기화될 수 있습니다. App 세션 유지 중 데이터 생성 및 삭제。[#138](https://github.com/try2love/codex-mobile-bridge/issues/138)
+- **새 채팅을 만들기 전에 모델을 선택하세요。** Codex、Claude、DSH、ZCode 공유 모델 및 반사 강도 선택, 생성 후 선택 유지. 새로운 포털, 계정 관리 및 채팅 설정은 동일한 액세스의 모델 캐시를 재사용하며 컴퓨터, 계정 및 구성별로 격리됩니다.。[#131](https://github.com/try2love/codex-mobile-bridge/issues/131)
+- **독립형 클라이언트와 CLI 관리하다。** 등록 가능하고 독립적임 Codex 구성 및 VS Code 확장된 환경, 독립형 실험 지원 Claude、DSH 데스크탑 구성. 이 게이트웨이가 보유한 수를 늘리십시오. CLI 연결 관리는 작업이 완료될 때까지 기다린 후 해제를 지원하고 원래 세션과 기록을 유지합니다.。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106) · [#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
+- **긴 대화와 질문 카드。** 지원되는 액세스에서 컨텍스트 보기, 수동 압축 및 백그라운드 작업 관리；Codex 비동기식 질문은 하나씩 건너뛸 수 있으며, 제출되지 않은 다른 질문의 내용은 그대로 유지됩니다. 상태 건너뛰기 Bridge 휴대폰과 Web 사이에 공유。[#118](https://github.com/try2love/codex-mobile-bridge/issues/118) · [#119](https://github.com/try2love/codex-mobile-bridge/issues/119) · [#121](https://github.com/try2love/codex-mobile-bridge/issues/121)
+- **모바일 알림 및 원격제어 출입。** Android 알림은 이벤트별로 유지되며, 동일한 채팅의 확인 및 완료 알림이 더 이상 서로 겹치지 않습니다. 중복 이벤트는 계속해서 중복 제거됩니다. 컴퓨터로 구성 추가 UU 설치된 것을 호출할 수 있는 원격포탈 UU 클라이언트의 실제 기능은 시스템 및 UU 지원하다。[#113](https://github.com/try2love/codex-mobile-bridge/issues/113)
 
-## 修复与优化
+## 수정 및 최적화
 
-- 修复第三方 Codex 接入只返回思考正文时无法展示的问题；支持含中文等正常 Unicode 字符的供应商模型 ID。[#110](https://github.com/try2love/codex-mobile-bridge/issues/110) · [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) · [PR #139](https://github.com/try2love/codex-mobile-bridge/pull/139)
-- 修复 Tailscale 遗留入口无法正确接管、规则丢失后不能恢复的问题。核验入口归属后恢复，稳定时降低检测频率，异常时退避重试，不覆盖其他服务的配置。[PR #135](https://github.com/try2love/codex-mobile-bridge/pull/135)
-- 改善 Claude 初始化、Windows 商店版识别、DSH 连接器升级与跨客户端原生改名；修复 Codex 原连接被替换后的恢复。[#120](https://github.com/try2love/codex-mobile-bridge/issues/120) · [#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
-- 保留长段思考及工具输出的阅读位置，改善首次复制和图片保存；修复手机冷启动样式加载及四客户端导航布局。[#112](https://github.com/try2love/codex-mobile-bridge/issues/112) · [#114](https://github.com/try2love/codex-mobile-bridge/issues/114) · [#115](https://github.com/try2love/codex-mobile-bridge/issues/115)
-- 停用未启用客户端的后台观察，按需启动可选服务，复用已核验状态与模型缓存；隐藏或收起二维码后停止无意义的配对刷新，减少空闲开销。
+- 타사 수리 Codex Access는 텍스트에 대해 생각할 때 표시할 수 없는 질문만 반환합니다. 일반 중국어 및 기타 언어를 지원합니다. Unicode 캐릭터 공급업체 모델 ID。[#110](https://github.com/try2love/codex-mobile-bridge/issues/110) · [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) · [PR #139](https://github.com/try2love/codex-mobile-bridge/pull/139)
+- 수리하다 Tailscale 문제는 레거시 포털을 올바르게 인수할 수 없고 규칙이 손실된 후 복원할 수 없다는 것입니다. 입구의 소유권을 확인한 후 복원하고, 안정되면 감지 빈도를 줄이고, 비정상 시에는 물러났다가 다시 시도하며, 다른 서비스의 구성을 커버하지 않습니다.。[PR #135](https://github.com/try2love/codex-mobile-bridge/pull/135)
+- 개선하다 Claude 초기화、Windows 스토어 버전 식별、DSH 커넥터 업그레이드 및 클라이언트 간 기본 이름 변경 결정된 Codex 원래 연결이 교체된 후 복원。[#120](https://github.com/try2love/codex-mobile-bridge/issues/120) · [#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
+- 긴 생각과 도구 출력의 읽기 위치를 유지하고 첫 번째 사본과 사진 저장을 개선합니다. 휴대폰 콜드 스타트 ​​스타일 로딩 및 4-클라이언트 탐색 레이아웃 수정。[#112](https://github.com/try2love/codex-mobile-bridge/issues/112) · [#114](https://github.com/try2love/codex-mobile-bridge/issues/114) · [#115](https://github.com/try2love/codex-mobile-bridge/issues/115)
+- 활성화되지 않은 클라이언트의 백그라운드 관찰을 비활성화하고, 필요에 따라 선택적 서비스를 시작하고, 확인된 상태 및 모델 캐시를 재사용합니다. QR 코드를 숨기거나 접은 후 의미 없는 페어링 새로 고침을 중지하여 유휴 오버헤드를 줄입니다.。
 
-## 使用范围与升级
+## 사용 및 업그레이드 범위
 
-覆盖安装对应平台 App，无需先卸载。保留原应用标识、签名身份及数据目录，以继续使用账号、配置、手机绑定和草稿。完整使用手机信道、通知和原生菜单改进，需同步更新手机 App；iOS 源码与未签名 IPA 仍需自行签名安装。
+해당 플랫폼을 덮고 설치하십시오. App，먼저 제거할 필요가 없습니다. 계정, 구성, 전화 바인딩 및 초안을 계속 사용하려면 원래 애플리케이션 ID, 서명 ID 및 데이터 디렉터리를 유지하세요. 휴대폰 채널, 알림 및 기본 메뉴 개선을 최대한 활용하려면 휴대폰 동시 업데이트가 필요합니다. App；iOS 소스 코드 및 서명되지 않음 IPA 여전히 서명하고 직접 설치해야 합니다.。
 
-独立客户端配置和 WSL 账号管理仍为实验性。原生操作取决于客户端版本及接入能力：共享 Codex 运行时当前仅在 macOS 默认配置开放；永久删除不保证同步关闭原 App 已打开的标签；逐题跳过不代表原生 Codex App 的局部跳过状态双向同步；Codex CLI 释放仍可能受上游延迟卸载限制。
+독립형 클라이언트 구성 및 WSL 계정 관리는 아직 실험적입니다. 기본 작업은 클라이언트 버전 및 액세스 기능에 따라 다릅니다. 공유 Codex 런타임은 현재 다음에서만 사용할 수 있습니다. macOS 기본 구성은 열려 있습니다. 영구 삭제는 원본이 동시에 닫히는 것을 보장하지 않습니다. App 열린 탭; 각 주제를 건너뛰는 것이 네이티브를 의미하는 것은 아닙니다. Codex App 부분 건너뛰기 상태 양방향 동기화；Codex CLI 릴리스에는 여전히 업스트림 지연 언로드가 적용될 수 있습니다.。
 
-macOS、Windows 和 Linux 正式包提供 ZCode 本地连接；macOS 本地启动器随安装包提供，无需开启 TCP 调试端口。也可使用已配置的官方远控方式。
+macOS、Windows 및 Linux 정식 패키지 제공 ZCode 지역 연결；macOS 로컬 실행 프로그램은 설치 패키지와 함께 제공되며 켤 필요가 없습니다. TCP 디버그 포트. 구성된 공식 원격 제어 방법을 사용할 수도 있습니다.。
 
-## 贡献
+## 기여하다
 
-感谢 [@tiancai123123](https://github.com/tiancai123123) 的第三方思考内容修复（PR #130）、[@laozuzhen](https://github.com/laozuzhen) 的 Tailscale 恢复方案（PR #135），以及 [@qybgh](https://github.com/qybgh) 的 Unicode 模型 ID 支持（PR #139）。感谢所有预览版体验者提供连接、模型、会话管理与跨平台反馈。
+고마워하는 [@tiancai123123](https://github.com/tiancai123123) 콘텐츠 복구에 대한 타사의 생각（PR #130）、[@laozuzhen](https://github.com/laozuzhen) 의 Tailscale 복구 계획（PR #135），게다가 [@qybgh](https://github.com/qybgh) 의 Unicode 모델 ID 지원하다（PR #139）。연결, 모델, 세션 관리 및 플랫폼 간 피드백을 제공해주신 모든 미리보기 사용자에게 감사드립니다.。
 
 ---
 
@@ -193,27 +193,27 @@ Thanks to [@tiancai123123](https://github.com/tiancai123123) for [PR #130](https
 
 ---
 
-## v2.2.0-preview.3 · ZCode 双通道接入、新建模型选择与独立客户端配置
+## v2.2.0-preview.3 · ZCode 듀얼 채널 액세스, 새로운 모델 선택 및 독립적인 클라이언트 구성
 
-本次预览版继续完善 ZCode 接入、账号与模型管理，让新建聊天前的设置更明确，并修复会话改名、模型缓存和网关启动中的问题。
+이 미리보기 버전은 계속해서 개선되고 있습니다. ZCode 액세스, 계정 및 모델 관리를 통해 새 채팅을 만들기 전 설정을 더 명확하게 만들고 세션 이름 변경, 모델 캐싱 및 게이트웨이 시작 문제를 해결합니다.。
 
-### 新增与优化
+### 새로운 추가 및 최적화
 
-- **ZCode 支持本机连接与官方远控两种方式。** 在桌面网关完成官方账号登录和远控链接配置后，可在手机和 Web 的账号管理中选择已准备好的连接方式。官方模式可正常启动尚未运行的 ZCode，并接回原聊天；切换方式保留输入草稿、附件和阅读位置，不自动重发消息。首次配置增加分步引导，登录状态加密保存。原 TCP 兼容端口入口由这两种方式替代。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124) · [#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
-- **新建聊天时选择模型和思考强度。** Codex、Claude、DSH、ZCode 共用模型选择入口，覆盖支持的桌面、CLI、SSH 和 WSL 接入。Claude 和 ZCode 创建聊天时，首条消息直接使用所选模型；思考强度以当前接入实际支持的档位为准。[#131](https://github.com/try2love/codex-mobile-bridge/issues/131)
-- **模型列表更充分地复用缓存。** 新建聊天、聊天设置和账号管理共享同一接入下已核验的模型目录；一处刷新后，其他入口同步更新。不同电脑、账号、项目和独立配置继续隔离，较晚返回的旧结果不会覆盖较新的目录，也不会改变其他聊天已选的模型。
-- **账号配置界面统一，ZCode 可保存自定义 API。** 复用共同的地址、密钥和模型选择表单，支持在保存前读取上游提供的模型。ZCode 可保存原客户端支持的 Anthropic Messages、OpenAI Chat Completions 和 OpenAI Responses 接入；保存配置与实际应用分开，应用时保留现有任务检查。
-- **ZCode 额度支持主动刷新。** 通过原客户端查询当前官方账号各模型的每日剩余额度，显示更新时间并复用缓存；查询失败保留同账号仍有效的旧值，同时说明未更新。额度查询不调用模型。[#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
-- **独立客户端配置，实验性开放。** 在已有 Codex 独立配置入口基础上，增加 Claude、DSH 的独立桌面配置，与默认接入并存。分别管理账号、会话、附件、草稿、模型缓存和通知，启动、重连及退出按当前实例执行。ZCode 可手动指定未被自动发现的安装位置，仍使用默认配置，不新增第二套独立 ZCode。
+- **ZCode 로컬 연결 및 공식 원격 제어를 지원합니다.。** 데스크탑 게이트웨이에서 공식계정 로그인 및 원격제어 링크 설정을 완료하신 후, 휴대폰 및 Web 계정 관리에서 준비된 연결 방법을 선택하세요. 공식 모드는 아직 실행 중이 아닌 경우 정상적으로 시작할 수 있습니다. ZCode，그리고 원래 채팅에 다시 연결하세요. 전환 모드는 입력 초안, 첨부 파일 및 읽기 위치를 유지하며 메시지를 자동으로 다시 보내지 않습니다. 최초 구성을 위한 단계별 안내가 추가되었으며, 로그인 상태가 암호화되어 저장됩니다. 원래의 TCP 호환되는 포트 항목은 이 두 가지 방법으로 대체됩니다.。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124) · [#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
+- **새 채팅을 만들 때 모델과 사고 강도를 선택하세요.。** Codex、Claude、DSH、ZCode 지원되는 데스크탑을 포함하는 공유 모델 선택 항목、CLI、SSH 및 WSL 연결。Claude 및 ZCode 채팅을 생성할 때 첫 번째 메시지는 선택한 모델을 직접 사용합니다. 사고 강도는 현재 액세스의 실제 지원 수준을 기반으로 합니다.。[#131](https://github.com/try2love/codex-mobile-bridge/issues/131)
+- **모델 목록은 캐시를 보다 완벽하게 재사용합니다.。** 새로운 채팅, 채팅 설정 및 계정 관리는 동일한 액세스 하에 검증된 모델 디렉터리를 공유합니다. 하나가 새로 고쳐지면 다른 항목도 동시에 업데이트됩니다. 다양한 컴퓨터, 계정, 프로젝트 및 독립적인 구성이 계속해서 격리됩니다. 나중에 반환된 이전 결과는 새 디렉터리를 덮어쓰지 않으며 다른 채팅에서 선택한 모델을 변경하지도 않습니다.。
+- **통합 계정 구성 인터페이스，ZCode 사용자 정의를 저장할 수 있습니다 API。** 공통 주소, 키 및 모델 선택 양식을 재사용하여 저장하기 전에 업스트림 제공 모델 읽기를 지원합니다.。ZCode 지원되는 원본 클라이언트를 저장할 수 있습니다. Anthropic Messages、OpenAI Chat Completions 및 OpenAI Responses 입장; 실제 애플리케이션과 별도로 구성을 저장하고, 적용 시 기존 작업 확인 내용을 유지합니다.。
+- **ZCode 할당량은 활성 새로 고침을 지원합니다.。** 기존 클라이언트를 통해 현재 공식 계정의 각 모델의 일일 남은 할당량을 쿼리하고 업데이트 시간을 표시하며 캐시를 재사용합니다. 쿼리가 실패하면 동일한 계정에 대해 여전히 유효한 이전 값이 유지되며 업데이트되지 않았음을 나타냅니다. 할당량 쿼리가 모델을 호출하지 않습니다.。[#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
+- **독립적인 클라이언트 구성, 실험적이고 개방적。** 기존에 Codex 독립된 구성 입구를 기반으로 추가 Claude、DSH 독립적인 데스크톱 구성은 기본 액세스와 공존합니다. 계정, 세션, 첨부 파일, 초안, 모델 캐시 및 알림을 각각 관리하고 현재 인스턴스를 기반으로 시작, 다시 연결 및 종료합니다.。ZCode 자동으로 검색되지 않는 설치 위치를 수동으로 지정할 수 있으며, 두 번째 독립 세트를 추가하지 않고도 기본 구성을 계속 사용할 수 있습니다. ZCode。
 
-### 修复
+### 수리하다
 
-- **会话改名同步到原客户端。** 完善 Claude Desktop、Claude Code CLI、DSH 和 ZCode 的原生改名与结果确认；不再把仅修改 Bridge 显示名称当作原 App 改名成功。未连接或原生版本不支持时给出明确提示。[#120](https://github.com/try2love/codex-mobile-bridge/issues/120)
-- **第三方 Codex 思考内容能够显示。** 当兼容 Responses API 只返回思考正文、未返回摘要时，使用上游已提供的正文补充展示，并支持 CLI 思考增量；有摘要时仍优先显示摘要。[#110](https://github.com/try2love/codex-mobile-bridge/issues/110) · [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130)
-- **可选登录恢复不再卡住整个网关。** 修复系统钥匙串未就绪时，ZCode 官方登录恢复阻塞主窗口的问题。未配置官方登录时不读取其钥匙串；已保存的登录在后台恢复，失败可单独重试。
-- **补齐平台与升级兼容。** 改善 Linux ZCode AppImage 的发现和原安装位置识别；修复 macOS 中文路径下的进程识别，以及 Windows 打包参数过长导致的构建失败。修复 DSH 旧连接插件升级与可选服务读取问题，并完善独立 Claude 开启开发者模式、自行重启后的显式连接恢复。
+- **세션 이름 변경은 원래 클라이언트와 동기화됩니다.。** 완벽한 Claude Desktop、Claude Code CLI、DSH 및 ZCode 기본 이름 변경 및 결과 확인 더 이상 수정만 하지 마세요 Bridge 이름을 원본으로 표시 App 이름 변경이 성공했습니다. 연결이 연결되지 않았거나 기본 버전이 이를 지원하지 않으면 명확한 메시지가 표시됩니다.。[#120](https://github.com/try2love/codex-mobile-bridge/issues/120)
+- **제3자 Codex 생각하는 내용을 표시할 수 있습니다.。** 호환되는 경우 Responses API 리플렉션의 본문만 반환되고 초록이 반환되지 않는 경우 업스트림에서 제공하는 본문을 활용하여 표시 보완 및 지원 CLI 점진적으로 생각하십시오. 여전히 초록이 있는 경우 초록을 먼저 표시합니다.。[#110](https://github.com/try2love/codex-mobile-bridge/issues/110) · [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130)
+- **선택적 로그인 복구로 인해 더 이상 전체 게이트웨이가 정지되지 않습니다.。** 시스템 키체인이 준비되지 않은 경우 수정，ZCode 공식 로그인은 메인 창을 차단하는 문제를 복원합니다. 공식 로그인이 구성되지 않으면 해당 키체인을 읽을 수 없습니다. 저장된 로그인은 백그라운드에서 복원되며, 실패할 경우 개별적으로 다시 시도할 수 있습니다.。
+- **플랫폼 완성 및 업그레이드 호환성。** 개선하다 Linux ZCode AppImage 발견 및 원래 설치 위치 식별 수리하다 macOS 중국어 경로에 따른 프로세스 식별 Windows 패키징 매개변수가 너무 길어서 빌드가 실패합니다. 수리하다 DSH 기존 연결 플러그인 업그레이드 및 선택적 서비스 읽기 문제 및 독립성 향상 Claude 개발자 모드를 켜고 스스로 다시 시작한 후 명시적인 연결 복구。
 
-感谢 [@tiancai123123](https://github.com/tiancai123123) 在 [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) 中提供第三方 Codex 思考内容修复及 Windows、Android 验证。
+고마워하는 [@tiancai123123](https://github.com/tiancai123123) 에서 [PR #130](https://github.com/try2love/codex-mobile-bridge/pull/130) 타사에서 제공 Codex 콘텐츠 수정에 대한 생각 및 Windows、Android 검증。
 
 ---
 
@@ -239,21 +239,21 @@ Thanks to [@tiancai123123](https://github.com/tiancai123123) for the reasoning-c
 
 ---
 
-## v2.2.0-preview.2 · ZCode 历史、桌面接入与模型额度
+## v2.2.0-preview.2 · ZCode 역사, 데스크톱 액세스 및 모델 크레딧
 
-**这次预览版把「看历史」和「操作桌面」分开了。** 手机和 Web 可以直接打开 ZCode 已保存的聊天；要继续发送或处理审批时，Bridge 再确认连接的是原来的桌面会话。
+**이 미리보기 버전은 ”보기 기록”과 ”데스크톱 조작”을 분리합니다.。** 휴대폰과 Web 직접 열 수 있습니다 ZCode 저장된 채팅; 계속해서 승인을 보내거나 처리하려면，Bridge 원래 데스크톱 세션에 연결되어 있는지 다시 확인하세요.。
 
-- **看历史不用切换桌面窗口。** 在 macOS、Windows 和 Linux 桌面网关上，可以直接读取已保存的 ZCode 聊天。如果 ZCode 只保留了列表条目，仍可打开空会话；原 App 已找不到的聊天不会取得发送权限。读取失败可以原地重试。打开聊天先看最新消息，向上翻阅时，后台刷新会保留阅读位置。[#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
-- **看清每条回复用的模型，也能找回附件。** 如果原记录提供了模型和思考强度，聊天会按回复显示当时的值。历史图片可以点缩略图看原图；来自当前项目、且来源可核实的附件可以点击文件名定位。原记录缺少信息时不会用当前模型或同名文件代替。
-- **从手机管理 ZCode 或新建项目聊天。** 可以在网关、手机或 Web 启动 ZCode、正常退出，或只关闭远程接入，让电脑上的任务继续运行。Windows 支持从原生托盘正常退出。「第三方通知」可以直接从列表打开；原 App 的项目服务就绪后，即可新建项目聊天，不必先找一个可发送的旧会话。[#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
-- **弱网下接回原聊天。** 如果手机没有收到接续结果，恢复连接后会继续查询同一次请求，无需反复点启用，也不会重发聊天消息。接续期间不会反复加载整份历史。
-- **按模型查看 ZCode 每日额度。** 账号页可分别显示 GLM-5.3、GLM-5.3-Flash 等模型的剩余额度及更新时间。数据来自 ZCode 官方账号已取得的记录；没有记录时不会估算，点击刷新也不会消耗模型额度。[#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
-- **继续 VS Code 里正在使用的 Codex 聊天。** 对于单独配置了 `CODEX_HOME` 的 VS Code 扩展，Bridge 优先把发送、审批和停止交给原来持有会话的扩展，减少电脑和手机争用同一聊天的问题。修复了 Windows 上同一目录因路径写法不同而未被识别的情况。可用操作取决于扩展版本。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106)
-- **连接与更新。** 会话连接重建失败后仍可重试；网关设置会指出尚未保存的字段。修复同一台电脑装有多份网关时，更新重启可能用错数据目录的问题。
+- **데스크톱 창을 전환하지 않고 기록 보기。** 에서 macOS、Windows 및 Linux 데스크톱 게이트웨이에서는 저장된 내용을 직접 읽을 수 있습니다. ZCode 채팅. 만약에 ZCode 목록 항목만 유지되며 빈 세션은 계속 열 수 있습니다. 원본 App 더 이상 찾을 수 없는 채팅에는 전송 권한이 부여되지 않습니다. 읽기에 실패하면 그 자리에서 다시 시도할 수 있습니다. 채팅을 열고 최신 뉴스를 먼저 읽어보세요. 위로 스크롤하면 배경 새로 고침이 읽기 위치를 유지합니다.。[#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
+- **각 응답에 사용된 모델을 명확하게 확인하고 첨부 파일을 검색하세요.。** 원본 기록이 모델과 사고 강도를 제공하는 경우 채팅에서는 응답으로 현재 값을 표시합니다. 역사적인 사진의 경우 축소판을 클릭하여 원본 이미지를 볼 수 있습니다. 검증 가능한 소스가 있는 현재 프로젝트의 첨부 파일의 경우 파일 이름을 클릭하여 찾을 수 있습니다. 원본 기록에 정보가 부족한 경우 현재 모델이나 동일한 이름의 파일로 대체되지 않습니다.。
+- **휴대폰에서 관리 ZCode 또는 새 프로젝트 채팅을 만드세요.。** 게이트웨이, 휴대폰 또는 Web 시작하다 ZCode、정상적으로 종료하거나 원격 액세스를 끄고 컴퓨터의 작업이 계속 실행되도록 하세요.。Windows 기본 트레이에서 정상적인 종료를 지원합니다. ”제3자 알림”은 목록에서 직접 열 수 있습니다. 원본 App 프로젝트 서비스가 준비되면 먼저 보낼 이전 대화를 찾을 필요 없이 새 프로젝트 채팅을 만들 수 있습니다.。[#128](https://github.com/try2love/codex-mobile-bridge/issues/128)
+- **약한 네트워크에서 원래 채팅 검색。** 전화기가 연결 결과를 수신하지 못한 경우 연결이 복원된 후에도 동일한 요청을 계속 쿼리합니다. 활성화를 반복적으로 클릭할 필요가 없으며 채팅 메시지가 다시 전송되지 않습니다. 연결 중에는 전체 기록이 반복적으로 로드되지 않습니다.。
+- **모델별로 보기 ZCode 일일 할당량。** 계정 페이지를 별도로 표시할 수 있습니다. GLM-5.3、GLM-5.3-Flash 모델의 잔액과 업데이트 시간을 기다립니다. 데이터 출처: ZCode 공식 계정에서 얻은 기록 기록이 없으면 추정이 이루어지지 않으며 새로 고침을 클릭해도 모델 할당량이 소비되지 않습니다.。[#129](https://github.com/try2love/codex-mobile-bridge/issues/129)
+- **계속하다 VS Code 에서 사용되는 Codex 채팅。** 개별적으로 구성한 경우 `CODEX_HOME` 의 VS Code 확장하다，Bridge 원래 세션을 진행했던 확장에 대한 전송, 승인 및 중지의 우선 순위를 지정하여 동일한 채팅을 위해 경쟁하는 컴퓨터와 휴대폰의 문제를 줄입니다. 결정된 Windows 동일한 디렉터리는 다른 경로 쓰기로 인해 인식되지 않습니다. 사용 가능한 작업은 확장 버전에 따라 다릅니다.。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106)
+- **연결 및 업데이트。** 세션 연결을 다시 설정하지 못한 경우에도 다시 시도할 수 있습니다. 게이트웨이 설정에는 저장되지 않은 필드가 표시됩니다. 동일한 컴퓨터에 게이트웨이의 여러 복사본이 설치된 경우 업데이트하고 다시 시작할 때 잘못된 데이터 디렉터리가 사용될 수 있는 문제를 해결했습니다.。
 
-**兼容范围：** Windows 和 Linux 桌面默认通过本机私有管道接入，不必开启 TCP 调试端口。网关按原进程身份和实际协议能力开放操作，不再只看版本号。已在 Windows x64 的 ZCode 3.17.1 和 Ubuntu 22.04 x64 已登录图形桌面验收。macOS 公开包普通启动即可看历史；要继续聊天，可在「应用管理」启用本机兼容端口。Mac Test 的锁屏无端口启动器不包含在公开包中。
+**호환성 범위：** Windows 및 Linux 데스크톱은 기본적으로 로컬 개인 채널을 통해 액세스되며 전원을 켤 필요가 없습니다. TCP 디버그 포트. 게이트웨이는 더 이상 버전 번호만 보지 않고 원래 프로세스 ID와 실제 프로토콜 기능을 기반으로 작동합니다. 이미 Windows x64 의 ZCode 3.17.1 및 Ubuntu 22.04 x64 그래픽 데스크탑 승인에 로그인했습니다.。macOS 공개 패키지를 정상적으로 실행하면 기록을 볼 수 있습니다. 채팅을 계속하려면 ”애플리케이션 관리”에서 로컬 호환 포트를 활성화하세요.。Mac Test 잠금 화면 포트리스 실행 프로그램은 공개 패키지에 포함되어 있지 않습니다.。
 
-**从 preview.1 更新：** macOS 和 Windows 网关可在「检查更新」中选择「更新并重启」；Android 可在 App 内检查更新、下载并确认安装。Linux 请覆盖安装对应架构的 DEB，或替换原 AppImage；iOS 可在 App 内检查更新并打开发布页，仍需使用与原安装一致的签名身份和应用标识覆盖安装。无需先卸载 preview.1。使用稳定版的用户不会收到此次预览更新。
+**～에서 preview.1 고쳐 쓰다：** macOS 및 Windows 게이트웨이는 ”업데이트 확인”에서 ”업데이트 및 다시 시작”을 선택할 수 있습니다.」；Android 다음에서 이용 가능 App 업데이트 확인, 다운로드 및 설치 확인。Linux 해당 아키텍처를 덮어쓰고 설치하십시오. DEB，아니면 원본을 교체하세요 AppImage；iOS 다음에서 이용 가능 App 업데이트를 확인하고 릴리스 페이지를 연 후에도 원래 설치와 동일한 서명 ID 및 애플리케이션 ID로 설치를 덮어써야 합니다. 먼저 제거할 필요가 없습니다. preview.1。안정 버전을 사용하는 사용자는 이 미리보기 업데이트를 받을 수 없습니다.。
 
 ---
 
@@ -275,32 +275,32 @@ You can now open saved ZCode chats on mobile and the web without switching the d
 
 ---
 
-## v2.2.0-preview.1 · ZCode 原生会话与手机连接切换
+## v2.2.0-preview.1 · ZCode 기본 세션과 모바일 연결 간 전환
 
-这次预览版把 ZCode 原生聊天带到手机和 Web。手机 App 也开始按网关整理电脑。同一个网关的局域网、固定 HTTPS 和临时 HTTPS 地址可以放在一张卡片里，在家和外出时都能继续原来的聊天。
+이 미리보기 버전 ZCode 기본 채팅을 휴대폰으로 가져오고 Web。휴대폰 App 또한 게이트웨이별로 컴퓨터를 정리하기 시작했습니다. LAN 및 동일한 게이트웨이로 고정 HTTPS 일시적이고 HTTPS 주소를 카드에 넣을 수 있으며 집에서나 밖에서나 원래 채팅을 계속할 수 있습니다.。
 
-### ZCode 原生接入预览
+### ZCode 기본 액세스 미리보기
 
-- **继续桌面上的聊天。** 在已配置 ZCode 接入的 macOS 或 Windows 网关上，可以从手机和 Web 浏览历史、继续原会话、发送附件、回答问题和处理审批。ZCode 重启后，即使桌面还停在首页，也可以从 Bridge 主动恢复旧聊天。接入使用网关自带运行时，无需另装 Node.js 或 Homebrew。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#123](https://github.com/try2love/codex-mobile-bridge/issues/123) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124)
-- **在项目里新建和整理会话。** 可以选已有项目，也可以登记新目录，用第一条消息创建原生聊天。支持改名、从指定回复分支，以及编辑原消息后重新发送。[#116](https://github.com/try2love/codex-mobile-bridge/issues/116) · [#120](https://github.com/try2love/codex-mobile-bridge/issues/120)
-- **控制下一步怎样执行。** 可切换模型和思考强度、引用 Skill、选择计划或目标模式，以及调整访问权限。任务进行中可选择「完成后发送」或「补充当前任务」。如果 ZCode 将补充内容排入队列，Bridge 会显示「已入队」。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#117](https://github.com/try2love/codex-mobile-bridge/issues/117) · [#126](https://github.com/try2love/codex-mobile-bridge/issues/126)
+- **데스크톱에서 채팅 계속하기。** 구성됨 ZCode 액세스됨 macOS 또는 Windows 게이트웨이에서 다음 항목에 액세스할 수 있습니다. Web 기록 찾아보기, 원래 대화 계속하기, 첨부 파일 보내기, 질문에 답변하기, 승인 처리하기。ZCode 다시 시작한 후에도 바탕 화면이 여전히 홈페이지에 멈춰 있어도 계속할 수 있습니다. Bridge 오래된 채팅을 사전에 복원합니다. 게이트웨이 자체에 접속하여 사용하는 경우 별도의 설치가 필요하지 않습니다. Node.js 또는 Homebrew。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#123](https://github.com/try2love/codex-mobile-bridge/issues/123) · [#124](https://github.com/try2love/codex-mobile-bridge/issues/124)
+- **프로젝트에서 세션 생성 및 구성。** 기존 프로젝트를 선택하거나 새 디렉터리를 등록하여 첫 번째 메시지로 기본 채팅을 만들 수 있습니다. 이름 바꾸기, 지정된 지점에서 응답, 원본 메시지 편집 및 재전송을 지원합니다.。[#116](https://github.com/try2love/codex-mobile-bridge/issues/116) · [#120](https://github.com/try2love/codex-mobile-bridge/issues/120)
+- **다음 단계 수행 방법 제어。** 전환 가능한 모델 및 사고 강도, 인용 Skill、계획이나 대상 모드를 선택하고 액세스 권한을 조정하세요. 작업이 진행되는 동안 ”완료 후 보내기” 또는 ”현재 작업 보충”을 선택할 수 있습니다. 만약에 ZCode 대기열 추가 콘텐츠，Bridge ”이미 팀에 합류했습니다”가 표시됩니다.」。[#107](https://github.com/try2love/codex-mobile-bridge/issues/107) · [#117](https://github.com/try2love/codex-mobile-bridge/issues/117) · [#126](https://github.com/try2love/codex-mobile-bridge/issues/126)
 
-### 手机连接与会话管理
+### 모바일 연결 및 세션 관리
 
-- **一台网关，一张电脑卡片。** 进入电脑时，App 会使用最先通过网关身份验证的已启用地址。自动模式下，回到同一局域网后优先走局域网，离开后可切回可用的公网入口。也可以查看延迟、手动选线。换线时保留当前聊天、草稿和阅读位置。[#125](https://github.com/try2love/codex-mobile-bridge/issues/125)
-- **接入独立的 VS Code Codex 配置。** 在桌面网关添加扩展使用的 `CODEX_HOME` 后，手机和 Web 会把它显示为独立客户端，分别管理会话、账号和草稿。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106)
-- **用完 CLI 后，把连接交还给电脑。** 可在会话菜单中释放单条连接，也可在设置里集中管理本网关持有的本机、SSH 和 WSL 连接。默认等任务结束再释放，原聊天和历史保留。Codex 原生服务有时会延迟释放，电脑端接手可能需要稍候。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
-- **管理长聊天与后台任务。** 支持的 Codex、Claude、DSH 和 ZCode 会话可查看原客户端提供的上下文用量，并在空闲时发起手动压缩。DSH 和 ZCode 还可查看当前聊天的后台任务，单独停止其中一项。[#118](https://github.com/try2love/codex-mobile-bridge/issues/118) · [#119](https://github.com/try2love/codex-mobile-bridge/issues/119) · [#121](https://github.com/try2love/codex-mobile-bridge/issues/121)
+- **게이트웨이 및 컴퓨터 카드。** 컴퓨터에 들어갈 때，App 게이트웨이 인증을 먼저 통과한 활성화된 주소가 사용됩니다. 자동 모드에서는 동일한 LAN으로 복귀한 후 LAN을 먼저 사용합니다. 나간 후에는 사용 가능한 공용 네트워크 입구로 다시 전환할 수 있습니다. 지연을 확인하고 회선을 수동으로 선택할 수도 있습니다. 회선을 전환할 때 현재 채팅, 초안 및 읽기 위치를 유지합니다.。[#125](https://github.com/try2love/codex-mobile-bridge/issues/125)
+- **독립적인 액세스 VS Code Codex 설정。** 데스크톱 게이트웨이에 확장 추가 `CODEX_HOME` 이후 휴대폰과 Web 세션, 계정, 초안을 별도로 관리할 수 있는 독립 클라이언트로 표시됩니다.。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106)
+- **다 떨어지다 CLI 마지막으로 연결을 컴퓨터에 다시 전달하십시오.。** 세션 메뉴에서 단일 연결을 해제하거나 설정에서 이 게이트웨이가 보유한 로컬 컴퓨터를 중앙에서 관리할 수 있습니다.、SSH 및 WSL 연결하다. 기본적으로 작업 완료 후 해제되며, 원래 채팅 내용과 기록은 유지됩니다.。Codex 기본 서비스 출시가 지연되는 경우가 있으며, 컴퓨터가 인계받는 데 시간이 걸릴 수 있습니다.。[#122](https://github.com/try2love/codex-mobile-bridge/issues/122)
+- **긴 채팅 및 백그라운드 작업 관리。** 지원됨 Codex、Claude、DSH 및 ZCode 세션은 원래 클라이언트가 제공한 컨텍스트 사용량을 보고 유휴 상태일 때 수동 압축을 시작할 수 있습니다.。DSH 및 ZCode 현재 채팅의 백그라운드 작업을 보고 그 중 하나를 개별적으로 중지할 수도 있습니다.。[#118](https://github.com/try2love/codex-mobile-bridge/issues/118) · [#119](https://github.com/try2love/codex-mobile-bridge/issues/119) · [#121](https://github.com/try2love/codex-mobile-bridge/issues/121)
 
-### 修复与阅读体验
+### 수리 및 독서 체험
 
-- **Claude Desktop 连接。** 修复 Windows 商店版（MSIX）已开启开发者模式却被误判的问题。macOS 和 Windows 上的首次初始化可在已信任目录完成握手，避免空消息触发模型调用。登录数据库暂时被占用时，仍可打开原生聊天历史，待账号身份重新确认后再恢复模型设置和对应账号的草稿。[#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
-- **阅读、复制与图片保存。** 展开 Claude 或 DSH 的长段思考或工具输出后，后台刷新会保留阅读位置。会话菜单中的复制操作首次点击即可生效，并给出反馈。图片预览新增保存原图入口，文件保存到当前手机或电脑。[#112](https://github.com/try2love/codex-mobile-bridge/issues/112) · [#114](https://github.com/try2love/codex-mobile-bridge/issues/114) · [#115](https://github.com/try2love/codex-mobile-bridge/issues/115)
-- **Ubuntu 网关启动。** 修复部分使用 Python 3.11 之前运行时的打包网关因缺少 TOML 读取组件而无法启动的问题。
+- **Claude Desktop 연결。** 수리하다 Windows 스토어 버전（MSIX）개발자 모드가 켜져 있지만 잘못 판단되는 문제。macOS 및 Windows 첫 번째 초기화에서는 모델 호출을 트리거하는 빈 메시지를 방지하기 위해 신뢰할 수 있는 디렉터리에서 핸드셰이크를 완료할 수 있습니다. 로그인 데이터베이스가 일시적으로 사용되는 경우에도 기본 채팅 기록을 열 수 있으며, 계정 신원을 확인한 후 해당 계정의 모델 설정 및 초안을 복원할 수 있습니다.。[#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
+- **사진 읽기, 복사 및 저장。** 확장하다 Claude 또는 DSH 오랜 생각이나 도구 출력 후에는 백그라운드 새로 고침이 읽기 위치를 유지합니다. 세션 메뉴의 복사 작업은 첫 번째 클릭에 적용되고 피드백을 제공합니다. 이미지 미리보기에 원본 이미지를 저장할 수 있는 새로운 입구가 추가되며, 파일은 현재 휴대폰이나 컴퓨터에 저장됩니다.。[#112](https://github.com/try2love/codex-mobile-bridge/issues/112) · [#114](https://github.com/try2love/codex-mobile-bridge/issues/114) · [#115](https://github.com/try2love/codex-mobile-bridge/issues/115)
+- **Ubuntu 게이트웨이 시작。** 수리부품용 Python 3.11 이전 런타임의 패키징 게이트웨이가 부족하여 누락되었습니다. TOML 구성요소를 읽는 데 문제가 있지만 시작하지 못함。
 
-**预览范围。** ZCode 接入目前面向已有接入配置的 macOS 和 Windows 网关，已验证 ZCode 3.17.1。手机多地址切换需要配套的 Android 或 iOS 预览 App。欢迎重点反馈 ZCode 冷启动后继续旧聊天、手机在 Wi-Fi 与蜂窝之间切换，以及 Claude 登录库被占用时打开历史这三个场景。
+**미리보기 범위。** ZCode 현재 기존 액세스 구성이 있는 사용자만 액세스할 수 있습니다. macOS 및 Windows 게이트웨이, 확인됨 ZCode 3.17.1。휴대폰 다중 주소 전환에는 지원 장비가 필요합니다. Android 또는 iOS 시사 App。주요 피드백을 환영합니다 ZCode 콜드 스타트 ​​후 이전 채팅을 계속하면 전화가 켜집니다. Wi-Fi 셀룰러 간 전환 및 Claude 로그인 라이브러리가 점유되어 있을 때 기록 열기의 세 가지 시나리오。
 
-感谢 [@SOFdian](https://github.com/SOFdian) 提出独立 VS Code 配置的接入需求，感谢 [@xtayavij](https://github.com/xtayavij) 提供 Windows 商店版 Claude 的复现步骤。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106) · [#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
+고마워하는 [@SOFdian](https://github.com/SOFdian) 독립을 제안하다 VS Code 구성된 액세스 요구 사항입니다. 감사합니다. [@xtayavij](https://github.com/xtayavij) 공급 Windows 스토어 버전 Claude 재현하는 단계。[#106](https://github.com/try2love/codex-mobile-bridge/issues/106) · [#127](https://github.com/try2love/codex-mobile-bridge/issues/127)
 
 ---
 
@@ -324,50 +324,50 @@ Thanks to [@SOFdian](https://github.com/SOFdian) for the independent VS Code con
 
 ---
 
-## v2.1.7 · 手机通知、会话整理与连接恢复
+## v2.1.7 · 모바일 알림, 대화 구성 및 연결 복구
 
 <a id="v217"></a>
 
-本次更新完善手机通知和会话管理，增加项目文件引用与历史图片预览，并修复弱网发送、SSH 离线和部分桌面会话连接异常。桌面与手机 App 版本为 **2.1.7**，Android/iOS 构建号为 **40**。
+이 업데이트는 모바일 알림 및 세션 관리를 개선하고, 프로젝트 파일 참조 및 기록 사진 미리 보기를 추가하고, 약한 네트워크 전송을 복구합니다.、SSH 오프라인 및 일부 데스크톱 세션이 비정상적으로 연결됩니다. 데스크톱과 모바일 App 버전은 **2.1.7**，Android/iOS 빌드번호는 **40**。
 
-### 新增与优化
+### 새로운 추가 및 최적화
 
-- **Android 后台任务通知**：可手动开启后台接收，在离开 App 后继续接收任务提醒。点击通知返回聊天时复用已有页面和草稿，减少重复加载。默认关闭，可随时暂停。[Issue #47](https://github.com/try2love/codex-mobile-bridge/issues/47) · [PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85)
-- **通知来源与手机外观**：按保存的连接地址分别启停任务提醒，减少多个入口重复通知；Android 与 iOS 统一支持浅色、深色及跟随系统。改善 iOS 前台通知，重新整理 Android 电脑选项菜单的分组、触摸区域和返回操作。[PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85) · [PR #95](https://github.com/try2love/codex-mobile-bridge/pull/95)
-- **统一会话菜单与分类整理**：长按、右键或标题入口集中提供详情、改名、置顶、复制、项目和分区整理。支持原生操作时同步原客户端；Bridge 显示分类明确标注“仅在 Bridge 中生效”。菜单返回和下拉关闭保持一致；分类结果未确认时不重复提交。[PR #92](https://github.com/try2love/codex-mobile-bridge/pull/92) · [Issue #77](https://github.com/try2love/codex-mobile-bridge/issues/77)
-- **引用宿主机项目文件**：附件入口可选择当前项目内的文件或文件夹，追加到草稿后发送，无需下载到手机再上传。Codex、Claude 和 DSH 使用各自的附件或引用格式；支持的文件链接可进入已有文件页面定位和预览。[Issue #102](https://github.com/try2love/codex-mobile-bridge/issues/102)
-- **历史图片预览**：Claude 与 DSH 的历史图片支持按需加载、预览和缩放，避免历史刷新反复传输原图。[Issue #99](https://github.com/try2love/codex-mobile-bridge/issues/99)
-- **聊天阅读与任务状态**：代码块增加语言标签和语法高亮，保留原文复制；DSH 已识别的注入上下文默认折叠。聊天统一显示运行中、等待审批及异常状态；本版不将这些状态提示描述为逐字流式输出。[Issue #104](https://github.com/try2love/codex-mobile-bridge/issues/104) · [Issue #101](https://github.com/try2love/codex-mobile-bridge/issues/101) · [Issue #98](https://github.com/try2love/codex-mobile-bridge/issues/98)
-- **项目创建与信任确认**：支持的 Codex App 和 Claude Desktop Code 接入可在远端确认工作区信任，明确展示环境与完整路径；完善 Codex SSH 项目登记和列表归类。取消后保留输入，信任确认不会自动发送首条消息。[Issue #100](https://github.com/try2love/codex-mobile-bridge/issues/100)
-- **DSH 双路线接入**：增加通用插件及显式实例绑定，手机 App 也可添加原生 DSH Mobile 链接。原生 Mobile 页面与 Bridge 统一聊天界面独立使用；兼容范围以客户端和插件版本核验为准。[Issue #91](https://github.com/try2love/codex-mobile-bridge/issues/91)
-- **可选 Codex 重置动态**：增加第三方重置动态查询和可选提醒，默认关闭并标明数据来源；不代表官方承诺或个人账号的实际额度。[PR #86](https://github.com/try2love/codex-mobile-bridge/pull/86)
+- **Android 백그라운드 작업 알림**：백그라운드 수신을 수동으로 켜고 나갈 수 있습니다. App 그런 다음 계속해서 작업 알림을 받으세요. 알림을 클릭하여 채팅으로 돌아갈 때 기존 페이지와 초안을 재사용하여 반복 로드를 줄입니다. 기본적으로 꺼져 있으며 언제든지 일시중지할 수 있습니다.。[Issue #47](https://github.com/try2love/codex-mobile-bridge/issues/47) · [PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85)
+- **알림 소스 및 전화기 모양**：여러 입구에서 반복되는 알림을 줄이기 위해 저장된 연결 주소에 따라 각각 작업 알림을 시작 및 중지합니다.；Android 및 iOS 라이트, 다크 및 팔로우 시스템에 대한 통합 지원. 개선하다 iOS 프런트 연락·정리 Android 컴퓨터 옵션 메뉴의 그룹화, 터치 영역 및 복귀 작업。[PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85) · [PR #95](https://github.com/try2love/codex-mobile-bridge/pull/95)
+- **통합 세션 메뉴 및 분류 구성**：길게 누르기, 마우스 오른쪽 버튼 클릭 또는 제목 입력은 세부 정보, 이름 변경, 고정, 복사, 프로젝트 및 파티션 구성을 제공합니다. 기본 작업 중 원본 클라이언트 동기화 지원；Bridge 명확하게 라벨이 지정된 카테고리 표시“오직 에서만 Bridge 에서 유효”。메뉴 복귀 및 드롭다운 닫기는 일관됩니다. 분류 결과가 확인되지 않은 경우에는 반복 제출이 이루어지지 않습니다.。[PR #92](https://github.com/try2love/codex-mobile-bridge/pull/92) · [Issue #77](https://github.com/try2love/codex-mobile-bridge/issues/77)
+- **참조 호스트 프로젝트 파일**：첨부 항목을 사용하면 현재 프로젝트 내의 파일이나 폴더를 선택하고 전송하기 전에 초안에 추가할 수 있습니다. 휴대폰으로 다운로드한 후 업로드할 필요가 없습니다.。Codex、Claude 및 DSH 해당 첨부 파일이나 인용 형식을 사용하세요. 지원되는 파일 링크는 기존 파일 페이지 위치 지정 및 미리보기에 들어갈 수 있습니다.。[Issue #102](https://github.com/try2love/codex-mobile-bridge/issues/102)
+- **역사적인 사진 미리보기**：Claude 및 DSH 기록 이미지는 주문형 로딩, 미리보기 및 확대/축소를 지원하여 기록 새로 고침 및 원본 이미지의 반복 전송을 방지합니다.。[Issue #99](https://github.com/try2love/codex-mobile-bridge/issues/99)
+- **채팅 읽기 및 작업 상태**：코드 블록에 언어 태그 및 구문 강조를 추가하고 복사할 원본 텍스트를 유지합니다.；DSH 식별된 주입 컨텍스트는 기본적으로 축소됩니다. 채팅은 실행 중, 승인 대기 중, 비정상 상태를 일률적으로 표시합니다. 이 버전에서는 이러한 상태 프롬프트를 축어적 스트리밍 출력으로 설명하지 않습니다.。[Issue #104](https://github.com/try2love/codex-mobile-bridge/issues/104) · [Issue #101](https://github.com/try2love/codex-mobile-bridge/issues/101) · [Issue #98](https://github.com/try2love/codex-mobile-bridge/issues/98)
+- **프로젝트 생성 및 신뢰 확인**：지원됨 Codex App 및 Claude Desktop Code Access는 원격으로 작업 공간의 신뢰를 확인하고 환경과 전체 경로를 명확하게 표시할 수 있습니다. 개선하다 Codex SSH 프로젝트 등록 및 목록 분류. 취소 후에도 계속 입력하세요. 신뢰 확인 시 첫 번째 메시지가 자동으로 전송되지 않습니다.。[Issue #100](https://github.com/try2love/codex-mobile-bridge/issues/100)
+- **DSH 이중 경로 액세스**：공통 플러그인 및 명시적 인스턴스 바인딩, 휴대폰 추가 App 네이티브를 추가할 수도 있습니다. DSH Mobile 링크. 토종의 Mobile 페이지 Bridge 통합 채팅 인터페이스는 독립적으로 사용할 수 있습니다. 호환성 범위는 클라이언트 및 플러그인 버전 확인에 따라 달라집니다.。[Issue #91](https://github.com/try2love/codex-mobile-bridge/issues/91)
+- **선택 과목 Codex 활동 재설정**：기본적으로 꺼져 있고 데이터 소스가 표시되는 타사 재설정 동적 쿼리 및 선택적 알림을 추가했습니다. 공식적인 약속이나 개인 계정의 실제 한도를 나타내지 않습니다.。[PR #86](https://github.com/try2love/codex-mobile-bridge/pull/86)
 
-### 问题修复
+### 버그 수정
 
-- 修复 Safari 中部分无关脚本异常触发“工作台尚未加载完成”的问题，改善失败资源重试，同时保留正常请求的缓存复用。[Issue #87](https://github.com/try2love/codex-mobile-bridge/issues/87) · [PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88)
-- 隔离离线 SSH 主机的慢请求，避免拖慢本机会话连接、账号查询和通知；增加失败退避与手动重试。改善 SSH 模型目录与 Skill 的读取和缓存复用。[Issue #90](https://github.com/try2love/codex-mobile-bridge/issues/90)
-- 为部分 Codex Desktop 异常提供“重建连接”入口；失败后可进入应用管理，在任务保护和明确确认下处理原生应用。原客户端内部路由异常仍有恢复限制，继续由 [Issue #103](https://github.com/try2love/codex-mobile-bridge/issues/103) 跟踪。
-- 改善已提交消息的确认恢复：依据发送回执或匹配的原生持久记录核对，不自动重发；只清理对应已提交草稿，保留用户后续编辑。
-- 修复 Windows WSL Codex 的部分时间线与写入互相等待问题，以及跨轮次回答问题卡片后其他未答卡片消失的问题。
-- 修复 Claude 模型设置中部分错误的“账号已切换”提示，保留模型来源、账号隔离及思考强度信息；完善支持原生设置时的手动模型入口。
-- 修复紧接正文的块公式解析和渲染，保留 TeX 原文。[Issue #94](https://github.com/try2love/codex-mobile-bridge/issues/94) · [PR #96](https://github.com/try2love/codex-mobile-bridge/pull/96)
-- 改善附件选择取消后的恢复、Claude 配置目录识别、DSH 接入组件升级兼容性和回复模型信息显示。[Issue #99](https://github.com/try2love/codex-mobile-bridge/issues/99) · [Issue #102](https://github.com/try2love/codex-mobile-bridge/issues/102)
-- 增加任务明确失败或阻塞时的“需要你处理”提醒，复用现有通知策略与去重机制。[Issue #47](https://github.com/try2love/codex-mobile-bridge/issues/47)
+- 수리하다 Safari 일부 관련 없는 스크립트가 비정상적으로 실행됩니다.“워크벤치가 아직 로드되지 않았습니다.”문제, 실패한 리소스 재시도를 개선하는 동시에 일반 요청의 캐시 재사용을 유지합니다.。[Issue #87](https://github.com/try2love/codex-mobile-bridge/issues/87) · [PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88)
+- 오프라인으로 격리 SSH 로컬 세션 연결, 계정 쿼리 및 알림 속도 저하를 방지하기 위해 호스트의 요청을 느리게 합니다. 실패 백오프 및 수동 재시도를 추가합니다. 개선하다 SSH 모델 디렉토리 Skill 읽기 및 캐시 멀티플렉싱。[Issue #90](https://github.com/try2love/codex-mobile-bridge/issues/90)
+- 부분적으로 Codex Desktop 예외가 제공됨“연결 재설정”기입; 실패 후 애플리케이션 관리에 들어가 작업 보호 및 명확한 확인 하에 기본 애플리케이션을 처리할 수 있습니다. 원래 클라이언트의 내부 라우팅 예외에는 여전히 복구 제한이 있으며 다음을 통해 계속 복원됩니다. [Issue #103](https://github.com/try2love/codex-mobile-bridge/issues/103) 길。
+- 제출된 메시지의 확인 복구 개선: 자동으로 재전송하지 않고 전송 영수증 또는 일치하는 기본 영구 기록을 기반으로 확인합니다. 해당 제출된 초안만 정리하고 사용자의 후속 편집 내용은 유지합니다.。
+- 수리하다 Windows WSL Codex 타임라인의 일부와 서면 대기 질문, 라운드에 걸쳐 질문 카드에 답변한 후 답변되지 않은 다른 카드가 사라지는 질문。
+- 수리하다 Claude 모델 설정의 일부 오류“계정이 전환되었습니다”팁: 모델 소스, 계정 격리 및 사고 강도 정보를 유지합니다. 기본 설정을 지원할 때 수동 모델 입력 개선。
+- 본문 텍스트 바로 다음에 오는 블록 수식의 구문 분석 및 렌더링을 수정하고 유지합니다. TeX 원래의。[Issue #94](https://github.com/try2love/codex-mobile-bridge/issues/94) · [PR #96](https://github.com/try2love/codex-mobile-bridge/pull/96)
+- 첨부 파일 선택 취소 후 복구 개선、Claude 디렉터리 식별 구성、DSH 구성 요소 업그레이드 호환성 및 응답 모델 정보 표시에 액세스。[Issue #99](https://github.com/try2love/codex-mobile-bridge/issues/99) · [Issue #102](https://github.com/try2love/codex-mobile-bridge/issues/102)
+- 작업이 명백히 실패하거나 차단되는 경우 기능 추가“당신이 처리해야”알림, 기존 알림 전략 및 중복 제거 메커니즘 재사용。[Issue #47](https://github.com/try2love/codex-mobile-bridge/issues/47)
 
-### 升级与使用范围
+### 업그레이드 및 사용 범위
 
-覆盖安装对应平台的原 App，不要先卸载或清空数据。Android 沿用原签名；iOS 沿用原应用标识，仍需使用自己的签名身份安装。建议同时更新网关与手机 App，并刷新已打开的共享页面；独立 Test 与正式版保持各自的数据目录。各平台验收范围见 [验证记录](VERIFICATION.md#v217)。
+해당 플랫폼의 원래 설치를 덮어씁니다. App，먼저 데이터를 제거하거나 지우지 마십시오.。Android 원본 서명 유지；iOS 원래 애플리케이션 ID를 유지하고 설치하려면 자체 서명 ID를 사용해야 합니다. 게이트웨이와 휴대폰을 동시에 업데이트하는 것이 좋습니다. App，열려 있는 공유 페이지를 새로 고칩니다. 독립형 Test 공식 버전으로 별도의 데이터 디렉토리를 유지하십시오. 각 플랫폼의 수용 범위는 다음을 참조하세요. [기록 확인](VERIFICATION.md#v217)。
 
-Android 后台通知需主动开启，并受通知权限及系统省电策略影响。**iOS 本次完善前台提醒，不新增 APNs 后台推送。** DSH 需要兼容的客户端与运行中插件；共享原生连接器的正式版和 Test 应使用兼容版本，更新接入前确认任务已经停止。Bridge 显示分类不会同步到原客户端。
+Android 백그라운드 알림은 적극적으로 켜져야 하며 알림 권한 및 시스템 절전 정책의 영향을 받습니다.。**iOS 이번에는 프런트 데스크 알림이 개선되었으며 새로 추가된 내용은 없습니다. APNs 백그라운드 푸시。** DSH 호환 가능한 클라이언트 및 런타임 플러그인이 필요합니다. 기본 커넥터의 공식 버전을 공유하고 Test 호환되는 버전을 사용해야 하며, 업데이트하기 전에 작업이 중지되었는지 확인해야 합니다.。Bridge 표시 카테고리는 원래 클라이언트와 동기화되지 않습니다.。
 
-部分原生归档限制继续由 [#77](https://github.com/try2love/codex-mobile-bridge/issues/77) 跟踪；[连接重建](https://github.com/try2love/codex-mobile-bridge/issues/103)不能保证修复 Codex 内部所有路由异常，也不等于消除公网网络故障。WSL 账号管理继续作为实验性功能提供。
+일부 기본 보관 제한 사항은 계속해서 다음에 의해 결정됩니다. [#77](https://github.com/try2love/codex-mobile-bridge/issues/77) 길；[연결 재설정](https://github.com/try2love/codex-mobile-bridge/issues/103)수리 보증 없음 Codex 내부 라우팅이 모두 비정상이라고 해서 공용망 장애가 해소된 것은 아닙니다.。WSL 계정 관리는 실험적 기능으로 계속 제공됩니다.。
 
-### 贡献与反馈
+### 기여 및 피드백
 
-- 感谢 [@heiqiu47](https://github.com/heiqiu47) 的 Android 后台通知与设置、可选重置动态、共享会话菜单及 Android 电脑选项菜单：[PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85)、[#86](https://github.com/try2love/codex-mobile-bridge/pull/86)、[#92](https://github.com/try2love/codex-mobile-bridge/pull/92)、[#95](https://github.com/try2love/codex-mobile-bridge/pull/95)。
-- 感谢 [@mc373906408（waken）](https://github.com/mc373906408) 的 Safari 启动错误识别与失败资源恢复：[PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88)。
-- 感谢 [@littltstream](https://github.com/littltstream) 的块公式渲染修复：[PR #96](https://github.com/try2love/codex-mobile-bridge/pull/96)。
-- 原作者提交完整保留，整合调整另行记录。感谢相关 Issue 的建议和复测，以及 [@SevenPwZ](https://github.com/SevenPwZ) 对 [#103](https://github.com/try2love/codex-mobile-bridge/issues/103) 的故障反馈。
+- 고마워하는 [@heiqiu47](https://github.com/heiqiu47) 의 Android 백그라운드 알림 및 설정, 선택적 재설정 업데이트, 공유 세션 메뉴 및 Android 컴퓨터 옵션 메뉴：[PR #85](https://github.com/try2love/codex-mobile-bridge/pull/85)、[#86](https://github.com/try2love/codex-mobile-bridge/pull/86)、[#92](https://github.com/try2love/codex-mobile-bridge/pull/92)、[#95](https://github.com/try2love/codex-mobile-bridge/pull/95)。
+- 고마워하는 [@mc373906408（waken）](https://github.com/mc373906408) 의 Safari 시작 오류 식별 및 실패한 리소스 복구：[PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88)。
+- 고마워하는 [@littltstream](https://github.com/littltstream) 블록 수식 렌더링 수정：[PR #96](https://github.com/try2love/codex-mobile-bridge/pull/96)。
+- 원저자의 제출물은 그대로 유지되어야 하며, 통합 및 조정 사항은 별도로 기록됩니다. 관련 감사합니다 Issue 권장 사항 및 재테스트 [@SevenPwZ](https://github.com/SevenPwZ) 오른쪽 [#103](https://github.com/try2love/codex-mobile-bridge/issues/103) 결함 피드백。
 
 ### English
 
@@ -392,36 +392,36 @@ Thanks to **[@heiqiu47](https://github.com/heiqiu47)** for PRs [#85](https://git
 
 <a id="v216"></a>
 
-## v2.1.6 · 会话整理、文件阅读与接入体验
+## v2.1.6 · 세션 구성, 파일 읽기 및 액세스 경험
 
-本版完善手机 App 与 Web 的会话整理、复制和文件阅读，优化账号管理，并修复跨平台项目分组与列表更新问题。桌面与手机 App 版本为 **2.1.6**，Android/iOS 构建号为 **39**。
+이 버전은 휴대폰에 적합합니다. App 및 Web 세션 정렬, 복사 및 파일 읽기, 계정 관리 최적화, 크로스 플랫폼 프로젝트 그룹화 및 목록 업데이트 문제 해결. 데스크톱과 모바일 App 버전은 **2.1.6**，Android/iOS 빌드번호는 **39**。
 
-### 新增与改进
+### 새로운 추가 및 개선 사항
 
-- **会话置顶**：Codex、Claude 和 DSH 在“按最近交互”列表中支持置顶与取消置顶。操作先在当前设备生效，再同步到网关，减轻弱网等待；这是 Bridge 手机 App 与 Web 的列表偏好，不修改原生 App 或 CLI 的置顶状态。电脑右键、手机长按可打开会话菜单。
-- **断开连接并归档**：增加二次确认，左侧“确认归档”、右侧“取消”，两个按钮采用相同样式和大小。在支持的接入中停止所选会话及可核验的子任务，确认停止后再归档；聊天记录保留，可取消归档。无法确认停止或归档结果时不会自动重复提交。原生能力限制见下文，不能保证所有 App/CLI 会话均可归档。
-- **复制与会话详情（#74、#75）**：支持复制 Codex 深度链接、DSH Session ID，以及文件和目录的绝对路径；修复旧版 iOS/Android App 中复制未写入剪贴板、缺少结果提示的问题。深度链接入口移至会话详情的“在电脑运行”旁；Windows 普通盘符与 UNC 路径显示不再带扩展路径前缀。
-- **文件阅读（#80、#81）**：Markdown 可切换阅读与源码模式，并保留相应阅读位置。增加独立的文件字号设置，应用于文本、代码、Markdown 和 HTML 预览；图片与 PDF 继续使用各自的缩放方式。
-- **账号与 API 接入（#78）**：统一 Codex 账号清单，保留桌面网关的“添加账号或 API”和具体额度展示。手机 API 表单沿用现有配色，折叠标题与相邻设置一致，去掉多余外框，补齐输入标识；支持“获取上游模型”并自动填入默认模型。官方账号登录仍在电脑完成。
-- **网关与列表**：直接展示全部访问地址（#76），移除“客户端与接入”中多余的 Codex/Claude 分组标题。Mac/Linux 不初始化或展示 WSL 模块。修复 DSH/Claude 列表与置顶状态读取范围导致的更新失败，以及最近会话和项目列表之间的缓存干扰。
-- **连接与项目分组（PR #73、#82）**：修复 Windows SSH/CLI 项目目录分组名称；提高 HTTP 监听队列容量，改善并发连接接入，并验证异常 GET 请求关闭连接时不会污染后续请求。
+- **주요 대화**：Codex、Claude 및 DSH 에서“언론 최근 상호작용”목록은 고정 및 고정 해제를 지원합니다. 작업은 먼저 현재 장치에 적용된 다음 게이트웨이와 동기화되어 약한 네트워크에 대한 대기 시간을 줄입니다. 이것은 Bridge 휴대폰 App 및 Web 기본 설정을 나열하고 기본을 수정하지 마세요. App 또는 CLI 고정된 상태. 컴퓨터를 마우스 오른쪽 버튼으로 클릭하거나 휴대폰을 길게 눌러 세션 메뉴를 엽니다.。
+- **연결 해제 및 보관**：두 번째 확인 추가, 왼쪽“보관 확인”、오른쪽“취소”，두 버튼 모두 스타일과 크기가 동일합니다. 지원되는 액세스에서 선택한 대화 및 확인 가능한 하위 작업을 중지하고 보관하기 전에 중지를 확인하세요. 채팅 기록은 유지되며 보관을 취소할 수 있습니다. 중지되거나 보관 결과를 확인할 수 없는 경우 제출이 자동으로 반복되지 않습니다. 기본 기능 제한 사항은 아래를 참조하세요. 우리는 모든 것을 보장할 수 없습니다 App/CLI 대화를 보관할 수 있습니다。
+- **복제 및 세션 세부정보（#74、#75）**：복사 지원 Codex 딥링크、DSH Session ID，파일과 디렉터리의 절대 경로; 이전 버전에 대한 수정 사항 iOS/Android App 복사 시 문제가 발생하여 클립보드에 기록되지 않고 결과 프롬프트가 누락됩니다. 딥링크 항목이 세션 세부정보로 이동되었습니다.“컴퓨터에서 실행”옆에；Windows 공통 드라이브 문자 및 UNC 경로는 더 이상 확장 경로 접두사와 함께 표시되지 않습니다.。
+- **파일 읽기（#80、#81）**：Markdown 읽기 모드와 소스 코드 모드 사이를 전환하고 해당 읽기 위치를 유지할 수 있습니다. 텍스트 및 코드에 적용되는 독립적인 파일 글꼴 크기 설정 추가、Markdown 및 HTML 시사; 사진과 PDF 계속해서 자체 확장 방법을 사용하세요.。
+- **계정 및 API 연결（#78）**：통일된 Codex 계정 목록, 데스크톱 게이트웨이 유지“계정을 추가하거나 API”그리고 구체적인 금액이 표시됩니다. 휴대폰 API 형태는 기존 배색을 따르고 접힌 제목은 인접한 설정과 일치하며 중복된 외부 프레임은 제거되고 입력 로고가 완성됩니다. 지원됨“업스트림 모델 가져오기”그리고 기본 모델을 자동으로 채웁니다. 컴퓨터에서는 아직 공식 계정 로그인이 완료되어 있습니다。
+- **게이트웨이 및 목록**：모든 액세스 주소를 직접 표시（#76），제거하다“클라이언트 및 액세스”초과 Codex/Claude 그룹 제목。Mac/Linux 초기화 또는 표시하지 않음 WSL 기준 치수. 수리하다 DSH/Claude 목록 및 고정 상태 읽기 범위로 인한 업데이트 실패, 최근 세션과 프로젝트 목록 간의 캐시 간섭。
+- **연결 및 프로젝트 그룹화（PR #73、#82）**：수리하다 Windows SSH/CLI 프로젝트 디렉토리 그룹 이름. 개선하다 HTTP 대기열 용량 모니터링, 동시 연결 액세스 개선, 예외 확인 GET 후속 요청을 오염시키지 않고 연결을 닫도록 요청합니다.。
 
-### 归档支持范围与限制
+### 보관 지원 범위 및 제한 사항
 
-- **Codex**：支持兼容原生运行时上的 CLI/WSL 会话，以及没有活跃写入者的 App 历史。**仍由 Codex App 持有的部分会话暂时不能从 Bridge 释放并归档**，请在 Codex App 中归档；Bridge 不会为此退出整个 App、影响其他会话或直接改写原生数据库。
-- **Claude**：Claude Code Desktop 通过支持的原生接口停止并归档。CLI/SSH/WSL 使用可逆文件归档，仅在原生版本、配置身份、会话文件及写入进程检查通过后启用；未验证的版本、Windows 原生 CLI，以及仍检测到其他写入者的环境可能无法归档。**Cowork 暂不支持归档与恢复。**
-- **DSH**：需要支持本版归档流程的连接器。停止目标会话及其任务后重新核验，再调用原生归档；无法确认安全状态时不执行。升级运行中的旧连接器需要显式重启接入，启动网关本身不会自动重启 DSH。
-- 归档不会删除聊天记录，也不会在取消归档时自动恢复未完成任务。上述未完成范围继续由 [#77](https://github.com/try2love/codex-mobile-bridge/issues/77) 跟踪。
+- **Codex**：네이티브 런타임과의 호환성 지원 CLI/WSL 세션 및 활동적인 작성자가 없는 세션 App 역사。**아직 Codex App 개최된 세션 중 일부를 일시적으로 이용할 수 없습니다. Bridge 릴리스 및 보관**，제발 Codex App 중간 아카이브；Bridge 이것 때문에 모든 것을 그만 두지는 않을 것입니다 App、다른 세션에 영향을 미치거나 기본 데이터베이스를 직접 덮어씁니다.。
+- **Claude**：Claude Code Desktop 지원되는 기본 인터페이스를 통해 중지 및 보관。CLI/SSH/WSL 기본 버전, 구성 ID, 세션 파일 및 쓰기 프로세스 검사를 통과한 후에만 활성화되는 되돌릴 수 있는 파일 보관을 사용합니다. 검증되지 않은 버전、Windows 네이티브 CLI，다른 작성자가 여전히 감지되는 환경은 보관되지 않을 수 있습니다.。**Cowork 보관 및 복구는 아직 지원되지 않습니다.。**
+- **DSH**：이 버전의 보관 프로세스를 지원하는 커넥터가 필요합니다. 기본 아카이브를 호출하기 전에 대상 세션과 해당 작업을 중지하고 다시 확인하십시오. 보안 상태를 확인할 수 없으면 실행하지 마십시오. 실행 중인 이전 커넥터를 업그레이드하려면 명시적으로 액세스를 다시 시작해야 합니다. 게이트웨이 자체를 시작해도 자동으로 다시 시작되지 않습니다. DSH。
+- 보관해도 채팅 기록은 삭제되지 않으며, 보관 취소 시 완료되지 않은 작업은 자동으로 복원되지 않습니다. 위의 미완성 범위는 다음에 의해 계속됩니다. [#77](https://github.com/try2love/codex-mobile-bridge/issues/77) 길。
 
-### 升级
+### 치받이
 
-覆盖安装对应平台原 App，不要先卸载或清除数据。Android 沿用原签名；iOS 仍需使用相同应用标识与签名身份自行覆盖安装。独立 Test 与正式 App 保持独立安装与数据目录。
+해당 플랫폼 원본을 덮고 설치하십시오. App，먼저 데이터를 제거하거나 지우지 마십시오.。Android 원본 서명 유지；iOS 설치를 직접 덮어쓰려면 여전히 동일한 애플리케이션 ID와 서명 ID를 사용해야 합니다. 독립적인 Test 그리고 형식적인 App 설치 및 데이터 디렉터리를 별도로 유지。
 
-更新网关后刷新 Web 或手机共享页面；旧手机 App 可在原电脑连接的“更多 → 刷新页面”加载新版。若正式版和 Test 共用一个 DSH 原生连接器，应一并升级到兼容版本；两套网关的独立安装并不隔离同一个原生连接器。仅在确认原生任务已停止后，通过明确的重启操作完成连接器升级。
+게이트웨이 업데이트 후 새로 고침 Web 또는 휴대폰 공유 페이지; 오래된 휴대폰 App 원래 컴퓨터에 연결할 수 있습니다“더 → 페이지 새로 고침”새 버전을 로드합니다. 공식 버전과 Test 하나를 공유하다 DSH 기본 커넥터는 호환되는 버전으로 함께 업그레이드되어야 합니다. 두 개의 게이트웨이 세트를 독립적으로 설치해도 동일한 기본 커넥터가 격리되지 않습니다. 기본 작업이 중지되었음을 확인한 후에만 명시적으로 다시 시작하여 커넥터 업그레이드가 완료됩니다.。
 
-### 贡献与反馈
+### 기여 및 피드백
 
-感谢 [@lanchengjiu](https://github.com/lanchengjiu) 的 [PR #73](https://github.com/try2love/codex-mobile-bridge/pull/73)，以及 [@mc373906408（waken）](https://github.com/mc373906408) 的 [PR #82](https://github.com/try2love/codex-mobile-bridge/pull/82)。两位作者的原始提交通过 merge 保留。感谢 #74、#75、#76、#77、#78、#80、#81 的建议与跨平台测试反馈。
+고마워하는 [@lanchengjiu](https://github.com/lanchengjiu) 의 [PR #73](https://github.com/try2love/codex-mobile-bridge/pull/73)，게다가 [@mc373906408（waken）](https://github.com/mc373906408) 의 [PR #82](https://github.com/try2love/codex-mobile-bridge/pull/82)。두 저자의 원본 제출물이 승인되었습니다. merge 예약하다. 고마워하는 #74、#75、#76、#77、#78、#80、#81 제안 및 크로스 플랫폼 테스트 피드백。
 
 ### English
 
@@ -445,32 +445,32 @@ Thanks to [@lanchengjiu](https://github.com/lanchengjiu) for PR #73 and [@mc3739
 <a id="v215"></a>
 <a id="v215-unreleased"></a>
 
-## v2.1.5 · WSL CLI、项目创建与聊天管理
+## v2.1.5 · WSL CLI、프로젝트 생성 및 채팅 관리
 
-本版扩展 Windows 网关的 WSL Codex / Claude Code CLI 接入，统一跨客户端新建项目，并完善回复阅读、消息队列和浏览器导航。桌面与手机 App 版本为 **2.1.5**，Android/iOS 构建号为 **38**。
+이 버전은 확장됩니다 Windows 게이트웨이 WSL Codex / Claude Code CLI 클라이언트 전반에 걸쳐 새 프로젝트에 액세스하고 통합하며 회신 읽기, 메시지 대기열 및 브라우저 탐색을 개선합니다. 데스크톱과 모바일 App 버전은 **2.1.5**，Android/iOS 빌드번호는 **38**。
 
-### 新增与改进
+### 새로운 추가 및 개선 사항
 
-- **WSL Codex 与 Claude Code CLI**：扫描并登记正在运行的发行版，在原 Linux 用户和配置目录中读取历史、显式继续或新建聊天；Codex 共用 APP / CLI / WSL 来源筛选，Claude 标注 CLI · WSL。按原生能力提供模型、推理、权限、Skill、审批、停止、文件、Git、附件、终端和通知；Codex 还支持原生 Goal 与持久队列。保留各环境的账号、工作目录、草稿、历史分页及操作回执；模型目录按身份缓存。被动浏览不唤醒已停止的发行版，关闭接入不退出原 CLI 任务，主题切换不重建 WSL Claude 会话。[WSL 使用说明](docs/wsl-codex.md)
-- **WSL 账号与接入（实验性）**：按发行版、用户和配置目录保存、导入及切换支持的 API 接入，并恢复原始文件配置。官方登录仍在原 WSL 完成；Windows 与 WSL 不自动同步凭据。切换前检查任务、审批、队列和未确认操作，空闲执行器正常交接，无法核验或外部工具管理的配置停止切换。此能力不保证所有账号与配置可用，尚未完成真实多账号全流程验证；保存或切换成功不代表上游认证成功。[实验性账号说明](docs/wsl-accounts.md)
-- **跨客户端新建项目聊天**：Codex App、本机/SSH CLI、WSL、Claude Desktop/CLI 和 DSH Desktop 共用运行环境及目录选择器，可选已有项目、浏览其他目录或在父目录中新建文件夹。沿用原生项目登记和权限；Claude 明确显示“创建并发送”，浏览目录本身不发送消息。新 SSH 目录、旧运行时及 DSH 连接器的能力边界见[使用说明](docs/project-chats.md)。
-- **回复审查、引用与附件**：完整代码审查标记展示为可复制的审查卡，授权文件可打开并高亮对应代码行；后续操作按钮先追加到草稿，再由用户发送。Codex / Claude 支持消息和选中文字引用，保留原草稿并按会话恢复；图片预览可添加到当前聊天附件。文件引用和修改文件摘要提供受权限约束的位置链接，长摘要保留分页。`codex://review` 保留 Desktop 目标，识别到 GitHub PR 时提供网页入口；不承诺在手机复现 Desktop 专属审查状态。Mermaid 继续沿用已有预览能力。[操作说明](docs/output-interactions.md)
-- **消息管理与多页面一致性（#71、PR #70）**：在“更多 → 消息管理”中撤回未发送消息、原位编辑并保留附件和队列位置、调整网关实际发送顺序，以及核对或显式忽略未确认记录。已交给 Claude / DSH 原生客户端的队列仍由原客户端管理。修复明确拒绝发送后的残留与旧页面记录互相干扰；不清空其他页面请求，不自动重发未知结果，编辑冲突保留内容并支持重新打开管理器。[消息管理](docs/message-management.md)
-- **返回与项目分组（#67、PR #70）**：浏览器返回遵循聊天、工具与全屏层级，避免意外离开工作台；修复 Windows / UNC 项目归类，并按实际执行主机的路径规则分组。
-- **按需资源与弱网**：聊天列表启动不再等待可选的文件和图表渲染器；打开对应功能时再加载，复用内容缓存并保留有限恢复。消息和配对等写入不自动重放。窄屏 WebKit 的 WSL 弹窗适配可用视区。
-- **客户端与手机生命周期**：改善连接入口恢复、原生聊天输出与分页记录还原，保留客户端任务及接入身份；区分关闭 Bridge 接入、停止任务与退出桌面程序，避免误影响其他原生进程。
+- **WSL Codex 및 Claude Code CLI**：원본에서 실행 중인 배포판을 스캔하고 등록합니다. Linux 기록을 읽고, 사용자 및 구성 디렉터리에서 명시적으로 계속하거나 새 채팅을 생성하세요.；Codex 공유하다 APP / CLI / WSL 소스 필터링，Claude 표시 CLI · WSL。기본 기능을 기반으로 모델, 추론, 권한 제공、Skill、승인, 중지, 문서화、Git、첨부 파일, 터미널 및 알림；Codex 네이티브도 지원 Goal 지속적인 대기열이 있습니다. 각 환경의 계정, 작업 디렉터리, 초안, 기록 페이징 및 작업 영수증을 보관합니다. 모델 디렉터리는 ID로 캐시됩니다. 패시브 브라우징은 중지된 배포를 깨우지 않으며 액세스를 닫아도 원래 버전이 종료되지 않습니다. CLI 작업, 테마 스위치가 다시 작성되지 않습니다. WSL Claude 대화。[WSL 사용 지침](docs/wsl-codex.md)
+- **WSL 계정 및 액세스（실험적）**：릴리스, 사용자 및 구성 디렉터리에서 지원되는 저장, 가져오기 및 전환 API 원본 파일 구성에 액세스하고 복원합니다. 공식 로그인이 아직 남아있습니다. WSL 마치다；Windows 및 WSL 자격 증명은 자동으로 동기화되지 않습니다. 전환하기 전에 작업, 승인, 대기열, 확인되지 않은 작업을 확인하세요. 유휴 실행자는 정상적으로 전달됩니다. 확인할 수 없거나 외부 도구로 관리되는 구성은 전환을 중지합니다. 이 기능은 모든 계정과 구성이 사용 가능함을 보장하지 않으며 실제 다중 계정의 전체 프로세스 검증이 완료되지 않았습니다. 성공적인 저장 또는 전환이 성공적인 업스트림 인증을 의미하지는 않습니다.。[실험 계정 설명](docs/wsl-accounts.md)
+- **클라이언트 간 새 프로젝트 채팅**：Codex App、로컬 머신/SSH CLI、WSL、Claude Desktop/CLI 및 DSH Desktop 실행 환경 및 디렉터리 선택기를 공유하고, 기존 프로젝트를 선택하고, 다른 디렉터리를 찾아보거나 상위 디렉터리에 새 폴더를 만듭니다. 네이티브 프로젝트 등록 및 권한 상속；Claude 명확하게 표시“작성 및 보내기”，디렉토리 자체를 검색하는 것만으로는 메시지가 전송되지 않습니다. 새로운 SSH 디렉토리, 이전 런타임 및 DSH 커넥터 기능 경계는 다음을 참조하세요.[사용 지침](docs/project-chats.md)。
+- **리뷰, 인용, 첨부 파일에 답장하기**：전체 코드 검토 표시는 복사 가능한 검토 카드로 표시되며 인증 파일을 열 수 있고 해당 코드 줄이 강조 표시됩니다. 후속 조치 버튼은 먼저 초안에 추가된 다음 사용자에 의해 전송됩니다.。Codex / Claude 메시지 및 선택한 텍스트 인용을 지원하고 원본 초안을 유지하며 세션별로 복원합니다. 현재 채팅 첨부 파일에 이미지 미리보기를 추가할 수 있습니다. 파일 참조 및 수정된 파일 요약은 권한이 제한된 위치 링크를 제공하고 긴 요약은 페이지 매김을 유지합니다.。`codex://review` 예약하다 Desktop 대상, 식별됨 GitHub PR 당시 웹포털을 제공합니다. 휴대폰에서의 재생산을 약속하지 않습니다 Desktop 단독 리뷰 상태。Mermaid 기존 미리보기 기능을 계속 사용하세요.。[작동 지침](docs/output-interactions.md)
+- **메시지 관리 및 다중 페이지 일관성（#71、PR #70）**：에서“더 → 메시지 관리”보내지 않은 메시지를 회수하고, 첨부 파일과 큐 위치를 그대로 편집하고, 게이트웨이의 실제 전송 순서를 조정하고, 확인되지 않은 레코드를 조정하거나 명시적으로 무시합니다. 넘겨졌다 Claude / DSH 기본 클라이언트의 대기열은 여전히 ​​원래 클라이언트에서 관리됩니다. 전송을 명시적으로 거부한 후 남은 부분과 이전 페이지 기록 간의 간섭을 수정합니다. 다른 페이지 요청을 지우지 않고, 알 수 없는 결과를 자동으로 다시 보내지 않으며, 콘텐츠를 유지하고 관리자 다시 열기를 지원하도록 충돌을 편집합니다.。[메시지 관리](docs/message-management.md)
+- **항목별로 그룹화된 반품（#67、PR #70）**：브라우저 반환은 실수로 작업대를 떠나는 것을 방지하기 위해 채팅, 도구 및 전체 화면 계층 구조를 따릅니다. 결정된 Windows / UNC 실제 실행 호스트의 경로 규칙에 따라 프로젝트를 분류하고 그룹화합니다.。
+- **주문형 리소스 및 취약한 네트워크**：채팅 목록 시작 시 더 이상 선택적 파일 및 차트 렌더러를 기다리지 않습니다. 해당 기능이 켜지면 로드되어 콘텐츠 캐시를 재사용하고 제한된 복구를 유지합니다. 메시지, 페어링 등의 쓰기는 자동으로 재생되지 않습니다. 좁은 화면 WebKit 의 WSL 팝업 창은 사용 가능한 뷰포트에 맞게 조정됩니다.。
+- **클라이언트 및 휴대폰 수명주기**：연결 입구 복구, 기본 채팅 출력 및 페이징 기록 복원을 개선하고, 클라이언트 작업을 유지하고 ID에 액세스합니다. 클로저를 구별하다 Bridge 실수로 다른 기본 프로세스에 영향을 주지 않도록 데스크톱 프로그램에 액세스하고, 작업을 중지하고, 종료하세요.。
 
-### 升级与边界
+### 업그레이드 및 경계
 
-覆盖安装对应平台原 App，不要先卸载或清除数据。Android 沿用原签名；iOS 仍需自行签名，使用相同应用标识与签名身份覆盖安装。独立 Test 与正式版互不覆盖。更新网关后刷新 Web / 手机共享页面；旧 Android 可在原电脑连接的“更多 → 刷新页面”主动加载新版。
+해당 플랫폼 원본을 덮고 설치하십시오. App，먼저 데이터를 제거하거나 지우지 마십시오.。Android 원본 서명 유지；iOS 설치를 덮어쓰려면 여전히 자신을 서명하고 동일한 애플리케이션 ID와 서명 ID를 사용해야 합니다. 독립적인 Test 공식 버전에는 포함되지 않습니다. 게이트웨이 업데이트 후 새로 고침 Web / 모바일 공유 페이지; 오래된 Android 원래 컴퓨터에 연결할 수 있습니다“더 → 페이지 새로 고침”새 버전을 적극적으로 로드。
 
-WSL 功能需要已安装且能力兼容的原生 CLI；扫描不安装程序，也不自动启用新入口。账号管理仍为实验性，不将模拟测试、配置写入或模型列表视为真实多账号认证与任务验证。各平台、构建和实测范围见[验证记录](VERIFICATION.md#v215)。
+WSL 기능에는 기본 설치 및 호환 기능이 필요합니다. CLI；검색은 프로그램을 설치하지 않으며 새 포털을 자동으로 활성화하지 않습니다. 계정 관리는 아직 실험적이며 시뮬레이션 테스트, 구성 작성 또는 모델 목록은 실제 다중 계정 인증 및 작업 확인으로 간주되지 않습니다. 각 플랫폼, 빌드 및 측정 범위는 다음을 참조하세요.[기록 확인](VERIFICATION.md#v215)。
 
-### 贡献与反馈
+### 기여 및 피드백
 
-- 感谢 [@we-worker](https://github.com/we-worker) 在 [PR #64](https://github.com/try2love/codex-mobile-bridge/pull/64) 中贡献 WSL、Magpie 兼容与项目目录能力，全部 **8 个原始提交**保留。
-- 感谢 [@lanchengjiu](https://github.com/lanchengjiu) 在 [PR #70](https://github.com/try2love/codex-mobile-bridge/pull/70) 中修复 Windows 项目归类和发送拒绝残留，原始提交 **d62002b** 保留在历史中。
-- 感谢 [#67](https://github.com/try2love/codex-mobile-bridge/issues/67)、[#71](https://github.com/try2love/codex-mobile-bridge/issues/71) 及回复阅读相关反馈；[#46](https://github.com/try2love/codex-mobile-bridge/issues/46) 的 Desktop 审查链接按上述边界处理。
+- 고마워하는 [@we-worker](https://github.com/we-worker) 에서 [PR #64](https://github.com/try2love/codex-mobile-bridge/pull/64) 기부금 WSL、Magpie 프로젝트 디렉토리 기능과 모두 호환 가능 **8 원래 커밋**예약하다。
+- 고마워하는 [@lanchengjiu](https://github.com/lanchengjiu) 에서 [PR #70](https://github.com/try2love/codex-mobile-bridge/pull/70) 중간 수리 Windows 프로젝트 분류 및 발송 거부 잔여, 원본 제출 **d62002b** 역사에 남다。
+- 고마워하는 [#67](https://github.com/try2love/codex-mobile-bridge/issues/67)、[#71](https://github.com/try2love/codex-mobile-bridge/issues/71) 관련 피드백을 읽으려면 답장을 보내세요.；[#46](https://github.com/try2love/codex-mobile-bridge/issues/46) 의 Desktop 리뷰 링크는 위의 경계에 따라 처리됩니다.。
 
 ### English
 
@@ -493,28 +493,28 @@ Thanks to [@we-worker](https://github.com/we-worker) for [PR #64](https://github
 
 <a id="v214"></a>
 
-## v2.1.4 · 公网启动、长会话与网络恢复
+## v2.1.4 · 공용 네트워크 시작, 긴 세션 및 네트워크 복구
 
-本版改善公网与弱网下的工作台启动，修复超长会话断开连接的问题，并补齐 Web 一键复制和可选的网络变化自动恢复。桌面与手机 App 版本为 **2.1.4**，Android/iOS 构建号为 **37**。
+이 버전은 공용 및 취약한 네트워크에서 워크벤치 시작을 개선하고, 지나치게 긴 세션의 연결 끊김 문제를 수정하고, Web 원클릭 복제 및 네트워크 변경 사항에 대한 선택적 자동 복구. 데스크톱과 모바일 App 버전은 **2.1.4**，Android/iOS 빌드번호는 **37**。
 
-### 修复与改进
+### 수정 및 개선
 
-- **公网启动与缓存复用（#62）**：修复 Cloudflare 固定入口因附加统计脚本被拦截而停在错误页的问题。必需资源提前下载、按依赖顺序执行；短暂下载失败或初始登录状态读取超时有限重试，重复打开复用未变化的缓存资源。
-- **长会话连接与阅读（#65）**：修复超大 Desktop 历史快照超过接收上限，导致当前及其他会话断开的问题。进入时先展示缓存和最近内容，上翻才加载更早记录，保留阅读位置；历史读取与原会话实时控制分离，发送和审批继续由原连接处理。
-- **多客户端历史**：为 Codex Desktop/CLI、Claude Code Desktop/CLI 和 DeepSeek Harness 接入各自支持的历史读取方式。改善跨页工具记录、过期响应处理和 Windows Claude 历史文件变化识别，保留账号、工作目录和权限边界。
-- **Web 一键复制（#66）**：回复、代码和 Mermaid 源码支持点击复制，补齐局域网 HTTP 与延迟获取长正文的兼容路径；浏览器拒绝时提供重新复制和手动入口。
-- **可选网络变化恢复（PR #63）**：默认关闭，可在桌面网关或登录后的手机/Web 中即时启停。使用系统网络事件和 30 秒兜底检查，稳定后更新实际可用的局域网入口；同 IP 续期不重建。修复 Windows 网卡地址读取、多网卡旧配置迁移和失败监听地址误报；Quick Tunnel 先自行恢复，连续明确失败后才有限重建。
+- **공용 네트워크 시작 및 캐시 재사용（#62）**：수리하다 Cloudflare 추가 통계 스크립트가 차단되어 오류 페이지에서 입장이 멈추는 현상을 수정하였습니다. 필요한 리소스를 미리 다운로드하여 종속성 순서대로 실행합니다. 단기적인 다운로드 실패 또는 초기 로그인 상태 읽기 시간 초과는 제한된 재시도이며 변경되지 않은 캐시된 리소스는 반복적으로 열리고 재사용됩니다.。
+- **긴 세션 연결 및 읽기（#65）**：대형 수리 Desktop 기록 스냅샷이 수신 상한을 초과하여 현재 세션과 다른 세션의 연결이 끊어집니다. 입장 시 캐시된 최신 콘텐츠가 먼저 표시되고, 읽은 위치를 유지하기 위해 위로 스크롤한 후 이전 기록이 로드됩니다. 이력 읽기는 원래 세션의 실시간 제어와 분리되어 있으며 전송 및 승인은 원래 연결을 통해 계속 처리됩니다.。
+- **다중 클라이언트 기록**：～을 위한 Codex Desktop/CLI、Claude Code Desktop/CLI 및 DeepSeek Harness 지원되는 해당 기록 읽기 방법에 액세스합니다. 향상된 교차 페이지 도구 로깅, 만료된 응답 처리 및 Windows Claude 기록 파일의 변경 사항을 인식하고 계정, 작업 디렉터리 및 권한 경계를 유지합니다.。
+- **Web 원클릭 복사（#66）**：답장, 코드 및 Mermaid 소스 코드는 원 클릭 복사를 지원하여 근거리 통신망을 완성합니다. HTTP 긴 본문을 지연하여 가져오는 호환 경로입니다. 브라우저가 거부할 경우 재복사 및 수동 입력 제공。
+- **선택적 네트워크 변경 복구（PR #63）**：기본적으로 꺼져 있으며, 로그인 후 데스크톱 게이트웨이나 휴대폰에서 사용할 수 있습니다./Web 즉시 시작하고 중지합니다. 시스템 네트워크 이벤트를 사용하고 30 몇 초 만에 모든 것을 확인하고 안정화 후 실제 사용 가능한 LAN 입구를 업데이트하세요. 같은 IP 갱신은 재구축되지 않습니다. 수리하다 Windows 네트워크 카드 주소 읽기, 여러 네트워크 카드의 이전 구성 마이그레이션 및 실패한 수신 주소에 대한 잘못된 경보；Quick Tunnel 먼저 스스로 복구하고, 계속해서 클리어 실패를 겪은 후 제한된 방식으로 다시 빌드하세요.。
 
-### 升级
+### 치받이
 
-覆盖安装对应平台的原应用，不要先卸载或清除数据，以保留配置、电脑列表和有效手机绑定。Android 沿用原签名；iOS 沿用正式应用标识，仍需使用自己的签名身份安装。独立 Test 与正式版互不覆盖。浏览器及现有手机 App 可在网关更新后刷新共享页面。
+해당 플랫폼에 대한 원본 애플리케이션을 덮어쓰고 설치합니다. 구성, 컴퓨터 목록 및 유효한 휴대폰 바인딩을 유지하려면 먼저 데이터를 제거하거나 지우지 마십시오.。Android 원본 서명 유지；iOS 공식 애플리케이션 ID를 따르되 설치하려면 자체 서명 ID를 사용해야 합니다. 독립적인 Test 공식 버전에는 포함되지 않습니다. 브라우저 및 기존 휴대폰 App 게이트웨이 업데이트 후 공유 페이지를 새로 고칠 수 있습니다.。
 
-网络恢复不会自动改写手机中保存的旧 IP；地址变化后请使用稳定域名、其他有效入口或重新扫码。各平台与升级验收范围见[验证记录](VERIFICATION.md#v214)。
+네트워크 복구는 휴대폰에 저장된 오래된 파일을 자동으로 덮어쓰지 않습니다. IP；주소가 변경된 후에는 안정적인 도메인 이름, 기타 유효한 입구를 사용하거나 QR 코드를 다시 스캔하세요. 각 플랫폼 및 업그레이드의 허용 범위를 확인하세요.[기록 확인](VERIFICATION.md#v214)。
 
-### 贡献与反馈
+### 기여 및 피드백
 
-- [@qybgh](https://github.com/qybgh) 在 [PR #63](https://github.com/try2love/codex-mobile-bridge/pull/63) 中贡献按网卡管理入口、地址变化通知和网络恢复基础；全部 8 个原始提交保留，默认关闭、监听与恢复策略修订另行提交。
-- 感谢 [@P2pfans2000](https://github.com/P2pfans2000) 在 [Issue #62](https://github.com/try2love/codex-mobile-bridge/issues/62) 中报告并复测公网启动问题，以及参与跨平台和手机实测的用户。
+- [@qybgh](https://github.com/qybgh) 에서 [PR #63](https://github.com/try2love/codex-mobile-bridge/pull/63) Zhongdong은 네트워크 카드 관리 입구, 주소 변경 알림 및 네트워크 복구의 기본에 기여합니다. 모두 8 원래 제출 내용은 유지되며 기본 종료, 모니터링 및 복구 전략 수정 사항은 별도로 제출됩니다.。
+- 고마워하는 [@P2pfans2000](https://github.com/P2pfans2000) 에서 [Issue #62](https://github.com/try2love/codex-mobile-bridge/issues/62) 공용 네트워크 시작 문제는 물론 크로스 플랫폼 및 휴대폰 테스트에 참여하는 사용자를 보고하고 다시 테스트합니다.。
 
 ### English
 
@@ -534,25 +534,25 @@ Thanks to [@qybgh](https://github.com/qybgh) for [PR #63](https://github.com/try
 
 <a id="v214-preview1"></a>
 
-## v2.1.4-preview.1 · 启动恢复与首次加载优化
+## v2.1.4-preview.1 · 시동 복구 및 첫 번째 로드 최적화
 
-这是面向体验用户的预发布版本，重点修复 Issue #62 的工作台启动问题。**v2.1.3 仍是最新正式版**，正式版更新检查不会自动安装本预览版；本轮代码保留在独立预发布分支，尚未合并 main。
+이는 수정 사항에 초점을 맞춘 숙련된 사용자를 위한 시험판 버전입니다. Issue #62 워크벤치 시작 문제。**v2.1.3 아직 최신 공식 버전**，공식 버전 업데이트 확인에서는 이 미리보기 버전을 자동으로 설치하지 않습니다. 이 코드 라운드는 독립적인 시험판 분기에 유지되며 아직 병합되지 않았습니다. main。
 
-### 修复与改进
+### 수정 및 개선
 
-- **Cloudflare 固定入口**：修复部分 Cloudflare Tunnel 页面因附加统计脚本被浏览器安全策略拦截，而一直停留在“工作台尚未加载完成”的问题。保留原有访问安全限制。
-- **首次加载更快**：页面样式加载时提前下载必需脚本，减少弱网和公网入口下的多轮等待；脚本仍按依赖顺序执行。
-- **缓存复用**：重复打开继续复用内容版本相同的资源；升级后仅更新发生变化的资源，首页及时读取当前版本。
-- **启动自动恢复**：短暂的资源下载失败或初始登录状态读取超时会有限重试；持续失败时显示恢复状态、可展开的详情和重新加载入口，不再只有空白页面。
-- **手机与无障碍显示**：改善早期原生剪贴板脚本加载失败后的恢复，以及减少动态效果设置下的启动提示。配对和消息等写入不会自动重发。
+- **Cloudflare 고정된 입구**：수리부품 Cloudflare Tunnel 첨부된 통계 스크립트로 인해 브라우저 보안 정책에 의해 해당 페이지가 차단되어 멈췄습니다.“워크벤치가 아직 로드되지 않았습니다.”문제. 원래의 액세스 보안 제한을 유지하세요。
+- **최초 로딩 속도 향상**：페이지 스타일을 로드할 때 필요한 스크립트를 미리 다운로드하여 약한 네트워크 및 공용 네트워크 입구에서 여러 차례의 대기 시간을 줄입니다. 스크립트는 여전히 종속성 순서로 실행됩니다.。
+- **캐시 재사용**：동일한 콘텐츠 버전의 리소스를 반복적으로 열고 재사용합니다. 업그레이드 후에는 변경된 리소스만 업데이트되며 홈페이지는 적시에 현재 버전을 읽습니다.。
+- **자동 복구 시작**：짧은 리소스 다운로드 실패 또는 초기 로그인 상태 읽기 시간 초과는 제한된 방식으로 다시 시도됩니다. 오류가 계속되면 복구 상태, 확장 가능한 세부 정보 및 다시 로드 항목이 표시되고 더 이상 빈 페이지가 없습니다.。
+- **휴대폰 및 접근 가능한 디스플레이**：초기 기본 클립보드 스크립트 로드 실패 후 복구가 향상되었으며 동적 효과 설정에서 시작 프롬프트가 감소되었습니다. 페어링, 메시지 등의 쓰기는 자동으로 재전송되지 않습니다.。
 
-### 下载与升级
+### 다운로드 및 업그레이드
 
-桌面及手机发布版本为 **2.1.4-preview.1**，Android/iOS 构建号为 **36**（iOS 系统版本字段为 2.1.4）。提供 macOS Apple Silicon/Intel、Windows x64、Linux x64/arm64、Android APK、iOS 未签名 IPA 与 Xcode 源码包。
+데스크톱 및 모바일 릴리스 버전은 다음과 같습니다. **2.1.4-preview.1**，Android/iOS 빌드번호는 **36**（iOS 시스템 버전 필드는 다음과 같습니다. 2.1.4）。공급 macOS Apple Silicon/Intel、Windows x64、Linux x64/arm64、Android APK、iOS 서명되지 않은 IPA 및 Xcode 소스코드 패키지。
 
-选择对应安装包覆盖原安装，保留原数据目录；Android 使用原签名，iOS 沿用原应用标识并需自行签名。不要先卸载或清空数据。仅更新 Web 网关也可使用本次共享页面修复。反馈时请注明平台、浏览器或 App、访问方式，以及首次/重复打开的表现；可附启动页展开的详情，请勿包含登录链接或凭据。
+원래 설치를 덮어쓰고 원래 데이터 디렉터리를 유지하려면 해당 설치 패키지를 선택합니다.；Android 원본 서명 사용，iOS 원본 애플리케이션 로고를 사용하고 직접 서명하세요. 먼저 데이터를 제거하거나 지우지 마십시오. 업데이트만 Web 이 공유 페이지를 사용하여 게이트웨이를 복구할 수도 있습니다. 피드백을 제공할 때 플랫폼, 브라우저 또는 App、접근 방법 및 최초 접속 방법/반복개방의 수행 시작 페이지 확장에 대한 세부정보를 첨부할 수 있습니다. 로그인 링크나 자격 증명은 포함하지 마세요.。
 
-感谢 [Issue #62](https://github.com/try2love/codex-mobile-bridge/issues/62) 的问题反馈与参与跨平台实测的用户。验收范围见 [验证记录](VERIFICATION.md#v214-preview1)。
+고마워하는 [Issue #62](https://github.com/try2love/codex-mobile-bridge/issues/62) 크로스 플랫폼 테스트에 참여하는 문제 및 사용자에 대한 피드백입니다. 허용 범위는 다음을 참조하세요. [기록 확인](VERIFICATION.md#v214-preview1)。
 
 ### English
 
@@ -574,29 +574,29 @@ Thanks to the [Issue #62](https://github.com/try2love/codex-mobile-bridge/issues
 <a id="unreleased-webhook"></a>
 <a id="unreleased-mermaid"></a>
 
-## v2.1.3 · 多目标通知、图表阅读与连接恢复
+## v2.1.3 · 다중 대상 알림, 차트 읽기 및 연결 복구
 
-本版新增多个独立 Webhook 目标和 Mermaid 图表阅读，并改善弱网加载、iOS 连接恢复及手机输入交互。桌面与手机 App 版本为 **2.1.3**，Android/iOS 构建号为 **35**。各平台验收范围以[验证记录](VERIFICATION.md)为准。
+이 버전에는 여러 가지 독립적인 기능이 추가되었습니다. Webhook 목표와 Mermaid 차트 읽기 및 약한 네트워크 로딩 개선、iOS 연결 복구 및 휴대폰 입력 상호 작용. 데스크톱과 모바일 App 버전은 **2.1.3**，Android/iOS 빌드번호는 **35**。각 플랫폼의 수용 범위는 다음을 기반으로 합니다.[기록 확인](VERIFICATION.md)대상。
 
-### 新增与改进
+### 새로운 추가 및 개선 사항
 
-- **多个 Webhook 接收目标**：每条配置可单独命名、启停、编辑、测试和删除；旧单目标配置仍可见。支持自动识别、通用自定义、飞书、钉钉、Discord 和 Telegram 的可编辑 JSON 模板，飞书与钉钉支持可选签名。修复飞书返回 HTTP 200 但业务拒绝时误报成功的问题。测试只使用已保存配置；保存不会发送通知。普通配置读取隐藏已保存地址、请求头和签名密钥，地址仅在主动查看时返回。每个已启用目标独立投递、去重与重试，不启动会话，也不补发历史通知。详见 [Webhook 配置说明](docs/webhook-notifications.md)。
-- **Mermaid 图表阅读**：在 Codex、Claude、DeepSeek Harness 聊天与 Markdown 文件中预览完整 Mermaid 代码块，可切换源码并复制原文。全屏时手机可双指缩放、放大后拖动或双击放大、还原；宽屏可用滚轮、按钮和双击缩放，再拖动图表。流式未完成内容保留源码；后续文字更新复用未变化图表。iOS App 同步修复图表预览子页面被导航策略拦截的问题，需同时更新网关与 App。
-- **弱网加载与 Windows 包体**：静态资源按内容生成版本地址，重复访问可使用浏览器缓存与条件请求；带页面专属安全随机数的 HTML 仍不缓存。Windows 包仅保留支持的 Electron 语言资源，以缩减包体。
-- **接入与恢复**：修复 DeepSeek Harness 自动折行的 YAML 接入配置无法识别的问题；iOS 网关不可达或遇到隧道错误时提供原生重试、返回电脑列表入口。账号查询在桌面标签可见性变化后恢复，收敛不必要的请求。
-- **手机交互**：弹窗打开时隐藏原生“更多”入口；调整手机列表、弹窗与常规输入框的焦点外观。补充回答卡片输入框被键盘遮挡时做一次可见定位，输入中不反复移动。
+- **다수의 Webhook 목표를 수신하다**：각 구성은 독립적으로 이름을 지정하고, 시작하고, 중지하고, 편집하고, 테스트하고, 삭제할 수 있습니다. 이전 단일 대상 구성이 계속 표시됩니다. 자동 인식, 일반 사용자 정의, Feishu 및 DingTalk 지원、Discord 및 Telegram 편집 가능 JSON 템플릿, Feishu 및 DingTalk는 선택적 서명을 지원합니다. 수리 Feishu 반환 HTTP 200 그러나 사업이 거절될 경우 오탐성 성공이 발생하는 문제가 있다. 테스트에는 저장된 구성만 사용됩니다. 저장하면 알림이 전송되지 않습니다. 일반 구성 읽기는 저장된 주소, 요청 헤더 및 서명 키를 숨기고, 주소는 적극적으로 볼 때만 반환됩니다. 활성화된 각 대상은 세션을 시작하거나 기록 알림을 다시 발행하지 않고 독립적으로 전달, 중복 제거 및 재시도됩니다. 세부정보 보기 [Webhook 구성 지침](docs/webhook-notifications.md)。
+- **Mermaid 차트 읽기**：에서 Codex、Claude、DeepSeek Harness 채팅하다 Markdown 파일의 전체 미리보기 Mermaid 코드 블록에서는 소스 코드를 전환하고 원본 텍스트를 복사할 수 있습니다. 전화기가 전체 화면일 때 두 손가락을 사용하여 확대/축소, 드래그하거나 두 번 클릭하여 확대 및 복원할 수 있습니다. 와이드 화면에서는 스크롤 휠, 버튼을 사용하고 두 번 클릭하여 확대/축소한 다음 차트를 드래그할 수 있습니다. 완료되지 않은 스트리밍 콘텐츠에는 소스 코드가 유지됩니다. 후속 텍스트 업데이트는 변경되지 않은 차트를 재사용합니다.。iOS App 탐색 정책에 의해 차트 미리보기 하위 페이지가 가로채는 문제를 동기적으로 수정합니다. 게이트웨이를 업데이트해야 하며 App。
+- **약한 네트워크 로딩 및 Windows 포함**：정적 리소스는 콘텐츠를 기반으로 버전 주소를 생성하고 브라우저 캐싱 및 조건부 요청은 반복 방문에 사용될 수 있습니다. 페이지별 보안 난수 사용 HTML 아직 캐시되지 않음。Windows 패키지는 계속 지원됩니다. Electron 패키지 본문을 줄이기 위한 언어 리소스。
+- **액세스 및 복구**：수리하다 DeepSeek Harness 자동으로 포장됨 YAML 액세스 구성을 인식할 수 없는 문제；iOS 게이트웨이에 연결할 수 없거나 터널 오류가 발생한 경우 기본 재시도 및 반환 컴퓨터 목록 항목을 제공합니다. 데스크탑 라벨 표시 변경 후 계정 쿼리가 재개되어 불필요한 요청이 줄어듭니다.。
+- **휴대폰 상호작용**：팝업 창이 열릴 때 기본 숨기기“더”입구; 휴대폰 목록, 팝업 창 및 일반 입력 상자의 초점 모양을 조정합니다. 보조 답안 카드의 입력란이 키보드로 가려지면 한 번만 보이고 위치가 지정되며, 입력 시 반복적으로 이동되지 않습니다.。
 
-### 升级
+### 치받이
 
-覆盖安装以保留原电脑列表、配对和网关数据，不要先卸载或清除配置。Android 沿用原签名；iOS 保留正式应用标识，仍需使用自己的签名身份安装。Web 页面在网关更新后刷新；iOS 的原生连接恢复和 Mermaid 子页面修复需要配套 App 更新。共享中继部署需同步更新服务。
+원래 컴퓨터 목록, 페어링 및 게이트웨이 데이터를 유지하려면 설치를 덮어쓰고 먼저 구성을 제거하거나 지우지 마십시오.。Android 원본 서명 유지；iOS 공식 앱 ID를 유지하고 설치하려면 자체 서명 ID를 사용해야 합니다.。Web 게이트웨이 업데이트 후 페이지가 새로 고쳐집니다.；iOS 기본 연결 복구 및 Mermaid 하위 페이지를 복구하려면 일치가 필요합니다. App 고쳐 쓰다. 공유 릴레이 배포에는 동기화된 업데이트 서비스가 필요합니다.。
 
-### 贡献者
+### 기부자
 
-- [@wangzheuser](https://github.com/wangzheuser) 提交 [PR #51](https://github.com/try2love/codex-mobile-bridge/pull/51)，修复 Harness 折行配置解析；原提交作者 [@w154594742](https://github.com/w154594742) 的署名保留。
-- [@RigerWu](https://github.com/RigerWu) 在 [PR #52](https://github.com/try2love/codex-mobile-bridge/pull/52) 中贡献 iOS 原生连接恢复入口。
-- [@heiqiu47](https://github.com/heiqiu47) 在 [PR #40](https://github.com/try2love/codex-mobile-bridge/pull/40) 中提出账号查询改进；本版纳入范围仅为查询生命周期收敛。
-- [@jasongzy](https://github.com/jasongzy) 通过 [Issue #60](https://github.com/try2love/codex-mobile-bridge/issues/60) 提出通用 Webhook 通知需求。
-- [@tiancai123123](https://github.com/tiancai123123) 在 [Issue #54](https://github.com/try2love/codex-mobile-bridge/issues/54) 中定位静态资源重复下载，并在 [PR #56](https://github.com/try2love/codex-mobile-bridge/pull/56) 中贡献内容哈希缓存与条件请求。
+- [@wangzheuser](https://github.com/wangzheuser) 제출하다 [PR #51](https://github.com/try2love/codex-mobile-bridge/pull/51)，수리하다 Harness 줄 바꿈 구성 분석; 원래 제출 작성자 [@w154594742](https://github.com/w154594742) 서명 예약됨。
+- [@RigerWu](https://github.com/RigerWu) 에서 [PR #52](https://github.com/try2love/codex-mobile-bridge/pull/52) 기부금 iOS 기본 연결 복구 입구。
+- [@heiqiu47](https://github.com/heiqiu47) 에서 [PR #40](https://github.com/try2love/codex-mobile-bridge/pull/40) 계정 쿼리 개선 사항은 다음에서 제안됩니다. 이 버전의 범위는 쿼리 수명 주기 수렴뿐입니다.。
+- [@jasongzy](https://github.com/jasongzy) 통해 [Issue #60](https://github.com/try2love/codex-mobile-bridge/issues/60) 보편적인 제안 Webhook 통지 요구 사항。
+- [@tiancai123123](https://github.com/tiancai123123) 에서 [Issue #54](https://github.com/try2love/codex-mobile-bridge/issues/54) 다음에서 정적 리소스를 찾습니다. [PR #56](https://github.com/try2love/codex-mobile-bridge/pull/56) 기여 콘텐츠 해시 캐싱 및 조건부 요청。
 
 ### English
 
@@ -616,33 +616,33 @@ Install over the existing app to retain saved computers, pairings and gateway da
 
 ---
 
-## v2.1.2 · 终端交互与跨平台兼容性
+## v2.1.2 · 터미널 상호 작용 및 플랫폼 간 호환성
 
-v2.1.2 重点改善手机与 Web 终端体验，让直接输入、中文输入、触摸滚动、字号调整和断线恢复更顺畅，并补齐 Windows 终端组件的安装与鼠标交互支持。
+v2.1.2 휴대폰 개선에 집중 Web 터미널 경험을 통해 직접 입력, 중국어 입력, 터치 스크롤링, 글꼴 크기 조정 및 연결 끊김 복구가 더욱 원활하고 완벽해졌습니다. Windows 터미널 구성요소 설치 및 마우스 상호작용 지원。
 
-### 新增与优化
+### 새로운 추가 및 최적화
 
-- **终端直接输入**：手机与宽屏 Web 默认直接在终端输入，保留可选的“编写后发送模式”；改善键盘唤起、输入焦点、中文组合输入和光标显示。
-- **Enter 与 Tab**：新增独立 Enter 按钮，可确认终端 CLI 菜单和命令；直接模式的 Tab 交给当前 shell 或 CLI，编写模式支持公共前缀补全及候选选择，兼容中文与空格路径。
-- **触摸与鼠标交互**：改善 OpenCode 类终端 CLI 的触摸滚动，保留普通终端历史滚动；支持程序启用的鼠标交互，避免用上下方向键代替翻阅。
-- **更连贯的终端连接**：持续双向传输减少逐次请求与排队等待；临时断线后自动恢复仍有效的会话。高延迟网络下减少额外等待，远端回显仍受实际网络延迟影响。
-- **独立终端字号**：通过加减按钮在 6–24px 调整，当前设备的终端共享该设置；shell 路径移至底部，为终端正文留出更多空间。
-- **阅读设置**：主题与语言放在设置顶部，正文字号范围扩大为 10–32px，代码字号扩大为 8–28px。
+- **터미널 직접 입력**：모바일 및 와이드스크린 Web 기본값은 터미널에 직접 입력하고 선택사항으로 남겨두는 것입니다.“쓰기 및 전송 모드”；키보드 각성, 입력 초점, 중국어 조합 입력 및 커서 표시 개선。
+- **Enter 및 Tab**：독립 추가 Enter 단말기 확인 버튼 CLI 메뉴 및 명령 직접 모드 Tab 현재에 맡겨라 shell 또는 CLI，쓰기 모드는 공개 접두사 완성 및 후보 선택을 지원하며 중국어 및 공백 경로와 호환됩니다.。
+- **터치 및 마우스 상호 작용**：개선하다 OpenCode 클래스 터미널 CLI 터치 스크롤, 일반적인 터미널 기록 스크롤 유지; 스크롤하는 대신 위쪽 및 아래쪽 화살표 키를 사용하지 않도록 프로그램 기반 마우스 상호 작용 지원。
+- **보다 일관된 터미널 연결**：지속적인 양방향 전송은 연속적인 요청과 대기열 대기를 줄입니다. 아직 유효한 세션은 일시적인 연결 해제 후 자동으로 복원됩니다. 대기 시간이 긴 네트워크에서 추가 대기 시간을 줄입니다. 원격 에코는 여전히 실제 네트워크 지연의 영향을 받습니다.。
+- **독립 터미널 글꼴 크기**：플러스 및 마이너스 버튼을 사용하여 6–24px 조정하면 현재 기기의 단말기가 이 설정을 공유합니다.；shell 터미널 본체에 더 많은 공간을 확보하기 위해 경로를 아래쪽으로 이동했습니다.。
+- **읽기 설정**：테마와 언어는 설정 상단에 배치되며, 텍스트 크기 범위는 10–32px，코드 글꼴 크기는 다음과 같이 확장됩니다. 8–28px。
 
-### Bug 修复
+### Bug 수리하다
 
-- 修复手机终端调出键盘后输入无效，以及编写模式点击正文出现无效输入焦点。
-- 修复中文、英文、粗体与方块字符混排时的网格错位，小字号文字重叠，以及 CLI 分栏背景边界不齐。
-- 修复终端退出交互式 CLI、收放键盘或调整尺寸后，内容覆盖底部按钮及右侧滚动条。
-- 修复部分环境下终端未使用 UTF-8 导致中文显示异常，以及重新进入终端需要手动重连。
-- 修复 Windows 10 系统 ConPTY 丢失鼠标信号；正式 Windows 安装包和 ZIP 携带完整 ConPTY 组件，无需手动补文件或替换系统组件。
-- 修复 Windows 安装器遗漏部分终端组件的解压兼容性问题。
+- 모바일 단말기에서 키보드 호출 후 입력이 잘못된 문제, 쓰기 모드에서 텍스트 클릭 시 입력 포커스가 잘못된 문제를 수정하였습니다.。
+- 중국어, 영어, 굵은 글씨 및 정사각형 문자가 혼합되어 있고 작은 글꼴 크기가 겹칠 때 격자 정렬이 잘못되는 문제를 수정했습니다. CLI 열 배경 테두리가 고르지 않습니다.。
+- 터미널 종료 대화식 수정 CLI、키보드를 접거나 크기를 조정한 후 콘텐츠가 하단 버튼과 오른쪽 스크롤 막대를 덮습니다.。
+- 일부 환경에서 단말기가 사용되지 않는 문제 수정 UTF-8 이로 인해 중국어 디스플레이가 비정상적이며, 단말기에 다시 진입하려면 수동 재접속이 필요합니다.。
+- 수리하다 Windows 10 체계 ConPTY 마우스 신호가 손실되었습니다. 공식적인 Windows 설치 패키지와 ZIP 완전한 운반 ConPTY 구성 요소, 수동으로 파일을 추가하거나 시스템 구성 요소를 교체할 필요가 없음。
+- 수리하다 Windows 설치 프로그램에서 일부 터미널 구성 요소의 압축 해제 호환성 문제가 누락되었습니다.。
 
-### 升级
+### 치받이
 
-桌面与手机 App 统一为 **2.1.2**，Android/iOS 构建号 **34**。覆盖安装并保留原数据目录，不要先卸载或清除配置；Android 沿用原签名，iOS 保留正式应用标识，仍需使用自己的签名身份安装。浏览器在网关升级后刷新；建议手机 App 同步更新以获得完整终端体验。
+데스크톱과 모바일 App 다음과 같이 통일 **2.1.2**，Android/iOS 빌드 번호 **34**。설치를 덮어쓰고 원래 데이터 디렉터리를 유지합니다. 먼저 구성을 제거하거나 지우지 마십시오.；Android 원본 서명 유지，iOS 공식 앱 ID를 유지하면서도 자체 서명 ID를 사용하여 설치해야 합니다. 게이트웨이가 업그레이드되면 브라우저가 새로 고쳐집니다. 휴대폰을 추천합니다 App 완전한 터미널 경험을 위한 업데이트 동기화。
 
-发布包覆盖 macOS Apple Silicon / Intel、Windows x64、实验性 Linux x64 / ARM64、Android，以及需自行签名的 iOS IPA/源码包。Windows 的包内 ConPTY 不替换系统组件；Linux 使用安装包手动升级。使用 `SHA256SUMS.txt` 校验下载。
+릴리스 패키지 적용 범위 macOS Apple Silicon / Intel、Windows x64、실험적 Linux x64 / ARM64、Android，그리고 직접 서명해야 하는 사람들 iOS IPA/소스코드 패키지。Windows 가방 안에 ConPTY 시스템 구성 요소를 교체하지 않음；Linux 수동으로 업그레이드하려면 설치 패키지를 사용하십시오. 사용 `SHA256SUMS.txt` 다운로드 확인。
 
 ### English
 
@@ -674,43 +674,43 @@ Packages cover Apple Silicon/Intel macOS, Windows x64, experimental Linux x64/AR
 
 ---
 
-## v2.1.1 · 模型与账号体验、草稿保存及文件定位
+## v2.1.1 · 모델 및 계정 경험, 초안 저장 및 파일 위치
 
-v2.1.1 改善 Codex、Claude 和 DeepSeek Harness 的账号与模型操作，减少重复加载，并补齐手机与 Web 的草稿保存、文件定位和导航体验。
+v2.1.1 개선하다 Codex、Claude 및 DeepSeek Harness 계정 및 모델 운영, 반복 로딩 감소, 휴대폰 및 Web 초안 저장, 파일 위치 지정 및 탐색 경험。
 
-### 新增与优化
+### 새로운 추가 및 최적화
 
-- **统一账号与模型界面**：三个客户端采用一致的账号卡片和模型选择布局。当前账号卡片底部提供“查看可用模型”、用量更新时间及刷新；模型列表单独显示上次成功更新时间。
-- **模型目录缓存**：优先显示缓存；手动刷新、切换接入或网关运行期间每 12 小时更新。按电脑、客户端、账号和有效接入配置隔离；失败保留原目录，不把失败时间当成成功更新时间。
-- **API 与 CLI 模型查询**：补齐可核验的环境变量接入及 SSH CLI 上游目录，保留上游或原生运行时提供的具体模型和思考强度。Claude 账号模型查询不再要求先连接 Desktop；不支持的能力会说明原因，不编造型号或推理选项。
-- **保留未发送草稿**：手机与 Web 切换聊天、客户端或电脑后，恢复对应输入草稿；按网关、账号与会话隔离，确认发送后清除。
-- **更快定位文件**：从聊天链接定位文件或文件夹时平滑滚动到目标，并高亮 3 秒；用户滚动可以中止自动定位。左上角返回直接回聊天列表，文件区的上级目录与系统返回继续保留层级导航。
-- **工具截图**：可查看工具返回的截图，并通过显示设置控制预览；限制预览体积及缓存占用。
-- **更新与绑定选择**：网关及手机 App 可跳过当前版本的自动提醒，手动检查仍可更新；修改网关密码时可选择保留仍有效的手机绑定。
+- **통합 계정 및 모델 인터페이스**：세 클라이언트는 동일한 계정 카드와 모델 선택 레이아웃을 사용합니다. 당좌카드 하단에서 확인 가능“사용 가능한 모델 보기”、사용량 업데이트 시간 및 새로 고침 모델 목록에는 마지막으로 성공한 업데이트 시간이 별도로 표시됩니다.。
+- **모델 디렉터리 캐시**：캐시를 먼저 표시합니다. 수동 새로 고침, 액세스 전환 또는 게이트웨이 작동 중 매번 12 매시간 업데이트됩니다. 컴퓨터, 클라이언트, 계정 및 유효한 액세스 구성별로 격리합니다. 실패할 경우 원래 디렉터리를 유지하고 실패 시간을 업데이트 성공 시간으로 간주하지 않습니다.。
+- **API 및 CLI 모델 쿼리**：검증 가능한 환경 변수 액세스를 완료하고 SSH CLI 업스트림 또는 기본 런타임에서 제공하는 특정 모델과 사고 강도를 유지하는 업스트림 디렉터리。Claude 더 이상 계정 모델 쿼리에 먼저 연결할 필요가 없습니다. Desktop；지원되지 않는 기능은 모델링이나 추론 옵션이 없는 이유와 함께 설명됩니다.。
+- **보내지 않은 초안 보관**：휴대폰과 Web 채팅, 클라이언트 또는 컴퓨터를 전환한 후 해당 입력 초안을 복원하십시오. 게이트웨이, 계정, 세션별로 분리하고 전송 확인 후 삭제하세요.。
+- **더 빠르게 파일 찾기**：채팅 링크에서 파일이나 폴더를 찾을 때 대상으로 부드럽게 스크롤하고 강조 표시 3 초; 사용자 스크롤을 통해 자동 위치 지정이 중단될 수 있습니다. 채팅 목록으로 바로 돌아가려면 왼쪽 상단으로 돌아가세요. 계층적 탐색을 계속 유지하려면 파일 영역 및 시스템의 상위 디렉터리로 돌아갑니다.。
+- **도구 스크린샷**：도구에서 반환된 스크린샷을 보고 디스플레이 설정을 통해 미리보기를 제어할 수 있습니다. 미리보기 크기 및 캐시 사용량 제한。
+- **업데이트 및 바인딩 선택**：게이트웨이 및 휴대폰 App 현재 버전의 자동 알림을 건너뛸 수 있으며, 수동 확인을 통해 업데이트할 수도 있습니다. 게이트웨이 비밀번호를 수정할 때 여전히 유효한 휴대폰 바인딩을 유지하도록 선택할 수 있습니다.。
 
-### Bug 修复
+### Bug 수리하다
 
-- 修复 Windows 账号切换或恢复时，配置文件被短暂占用导致操作中断；持续占用仍会报错并保留原文件。
+- 수리하다 Windows 계정이 전환되거나 복원되면 구성 파일이 일시적으로 사용되어 작업이 중단됩니다. 계속해서 사용 중인 경우에도 오류가 보고되고 원본 파일은 유지됩니다.。
 
-- 修复 Codex 当前账号模型列表长时间停留在读取中、Claude 模型设置重复请求，以及账号切换后旧模型结果覆盖新接入的问题。
-- 降低账号面板无必要的高频刷新，修复模型列表滚动时自动回到顶部。
-- 修复快速从 Codex 滑到 DeepSeek Harness 时被拉回 Claude；Claude/DSH 重进列表优先展示缓存，再同步最新内容；统一筛选框样式。
-- 修复非图片附件的显示与上下文信息、ChatGPT 登录经过自定义网关路由时的身份保留，并限制工作台启动资源并发。
-- 修复 iOS 场景生命周期及通知跳转重试，避免启动或恢复期间丢失待处理跳转。
-- 加强模型目录缓存身份隔离，修复网关直接查询上游模型目录时的环境凭据误用。
+- 수리하다 Codex 현재 계정 모델 목록이 오랫동안 읽기 상태로 유지됩니다.、Claude 모델 설정에 대한 반복 요청 및 계정 전환 후 기존 모델이 새 연결을 덮어쓰는 문제。
+- 계정 패널의 불필요한 고주파 새로 고침을 줄이고, 스크롤 시 모델 목록이 자동으로 상위로 돌아가는 문제 수정。
+- 신속하게 수리하세요 Codex 슬라이드 DeepSeek Harness 뒤로 끌려갔다 Claude；Claude/DSH 목록을 다시 입력하여 캐시를 먼저 표시한 다음 최신 콘텐츠를 동기화하세요. 필터 상자 스타일을 통일하다。
+- 이미지가 아닌 첨부 파일에 대한 고정된 표시 및 상황별 정보、ChatGPT 사용자 정의 게이트웨이를 통해 로그인이 라우팅될 때 ID가 보존되고 워크벤치 시작 리소스 동시성이 제한됩니다.。
+- 수리하다 iOS 시작 또는 복구 중에 보류 중인 점프 손실을 방지하기 위한 장면 수명 주기 및 알림 점프 재시도。
+- 모델 디렉터리 캐시 ID 격리를 강화하고 게이트웨이가 업스트림 모델 디렉터리를 직접 쿼리할 때 환경 자격 증명의 오용을 수정합니다.。
 
-### 贡献者
+### 기부자
 
-- [@qybgh](https://github.com/qybgh) — [PR #38](https://github.com/try2love/codex-mobile-bridge/pull/38)：非图片附件显示与上下文修复。
-- [@heiqiu47](https://github.com/heiqiu47) — 采纳 [PR #40](https://github.com/try2love/codex-mobile-bridge/pull/40) 中的账号卡片、模型选择和模型目录兼容改进，并适配到当前多客户端界面；不包含重置预测功能。
-- [@Lovest20018](https://github.com/Lovest20018) — [PR #42](https://github.com/try2love/codex-mobile-bridge/pull/42) 的启动资源并发控制，以及 [PR #43](https://github.com/try2love/codex-mobile-bridge/pull/43) 的 ChatGPT 路由身份修复。
-- [@RigerWu](https://github.com/RigerWu) — [PR #44](https://github.com/try2love/codex-mobile-bridge/pull/44)：工具截图预览、显示控制与缓存限制，以及 iOS 场景生命周期和通知跳转改进。
+- [@qybgh](https://github.com/qybgh) — [PR #38](https://github.com/try2love/codex-mobile-bridge/pull/38)：이미지가 아닌 첨부 표시 및 컨텍스트 수정。
+- [@heiqiu47](https://github.com/heiqiu47) — 양자 [PR #40](https://github.com/try2love/codex-mobile-bridge/pull/40) 계정 카드, 모델 선택 및 모델 디렉토리 호환성이 개선되어 현재 다중 클라이언트 인터페이스에 맞게 조정되었습니다. 재설정 예측 기능은 포함되어 있지 않습니다。
+- [@Lovest20018](https://github.com/Lovest20018) — [PR #42](https://github.com/try2love/codex-mobile-bridge/pull/42) 시작 리소스 동시성 제어 및 [PR #43](https://github.com/try2love/codex-mobile-bridge/pull/43) 의 ChatGPT 라우팅 ID 복구。
+- [@RigerWu](https://github.com/RigerWu) — [PR #44](https://github.com/try2love/codex-mobile-bridge/pull/44)：도구 스크린샷 미리보기, 디스플레이 제어 및 캐시 제한 iOS 장면 수명주기 및 알림 점프 개선。
 
-### 升级
+### 치받이
 
-网关与手机 App 均为 **2.1.1**，Android/iOS 构建号 **33**。支持 macOS Apple Silicon / Intel、Windows x64、实验性 Linux x64 / ARM64、Android，以及需自行签名的 iOS IPA/源码包。Linux 的 Claude 接入使用 Claude Code CLI；Claude Desktop 自动连接支持 macOS / Windows。
+게이트웨이 및 휴대폰 App 모두는 **2.1.1**，Android/iOS 빌드 번호 **33**。지원하다 macOS Apple Silicon / Intel、Windows x64、실험적 Linux x64 / ARM64、Android，그리고 직접 서명해야 하는 사람들 iOS IPA/소스코드 패키지。Linux 의 Claude 접근 및 사용 Claude Code CLI；Claude Desktop 자동 연결 지원 macOS / Windows。
 
-覆盖安装并保留原数据目录，避免先卸载或清除数据；Android 沿用原签名，iOS 请使用相同签名身份和 Bundle ID。浏览器在网关升级后刷新，共享中继部署同步更新服务。使用 `SHA256SUMS.txt` 校验下载。
+설치를 덮어쓰고 원래 데이터 디렉터리를 유지하여 먼저 데이터를 제거하거나 지우는 것을 방지하세요.；Android 원본 서명 유지，iOS 동일한 서명 ID를 사용하십시오. Bundle ID。게이트웨이가 업그레이드된 후 브라우저가 새로 고쳐지고 공유 릴레이 배포가 업데이트 서비스를 동기화합니다. 사용 `SHA256SUMS.txt` 다운로드 확인。
 
 ### English
 
@@ -752,37 +752,37 @@ Install over the existing app and retain its data directory. Android keeps its s
 
 ---
 
-## v2.1.0 · CLI 接入、文件阅读与连接体验
+## v2.1.0 · CLI 액세스, 파일 읽기 및 연결 경험
 
-v2.1.0 将 Codex CLI 与 Claude Code CLI 纳入手机和网页工作台，并改善已有 HTTPS 入口、文件阅读与多客户端连接。感谢通过 Issues 反馈使用体验。
+v2.1.0 할 것이다 Codex CLI 및 Claude Code CLI 모바일 및 웹 워크벤치 통합 및 기존 워크벤치 개선 HTTPS 포털, 파일 읽기 및 다중 클라이언트 연결. 합격해주셔서 감사합니다 Issues 경험에 대한 피드백。
 
-### 新增功能
+### 새로운 기능
 
-- **Codex CLI 会话**：发现并阅读本机或 SSH 上已有聊天；原终端关闭后，可显式点击“继续会话”恢复。支持从已知项目目录新建聊天、读取后续回复，并在原生运行时提供的范围内操作模型、推理强度、Skill、权限、计划模式、审批和 Goal。
-- **Claude Code CLI 会话**：在本机或 SSH 上阅读历史、恢复已关闭的聊天，从已有项目新建聊天，并使用模型、权限、Skill、上传、审批和中断。各会话沿用执行端配置和工作目录，不接管其他终端中仍在运行的 Claude 进程。
-- **独立 CLI 账号配置**：Codex 与 Claude 分别管理 CLI 接入、模型查询与连通性检查；桌面账号切换可选择同步本机 CLI，并分别显示结果。SSH 保留远端配置。
-- **已有 HTTPS 入口**：可接入已有穿透或反向代理的 HTTPS 根地址，包括自定义端口；提供固定入口检测和配置引导。详见[配置说明](https://github.com/try2love/codex-mobile-bridge/blob/v2.1.0/docs/external-tunnel.md)。
-- **文件阅读**：源码高亮、行号、复制和换行；PDF 连续滑动、缩放、文字选择与全屏；自包含 HTML 的隔离预览和源码切换。
+- **Codex CLI 대화**：네이티브 또는 SSH 이미 채팅이 켜져 있습니다. 원래 터미널을 닫은 후 명시적으로 클릭할 수 있습니다.“대화 계속하기”다시 덮다. 알려진 프로젝트 디렉터리에서 새 채팅 생성, 후속 응답 읽기, 기본 런타임에서 제공하는 범위 내에서 모델 및 추론 강도 운영을 지원합니다.、Skill、권한, 계획 모드, 승인 및 Goal。
+- **Claude Code CLI 대화**：이 기계에서 또는 SSH 기록 읽기, 비공개 채팅 복원, 기존 프로젝트에서 새 채팅 생성, 모델 및 권한 사용、Skill、업로드, 승인 및 중단. 각 세션은 실행 구성 및 작업 디렉터리를 상속하며 다른 터미널에서 아직 실행 중인 파일을 인계받지 않습니다. Claude 프로세스。
+- **독립적인 CLI 계정 구성**：Codex 및 Claude 별도 관리 CLI 액세스, 모델 쿼리 및 연결성 확인 데스크톱 계정 전환은 로컬 컴퓨터를 동기화하도록 선택할 수 있습니다. CLI，결과를 별도로 표시합니다.。SSH 원격 구성 유지。
+- **이미 HTTPS 입구**：기존 침투 또는 역방향 프록시에 액세스할 수 있습니다. HTTPS 사용자 정의 포트를 포함한 루트 주소 고정 항목 감지 및 구성 지침을 제공합니다. 세부정보 보기[구성 지침](https://github.com/try2love/codex-mobile-bridge/blob/v2.1.0/docs/external-tunnel.md)。
+- **파일 읽기**：소스 코드 강조 표시, 줄 번호, 복사 및 줄 바꿈；PDF 지속적인 슬라이딩, 확대/축소, 텍스트 선택 및 전체 화면; 독립된 HTML 격리된 미리보기 및 소스 코드 전환。
 
-### 体验优化
+### 경험 최적화
 
-- Codex 列表按本机与各 SSH 主机逐步呈现，较慢的主机不阻塞已经读到的聊天；失败主机保留已有列表。Claude Desktop 与 CLI 混合列表按实际时间排序，来源标签持续显示在日期上方；客户端切换滑动时列表与标签布局更稳定。
-- iOS Safari 保留原有页面布局，修复输入时的大面积空白及滚动抖动。弹窗可点击外部背景关闭。
-- Claude 初始化在已确认提交后更早显示连接进度；Windows 与 macOS 的 Console 初始化减少多余等待。Claude 的额度改为手动查询，保留上次成功结果与时间。
-- SSH 连接诊断可复制摘要或导出脱敏报告；文件目录逐级返回、全屏先退出，PDF 切换标签后保留阅读位置。所有客户端停用后，网关仍可独立启动和管理。
+- Codex 목록은 로컬 컴퓨터별로 구성되며 각 컴퓨터는 SSH 호스트는 점진적으로 표시되며 느린 호스트는 읽은 채팅을 차단하지 않습니다. 실패한 호스트는 기존 목록을 유지합니다.。Claude Desktop 및 CLI 혼합 목록은 실제 시간을 기준으로 정렬되며 날짜 위에 소스 레이블이 계속 표시됩니다. 클라이언트가 전환하고 슬라이드할 때 목록과 라벨 레이아웃이 더 안정적입니다.。
+- iOS Safari 원본 페이지 레이아웃을 유지하고 입력 중 큰 공백 영역과 스크롤 떨림을 수정합니다. 팝업창은 외부 배경을 클릭하여 닫을 수 있습니다.。
+- Claude 초기화는 커밋 확인 후 더 일찍 연결 진행 상황을 표시합니다.；Windows 및 macOS 의 Console 초기화로 불필요한 대기 시간이 줄어듭니다.。Claude 할당량은 수동 쿼리로 변경되며, 마지막으로 성공한 결과와 시간이 유지됩니다.。
+- SSH 연결 진단은 요약을 복사하거나 둔감화 보고서를 내보낼 수 있습니다. 단계별로 파일 디렉터리로 돌아가서 먼저 전체 화면에서 종료하세요.，PDF 탭 전환 후에도 읽기 위치를 유지합니다. 모든 클라이언트가 비활성화된 후에도 게이트웨이를 독립적으로 시작하고 관리할 수 있습니다.。
 
-### Bug 修复
+### Bug 수리하다
 
-- 修复 Windows 连续终端子进程输出与 Ctrl+C，保留扩展路径中的项目工作目录；CMD 跨盘切换说明给出完整 `cd /d` 示例。
-- 修复当前 DeepSeek Harness 主机记录在不同换行格式下的识别；修复 Claude Desktop 普通退出的会话归属判断、首次 Windows 初始化时的错误交接，以及重连与初始化期间的请求状态。
-- 修复 Claude Desktop / CLI 混合日期排序，以及 Claude Code CLI 恢复时合成模型名覆盖真实模型的问题；已退出的旧版 Claude Code 写入者可在确认退出后恢复，身份不明的进程仍受保护。
-- 修复固定 HTTPS 入口检测后的旧错误残留，并减少 PDF 快速翻阅、缩放时的闪烁。
+- 수리하다 Windows 다음을 사용한 연속 터미널 하위 프로세스 출력 Ctrl+C，확장 경로에 프로젝트 작업 디렉터리 유지；CMD 디스크 간 전환에 대한 완전한 지침이 제공됩니다. `cd /d` 예。
+- 현재를 고치다 DeepSeek Harness 다양한 개행 형식으로 호스트 레코드 인식 결정된 Claude Desktop 최초 일반 종료에 대한 세션 소유권 판단 Windows 초기화 중 오류 핸드오버, 재접속 및 초기화 중 요청 상태。
+- 수리하다 Claude Desktop / CLI 혼합 날짜 정렬 및 Claude Code CLI 복원 시 합성 모델 이름이 실제 모델을 덮어씁니다. 이전 버전이 종료되었습니다 Claude Code 작성자는 종료를 확인한 후 재개할 수 있으며, 식별되지 않은 프로세스는 보호된 상태로 유지됩니다.。
+- 수정하다 HTTPS 항목 감지 후에도 오래된 오류가 남아 있으며 이를 줄입니다. PDF 빠르게 스크롤하거나 확대/축소할 때 깜박임。
 
-### 升级说明
+### 업그레이드 지침
 
-提供 macOS Apple Silicon / Intel、Windows x64、实验性 Linux x64 / ARM64、Android APK、iOS 未签名 IPA 和源码包。建议网关与手机 App 一起更新；浏览器用户更新网关后刷新页面，共享中继部署也需同步更新中继服务。Android 请覆盖安装以保留电脑列表和绑定，不要先卸载；iOS 需自行签名，并以相同签名身份覆盖安装以保留 App 数据。可用 `SHA256SUMS.txt` 校验下载。
+공급 macOS Apple Silicon / Intel、Windows x64、실험적 Linux x64 / ARM64、Android APK、iOS 서명되지 않은 IPA 및 소스 코드 패키지. 권장 게이트웨이 및 휴대폰 App 함께 업데이트하세요. 브라우저 사용자는 게이트웨이를 업데이트한 후 페이지를 새로 고치고 공유 릴레이 배포도 동시에 릴레이 서비스를 업데이트해야 합니다.。Android 컴퓨터 목록과 바인딩을 유지하려면 설치를 덮어쓰십시오. 먼저 제거하지 마십시오.；iOS 유지하려면 자신을 서명하고 동일한 서명 ID로 설치를 덮어써야 합니다. App 데이터. 사용 가능 `SHA256SUMS.txt` 다운로드 확인。
 
-CLI 需要执行端已安装并配置对应原生程序。Linux 支持 Claude Code CLI，Claude Desktop 自动连接仍只支持 macOS / Windows。PDF 在线预览上限 **20 MiB**，还受普通点击下载限额约束；源码与 HTML 预览支持 **512 KiB 以内 UTF-8 文本**。HTML 预览面向自包含文件，不访问外部网络或网关登录信息。
+CLI 실행 종료에는 해당 네이티브 프로그램이 설치 및 구성되어 있어야 합니다.。Linux 지원하다 Claude Code CLI，Claude Desktop 자동 연결은 여전히 ​​다음만 지원합니다. macOS / Windows。PDF 온라인 미리보기 제한 **20 MiB**，또한 일반 클릭 다운로드 제한도 적용됩니다. 소스코드는 동일합니다 HTML 미리보기 지원 **512 KiB 이내에 UTF-8 텍스트**。HTML 미리보기는 자체 포함된 파일을 위한 것이며 외부 네트워크 또는 게이트웨이 로그인 정보에 액세스하지 않습니다.。
 
 ### English
 
@@ -818,39 +818,39 @@ The execution host needs its native CLI installed and configured. Linux supports
 
 ---
 
-## v2.1.0-preview.1 · CLI 接入、已有 HTTPS 入口与阅读体验
+## v2.1.0-preview.1 · CLI 액세스, 기존 HTTPS 입학 및 독서 경험
 
-这是 v2.1.0 的首个预览版，欢迎体验并通过 [Issues](https://github.com/try2love/codex-mobile-bridge/issues) 反馈问题和建议。稳定版继续保留 v2.0.3。
+이것은 v2.1.0 첫 번째 미리보기 버전을 경험하고 통과해 보세요. [Issues](https://github.com/try2love/codex-mobile-bridge/issues) 피드백 질문 및 제안. 안정 버전은 그대로 유지됩니다 v2.0.3。
 
-### 新增功能
+### 새로운 기능
 
-- **Codex CLI 会话**：在手机与 Web 发现和阅读已有 CLI 聊天，原终端关闭后也可点击“继续会话”恢复；支持从已有本机或 SSH 项目目录新建 CLI 聊天。终端后续回复可持续同步阅读，每轮回复按原始记录显示模型。
-- **CLI 完整操作**：Codex CLI 支持模型与推理强度、Skill、普通/计划模式、权限切换、审批与中断；兼容的本机和 SSH 原生 CLI 支持 Goal 的创建、暂停、修改、恢复与关闭。
-- **Claude Code 本机与 SSH 接入**：支持历史阅读、已关闭会话恢复、新建聊天、发送消息、模型与权限切换、Skill、文件上传、审批及中断，沿用执行端的配置与工作目录。
-- **独立 CLI 账号配置**：Codex 与 Claude 在各自账号管理中配置 CLI，支持查询上游模型和测试连通性，不依赖 Cockpit Tools。桌面账号切换可选“同时应用到本机 CLI”，分别显示生效结果；SSH 保留各服务器自己的配置。
-- **已有穿透 / 反向代理入口**：填写已有 HTTPS 根地址即可接入，支持自定义端口；网络连接方式默认展开，并提供固定入口检测和更清晰的配置引导。详见[配置说明](https://github.com/try2love/codex-mobile-bridge/blob/v2.1.0-preview.1/docs/external-tunnel.md)。
-- **文件阅读**：源码增加高亮、行号、复制与自动换行；PDF 支持连续滑动、双指缩放、文字选择和全屏，电脑保留翻页与缩放按钮；自包含 HTML 可预览内联交互、动画并切换源码。
+- **Codex CLI 대화**：휴대폰으로 Web 기존 검색 및 읽기 CLI 채팅은 원래 단말기를 닫은 후에도 클릭이 가능합니다.“대화 계속하기”회복; 기존 로컬 또는 SSH 새 프로젝트 디렉토리 CLI 채팅. 단말기의 후속 응답은 연속적이고 동기적으로 읽을 수 있으며 각 회신은 원본 기록에 따라 모델을 표시합니다.。
+- **CLI 작업 완료**：Codex CLI 지원 모델 및 추론 강도、Skill、평범한/예약 모드, 권한 전환, 승인 및 중단 호환 가능한 네이티브 및 SSH 네이티브 CLI 지원하다 Goal 생성, 일시중지, 수정, 재개 및 닫기。
+- **Claude Code 이 기계와 SSH 연결**：기록 읽기, 닫힌 세션 복구, 새 채팅, 메시지 보내기, 모델 및 권한 전환 지원、Skill、파일 업로드, 승인 및 중단은 실행 종료의 구성 및 작업 디렉터리를 따릅니다.。
+- **독립적인 CLI 계정 구성**：Codex 및 Claude 각 계정 관리에서 구성 CLI，의존하지 않고 업스트림 모델 쿼리 및 연결 테스트를 지원합니다. Cockpit Tools。데스크톱 계정 전환은 선택 사항입니다.“동시에 이 기계에 적용하십시오 CLI”，효과적인 결과를 별도로 표시；SSH 각 서버의 자체 구성 유지。
+- **침투가 있었네요 / 역방향 프록시 입구**：기존 채우기 HTTPS 루트 주소에 액세스할 수 있으며 사용자 정의 포트가 지원됩니다. 네트워크 연결 방식을 기본으로 확장하고, 고정된 출입구 감지 및 보다 명확한 구성 안내를 제공합니다. 세부정보 보기[구성 지침](https://github.com/try2love/codex-mobile-bridge/blob/v2.1.0-preview.1/docs/external-tunnel.md)。
+- **파일 읽기**：소스 코드에 강조 표시, 줄 번호, 복사 및 자동 줄 바꿈 추가；PDF 연속 슬라이딩, 두 손가락 확대/축소, 텍스트 선택 및 전체 화면을 지원합니다. 컴퓨터에는 페이지 넘김 및 확대/축소 버튼이 유지됩니다. 독립된 HTML 인라인 상호 작용, 애니메이션을 미리 보고 소스 코드를 전환할 수 있습니다.。
 
-### 体验优化
+### 경험 최적화
 
-- 根据实际会话类型显示筛选与日期上方的类型标签；对齐 Codex 与 Claude 列表高度，Claude 上下文使用可点击查看详情的圆环。
-- 客户端状态在后台更新，保留已有列表；CLI 短暂断线保留草稿与 Skill 选择。
-- 设置中提供“SSH 连接诊断”，支持复制摘要和导出脱敏报告；顶部同一 SSH 故障可关闭。
-- Claude 额度改为主动点击查询，显示上次成功查询时间，查询失败保留原结果。
-- 文件描述与下载、复制、全屏操作并排；目录返回先回上一级，全屏返回先退出预览。PDF 切换标签与全屏时保留阅读位置。
+- 날짜 위에 유형 라벨이 있는 실제 세션 유형을 기반으로 필터를 표시합니다. 정렬됨 Codex 및 Claude 목록 높이，Claude 세부정보를 위해 클릭 가능한 링을 상황에 맞게 사용。
+- 클라이언트 상태는 백그라운드에서 업데이트되고 기존 목록은 유지됩니다.；CLI 초안을 보관하고 Skill 선택하다。
+- 설정에서 사용 가능“SSH 연결 진단”，요약 복사 및 둔감화 보고서 내보내기를 지원합니다. 윗부분은 똑같음 SSH 결함이 닫힐 수 있음。
+- Claude 할당량이 마지막으로 성공한 쿼리 시간을 표시하는 활성 클릭 쿼리로 변경됩니다. 쿼리가 실패하면 원래 결과가 유지됩니다.。
+- 파일 설명은 다운로드, 복사 및 전체 화면 작업과 나란히 표시됩니다. 디렉터리로 돌아가려면 먼저 이전 레벨로 돌아가고, 전체 화면으로 돌아가려면 먼저 미리보기를 종료하세요.。PDF 탭 및 전체 화면 전환 시 읽기 위치 유지。
 
-### Bug 修复
+### Bug 수리하다
 
-- 修复 Windows Codex 保存历史与冷恢复中的长路径识别问题，以及已退出的旧版 Claude Code 会话被误判占用的问题；改善 Windows UTF-8 读取与 Linux 进程识别。
-- 修复 CLI 后台读取短暂超时导致有效连接丢失的问题，改善 Goal 运行后的连接恢复。
-- 修复固定 HTTPS 入口检测成功后仍显示上一次错误的问题；切换入口后清除旧结果。
-- 减少 PDF 快速翻阅、缩放和邻页回看时的黑屏与闪烁，保留已渲染画面直到替换完成。
+- 수리하다 Windows Codex 저장 기록, 콜드 복구 및 종료된 이전 버전에서 긴 경로 인식 문제 Claude Code 세션이 잘못 판단되고 점유되는 문제; 개선됨 Windows UTF-8 함께 읽기 Linux 프로세스 식별。
+- 수리하다 CLI 유효한 연결이 끊어지는 백그라운드 읽기 짧은 시간 초과 문제가 개선되었습니다. Goal 실행 후 연결 복구。
+- 수정하다 HTTPS 포털이 성공적으로 감지된 후에도 마지막 오류가 계속 표시되는 문제; 포털을 전환하면 이전 결과가 지워집니다.。
+- 줄이다 PDF 교체가 완료될 때까지 렌더링된 이미지를 유지하면서 인접 페이지를 빠르게 넘기고, 확대/축소하고, 검토할 때 검은색 화면이 나타나고 깜박입니다.。
 
-### 安装与使用
+### 설치 및 사용
 
-本次提供 macOS Apple Silicon / Intel、Windows x64、Linux x64 / ARM64、Android APK、iOS 未签名 IPA 和源码包。建议网关与手机 App 一起更新，浏览器用户更新网关后刷新页面；共享中继部署也需同步更新中继服务。Android 覆盖安装以保留数据，iOS 需自行签名。下载可用 `SHA256SUMS.txt` 校验。
+이번에 제공한 macOS Apple Silicon / Intel、Windows x64、Linux x64 / ARM64、Android APK、iOS 서명되지 않은 IPA 및 소스 코드 패키지. 권장 게이트웨이 및 휴대폰 App 함께 업데이트하세요. 브라우저 사용자는 게이트웨이를 업데이트한 후 페이지를 새로 고칩니다. 공유 릴레이 배포도 동시에 릴레이 서비스를 업데이트해야 합니다.。Android 데이터 보존을 위해 설치 덮어쓰기，iOS 스스로 서명해야합니다. 다운로드 가능 `SHA256SUMS.txt` 확인하다。
 
-CLI 需要执行端已安装并配置相应原生程序；不会接管其他终端仍在运行的 Claude 会话。PDF 在线预览上限为 **20 MiB**，同时受当前普通点击下载限额约束；源码与 HTML 预览支持 **512 KiB 以内 UTF-8 文本**，更大文件可下载打开。HTML 预览面向自包含文件，不开放外部网络与网关登录信息。
+CLI 실행 터미널에는 해당 기본 프로그램이 설치 및 구성되어 있어야 합니다. 다른 터미널에서 아직 실행 중인 프로그램을 인계받지는 않습니다. Claude 대화。PDF 온라인 미리보기 제한은 다음과 같습니다. **20 MiB**，동시에 현재 일반 클릭 다운로드 제한이 적용됩니다. 소스코드는 동일합니다 HTML 미리보기 지원 **512 KiB 이내에 UTF-8 텍스트**，더 큰 파일을 다운로드하고 열 수 있습니다.。HTML 미리보기는 자체 포함된 파일을 위한 것이며 외부 네트워크 및 게이트웨이 로그인 정보를 노출하지 않습니다.。
 
 ### English
 
@@ -888,23 +888,23 @@ The execution host needs its native CLI installed and configured. Live Claude ch
 
 ---
 
-## v2.0.3 · 手机更新、第三方通知与界面优化
+## v2.0.3 · 휴대폰 업데이트, 타사 알림 및 인터페이스 최적화
 
-- **Android 应用内更新**：检查新版、查看更新说明，在 App 内下载 APK 并交给系统安装器。安装前校验大小和 SHA-256；完成下载后，即使离开 App 授予安装权限或重新打开 App，也可继续安装或保存 APK。
-- **更新下载方式自己选**：可选「手机下载」或「电脑下载」。手机无法查询 GitHub 时可通过当前已登录网关查询；选择电脑下载后，由电脑下载并校验，再传给手机安装。下载失败可重新选择方式，或通过「GitHub ↗」在浏览器下载对应 APK，不会自动替换用户选定的下载方式。
-- **手机与 Web 配置第三方通知**：从设置或聊天列表进入「第三方通知」，选择 **Bark（iPhone）、ntfy（Android）或 PushPlus（微信）**，分别配置、保存和测试；与电脑网关共用配置，也可修改通知跳转地址、标题显示及网关入口通知。该配置入口用于直连网关，共享中继保留原有权限范围。
-- **搜索与筛选更紧凑**：搜索框始终可见，显示「搜索 / Search」；各选择框按当前内容分配宽度，其余空间留给搜索。精简英文按钮，改善手机横屏、平板和展开折叠屏上的 Claude、Codex、DSH 列表布局。
-- **聊天列表减少干扰**：Claude 与 DSH 支持手动下拉刷新，保留搜索、筛选和阅读位置；移除常驻的读取与连接成功提示，恢复成功后清除过期错误，连接失败仍提供说明和重试入口。修复刷新失败提示持续停留的问题。
-- **设置与工作台更清楚**：底部 App 图标开关、应用管理与第三方通知入口并列，兼顾中英文窄屏显示；文件传输保存按钮明确说明用途，修复未打开设置时遗留「请登录」提示的问题。关闭当前工具标签时切换到可用标签，避免不必要地退出分屏。
-- **手机连接恢复**：Android/iOS 安全保存仍有效的扫码绑定凭据，WebView 登录状态丢失时尝试恢复；不保存网关密码，退出、移除电脑或撤销绑定后不再恢复。改善网关登录会话隔离、Claude 已初始化连接的重连入口，以及 macOS Claude 初始化时长 Console 输入的核验与连接效率。
+- **Android 인앱 업데이트**：새 버전을 확인하고 업데이트 지침을 확인하세요. App 기간 내 다운로드 APK 시스템 설치자에게 넘겨졌습니다. 설치 전 크기 합계 확인 SHA-256；다운로드 완료 후 나가셔도 App 설치 권한 부여 또는 다시 열기 App，계속해서 설치하거나 저장할 수도 있습니다. APK。
+- **자신만의 업데이트 다운로드 방법을 선택하세요**：”모바일 다운로드” 또는 ”컴퓨터 다운로드”를 선택할 수 있습니다. 휴대폰에서는 문의가 불가능합니다 GitHub 현재 로그인된 게이트웨이를 통해 쿼리할 수 있습니다. 다운로드할 컴퓨터를 선택한 후 컴퓨터는 이를 다운로드하고 확인한 다음 설치를 위해 휴대폰으로 전송합니다. 다운로드가 실패하면 방법을 다시 선택하거나 통과할 수 있습니다.「GitHub ↗」브라우저에서 해당 항목을 다운로드하십시오. APK，사용자가 선택한 다운로드 방법을 자동으로 대체하지 않습니다.。
+- **휴대폰과 Web 타사 알림 구성**：설정 또는 채팅 목록에서 ”제3자 알림”으로 이동하여 선택하세요. **Bark（iPhone）、ntfy（Android）또는 PushPlus（WeChat）**，별도로 구성, 저장 및 테스트하십시오. 컴퓨터 게이트웨이와 구성을 공유하고 알림 점프 주소, 제목 표시 및 게이트웨이 입구 알림을 수정할 수도 있습니다. 이 구성 항목은 게이트웨이에 직접 연결하는 데 사용되며 공유 릴레이는 원래 권한을 유지합니다.。
+- **검색 및 필터링이 더욱 컴팩트해졌습니다.**：검색창은 항상 표시되며 ’검색’이 표시됩니다. / Search」；각 선택 상자에는 현재 내용에 따라 너비가 할당되고 나머지 공간은 검색용으로 예약됩니다. 휴대폰 가로, 태블릿, 펼쳐진 병풍을 개선하기 위한 유선형 영어 버튼 Claude、Codex、DSH 목록 레이아웃。
+- **채팅 목록은 방해 요소를 줄여줍니다.**：Claude 및 DSH 수동 풀다운 새로 고침, 검색 유지, 필터링 및 읽기 위치를 지원합니다. 영구 읽기 및 연결 성공 프롬프트를 제거하고, 성공적인 복구 후 만료 오류를 지우며, 연결 실패에 대한 설명과 재시도 항목을 계속 제공합니다. 새로 고침 실패 메시지가 지속되는 문제를 수정했습니다.。
+- **설정 및 작업대가 더 명확해졌습니다.**：맨 아래 App 중국어와 영어로 된 좁은 화면 디스플레이를 고려하여 아이콘 스위치, 애플리케이션 관리 및 타사 알림 포털이 병치되어 있습니다. 파일 전송 및 저장 버튼은 목적을 명확하게 설명하고 설정이 열리지 않을 때 ”로그인하세요” 프롬프트가 남는 문제를 해결합니다. 불필요하게 분할 화면을 종료하지 않으려면 현재 도구 탭을 닫을 때 사용 가능한 탭으로 전환하세요.。
+- **휴대폰 연결 복구**：Android/iOS 여전히 유효한 스캔 코드 바인딩 자격 증명을 안전하게 저장，WebView 로그인 상태를 분실한 경우 복원을 시도하십시오. 게이트웨이 비밀번호를 저장하지 마십시오. 로그아웃, 컴퓨터 제거 또는 바인딩 취소 후에는 복원되지 않습니다. 게이트웨이 로그인 세션 격리 개선、Claude 초기화된 연결에 대한 재연결 항목 macOS Claude 초기화 기간 Console 입력 검증 및 연결 효율성。
 
-### 致谢
+### 감사의 말
 
-感谢 [@SevenPwZ（des1re）](https://github.com/SevenPwZ) 在 [PR #32](https://github.com/try2love/codex-mobile-bridge/pull/32) 中贡献 Android 应用内更新。本版在该贡献基础上整合电脑协助下载、下载方式选择与安装恢复优化。
+고마워하는 [@SevenPwZ（des1re）](https://github.com/SevenPwZ) 에서 [PR #32](https://github.com/try2love/codex-mobile-bridge/pull/32) 기부금 Android 인앱 업데이트. 이러한 기여를 바탕으로 이 버전은 컴퓨터 지원 다운로드, 다운로드 방법 선택 및 설치 복구 최적화를 통합합니다.。
 
-### 升级说明
+### 업그레이드 지침
 
-建议电脑网关与 Android/iOS App 一起更新至 v2.0.3，以使用完整的通知配置、绑定恢复和更新改进。网页用户更新网关后重新加载页面即可。旧 Android 版本首次升级可下载 APK 覆盖安装，不要先卸载；后续更新可使用新版应用内更新。电脑协助下载需要配套网关，电脑仍须能访问 GitHub；仅更新手机时也可继续使用手机直连下载。iOS IPA 仍需自行签名，另附 Xcode 源码包；Linux 仍为实验性支持，使用安装包手动升级。正式下载文件可用 `SHA256SUMS.txt` 校验。
+컴퓨터 게이트웨이를 다음에 연결하는 것이 좋습니다. Android/iOS App 함께 업데이트하세요 v2.0.3，전체 알림 구성, 바인딩 복구 및 업데이트 개선 사항을 활용합니다. 웹 사용자는 게이트웨이를 업데이트한 후 페이지를 다시 로드할 수 있습니다. 오래된 Android 첫 번째 버전 업그레이드를 다운로드할 수 있습니다. APK 설치를 덮어쓰고 먼저 제거하지 마십시오. 후속 업데이트에서는 새 버전의 인앱 업데이트를 사용할 수 있습니다. 컴퓨터 지원 다운로드에는 지원 게이트웨이가 필요하며 컴퓨터는 계속해서 이에 액세스할 수 있어야 합니다. GitHub；휴대폰 업데이트만 하면 휴대폰 직접 다운로드를 계속해서 이용하실 수 있습니다.。iOS IPA 그래도 직접 서명해야 하며 별도로 첨부해야 합니다. Xcode 소스코드 패키지；Linux 아직 실험적 지원이므로 설치 패키지를 사용하여 수동으로 업그레이드하세요. 공식 다운로드 파일 사용 가능 `SHA256SUMS.txt` 확인하다。
 
 ### English
 
@@ -922,17 +922,17 @@ Update both the gateway and mobile app for all improvements; reload browser page
 
 ---
 
-## v2.0.2 · 文件兼容与聊天列表体验优化
+## v2.0.2 · 파일 호환성 및 채팅 목록 경험 최적화
 
-- **聊天列表更连贯**：Codex 列表滚动接近底部时自动加载后续聊天，移除常驻“加载更多”按钮。下拉刷新提示不再挤压列表，手势跟随与回弹更顺滑，成功提示更快收起；内容未变化时保留已有列表节点和阅读位置。
-- **Windows 文件链接更可靠**：兼容盘符、反斜杠、file URL 和长路径前缀；同一文件的不同引用共用下载入口。继续使用现有工作区授权与可配置下载上限。
-- **手机下载后直接打开**：Android 和 iOS 可通过系统支持的应用打开已下载文件，同时保留保存入口；系统区域颜色随当前页面变化。
-- **跨平台登录自启**：Windows、macOS 和已安装的 Linux 桌面包可在高级设置中启用。Windows/macOS 登录后收起控制面板，macOS 可从菜单栏或 Dock 恢复；Linux 保持窗口可见，AppImage 使用原文件路径。
-- 保留 v2.0.1 的 macOS 异常应用 plist 扫描修复。
+- **채팅 목록이 더 일관되게 유지됩니다.**：Codex 목록이 하단 근처로 스크롤되면 자동으로 후속 채팅을 로드하고 영구 제거“더 로드하세요”단추. 풀다운 새로 고침 프롬프트가 더 이상 목록을 압박하지 않고 제스처 따르기 및 리바운드가 더 원활해지며 성공 프롬프트가 더 빨리 철회됩니다. 콘텐츠가 변경되지 않으면 기존 목록 노드와 읽기 위치가 유지됩니다.。
+- **Windows 파일 링크가 더 안정적입니다.**：드라이브 문자, 백슬래시와 호환 가능、file URL 긴 경로 접두사; 동일한 파일에 대한 다른 참조는 다운로드 항목을 공유합니다. 기존 작업 공간 라이선스 및 구성 가능한 다운로드 한도를 계속 사용합니다.。
+- **휴대폰에서 다운로드 후 바로 열기**：Android 및 iOS 다운로드한 파일은 저장 항목을 유지하면서 시스템에서 지원하는 응용 프로그램을 통해 열 수 있습니다. 현재 페이지에 따라 시스템 영역의 색상이 변경됩니다.。
+- **크로스 플랫폼 로그인 자동 시작**：Windows、macOS 그리고 설치됨 Linux 고급 설정에서 데스크탑 패키지를 활성화할 수 있습니다.。Windows/macOS 로그인 후 제어판 축소，macOS 메뉴 표시줄에서 사용 가능하거나 Dock 다시 덮다；Linux 창을 계속 보이도록 유지，AppImage 원본 파일 경로 사용。
+- 예약하다 v2.0.1 의 macOS 비정상적인 적용 plist 스캔하여 복구。
 
-感谢 [@heiqiu47](https://github.com/heiqiu47) 在 [PR #24](https://github.com/try2love/codex-mobile-bridge/pull/24) 中贡献的文件兼容、手机文件打开、系统栏与登录自启改进。本版按现有 main 的文件与认证边界整合，并扩展跨平台适配。
+고마워하는 [@heiqiu47](https://github.com/heiqiu47) 에서 [PR #24](https://github.com/try2love/codex-mobile-bridge/pull/24) 기여된 파일 호환성, 휴대폰 파일 열기, 시스템 표시줄 및 로그인 자동 시작 개선. 이 버전은 현재 버전을 기반으로 합니다. main 파일 및 인증 경계를 통합하고 플랫폼 간 적응을 확장합니다.。
 
-**升级**：建议网关与手机 App 一起更新至 v2.0.2，以使用完整改进。聊天列表优化由网关提供，升级后重新加载页面即可。Android 覆盖安装以保留已保存电脑与登录；iOS IPA 仍需自行签名，另附 Xcode 源码包。Linux 仍为实验性支持，请保留数据目录后手动安装。下载文件可用 `SHA256SUMS.txt` 校验。
+**치받이**：권장 게이트웨이 및 휴대폰 App 함께 업데이트하세요 v2.0.2，전체 개선 사항을 사용합니다. 채팅 목록 최적화는 게이트웨이에서 제공됩니다. 업그레이드 후 페이지를 다시 로드하면 됩니다.。Android 저장된 컴퓨터와 로그인을 유지하려면 설치를 덮어씁니다.；iOS IPA 그래도 직접 서명해야 하며 별도로 첨부해야 합니다. Xcode 소스코드 패키지。Linux 아직 실험적인 지원이므로 데이터 디렉터리를 유지하고 수동으로 설치하세요. 다운로드 가능한 파일 `SHA256SUMS.txt` 확인하다。
 
 ### English
 
@@ -946,80 +946,80 @@ Thanks to [@heiqiu47](https://github.com/heiqiu47) for [PR #24](https://github.c
 
 ---
 
-## v2.0.1 · 修复 macOS 客户端扫描中断
+## v2.0.1 · 수리하다 macOS 클라이언트 검사가 중단되었습니다.
 
-- 修复 macOS 扫描应用时，某个应用的 `Info.plist` 存在 XML 格式错误，导致整轮客户端发现中断、已启用客户端无法继续自动接入的问题。
-- 遇到这类异常应用时跳过该候选，继续发现其他客户端，并在网关日志中记录具体文件路径和解析原因，便于定位。
-- 受影响的 macOS 用户建议更新电脑端网关；已有账号、会话与连接配置无需重新设置。
+- 수리하다 macOS 앱을 검사할 때 앱의 `Info.plist` 존재하다 XML 형식이 잘못되어 클라이언트 검색 전체가 중단되고 클라이언트가 자동 액세스를 계속할 수 없게 됩니다.。
+- 이러한 비정상적인 응용 프로그램이 발견되면 후보를 건너뛰고 계속해서 다른 클라이언트를 검색하고 게이트웨이 로그에 특정 파일 경로와 해결 이유를 기록하여 쉽게 찾을 수 있습니다.。
+- 체하는 macOS 사용자는 컴퓨터 측 게이트웨이를 업데이트하는 것이 좋습니다. 기존 계정, 세션 및 연결 구성을 재설정할 필요가 없습니다.。
 
-## v2.0.0 · 从手机聊天到多客户端远程工作台
+## v2.0.0 · 모바일 채팅부터 멀티 클라이언트 원격 워크벤치까지
 
-v2.0.0 将 v1.4.0 的 Codex 手机网关扩展为 **Codex、Claude Desktop、DeepSeek Harness 的统一远程入口**。这次正式版汇总整个 v2 预览周期的工作台、手机 App、多客户端、网络连接和平台适配改进。任务继续在原电脑或对应 SSH 服务器运行，已有会话的提供商、认证与工作目录保持归属。
+v2.0.0 할 것이다 v1.4.0 의 Codex 휴대폰 게이트웨이가 확장되었습니다. **Codex、Claude Desktop、DeepSeek Harness 통합 원격 포털**。이 공식 버전은 전체 내용을 요약합니다. v2 미리보기 사이클 작업대, 휴대폰 App、다중 클라이언트, 네트워크 연결 및 플랫폼 적응 개선. 원래 컴퓨터나 상대 컴퓨터에서 작업이 계속됩니다. SSH 서버가 실행 중이고 기존 세션 공급자, 자격 증명 및 작업 디렉터리는 계속 소유됩니다.。
 
-### 三个客户端，各自的会话与配置
+### 3개의 클라이언트, 각각의 세션 및 구성
 
-- **自动发现与接入**：网关扫描本机已安装的 Codex、Claude Desktop 和 DeepSeek Harness。无需先启动网关，即可检查安装与登录状态、管理接入；后续安装客户端后可重新扫描。只有配置就绪的应用才能启用，网关启动后再连接已启用的应用。
-- **独立聊天列表**：按应用切换聊天，创建会话时直接归属当前应用；Claude Code 与 Cowork 分组并可折叠。网页和手机共用会话状态标识、重连入口及可用能力提示。
-- **受保护的启停**：桌面、Web 和手机可管理已配置客户端。正常退出前检查运行任务、等待授权与待发送内容；任务状态不明时保留明确的恢复指引。退出选项区分仅停用手机接入、正常退出与二次确认的强制退出。
-- **恢复已有连接**：改善 Claude 断线重连、隐藏窗口恢复、中文路径与目录信任提示；核验并恢复旧 Harness 接入，处理插件更新和残留实例。发送或授权结果未知时，不自动重放操作。
+- **자동 검색 및 액세스**：게이트웨이는 설치된 것을 스캔합니다. Codex、Claude Desktop 및 DeepSeek Harness。게이트웨이를 먼저 시작하지 않고도 설치 및 로그인 상태를 확인하고 액세스를 관리할 수 있습니다. 나중에 클라이언트를 설치한 후 다시 검색할 수 있습니다. 설정된 애플리케이션만 활성화할 수 있으며, 활성화된 애플리케이션은 게이트웨이가 시작된 후에 연결할 수 있습니다.。
+- **독립적인 채팅 목록**：애플리케이션별로 채팅을 전환하고, 대화를 생성하면 현재 애플리케이션에 직접 속하게 됩니다.；Claude Code 및 Cowork 그룹화되고 접을 수 있습니다. 웹 페이지와 휴대폰은 세션 상태 식별자, 재연결 포털 및 사용 가능한 기능 프롬프트를 공유합니다.。
+- **보호된 시작/중지**：데스크탑、Web 휴대폰에서는 구성된 클라이언트를 관리할 수 있습니다. 정상적으로 종료되기 전에 실행 중인 작업을 확인하고 인증 및 콘텐츠가 전송될 때까지 기다립니다. 작업 상태를 알 수 없는 경우 명확한 복구 지침을 유지합니다. 종료 옵션은 휴대폰 접속만 비활성화, 일반 종료, 이중 확인 후 강제 종료로 구분됩니다.。
+- **기존 연결 복원**：개선하다 Claude 연결 해제 및 재연결, 숨겨진 창 복구, 중국어 경로 및 디렉터리 신뢰 프롬프트; 오래된 것을 확인하고 복원하세요 Harness 플러그인 업데이트 및 잔여 인스턴스에 액세스하고 처리합니다. 전송 또는 인증 결과를 알 수 없는 경우 작업이 자동으로 재생되지 않습니다.。
 
-### 聊天与项目工作台
+### 채팅 및 프로젝트 워크벤치
 
-- **文件标签**：浏览本机或 Codex SSH 会话的项目文件，预览文本、Markdown 和图片，上传文件，在聊天文件链接与目录之间定位。普通点击先选择定位或下载，默认下载阈值为 20 MiB，可从网关、Web 或手机即时调整。
-- **大文件与目录下载**：文件列表长按、右键或键盘菜单可明确下载文件及目录，不受普通点击阈值限制；目录打包为 ZIP。下载浮窗显示进度、速度和总量，支持暂停、继续、取消；原生手机使用磁盘下载，浏览器仍受站点存储和设备空间限制。
-- **图片缩放**：聊天图片、发送前附件和工作区图片共用查看器。手机双指缩放、放大后拖动；电脑滚轮缩放与拖动；双击切换适应屏幕与两倍，支持 1–8 倍及恢复适应。关闭图片后保留草稿、阅读位置和文件标签。
-- **连续终端**：终端保留工作目录、环境和交互状态，支持多行命令、停止、清屏与尺寸变化。macOS/Linux 使用 PTY，Windows 使用 ConPTY，并补齐跨盘 `cd` 的处理；关闭刚创建的终端时也回收其所属进程树，避免后台残留。
-- **Git 面板**：查看变更、差异、提交历史图和分支；暂存、提交、切换分支、本地合并与中止合并。保留工作区检查与确认，不提供远程推送或历史重写。
-- **Codex 侧边聊天与子智能体**：在工作台查看子智能体历史，创建临时侧边聊天，独立选择模型、推理、Skill、权限和附件；支持排队、补充任务、普通/计划模式与同网关多设备同步。侧边聊天在结束或网关重启后清除，暂不支持 SSH。
-- **宽屏分屏**：电脑浏览器、平板与折叠屏可将工具标签放到右侧并调整宽度；窄屏恢复单栏，保留标签、草稿和阅读位置。Claude/DSH 按自身协议提供工具能力，不把 Codex 专属功能伪装成全部客户端可用。
-- **上下文与权限**：Codex、Claude Code 和 DSH 在权限附近展示上游提供的上下文用量，点击查看已用量、容量及说明；未提供的数据显示未知。权限按钮显示当前模式，模型与推理选项依照客户端能力。Codex 支持不选择项目创建会话。
+- **파일 태그**：이 기계를 찾아보거나 Codex SSH 세션의 프로젝트 파일, 텍스트 미리보기、Markdown 사진과 파일을 업로드하고 채팅 파일 링크와 디렉토리 사이를 찾습니다. 일반적으로 위치 지정 또는 다운로드를 먼저 선택하려면 클릭하세요. 기본 다운로드 임계값은 다음과 같습니다. 20 MiB，게이트웨이에서 사용 가능、Web 또는 휴대폰에서 실시간으로 조정하세요.。
+- **대용량 파일 및 디렉터리 다운로드**：파일 목록에서 길게 누르기, 마우스 오른쪽 버튼 클릭 또는 키보드 메뉴를 사용하면 일반 클릭 임계값에 의해 제한되지 않는 파일 및 디렉터리를 명확하게 다운로드할 수 있습니다. 디렉토리는 다음과 같이 패키지됩니다. ZIP。다운로드 부동 창에는 진행률, 속도 및 총량이 표시되며 일시 중지, 계속 및 취소를 지원합니다. 기본 휴대폰은 디스크 다운로드를 사용하며 브라우저는 여전히 사이트 저장 공간과 장치 공간으로 인해 제한됩니다.。
+- **이미지 줌**：채팅 사진, 미리 전송된 첨부 파일, 작업 공간 사진을 위한 공유 뷰어입니다. 휴대폰에서는 두 손가락을 사용하여 확대/축소하고 드래그할 수 있습니다. 컴퓨터 스크롤 휠로 확대/축소 및 드래그; 화면에 적응하고 크기를 두 배로 늘리려면 두 번 클릭하여 전환하십시오. 1–8 시간과 회복 적응. 이미지를 닫은 후에도 초안, 읽기 위치, 파일 태그 유지。
+- **연속 터미널**：터미널은 작업 디렉터리, 환경 및 상호 작용 상태를 유지하고 여러 줄 명령, 중지, 화면 지우기 및 크기 변경을 지원합니다.。macOS/Linux 사용 PTY，Windows 사용 ConPTY，범위를 완료하고 `cd` 처리; 새로 생성된 터미널을 닫을 때 해당 터미널이 속한 프로세스 트리도 재활용되어 배경 잔여물을 방지합니다.。
+- **Git 패널**：변경 사항, 차이점, 커밋 기록 그래프 및 분기를 봅니다. 스테이지, 커밋, 브랜치 전환, 로컬 병합 및 병합 중단이 가능합니다. 작업 공간 검사 및 확인을 유지하고 원격 푸시 또는 기록 재작성을 제공하지 않습니다.。
+- **Codex 사이드 채팅 및 하위 에이전트**：워크벤치에서 하위 에이전트의 기록을 보고, 임시 사이드 채팅을 만들고, 모델과 추론을 독립적으로 선택합니다.、Skill、권한 및 첨부 파일 대기열 지원, 보충 작업, 일반/일정 모드는 동일한 게이트웨이에 있는 여러 장치와 동기화됩니다. 사이드 채팅은 종료 후 삭제되거나 게이트웨이가 다시 시작되며 이는 아직 지원되지 않습니다. SSH。
+- **와이드스크린 분할 화면**：컴퓨터 브라우저, 태블릿 및 병풍에서는 도구 탭을 오른쪽으로 이동하고 너비를 조정할 수 있습니다. 좁은 화면에서는 탭, 초안 및 읽기 위치를 유지하면서 단일 열을 복원할 수 있습니다.。Claude/DSH 별도의 동의 없이 자체 계약에 따라 도구 기능을 제공합니다. Codex 독점 기능은 모든 클라이언트가 사용할 수 있는 것으로 위장됩니다.。
+- **컨텍스트 및 권한**：Codex、Claude Code 및 DSH 업스트림에서 제공하는 상황별 사용법은 권한 근처에 표시됩니다. 사용량, 용량 및 설명을 보려면 클릭하세요. 제공되지 않은 데이터는 알 수 없음으로 표시됩니다. 권한 버튼은 현재 모드를 표시하며 모델 및 추론 옵션은 클라이언트 기능을 기반으로 합니다.。Codex 프로젝트를 선택하지 않고 세션 생성 지원。
 
-### 账号、API、额度与模型
+### 계정、API、할당량 및 모델
 
-- **按客户端管理**：桌面网关管理 Codex、Claude、DSH 各自的已保存账号或支持的 API 接入，提供导入、修改、重命名和删除。Web/手机展示当前应用的账号信息，可切换已保存接入；凭据的新增与编辑仍留在电脑端。
-- **当前接入更清晰**：当前账号置顶并标记，额度和重置卡紧邻账号；切换前核验任务，必要时重启对应客户端，并保留恢复信息。
-- **API 使用自己的模型**：Codex 模型选择器与账号页共用当前 API 上游目录，支持主动刷新及手动填写；修复切换 API 后仍用官方地址或旧 GPT 列表的问题，兼容 CC Switch 模型目录。能列出模型不代表第三方协议一定兼容。
-- **查询节奏可控**：进入账号页自动查询，可见时每五分钟更新，手动查询立即执行并重新计时；保留上次成功值和时间，失败不把未知余额显示成零。
-- **官方额度与重置卡**：查看官方账号额度、恢复时间及服务返回的订阅周期；可为任一已保存的 Codex 官方账号使用重置卡，无需先切换接入。确认页核对账号与到期时间，等待五秒后才可消费，结果不明时复用原请求标识。
-- **客户端能力有别**：Claude 支持已登录配置及第三方网关配置，DSH 支持保存当前账号、管理官方 API Key 与查询可用余额，任意第三方提供商需在 Harness 配置；模型、推理和额度以客户端/上游实际返回为准。Codex Fast、重置卡及 Skills 不扩展为其他客户端的通用能力。
+- **클라이언트별로 관리**：데스크탑 게이트웨이 관리 Codex、Claude、DSH 각 저장된 계정 또는 지원됨 API 액세스, 가져오기, 수정, 이름 변경 및 삭제 제공。Web/휴대폰에는 현재 애플리케이션의 계정 정보가 표시되며 저장된 액세스로 전환할 수 있습니다. 자격 증명 추가 및 편집은 여전히 ​​컴퓨터에 남아 있습니다.。
+- **현재 액세스가 더 명확해졌습니다.**：현재 계정은 고정되어 표시되며 한도 및 재설정 카드는 계정 옆에 있습니다. 전환하기 전에 작업을 확인하고 필요한 경우 해당 클라이언트를 다시 시작하고 복구 정보를 유지하십시오.。
+- **API 자신만의 모델을 사용하세요**：Codex 모델 선택기와 계정 페이지는 현재를 공유합니다. API 업스트림 디렉토리는 활성 새로 고침 및 수동 채우기를 지원합니다. 스위칭 수정 API 아직도 공식 주소나 예전 주소를 사용하고 있어요 GPT 문제 목록, 호환 가능 CC Switch 모델 디렉토리. 모델을 나열할 수 있다고 해서 타사 프로토콜이 반드시 호환된다는 의미는 아닙니다.。
+- **제어 가능한 쿼리 속도**：자동으로 조회할 계정 페이지를 입력하세요. 표시되면 5분마다 업데이트됩니다. 수동 쿼리는 즉시 실행되고 시간이 다시 설정됩니다. 마지막으로 성공한 값과 시간이 유지됩니다. 실패하면 알 수 없는 잔액이 0으로 표시되지 않습니다.。
+- **공식 신용 한도 및 카드 재설정**：공식 계정 할당량, 복구 시간 및 서비스 반환 가입 기간을 확인하세요. 그것은 무엇이든 저장될 수 있습니다 Codex 공식 계정은 재설정 카드를 사용하므로 먼저 액세스를 전환할 필요가 없습니다. 확인 페이지에서는 계좌번호와 만료시간을 확인하고 5초간 대기한 후 소비하며, 결과를 알 수 없는 경우 원래 요청 ID를 재사용합니다.。
+- **클라이언트 기능은 다양함**：Claude 로그인 구성 및 타사 게이트웨이 구성 지원，DSH 당좌계좌 저장 및 공식계좌 관리 지원 API Key 사용 가능한 잔액을 확인하려면 타사 제공업체가 다음을 수행해야 합니다. Harness 구성; 모델, 추론 및 할당량은 클라이언트 측입니다./상류로부터의 실제 수익이 우선합니다.。Codex Fast、카드 재설정 및 Skills 다른 클라이언트의 일반적인 기능으로 확장되지 않습니다.。
 
-### Android、iOS 与手机网页
+### Android、iOS 그리고 모바일 웹페이지
 
-- **多台电脑与扫码保持登录**：App 保存多台电脑，支持重命名、删除、按最近访问排序和手动刷新在线状态。扫码建立可撤销的可信设备绑定，普通网页登录过期不再迫使手机反复输入密码。
-- **更紧凑的聊天列表**：搜索、排序与归档入口收拢；功能栏位于应用切换栏上方。只有一个已启用应用时隐藏切换栏；更多菜单可隐藏底部图标。左右滑动切换应用默认开启，带拖动预览，也可关闭。
-- **电脑卡片上的应用通知**：显示已启用应用的原始图标，网关按用户通知选择维护各应用未读数；点击图标直接进入该应用列表。列表加载成功后标记已读，其他应用及新到达提醒保留；已读不等于批准权限请求。
-- **通知权限与来源**：首次打开申请通知权限，允许后默认使用横幅和声音，保留用户后续选择。Android 大图标与 iOS 图片附件标明来源应用；iOS 系统小图标仍属于 Bridge，不能逐条替换成其他 App。
-- **原生交互修复**：修复 Android 应用图标跳转地址校验、重复更多菜单、输入换行、剪贴板、附件和返回导航等问题；iOS 与 Android 共用页面宿主适配，同时保留各自原生扫码、下载与系统返回逻辑。
+- **여러 컴퓨터에서 로그인 상태를 유지하려면 QR 코드를 스캔하세요.**：App 여러 대의 컴퓨터를 저장하고 이름 바꾸기, 삭제, 최근 방문순 정렬 및 온라인 상태 수동 새로 고침을 지원합니다. 취소 가능한 신뢰할 수 있는 장치 바인딩을 설정하려면 QR 코드를 스캔하세요. 일반 웹 페이지 로그인 만료로 인해 더 이상 전화기에 비밀번호를 반복적으로 입력하지 않아도 됩니다.。
+- **더욱 간결해진 채팅 목록**：검색, 정렬 및 보관 입구가 축소되었습니다. 기능 표시줄은 응용 프로그램 전환 표시줄 위에 있습니다. 활성화된 앱이 하나만 있는 경우 토글 바를 숨깁니다. 더 많은 메뉴는 하단 아이콘을 숨깁니다. 왼쪽 및 오른쪽으로 슬라이드하여 앱 전환이 기본적으로 활성화되어 있으며 드래그 미리보기가 포함되어 있으며 비활성화할 수도 있습니다.。
+- **컴퓨터 카드에 대한 애플리케이션 알림**：활성화된 애플리케이션의 원래 아이콘이 표시됩니다. 게이트웨이는 사용자 알림에 따라 각 애플리케이션에 대해 읽지 않은 데이터를 선택하고 유지합니다. 아이콘을 클릭하면 애플리케이션 목록에 바로 들어갈 수 있습니다. 목록이 성공적으로 로드되면 읽음으로 표시되고 다른 응용 프로그램과 새로운 도착 알림은 유지됩니다. 읽음은 권한 요청의 승인을 의미하지 않습니다.。
+- **알림 권한 및 소스**：처음으로 애플리케이션 알림 권한을 엽니다. 권한을 부여한 후에는 배너와 사운드가 기본적으로 사용되며, 사용자의 이후 선택 사항은 유지됩니다.。Android 큰 아이콘 iOS 이미지 첨부는 소스 애플리케이션을 나타냅니다.；iOS 시스템 작은 아이콘은 여전히 ​​​​에 속합니다 Bridge，한 아이템씩 다른 아이템으로 교체할 수 없습니다. App。
+- **기본 상호작용 수정**：수리하다 Android 애플리케이션 아이콘 점프 주소 확인, 추가 메뉴 반복, 입력 줄 바꿈, 클립보드, 첨부 파일 및 복귀 탐색 등의 문제；iOS 및 Android 고유한 기본 코드 스캔, 다운로드 및 시스템 반환 논리를 유지하면서 공유 페이지 호스트 적응。
 
-### 远程连接与网关设置
+### 원격 연결 및 게이트웨이 설정
 
-- **固定 HTTPS · Tailscale**：检测官方客户端、读取固定 `.ts.net` 地址，支持公网 Funnel 与私有 Serve，连接随网关启停。Funnel 下手机无需安装 Tailscale；Serve 需要同一私有网络权限。首次登录、网络权限及 Funnel 授权由用户在官方界面完成。
-- **自有服务器 + SSH**：保留普通用户 SSH 反向转发、主机指纹核验及固定入口检测。手机访问地址可留空并使用服务器公网 IP 的 HTTPS 地址，但服务器仍需已有 HTTPS 反代和与 IP 匹配的受信任证书；不会自动降级 HTTP。
-- **保留多种入口**：局域网、内置 Cloudflare 临时 HTTPS、固定 Cloudflare Tunnel、Tailscale、自有服务器与 NAS/已有反代可按需配置。移除桌面端“自建中继 · 内测”邀请码入口，减少普通用户配置负担。
-- **网络提示更准确**：Cloudflare 和 Tailscale 公网转发/中继可能经过境外节点，中国大陆直连可能较慢或超时；固定域名不保证国内速度。首次配置后应在实际 Wi-Fi 与蜂窝网络验证。
-- **设置重新分区**：概览、客户端与接入、网络访问、登录与设备、消息通知、应用与维护各司其职；概览和客户端页均可启停网关。修复网关实际已启动却被界面误报超时的情况；文件传输设置独立保存，异步加载不再误报网关配置未保存并阻止启动。
+- **결정된 HTTPS · Tailscale**：공식 클라이언트 감지, 수정됨 읽기 `.ts.net` 주소, 공용 네트워크 지원 Funnel 비공개로 Serve，게이트웨이를 통해 연결이 시작되고 중지됩니다.。Funnel 휴대폰을 다운로드할 때 설치가 필요하지 않습니다 Tailscale；Serve 동일한 개인 네트워크 권한이 필요합니다. 최초 로그인, 네트워크 권한 및 Funnel 승인은 공식 인터페이스에서 사용자에 의해 완료됩니다.。
+- **자체 서버 + SSH**：일반 사용자 유지 SSH 역방향 전달, 호스트 지문 확인 및 고정 입구 감지. 휴대폰 접속 주소는 비워두시면 서버 공용망을 이용하실 수 있습니다. IP 의 HTTPS 주소가 있지만 서버에는 여전히 하나의 주소가 필요합니다. HTTPS 반세대적이고 IP 신뢰할 수 있는 인증서와 일치합니다. 자동 다운그레이드 없음 HTTP。
+- **출입구를 여러 개 유지하세요**：LAN, 내장 Cloudflare 일시적인 HTTPS、결정된 Cloudflare Tunnel、Tailscale、자체 서버 vs. NAS/필요에 따라 구성할 수 있는 역세대가 이미 있습니다. 데스크탑 제거“자체 제작 트렁크 · 내부 베타”초대코드 입력으로 일반 사용자의 설정 부담 경감。
+- **네트워크 프롬프트가 더 정확해졌습니다.**：Cloudflare 및 Tailscale 공용 네트워크 전달/릴레이는 해외 노드를 통과할 수 있으며, 중국 본토로의 직접 연결은 느리거나 시간 초과될 수 있습니다. 고정 도메인 이름은 국내 속도를 보장하지 않습니다. 초기 구성 후 실제 Wi-Fi 이동통신망으로 확인。
+- **재파티셔닝 설정**：개요, 클라이언트 및 액세스, 네트워크 액세스, 로그인 및 장치, 메시지 알림, 애플리케이션 및 유지 관리는 모두 자체 임무를 수행합니다. 개요 페이지와 클라이언트 페이지 모두 게이트웨이를 시작하고 중지할 수 있습니다. 게이트웨이가 실제로 시작되었지만 인터페이스에 의해 시간 초과되었다고 잘못 보고되는 상황을 수정했습니다. 파일 전송 설정은 독립적으로 저장되며, 비동기 로딩은 더 이상 게이트웨이 구성이 저장되지 않아 시작을 방해한다고 잘못 보고하지 않습니다.。
 
-### 安全、效率与平台维护
+### 보안, 효율성 및 플랫폼 유지 관리
 
-- **请求与文件边界**：加固 DSH 带认证请求的重定向限制；限制中继压缩请求，避免解压后体积绕过；保留登录、CSRF、同源图片入口和受控文件访问。Windows 补齐 junction/reparse point、`.git` 大小写及 Win32 路径别名检查。
-- **减少重复工作**：同轮状态刷新共用进程扫描，相同只读请求合并；发送、授权、停止保持独立。后台暂停终端读取并保留 shell，回前台按游标补读；手机通知使用增量游标，离开前台停止巡检。
-- **Windows 与 Ubuntu 实测分支整合**：吸纳 Windows 安装发现、进程退出、终端和路径边界调整；改进 Ubuntu 启动器识别、权限能力查询与侧边聊天权限确认。Linux 仍为实验性支持，Claude 自动连接仅限 macOS/Windows。
-- **更清晰的源码结构**：共享业务、客户端协议、操作系统实现分别归入 `features`、`clients`、`platforms`；Web 宿主与宽窄布局独立，Android/iOS 保留各自原生入口，共用注入脚本只有一份。便于在目标系统上定向维护。
-- **保留 v1.4.0 的基础能力**：登录保护、会话归属、原生 Fast、模型/Skill 独立加载、已安装 Skill 链接、图片路径规范化、临时隧道重试和签名更新检查继续保留。
+- **요청 및 파일 경계**：보강 DSH 인증 요청으로 제한 사항을 리디렉션합니다. 압축 해제 후 볼륨 바이패스를 방지하기 위해 릴레이 압축 요청을 제한합니다. 로그인 유지、CSRF、동일 원본 이미지 입력 ​​및 파일 액세스 제어。Windows 완벽한 junction/reparse point、`.git` 대문자와 소문자 Win32 경로 별칭 검사。
+- **업무 중복을 줄여라**：동일한 상태 새로 고침 라운드는 프로세스 검색을 공유하고 동일한 읽기 전용 요청이 병합됩니다. 전송, 승인 및 중지는 독립적으로 유지됩니다. 백그라운드에서 터미널 읽기를 일시 중지하고 유지합니다. shell，프론트 데스크로 돌아가서 커서를 눌러 읽기를 완료하세요. 휴대폰에서 증분 커서를 사용하라고 알리고, 검사를 중지하려면 프런트 데스크를 나가세요.。
+- **Windows 및 Ubuntu 실제 지점 통합**：흡수하다 Windows 설치 검색, 프로세스 종료, 터미널 및 경로 경계 조정 개량 Ubuntu 런처 식별, 권한 기능 조회 및 사이드 채팅 권한 확인。Linux 아직 실험적인 지원，Claude 자동 연결만 가능 macOS/Windows。
+- **더욱 명확한 소스 코드 구조**：공유 서비스, 클라이언트 프로토콜 및 운영 체제 구현은 별도로 분류됩니다. `features`、`clients`、`platforms`；Web 호스트는 넓고 좁은 레이아웃에 독립적입니다.，Android/iOS 각각의 기본 입구를 유지하고 공유 주입 스크립트의 사본을 하나만 보유하십시오. 대상 시스템에 대한 목표 유지 관리를 촉진합니다.。
+- **예약하다 v1.4.0 기본 능력**：로그인 보호, 세션 소유권, 기본 Fast、모델/Skill 독립적으로 로드 및 설치됨 Skill 링크, 이미지 경로 정규화, 임시 터널 재시도 및 서명 업데이트 확인은 그대로 유지됩니다.。
 
-### 安装、升级与能力边界
+### 설치, 업그레이드 및 기능 경계
 
-- **电脑端**：提供 macOS arm64/x64 DMG 与 ZIP、Windows x64 Setup 与 ZIP，以及实验性 Ubuntu x64/ARM64 DEB 与 AppImage。macOS 使用 ad-hoc 完整性签名、未公证；Windows 无发布者证书签名。没有 Windows ARM64 专用包。
-- **升级网关**：macOS/Windows 可在“应用更新”查看正式版，或停止旧网关并退出后手动安装；保留原数据目录。Linux 手动升级。不要让两个网关同时操作同一套客户端与数据。
-- **Android**：覆盖安装 APK 以保留电脑列表和登录，不要先卸载。**iOS IPA 未签名**，需自行签名；源码包包含 Xcode 工程，暂无 App Store/TestFlight 分发。使用 `SHA256SUMS.txt` 校验下载。
-- **Claude**：接入 Code/Cowork，不包含普通 Chat。首次初始化或丢失连接后的重新初始化可能需要电脑解锁、辅助功能/开发者模式及目录信任确认；已有连接优先在后台复用。不能承诺从锁屏状态完成冷启动。Cowork 未提供可靠上下文用量时显示未知。
-- **通知与在线状态**：普通手机包依靠前台同步，不保证后台、锁屏或被系统终止后的送达；可使用 Bark、ntfy、PushPlus。灵动岛在后台可能显示最后状态。电脑睡眠或离线时无法继续远程操作。
-- **原版 Codex 更新**：Bridge 可查询支持渠道的版本并引导原生更新器/商店；安装资格与确认仍由原应用处理，不承诺完全无人值守升级。此入口与 Bridge 自身更新独立。
-- 客户端内部接口可能随上游更新变化。平台打包、模拟协议检查与真实账号/模型执行是不同验证范围；没有设备耗电测量，不宣称具体续航提升。
+- **PC**：공급 macOS arm64/x64 DMG 및 ZIP、Windows x64 Setup 및 ZIP，그리고 실험적이다 Ubuntu x64/ARM64 DEB 및 AppImage。macOS 사용 ad-hoc 공증되지 않은 완전한 서명；Windows 게시자 인증서 없이 서명되었습니다. 아니요 Windows ARM64 특별 패키지。
+- **게이트웨이 업그레이드**：macOS/Windows 다음에서 이용 가능“업데이트 적용”공식 버전을 확인하거나 이전 게이트웨이를 중지하고 종료한 후 수동으로 설치하세요. 원래 데이터 디렉터리를 유지。Linux 수동 업그레이드. 두 개의 게이트웨이가 동일한 클라이언트 및 데이터 세트를 동시에 작동하도록 허용하지 마십시오.。
+- **Android**：오버레이 설치 APK 컴퓨터 목록과 로그인을 유지하려면 먼저 제거하지 마십시오。**iOS IPA 서명되지 않은**，직접 서명해야 합니다. 소스 코드 패키지에는 다음이 포함되어 있습니다. Xcode 엔지니어링, 없음 App Store/TestFlight 분포. 사용 `SHA256SUMS.txt` 다운로드 확인。
+- **Claude**：연결 Code/Cowork，일반은 포함되지 않습니다 Chat。연결이 끊어진 후 처음 초기화하거나 다시 초기화하려면 컴퓨터 잠금 해제, 접근성이 필요할 수 있습니다./개발자 모드 및 디렉터리 신뢰 확인 기존 연결은 먼저 백그라운드에서 재사용됩니다. 잠금 화면 상태에서 콜드 부팅을 완료할 것을 약속할 수 없습니다.。Cowork 신뢰할 수 있는 컨텍스트 사용이 제공되지 않으면 알 수 없음을 표시합니다.。
+- **알림 및 현재 상태**：일반 휴대폰 패키지는 포그라운드 동기화에 의존하며 백그라운드, 잠금 화면 또는 시스템 종료 후 전달을 보장하지 않습니다. 당신은 사용할 수 있습니다 Bark、ntfy、PushPlus。스마트 아일랜드는 백그라운드에서 마지막 상태를 표시할 수 있습니다. 컴퓨터가 절전 모드이거나 오프라인 상태인 동안에는 원격 작업을 계속할 수 없습니다.。
+- **원래의 Codex 고쳐 쓰다**：Bridge 지원되는 채널의 버전을 쿼리하고 기본 업데이트 프로그램을 안내할 수 있습니다./가게; 설치 자격 및 확인은 여전히 ​​원래 앱에서 처리되며 완전한 무인 업그레이드는 보장되지 않습니다. 이 입구는 다음과 관련이 있습니다. Bridge 자동 업데이트 및 독립적。
+- 클라이언트 내부 인터페이스는 업스트림 업데이트에 따라 변경될 수 있습니다. 플랫폼 패키징, 시뮬레이션 프로토콜 확인 및 실계좌/모델 실행은 검증 범위가 다릅니다. 장치 전력 소비 측정이 없으며 구체적인 배터리 수명 개선이 주장되지 않습니다.。
 
-### 致谢
+### 감사의 말
 
-感谢参与跨平台真机测试、反馈和贡献的用户。保留 [@qybgh](https://github.com/qybgh) 在 [#15](https://github.com/try2love/codex-mobile-bridge/pull/15) 中的更新交接贡献、[@702165405](https://github.com/702165405) 在 [#16](https://github.com/try2love/codex-mobile-bridge/pull/16) 中的模型目录兼容贡献，以及 MIT 项目 [coding-mobile](https://github.com/2389859005/coding-mobile) 对 Claude/Harness 接入的参考；相关许可与归属随源码保留。
+크로스 플랫폼 실제 장치 테스트, 피드백 및 기여에 참여한 사용자에게 감사드립니다. 예약하다 [@qybgh](https://github.com/qybgh) 에서 [#15](https://github.com/try2love/codex-mobile-bridge/pull/15) 인계 기여 업데이트、[@702165405](https://github.com/702165405) 에서 [#16](https://github.com/try2love/codex-mobile-bridge/pull/16) 모델 카탈로그 호환성 기여 MIT 프로젝트 [coding-mobile](https://github.com/2389859005/coding-mobile) 오른쪽 Claude/Harness 접속 참고자료 관련 라이선스 및 속성은 소스 코드와 함께 유지됩니다.。
 
 ---
 
@@ -1091,22 +1091,22 @@ Thanks to contributors and cross-platform testers, including [@qybgh](https://gi
 
 ---
 
-## v2.0.0-preview.3 · 账号、模型与移动端体验改进
+## v2.0.0-preview.3 · 계정, 모델 및 모바일 환경 개선
 
-- **账号与重置卡**：整理“账号与接入”布局，当前接入置顶，刷新时保留上次成功的额度与更新时间。每个已保存的官方账号均可手动使用重置卡，无需先切换登录，也不依赖 Codex 的代理用量重置开关；确认页展示账号和卡片到期时间，等待五秒后才可使用，结果不明时重试同一请求。
-- **模型与旧聊天**：模型选择器与账号页共用当前接入的模型来源，可主动刷新上游列表；官方模型的推理选项按能力匹配。切换接入后，兼容的旧聊天可继续使用新接入，修复旧供应商检查误拦发送的问题。回复旁展示该轮模型与推理强度，缺少记录的历史回复不补猜标签。
-- **更轻的账号切换**：切换时只更新认证与接入配置，不再批量加载旧聊天或访问其项目目录；取消网关启动时的文稿目录探测。主动打开文件树、预览或下载附件等文件功能仍可能需要对应的系统权限。
-- **手机连接与附件**：电脑列表支持重命名、移除连接及入口在线状态；聊天顶部可在保存的连接名称与真实设备名称之间切换。改进扫码后的登录保持，修复手机选完文件后附件名称、预览及上传状态缺失的问题，Android 与 iOS 同步相关界面和功能。
-- **更紧凑的界面**：调整聊天列表顶部及底部按钮布局，将账号页刷新按钮放在标题旁；完善中英文操作提示、网关默认语言和手机弹窗样式。共享中继入口暂时隐藏。
-- **桌面程序与更新**：新增桌面程序扫描，macOS 支持直接填写 `.app` 路径。“在电脑上检查 Codex 更新”打开原版 Codex 的“检查更新 / Check for Updates…”菜单，后续检查、下载与安装由 Codex 自身处理；网关仍使用独立的更新入口。
+- **계정 및 카드 재설정**：정돈하다“계정 및 액세스”레이아웃, 현재 접근 권한이 상단에 표시되며, 새로고침 시 마지막으로 성공한 금액과 업데이트 시간이 유지됩니다. 저장된 각 공식 계정은 먼저 로그인을 전환하거나 다른 계정에 의존하지 않고 수동으로 재설정 카드를 사용할 수 있습니다. Codex 에이전트 사용량 재설정 스위치; 확인 페이지에는 계좌번호와 카드 만료 시간이 표시되며, 5초 후에 사용하고, 결과를 알 수 없는 경우 동일한 요청을 다시 시도하세요.。
+- **오래된 모델과의 채팅**：모델 선택기와 계정 페이지는 현재 액세스된 모델 소스를 공유하며 업스트림 목록을 적극적으로 새로 고칠 수 있습니다. 공식 모델의 추론 옵션은 기능에 따라 일치됩니다. 액세스를 전환한 후에도 호환되는 이전 채팅은 계속해서 새 액세스를 사용할 수 있으며, 이는 이전 공급자가 잘못 확인하고 전송하는 문제를 해결합니다. 이번 라운드의 모델과 추론 강도가 답변 옆에 표시됩니다. 기록된 과거 답변이 부족한 경우 추측 태그가 제공되지 않습니다.。
+- **더 쉬운 계정 전환**：전환 시 인증 및 액세스 구성만 업데이트되며 이전 채팅은 더 이상 일괄적으로 로드되지 않거나 해당 프로젝트 디렉터리에 액세스됩니다. 게이트웨이 시작 시 문서 디렉터리 감지가 취소됩니다. 파일 트리 열기, 첨부 파일 미리 보기 또는 다운로드와 같은 파일 기능에는 여전히 해당 시스템 권한이 필요할 수 있습니다.。
+- **휴대폰 연결 및 액세서리**：컴퓨터 목록은 이름 바꾸기, 연결 제거 및 포털 온라인 상태를 지원합니다. 채팅 상단에서는 저장된 연결 이름과 실제 장치 이름 간에 전환할 수 있습니다. QR코드 스캔 후 로그인 유지율 개선, 휴대폰에서 파일 선택 후 첨부파일명, 미리보기, 업로드 상태가 누락되는 문제 수정，Android 및 iOS 관련 인터페이스 및 기능 동기화。
+- **더욱 컴팩트한 인터페이스**：채팅 목록 상단과 하단의 버튼 레이아웃을 조정하고 제목 옆에 계정 페이지 새로 고침 버튼을 배치하세요. 중국어 및 영어 작업 프롬프트, 게이트웨이 기본 언어 및 휴대폰 팝업 창 스타일을 개선합니다. 공유 중계 입구가 일시적으로 숨겨졌습니다.。
+- **데스크톱 프로그램 및 업데이트**：데스크톱 프로그램 검사 추가，macOS 직접 작성 지원 `.app` 길。“컴퓨터에서 확인 Codex 고쳐 쓰다”원본 버전을 엽니다. Codex 의“업데이트 확인 / Check for Updates…”메뉴, 후속 점검, 다운로드 및 설치 Codex 자체적으로 처리됩니다. 게이트웨이는 여전히 별도의 업데이트 포털을 사용합니다.。
 
-### 已知限制
+### 알려진 제한사항
 
-- 订阅日期接口可能受限或无法返回日期，此时显示暂未确认，不据此判断订阅过期。真实账号查询仍存在被上游拒绝的情况。
-- 已知 GPT-Load v2.0.0-rc.45 的 Antigravity → Gemini 协议转换路径可能返回 `422 protocol_conversion_unsupported`；能列出模型不代表该模型已能正常对话。
-- 旧 API 聊天切回官方接入后，部分聊天可能暂不显示 Fast 开关。原版 Codex 的实际退出、启动和更新菜单、macOS 系统权限弹窗及手机真机仍需进一步验证；隔离运行时与模拟上游测试不等于这些场景已经实测通过。
+- 구독 날짜 인터페이스가 제한되거나 날짜를 반환하지 못할 수 있습니다. 이때는 미확인으로 표시되며, 이를 기준으로 구독 만료 여부를 판단하지 않습니다. 실제 계정 쿼리는 여전히 업스트림에서 거부됩니다.。
+- 알려진 GPT-Load v2.0.0-rc.45 의 Antigravity → Gemini 프로토콜 변환 경로가 반환될 수 있습니다. `422 protocol_conversion_unsupported`；모델을 나열할 수 있다고 해서 해당 모델이 정상적인 대화를 나눌 수 있다는 의미는 아닙니다.。
+- 오래된 API 채팅이 다시 공식 액세스로 전환된 후 일부 채팅이 일시적으로 표시되지 않을 수 있습니다. Fast 스위치. 원래의 Codex 실제 종료, 시작 및 업데이트 메뉴、macOS 시스템 권한 팝업 및 실제 휴대폰에는 추가 확인이 필요합니다. 격리 런타임 및 시뮬레이션된 업스트림 테스트는 이러한 시나리오가 테스트되고 통과되었음을 의미하지 않습니다.。
 
-这是主动选择体验的 **Pre-release**，不设为 Latest，不向 v1.4.0 正式版用户推送。Android 请覆盖安装以保留数据；**iOS IPA 未签名**，需自行签名，源码包提供 Xcode 工程，暂无 App Store / TestFlight 分发。使用 `SHA256SUMS.txt` 校验下载文件。
+경험해 볼 수 있는 적극적인 선택입니다. **Pre-release**，다음으로 설정되지 않음 Latest，하지 v1.4.0 공식 버전 사용자 푸시。Android 데이터를 보존하려면 설치를 덮어쓰십시오.；**iOS IPA 서명되지 않은**，직접 서명해야 하며 소스 코드 패키지가 제공됩니다. Xcode 엔지니어링, 없음 App Store / TestFlight 분포. 사용 `SHA256SUMS.txt` 다운로드한 파일 확인。
 
 ### English
 
@@ -1127,18 +1127,18 @@ This is an opt-in **Pre-release**, not Latest, and is excluded from stable v1.4.
 
 ---
 
-## v2.0.0-preview.2 · 更新与模型兼容改进
+## v2.0.0-preview.2 · 업데이트 및 모델 호환성 개선
 
-- 优化应用更新流程，修复更新时可能卡住的问题。
-- 改善第三方 API 模型列表兼容性，支持 CC Switch 模型目录。
-- 保留现有 Android、iOS 和 Web 界面及操作方式，三端共用模型兼容改进。
+- 애플리케이션 업데이트 프로세스를 최적화하고 업데이트 중에 멈출 수 있는 문제를 해결하세요.。
+- 제3자를 개선하다 API 모델 목록 호환성, 지원 CC Switch 모델 카탈로그。
+- 계속 존재하다 Android、iOS 및 Web 인터페이스 및 동작 모드, 3단자 공유 모델 호환성 개선。
 
-### 感谢贡献者
+### 기여자들에게 감사드립니다
 
-- 感谢 [@qybgh](https://github.com/qybgh) 在 [#15](https://github.com/try2love/codex-mobile-bridge/pull/15) 中贡献的更新交接修复与测试，本版在确认更新助手就绪后执行交接。
-- 感谢 [@702165405](https://github.com/702165405) 在 [#16](https://github.com/try2love/codex-mobile-bridge/pull/16) 中贡献的模型目录兼容改进。本次接纳该共用补丁，独立原生 Android 客户端未纳入本版。
+- 고마워하는 [@qybgh](https://github.com/qybgh) 에서 [#15](https://github.com/try2love/codex-mobile-bridge/pull/15) 에서 제공한 업데이트 핸드오버 수정 사항 및 테스트입니다. 이 버전은 업데이트 도우미가 준비되었는지 확인한 후 핸드오버를 수행합니다.。
+- 고마워하는 [@702165405](https://github.com/702165405) 에서 [#16](https://github.com/try2love/codex-mobile-bridge/pull/16) 기여된 모델 카탈로그 호환성 개선. 이번에는 공유 패치가 채택되었으며 독립적이고 기본입니다. Android 이 버전에는 클라이언트가 포함되어 있지 않습니다.。
 
-这是主动选择体验的预发布版本，不设为 Latest；v1.4.0 正式版用户的更新通道保持不变。Android 可覆盖安装并保留数据；iOS 未签名 IPA 仍需自行签名，源码包提供 Xcode 工程。使用 SHA256SUMS.txt 校验下载文件。
+이는 활성 선택 환경의 시험판 버전이며 다음으로 설정되지 않았습니다. Latest；v1.4.0 정식 버전 사용자를 위한 업데이트 채널은 변경되지 않습니다.。Android 설치 덮어쓰기 및 데이터 유지 기능；iOS 서명되지 않은 IPA 여전히 직접 서명해야 하며 소스 코드 패키지가 제공됩니다. Xcode 프로젝트. 사용 SHA256SUMS.txt 다운로드한 파일 확인。
 
 ### English
 
@@ -1150,26 +1150,26 @@ This is an opt-in prerelease, not Latest. Stable v1.4.0 users remain on the stab
 
 ---
 
-## v2.0.0-preview.1 · 网页与手机远程工作台
+## v2.0.0-preview.1 · 웹 및 모바일 원격 워크벤치
 
-这是主动选择体验的 **Pre-release**，不会设为 Latest，也不会向 v1.4.0 正式版用户推送更新。正式版继续保留。请先停止旧网关再试用预览，保留配置备份；体验后可重新安装正式版。
+경험해 볼 수 있는 적극적인 선택입니다. **Pre-release**，으로 설정되지 않습니다 Latest，도 아니다 v1.4.0 공식 버전 사용자는 업데이트를 푸시합니다. 공식 버전은 계속 사용할 수 있습니다. 미리보기를 시도하기 전에 이전 게이트웨이를 중지하고 구성 백업을 유지하십시오. 경험 후 공식 버전을 다시 설치할 수 있습니다。
 
-- **工作台标签**：在聊天旁浏览和传输文件，预览文本与图片，按类型区分图标，选择是否显示缩略图。
-- **连续终端**：保留目录和 shell 状态，支持交互、停止与尺寸适配；手机可编写多行后再发送。
-- **Git 面板**：变更与提交历史图、差异、暂存、提交、分支切换与本地合并。暂不提供远程推送或历史重写。
-- **临时侧边聊天**：继承创建时的上下文，独立设置模型、思考程度、Skill 与权限，支持附件、排队和补充任务；普通／计划模式，同一网关的多设备可同步。结束或重启网关后清除，不会显示为 Codex 原生侧边标签；暂不支持 SSH 侧边聊天。
-- **宽屏分屏**：拖动工具标签到右侧，调整两栏宽度。手机与窄屏保持单栏，输入区更紧凑。
-- **Android 与 iOS App**：扫码保存多台电脑、直接复制、文件预览与下载、清空通知、设置中检查新版。安卓电脑列表双击返回退出，应用图标与项目 Logo 一致。
+- **작업대 라벨**：채팅 옆에 있는 파일 찾아보기 및 전송, 텍스트 및 이미지 미리보기, 유형별 아이콘 구별, 썸네일 표시 여부 선택。
+- **연속 터미널**：디렉토리를 유지하고 shell 상태, 상호 작용 지원, 정지 및 크기 적응 휴대폰은 보내기 전에 여러 줄을 쓸 수 있습니다。
+- **Git 패널**：변경 및 커밋 기록 그래프, diff, 스테이징, 커밋, 분기 전환 및 로컬 병합. 현재는 원격 푸시 또는 기록 다시 쓰기를 사용할 수 없습니다.。
+- **임시 사이드 채팅**：생성 시 컨텍스트를 상속하고 모델과 사고 수준을 독립적으로 설정、Skill 권한이 있으면 첨부 파일, 대기열 및 보충 작업을 지원합니다. 일반/예약 모드에서는 동일한 게이트웨이에 있는 여러 장치를 동기화할 수 있습니다. 게이트웨이를 종료하거나 다시 시작한 후 지워지면 다음과 같이 표시되지 않습니다. Codex 기본 측면 라벨; 아직 지원되지 않음 SSH 보조 채팅。
+- **와이드스크린 분할 화면**：도구 레이블을 오른쪽으로 끌어 두 열의 너비를 조정합니다. 휴대폰 및 좁은 화면은 단일 열을 유지하고 입력 영역은 더 컴팩트합니다.。
+- **Android 및 iOS App**：QR 코드를 스캔하여 여러 컴퓨터에 저장하고, 직접 복사하고, 파일을 미리 보고 다운로드하고, 알림을 지우고, 설정에서 새 버전을 확인하세요. 돌아가거나 종료하려면 Android 컴퓨터 목록을 두 번 클릭하세요. 애플리케이션 아이콘 및 항목 Logo 일관된。
 
-### 下载与更新
+### 다운로드 및 업데이트
 
-电脑端提供 macOS arm64/x64、Windows x64 和实验性 Ubuntu x64/ARM64 包。先安装本版网关，Web 打开其地址，手机 App 扫码连接。移动端使用预览通道，只有用户主动检查并选择后才打开下载或安装指引。
+PC에서 이용 가능 macOS arm64/x64、Windows x64 그리고 실험적이다 Ubuntu x64/ARM64 가방. 이 버전의 게이트웨이를 먼저 설치하세요.，Web 주소, 휴대폰 열기 App QR 코드를 스캔하여 연결하세요. 모바일 단말기는 미리보기 채널을 사용하며, 다운로드나 설치 가이드는 사용자가 적극적으로 확인하고 선택한 후에만 열립니다.。
 
-- **Android APK**：下载后覆盖安装，不要先卸载，以保留已保存电脑与登录状态。与本地 preview.10 使用同一签名。
-- **iOS 未签名 IPA**：必须使用自己的 Apple 账号签名后安装；不能直接点开安装。`iOS-source.zip` 提供 Xcode 工程，可连接手机后签名运行。免费开发签名可能需要定期重新安装；尚无 App Store / TestFlight 发布。
-- **通知**：App 前台可提醒新任务；不保证后台或锁屏送达。Bark、ntfy、PushPlus 仍可作为外部通知通道。灵动岛在后台可能显示旧状态。
+- **Android APK**：다운로드 후 설치를 덮어씁니다. 저장된 컴퓨터와 로그인 상태를 유지하려면 먼저 제거하지 마십시오. 현지와 함께 preview.10 동일한 서명을 사용하세요.。
+- **iOS 서명되지 않은 IPA**：반드시 직접 사용해야 합니다 Apple 계정에 서명한 후 설치하세요. 직접 클릭하여 설치할 수는 없습니다.。`iOS-source.zip` 공급 Xcode 휴대폰에 연결한 후 프로젝트에 서명하고 실행할 수 있습니다. 무료 개발 서명에는 정기적인 재설치가 필요할 수 있습니다. 아직 없음 App Store / TestFlight 풀어 주다。
+- **통지하다**：App 전경은 새로운 작업을 상기시켜 줍니다. 백그라운드 또는 잠금 화면에서의 전달은 보장되지 않습니다.。Bark、ntfy、PushPlus 외부 알림 채널로 계속 사용할 수 있습니다. 스마트 아일랜드가 백그라운드에서 이전 상태를 표시할 수 있습니다.。
 
-使用 `SHA256SUMS.txt` 校验产物。macOS 为 ad-hoc 签名、未公证；Windows 无证书签名。预览功能仍可能存在兼容性问题。
+사용 `SHA256SUMS.txt` 제품 확인。macOS ～을 위한 ad-hoc 서명되었으나 공증되지 않음；Windows 인증서 서명이 없습니다. 미리보기 기능과의 호환성 문제가 여전히 있을 수 있습니다.。
 
 ### English
 
@@ -1185,18 +1185,18 @@ Stop the old gateway before trying another build on the same port, and retain a 
 
 ---
 
-## v1.4.0 · 连接更简单，远程使用更顺畅
+## v1.4.0 · 연결이 더 간단해지고 원격 사용이 더 원활해졌습니다.
 
-- **开箱即用的外网连接**：App 内置 cloudflared，临时 HTTPS 无需额外安装；完善固定 Cloudflare 域名、普通用户 SSH 和 NAS / 已有反代方案。
-- **更清晰的配置体验**：每种连接均可折叠并直接打开对应在线指引；地址框自动补入 HTTPS 前缀，错误字段自动展开定位，短期通知显示 5 秒。保存的凭据可遮罩查看，SSH 私钥选择器支持隐藏目录。
-- **更完整的登录保护**：支持记住登录 7 天、密码尝试次数提示、IP 封禁及电脑端解除，可选发送安全通知。
-- **模型和 Skill 更易用**：保留原生 Fast 和自定义 API 模型目录，模型与 Skill 独立加载；Skill 支持缓存、搜索分页和完整描述，兼容正常安装的符号链接。
-- **聊天与更新更稳定**：改善图片预览、临时隧道重试和更新交接；修复过期接入记录误拦发送。App 和网页均可忽略未确认发送提示，不会自动重发消息。
-- **更直观的教程**：临时 HTTPS 标注“推荐”，固定域名、服务器和 NAS 标注“进阶”，提供分步图示及参考命令的适用条件说明。服务器管理员操作由用户自行完成，App 不执行 sudo。
+- **즉시 사용 가능한 외부 네트워크 연결**：App 내장 cloudflared，일시적인 HTTPS 추가 설치가 필요하지 않습니다. 완벽한 고정 Cloudflare 도메인 이름, 일반 사용자 SSH 및 NAS / 역세대 계획이 있다。
+- **더욱 명확한 구성 경험**：각 연결을 접을 수 있으며 해당 온라인 가이드를 직접 열 수 있습니다. 주소창은 자동으로 채워집니다 HTTPS 접두사, 오류 필드의 자동 확장 및 위치 지정, 단기 알림 표시 5 두번째. 저장된 자격 증명은 마스크로 볼 수 있습니다，SSH 개인 키 선택기는 숨겨진 디렉터리를 지원합니다.。
+- **더욱 완벽한 로그인 보호**：지원 로그인을 기억하세요 7 요일 및 비밀번호 시도에 대한 팁、IP PC에서 차단 및 차단 해제, 선택적으로 보안 알림 보내기。
+- **모델과 Skill 사용하기 더 쉬워졌습니다.**：네이티브 유지 Fast 그리고 맞춤 API 모델 디렉토리, 모델 Skill 독립적인 로딩；Skill 캐싱, 검색 페이징 및 전체 설명을 지원하며 일반 설치된 심볼릭 링크와 호환됩니다.。
+- **채팅과 업데이트가 더 안정적입니다.**：사진 미리보기, 임시 터널 재시도 및 업데이트 핸드오버를 개선합니다. 만료된 액세스 기록이 실수로 차단되어 전송되는 문제 수정。App 확인되지 않은 전송 프롬프트와 웹 페이지를 무시할 수 있으며 메시지는 자동으로 재전송되지 않습니다.。
+- **더욱 직관적인 튜토리얼**：일시적인 HTTPS 표시“추천하다”，고정 도메인 이름, 서버 및 NAS 표시“고급의”，참조 명령에 적용 가능한 조건에 대한 단계별 그림과 설명을 제공합니다. 서버 관리자 작업은 사용자가 직접 완료합니다.，App 실행되지 않음 sudo。
 
-合并 PR #11，并包含 Preview 测试期间的兼容性与体验修复。
+병합 PR #11，그리고 포함 Preview 테스트 중 호환성 및 환경 수정。
 
-**升级**：在正式版 App 的“应用更新”中检查更新，或先停止网关并退出，再安装对应平台的新包；保留原数据目录。Preview 用户请手动安装正式版并确认使用原数据目录。更新后重新加载手机页面。临时 HTTPS 地址可能因重启变化，请提前开启入口变化通知。
+**치받이**：공식 버전에서는 App 의“업데이트 적용”업데이트를 확인하거나, 게이트웨이를 중지하고 먼저 종료한 후 플랫폼에 해당하는 새 패키지를 설치하십시오. 원래 데이터 디렉터리를 유지。Preview 사용자는 공식 버전을 수동으로 설치하고 원본 데이터 디렉토리를 사용하도록 확인해야 합니다. 업데이트 후 모바일 페이지를 다시 로드하세요. 일시적인 HTTPS 재가입으로 인해 주소가 변경될 수 있으니 사전에 출입구 변경 알림을 활성화해 주시기 바랍니다.。
 
 **English**
 
@@ -1208,16 +1208,16 @@ Includes PR #11 and fixes validated during Preview testing. Update through the s
 
 ---
 
-## v1.3.3 · 能耗与通知优化
+## v1.3.3 · 에너지 소비 및 알림 최적화
 
-- **按需监控会话**：持续监听运行中和等待处理的会话，结束后解除通知订阅；通过实时事件和每 30 秒的变更元数据检查发现新任务，减少反复读取历史会话。
-- **通知重试更独立**：完成通知发送失败时保留重试记录，不必持续订阅已结束会话。补齐会话再次运行、断线恢复、通知开关变化及完成状态先后到达的处理。
-- **优化能耗**：状态查询复用进程；窗口隐藏时暂停刷新，状态不变时不重绘界面。
-- **稳定窗口标题**：统一管理原生窗口标题，避免页面标题反复覆盖；切换语言时按需更新。
+- **요청 시 세션 모니터링**：실행 중인 세션과 대기 중인 세션을 지속적으로 모니터링하고 종료 후 알림 구독을 취소합니다. 실시간 이벤트와 각 세션을 통해 30 새로운 작업을 발견하고 기록 세션의 반복 읽기를 줄이기 위해 변경 메타데이터를 몇 초 동안 확인합니다.。
+- **알림 재시도는 더욱 독립적입니다.**：종료된 세션을 계속 구독하지 않고도 완료 알림 전송에 실패할 경우 재시도 기록을 유지합니다. 세션 재실행, 연결 끊김 복구, 알림 스위치 변경 및 완료 상태가 순차적으로 도착하는 처리를 완료합니다.。
+- **에너지 소비 최적화**：상태 쿼리 재사용 프로세스; 창이 숨겨지면 새로 고침이 일시 중지되고 상태가 변경되지 않으면 인터페이스가 다시 그려지지 않습니다.。
+- **안정적인 창 제목**：페이지 제목을 반복적으로 덮어쓰는 것을 방지하기 위한 기본 창 제목의 통합 관리 언어를 전환할 때 필요에 따라 업데이트。
 
-Mac / Windows v1.1.0 及后续版本可在“应用更新”选择“更新并重启”。保留数据目录即可保留登录、网络和通知设置。通过临时 HTTPS 远程升级前，请确认 v1.3.2 引入的“网关启动与入口通知”已开启且手机能够收到。Linux 仍为实验性支持，请停止网关并退出 App 后手动安装新版。
+Mac / Windows v1.1.0 후속 버전은 다음에서 찾을 수 있습니다.“업데이트 적용”선택하다“업데이트 및 다시 시작”。데이터 디렉터리를 유지하면 로그인, 네트워크 및 알림 설정이 유지됩니다. 일시적으로 HTTPS 원격 업그레이드 전 확인해주세요 v1.3.2 소개“게이트웨이 시작 및 포털 알림”켜져 있고 휴대전화에서 수신할 수 있습니다.。Linux 아직 실험적인 지원이므로 게이트웨이를 중지하고 종료하세요. App 그런 다음 새 버전을 수동으로 설치하십시오.。
 
-提供 Mac Apple Silicon / Intel 的 DMG、ZIP，Windows x64 的 Setup.exe、ZIP，以及 Ubuntu x64 / ARM64 的 DEB、AppImage。使用 `SHA256SUMS.txt` 校验下载；Mac / Windows 应用内更新使用签名的 `bridge-update.json`。Mac 仍为 ad-hoc 签名、未公证；Windows 无证书签名。
+공급 Mac Apple Silicon / Intel 의 DMG、ZIP，Windows x64 의 Setup.exe、ZIP，게다가 Ubuntu x64 / ARM64 의 DEB、AppImage。사용 `SHA256SUMS.txt` 다운로드 확인；Mac / Windows 인앱 업데이트는 서명을 사용합니다. `bridge-update.json`。Mac 아직 ad-hoc 서명되었으나 공증되지 않음；Windows 인증서 서명 없음。
 
 ---
 

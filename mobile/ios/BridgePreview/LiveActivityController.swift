@@ -50,6 +50,6 @@ final class LiveActivityController {
     }
     enum Failure: LocalizedError {
         case disabled
-        var errorDescription: String? { "请在系统设置中允许 Bridge Preview 的实时活动。" }
+        var errorDescription: String? { "시스템 설정에서 허용해주세요 Bridge Preview 실시간 활동。" }
     }
 }

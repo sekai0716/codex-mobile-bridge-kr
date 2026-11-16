@@ -300,11 +300,11 @@ class WslReleaseTests(unittest.TestCase):
         self.assertEqual(result['status'], 'detached')
         self.assertFalse(runtime.closed)
         self.assertFalse(self.entry.cli_connections())
-        with self.assertRaisesRegex(IPCError, '释放'):
+        with self.assertRaisesRegex(IPCError, "CLI\\ 연결이\\ 해제되었습니다\\.\\ 다시\\ 연결하려면\\ ’세션\\ 계속’을\\ 클릭하세요\\."):
             self.entry._target(self.identifier)
         self.entry.activate(self.identifier)
         self.assertFalse(self.entry.released_cli.contains(self.identifier))
-        with self.assertRaisesRegex(IPCError, '变化'):
+        with self.assertRaisesRegex(IPCError, "기존\\ WSL\\ CLI\\ 연결이\\ 변경되었습니다\\.\\ 새로운\\ 연결이\\ 작동되지\\ 않음"):
             row['_release'](True)
 
 

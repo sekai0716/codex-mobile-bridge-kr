@@ -73,7 +73,7 @@ def main():
                     value = json.loads(line)
                     action = value.get('action')
                     if action not in ('accounts', 'account', 'cli-access', 'desktop-sessions', 'start', 'stop', 'save'):
-                        raise ValueError('不支持的本机管理操作')
+                        raise ValueError('지원하지 않는 네이티브 관리 작업입니다.')
                     method = getattr(desktop, action.replace('-', '_'))
                     result = method() if action == 'stop' else method(value.get('payload') or {})
                     response = {'ok': True, 'result': result}
@@ -88,7 +88,7 @@ def main():
         for line in sys.stdin:
             try:
                 if json.loads(line) != {'action': 'snapshot'}:
-                    raise ValueError('不支持的状态查询')
+                    raise ValueError('지원하지 않는 상태 조회입니다.')
                 result = {'ok': True, 'result': desktop.snapshot()}
             except Exception as exc:
                 result = {'ok': False, 'error': str(exc), 'validation': getattr(exc, 'validation', None)}

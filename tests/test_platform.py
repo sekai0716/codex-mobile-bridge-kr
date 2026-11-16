@@ -25,7 +25,7 @@ class TransportTests(unittest.TestCase):
     def test_missing_desktop_is_actionable(self):
         endpoint = (r'\\.\pipe\missing-' + uuid.uuid4().hex if os.name == 'nt'
                     else str(ROOT / '.tmp/missing.sock'))
-        with self.assertRaisesRegex(IPCError, '\u684c\u9762 App'):
+        with self.assertRaisesRegex(IPCError, "데스크탑\\ App\\ 연결되지\\ 않았습니다\\.\\ 열어주세요\\.\\ Codex\\ App。"):
             DesktopIPC(endpoint).connect()
 
     def test_large_unicode_frames_and_reconnect(self):
@@ -135,7 +135,7 @@ class LifecycleTests(unittest.TestCase):
         result = subprocess.run([sys.executable, '-B', str(ROOT / 'run.py'), '--help'],
                                 env=env, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('手机网关', result.stdout.decode('utf-8'))
+        self.assertIn('모바일 게이트웨이', result.stdout.decode('utf-8'))
 
     @unittest.skipUnless(os.name == 'nt', 'Windows command launchers')
     def test_launchers_fall_back_when_py_has_no_interpreter(self):
@@ -228,7 +228,7 @@ class LifecycleTests(unittest.TestCase):
                         if process.poll() is not None or time.monotonic() >= deadline:
                             self.fail('Gateway failed to start: ' + (root / 'output.log').read_text(encoding='utf-8', errors='replace'))
                         time.sleep(.05)
-                    self.assertIn('手机网关已启动', (root / 'output.log').read_text(encoding='utf-8'))
+                    self.assertIn('모바일 게이트웨이가 시작되었습니다', (root / 'output.log').read_text(encoding='utf-8'))
                     conn = http.client.HTTPConnection('127.0.0.1', port, timeout=3)
                     conn.request('GET', '/api/auth')
                     response = conn.getresponse()
@@ -243,7 +243,7 @@ class LifecycleTests(unittest.TestCase):
                     conn.close()
                     credentials = next(root.glob('*.txt')).read_text(encoding='utf-8')
                     self.assertEqual(json.loads(config.read_text(encoding='utf-8'))['auth']['username'], 'admin')
-                    self.assertIn('\u8d26\u53f7', credentials)
+                    self.assertIn("Codex App 모바일 게이트웨이\n계정: admin\n비밀번호: ", credentials)
                     result = subprocess.run([sys.executable, '-B', str(ROOT / 'stop.py'), '--config', str(config)],
                                             capture_output=True, timeout=20)
                     self.assertEqual(result.returncode, 0, result.stderr)

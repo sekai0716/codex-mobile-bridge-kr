@@ -113,21 +113,21 @@ class Handler(BaseHTTPRequestHandler):
             names = {'codex': 'Codex', 'claude': 'Claude', 'deepseek': 'DSH'}
             rows = [{'id': sid if provider == 'codex' else provider + '-synthetic-' + str(i), 'host': 'local',
                      'title': names.get(provider, provider) + ' · ' + title,
-                     'projectName': '示例项目', 'projectKey': 'synthetic', 'cwd': '/synthetic/project',
+                     'projectName': '샘플 프로젝트', 'projectKey': 'synthetic', 'cwd': '/synthetic/project',
                      'recency': 1793145600000 - i * 60000, 'updatedAt': 1793145600000 - i * 60000,
                      'backend': 'code', 'runtime': 'desktop', 'access': {'source': 'desktop'},
                      'capabilities': {'fork': True, 'archive': True, 'unarchive': True, 'rename': True,
                                       'organization': provider in ('codex', 'deepseek')}, 'bridgePinned': False}
-                    for i, title in enumerate(['页面交互验证', '文档整理', '单元测试检查'])]
+                    for i, title in enumerate(['페이지 대화형 검증', '문서 구성', '단위 테스트 확인'])]
             if provider == 'codex':
                 for i, row in enumerate(rows):
                     row['id'] = sid[:-1] + str(i)
             value = {}
             if path == '/api/auth':
                 value = {'authenticated': True, 'csrf': 'synthetic', 'draftIdentity': 'synthetic',
-                         'listCacheIdentity': 'a' * 64, 'computer': {'name': '菜单测试电脑'}, 'uiLanguage': 'zh'}
+                         'listCacheIdentity': 'a' * 64, 'computer': {'name': '메뉴 테스트 컴퓨터'}, 'uiLanguage': 'ko'}
             elif path == '/api/clients':
-                value = {'clients': clients, 'computer': '菜单测试电脑'}
+                value = {'clients': clients, 'computer': '메뉴 테스트 컴퓨터'}
             elif path == '/api/sessions' or path.endswith('/list'):
                 value = {'sessions': rows, 'complete': True, 'connected': True,
                          'remoteHosts': [], 'availableSources': ['desktop']}
@@ -136,8 +136,8 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/account':
                 value = {'visible': False}
             elif path.endswith('/organization'):
-                value = {'projectId': None, 'sectionId': None, 'projects': [{'id': 'p', 'title': '示例项目'}],
-                         'sections': [{'id': 's', 'title': '示例分区'}], 'status': 'confirmed',
+                value = {'projectId': None, 'sectionId': None, 'projects': [{'id': 'p', 'title': '샘플 프로젝트'}],
+                         'sections': [{'id': 's', 'title': '예시 파티션'}], 'status': 'confirmed',
                          'scope': 'bridge' if provider == 'claude' else 'native',
                          'sectionScope': 'native' if provider == 'codex' else 'bridge'}
             self.output(json.dumps(value), 'application/json')

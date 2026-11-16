@@ -11,7 +11,7 @@ window.BridgeChatMedia = (() => {
     const player=document.createElement(kind);player.controls=true;player.preload='none';
     player.setAttribute('aria-label',name);if(kind==='video')player.playsInline=true;
     const error=document.createElement('span');error.className='muted chat-media-error';error.hidden=true;
-    player.onerror=()=>{error.textContent=BridgeI18n.t('无法播放此文件，请通过文件菜单下载后打开。');error.hidden=false;};
+    player.onerror=()=>{error.textContent=BridgeI18n.t('이 파일을 재생할 수 없습니다. 파일 메뉴에서 다운로드하여 엽니다.');error.hidden=false;};
     player.onloadeddata=()=>{error.hidden=true;};player.src=source.href;
     wrapper.append(player,error);return wrapper;
   }

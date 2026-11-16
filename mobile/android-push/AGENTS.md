@@ -1,6 +1,6 @@
-# 可选 Android FCM 宿主
+# 선택적 Android FCM 호스트
 
-- 本目录只包含 Firebase 推送引导和服务；Activity、下载、扫码等公共原生实现继续引用 `../android/src`。
-- Gradle 必须同时读取 `../shared/web` 与 `../android/assets`，与普通 APK 资源一致，且资产文件名不能重复。
-- 不向普通 APK 引入 Firebase 依赖，不提交项目密钥、google-services 配置或签名文件。
-- 其他 Android 安全和验证要求见 `../android/AGENTS.md`。
+- 이 디렉터리에는 Firebase 푸시 초기화와 서비스만 둡니다. Activity, 다운로드, QR 코드 스캔 등 공통 네이티브 구현은 계속 `../android/src`를 참조합니다.
+- Gradle은 `../shared/web`과 `../android/assets`를 모두 읽어 일반 APK와 같은 리소스를 포함해야 합니다. 에셋 파일명은 중복되어서는 안 됩니다.
+- 일반 APK에 Firebase 의존성을 추가하지 않습니다. 프로젝트 키, google-services 설정, 서명 파일을 커밋하지 않습니다.
+- 나머지 Android 보안·검증 요구사항은 `../android/AGENTS.md`를 따릅니다.

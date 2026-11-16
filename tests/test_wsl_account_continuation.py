@@ -92,7 +92,7 @@ class WslAccountContinuationTests(unittest.TestCase):
         self.switch()
         self.metadata['model_provider'] = 'other_api'
         self.entry.server.thread['modelProvider'] = 'other_api'
-        with self.assertRaisesRegex(IPCError, '提供商与当前接入不同'):
+        with self.assertRaisesRegex(IPCError, "이\\ 채팅은\\ 다른\\ 제공업체를\\ 사용합니다\\.\\ 먼저\\ 원래\\ 액세스\\ 프로필을\\ 선택하세요\\."):
             self.entry._target(self.identifier, activate=True)
         self.assertEqual([method for method, _ in self.entry.server.calls], ['thread/read', 'config/read'])
         self.assertFalse(self.entry.receipts_path.exists())
@@ -110,7 +110,7 @@ class WslAccountContinuationTests(unittest.TestCase):
                     return result
                 self.entry.server.request = request
                 self.entry.server.calls.clear()
-                with self.assertRaisesRegex(IPCError, '项目覆盖'):
+                with self.assertRaisesRegex(IPCError, "이\\ 프로젝트는\\ 선택한\\ WSL\\ API\\ 엔드포인트\\ 또는\\ 인증을\\ 재정의합니다\\.\\ 원래\\ CLI의\\ 프로젝트\\ 구성을\\ 수정한\\ 후\\ 다시\\ 연결하세요\\."):
                     self.entry._target(self.identifier, activate=True)
                 self.assertFalse(any(method in ('thread/resume', 'turn/start') for method, _ in self.entry.server.calls))
                 self.assertNotIn(self.identifier, self.entry._managed_routes)
@@ -119,7 +119,7 @@ class WslAccountContinuationTests(unittest.TestCase):
     def test_loaded_thread_without_generation_proof_requires_manual_service_exit(self):
         self.switch()
         self.entry.server.thread.update(status={'type': 'idle'}, canAcceptDirectInput=True)
-        with self.assertRaisesRegex(IPCError, '退出原 WSL 服务'):
+        with self.assertRaisesRegex(IPCError, "이\\ WSL\\ 채팅은\\ 다른\\ 연결에\\ 의해\\ 로드되었으며\\ 해당\\ API\\ 경로를\\ 확인할\\ 수\\ 없습니다\\.\\ 원래\\ WSL\\ 서비스를\\ 종료한\\ 후\\ 다시\\ 연결하세요\\."):
             self.entry.send(self.identifier, 'must not send', str(uuid.uuid4()))
         self.assertFalse(any(method in ('thread/resume', 'turn/start') for method, _ in self.entry.server.calls))
         self.assertFalse(self.entry.receipts_path.exists())
@@ -142,7 +142,7 @@ class WslAccountContinuationTests(unittest.TestCase):
                 result['config']['model_providers']['original_api']['base_url'] = 'https://old.invalid/v1'
             return result
         self.entry.server.request = request
-        with self.assertRaisesRegex(IPCError, '项目覆盖'):
+        with self.assertRaisesRegex(IPCError, "이\\ 프로젝트는\\ 선택한\\ WSL\\ API\\ 엔드포인트\\ 또는\\ 인증을\\ 재정의합니다\\.\\ 원래\\ CLI의\\ 프로젝트\\ 구성을\\ 수정한\\ 후\\ 다시\\ 연결하세요\\."):
             self.entry.send(self.identifier, 'must not send', str(uuid.uuid4()))
         self.assertEqual(sum(method == 'turn/start' for method, _ in self.entry.server.calls), 1)
         self.assertFalse(any(method in ('model/list', 'config/batchWrite', 'thread/start')
@@ -152,11 +152,11 @@ class WslAccountContinuationTests(unittest.TestCase):
         self.switch()
         self.entry._target(self.identifier, activate=True)
         self.entry.generation = 'replacement-generation'
-        with self.assertRaisesRegex(IPCError, '退出原 WSL 服务'):
+        with self.assertRaisesRegex(IPCError, "이\\ WSL\\ 채팅은\\ 다른\\ 연결에\\ 의해\\ 로드되었으며\\ 해당\\ API\\ 경로를\\ 확인할\\ 수\\ 없습니다\\.\\ 원래\\ WSL\\ 서비스를\\ 종료한\\ 후\\ 다시\\ 연결하세요\\."):
             self.entry._target(self.identifier, activate=True)
         with (self.home / 'auth.json').open('a') as output:
             output.write(' ')
-        with self.assertRaisesRegex(IPCError, '账号配置已变化'):
+        with self.assertRaisesRegex(IPCError, '계정 구성이 변경되었습니다.'):
             self.entry._target(self.identifier, activate=True)
         self.assertFalse(any(method == 'turn/start' for method, _ in self.entry.server.calls))
 
@@ -251,7 +251,7 @@ class WslAccountContinuationTests(unittest.TestCase):
                 result['config']['model_providers']['original_api']['base_url'] = 'https://old.invalid/v1'
             return result
         self.entry.server.request = request
-        with self.assertRaisesRegex(IPCError, '项目覆盖'):
+        with self.assertRaisesRegex(IPCError, "이\\ 프로젝트는\\ 선택한\\ WSL\\ API\\ 엔드포인트\\ 또는\\ 인증을\\ 재정의합니다\\.\\ 원래\\ CLI의\\ 프로젝트\\ 구성을\\ 수정한\\ 후\\ 다시\\ 연결하세요\\."):
             self.entry.create_chat(self.entry.host+'|'+self.metadata['cwd'], 'Fixture', str(uuid.uuid4()))
         self.assertFalse(self.entry.creations_path.exists())
         self.assertFalse(self.entry.creations)
@@ -269,7 +269,7 @@ class WslAccountContinuationTests(unittest.TestCase):
             return result
         self.entry.server.request = request
         with patch.object(self.entry, '_account_route', wraps=self.store.route_summary) as route:
-            with self.assertRaisesRegex(IPCError, '项目覆盖'):
+            with self.assertRaisesRegex(IPCError, "이\\ 프로젝트는\\ 선택한\\ WSL\\ API\\ 엔드포인트\\ 또는\\ 인증을\\ 재정의합니다\\.\\ 원래\\ CLI의\\ 프로젝트\\ 구성을\\ 수정한\\ 후\\ 다시\\ 연결하세요\\."):
                 self.entry.send(self.identifier, 'must not send', str(uuid.uuid4()))
         route.assert_called_once()
         self.assertEqual(sum(method == 'config/read' for method, _ in self.entry.server.calls), 1)

@@ -37,12 +37,12 @@
         credentials: 'same-origin', cache: 'no-store', redirect: 'error',
       });
     } catch {
-      throw new Error(body === undefined ? '无法连接中继，请检查网络后刷新。' : '连接中断，操作结果待确认，请先刷新状态，勿重复提交。');
+      throw new Error(body === undefined ? '릴레이에 연결할 수 없습니다. 네트워크를 확인하고 새로고침하세요.。' : '연결이 중단되었으며 작업 결과를 확인해야 합니다. 먼저 상태를 새로 고치고 다시 제출하지 마세요.。');
     }
     if (response.status === 401) signedOut();
     if (!response.ok) {
       const value = await response.json().catch(() => ({}));
-      throw new Error(response.status === 429 ? '请求过于频繁，请稍后再试。' : value.error || '请求失败，请刷新后重试。');
+      throw new Error(response.status === 429 ? '요청이 너무 자주 발생합니다. 나중에 다시 시도해 주세요.。' : value.error || '요청이 실패했습니다. 새로고침한 후 다시 시도해 주세요.。');
     }
     return response.json();
   }
@@ -77,16 +77,16 @@
     for (const device of data.devices) {
       const row = document.createElement('tr');
       cell(row, device.name); cell(row, device.owner);
-      badge(row, device.revoked ? '已撤销' : device.online ? '在线' : '离线', device.online);
+      badge(row, device.revoked ? '취소됨' : device.online ? '온라인' : '오프라인', device.online);
       cell(row, date(device.created));
       const action = cell(row, device.revoked ? '—' : '');
       if (!device.revoked) {
         const button = document.createElement('button');
-        button.className = 'danger'; button.textContent = '撤销';
-        button.setAttribute('aria-label', '撤销 ' + device.name);
+        button.className = 'danger'; button.textContent = '취소';
+        button.setAttribute('aria-label', '취소 ' + device.name);
         button.addEventListener('click', () => {
           revokeId = device.id;
-          $('revoke-description').textContent = `撤销“${device.name}”（${device.owner}）及其全部手机的访问权限？`;
+          $('revoke-description').textContent = `취소“${device.name}”（${device.owner}）모든 전화에 대한 액세스？`;
           $('revoke-dialog').showModal();
         });
         action.append(button);
@@ -99,13 +99,13 @@
     for (const invitation of data.invitations) {
       const row = document.createElement('tr');
       cell(row, invitation.owner);
-      badge(row, invitation.used ? '已使用' : invitation.expires <= data.now ? '已过期' : '可使用');
+      badge(row, invitation.used ? '이미 사용됨' : invitation.expires <= data.now ? '만료됨' : '사용 가능');
       cell(row, date(invitation.expires));
       $('invitations').append(row);
     }
     $('invitations-empty').hidden = data.invitations.length > 0;
     $('invitations-table').hidden = !data.invitations.length;
-    $('updated').textContent = '状态更新于 ' + date(data.now);
+    $('updated').textContent = '상태 업데이트 날짜 ' + date(data.now);
     $('login-panel').hidden = true;
     $('dashboard').hidden = false;
     $('logout').hidden = false;
@@ -124,11 +124,11 @@
     event.preventDefault();
     run(event.submitter, async () => {
       const owner = $('owner').value.trim();
-      if (!owner) throw new Error('请填写用户备注。');
-      if (!$('invitation-result').hidden) throw new Error('请先保存当前邀请码，再收起并清除后生成下一个。');
+      if (!owner) throw new Error('사용자 비고를 작성해주세요。');
+      if (!$('invitation-result').hidden) throw new Error('현재 초대 코드를 먼저 저장한 후 닫고 지워서 다음 초대 코드를 생성하세요.。');
       const hours = Number($('hours').value);
       const result = await api('invite', { owner, hours });
-      $('invitation-text').value = `中继地址：${relayOrigin}\n邀请码：${result.invitation}\n有效期：${hours} 小时（仅限注册一台电脑）\n在电脑客户端的“共享中继”中填写以上地址和邀请码。`;
+      $('invitation-text').value = `릴레이 주소：${relayOrigin}\n초대코드：${result.invitation}\n유효기간：${hours} 시간（한 대의 컴퓨터만 등록할 수 있습니다.）\n컴퓨터 클라이언트에서“공유 트렁크”위의 주소와 초대코드를 입력하세요。`;
       $('invitation-result').hidden = false;
       await refresh();
     });
@@ -136,10 +136,10 @@
   $('copy').addEventListener('click', () => run($('copy'), async () => {
     try {
       await navigator.clipboard.writeText($('invitation-text').value);
-      status('接入信息已复制，请私下发送给对应用户。');
+      status('접속 정보가 복사되었습니다. 해당 사용자에게 비공개로 보내주세요.。');
     } catch {
       $('invitation-text').focus(); $('invitation-text').select();
-      status('请复制已选中的接入信息。');
+      status('선택한 접속 정보를 복사해 주세요。');
     }
   }));
   $('dismiss-invitation').addEventListener('click', clearInvitation);
@@ -149,12 +149,12 @@
     await api('revoke', { deviceId: revokeId });
     $('revoke-dialog').close();
     await refresh();
-    status('设备及其手机授权已撤销。');
+    status('기기 및 전화 승인이 취소되었습니다.。');
   }));
   $('logout').addEventListener('click', () => run($('logout'), async () => {
     await api('logout', {});
     signedOut();
-    status('已退出管理后台。');
+    status('관리 배경 종료。');
   }));
   // Clear visible secrets when navigating away, including pages retained in bfcache.
   window.addEventListener('pagehide', signedOut);
@@ -162,7 +162,7 @@
     try {
       const session = await api('session');
       if (session.authenticated) { csrf = session.csrf; await refresh(); }
-      else if (!session.configured) $('login-help').textContent = '尚未设置管理密钥。请先在服务器终端运行 admin-token 命令，详见部署文档。';
+      else if (!session.configured) $('login-help').textContent = '아직 관리키가 설정되지 않았습니다. 먼저 서버 터미널에서 실행해주세요 admin-token 명령, 자세한 내용은 배포 설명서를 참조하세요.。';
     } catch (error) { status(error.message, true); }
   }
   window.addEventListener('pageshow', (event) => { if (event.persisted) restore(); });

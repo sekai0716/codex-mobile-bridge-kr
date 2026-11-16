@@ -204,7 +204,7 @@ class WslClaudeContract(unittest.TestCase):
             self.assertFalse(row['canReconnect'])
             self.assertFalse(row['canInitializeDesktop'])
             self.assertFalse(row['canStartDesktop'])
-            with self.assertRaisesRegex(ValueError, 'Claude Desktop 接入已关闭'):
+            with self.assertRaisesRegex(ValueError, "Claude\\ Desktop\\ 액세스가\\ 종료되었습니다\\.\\ 먼저\\ 원래\\ 컴퓨터에서\\ 액세스를\\ 활성화하세요\\."):
                 manager.reconnect_claude()
             manager.config['enabled']['claude'] = True
             row = next(row for row in manager.clients(refresh=True)['clients'] if row['id'] == 'claude')

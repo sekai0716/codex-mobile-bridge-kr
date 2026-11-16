@@ -7,13 +7,13 @@ struct SetupError: Error { let state: String; let reason: String }
 func fail(_ state: String, _ reason: String) throws -> Never { throw SetupError(state: state, reason: reason) }
 func desktopIssue(hasSession: Bool, onConsole: Bool?, loginDone: Bool?, locked: Bool?, foreground: String?, screenSaverWindow: Bool) -> SetupError? {
     if locked == true {
-        return SetupError(state: "needs-unlock", reason: "Mac 已锁屏，Claude 建立连接需要可交互桌面；解锁后会自动继续连接")
+        return SetupError(state: "needs-unlock", reason: "Mac 화면 잠김，Claude 연결을 설정하려면 대화형 데스크탑이 필요합니다. 잠금 해제 후 연결이 자동으로 계속됩니다")
     }
     if hasSession && onConsole == true && loginDone == true && (foreground == "com.apple.ScreenSaver.Engine" || screenSaverWindow) {
-        return SetupError(state: "needs-screen-saver", reason: "Mac 正在显示屏幕保护程序，Claude 建立连接需要可交互桌面；退出屏保后会自动继续连接")
+        return SetupError(state: "needs-screen-saver", reason: "Mac 화면 보호기 표시 중，Claude 연결을 설정하려면 대화형 데스크탑이 필요합니다. 화면 보호기를 종료하면 연결이 자동으로 계속됩니다.")
     }
     if !hasSession || onConsole != true || loginDone != true || foreground == nil || foreground == "com.apple.loginwindow" {
-        return SetupError(state: "needs-desktop", reason: "当前 Mac 会话不可交互，Claude 接入已暂停；返回当前用户桌面后会自动继续连接")
+        return SetupError(state: "needs-desktop", reason: "현재 Mac 세션이 대화형이 아닙니다.，Claude 액세스가 일시 중지되었습니다. 현재 사용자의 데스크탑으로 돌아온 후 연결이 자동으로 재개됩니다.")
     }
     return nil
 }
@@ -58,11 +58,12 @@ func output(_ state: String, _ reason: String) {
     let data = try! JSONSerialization.data(withJSONObject: value)
     print(String(data: data, encoding: .utf8)!)
 }
+// Claude/DevTools의 실제 접근성 이름과 구형 오류 문구는 외부 계약이므로 번역하지 않습니다.
 func bridgeOwnerIssue(_ value: String, marker: String) -> String? {
     guard value.contains("[\(marker)]") else { return nil }
     if value.contains("BRIDGE_OWNER_BUSY") { return "busy" }
     if value.contains("BRIDGE_OWNER_UNCONFIRMED") { return "unconfirmed" }
-    if value.contains("BRIDGE_OWNER_LEGACY") || value.contains("Claude 桥接连接被其他网关占用") { return "legacy" }
+    if value.contains("BRIDGE_OWNER_LEGACY") || value.contains("Claude \u{6865}\u{63a5}\u{8fde}\u{63a5}\u{88ab}\u{5176}\u{4ed6}\u{7f51}\u{5173}\u{5360}\u{7528}") { return "legacy" }
     return nil
 }
 func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
@@ -85,14 +86,14 @@ func find(_ root: AXUIElement, matching: (AXUIElement) -> Bool) -> AXUIElement? 
     return nil
 }
 func promptName(_ name: String) -> Bool {
-    ["console-prompt", "Console prompt", "控制台提示", "控制台提示符"].contains(name)
+    ["console-prompt", "Console prompt", "\u{63a7}\u{5236}\u{53f0}\u{63d0}\u{793a}", "\u{63a7}\u{5236}\u{53f0}\u{63d0}\u{793a}\u{7b26}"].contains(name)
 }
 func isPrompt(_ element: AXUIElement) -> Bool {
     promptName(text(element, kAXIdentifierAttribute)) || promptName(text(element, kAXDescriptionAttribute)) || promptName(text(element, kAXTitleAttribute))
 }
 func consoleTab(role: String, identifier: String, description: String, title: String) -> Bool {
     ["AXRadioButton", "AXButton", "AXTab"].contains(role) &&
-        [identifier, description, title].contains(where: { ["Console", "控制台"].contains($0) })
+        [identifier, description, title].contains(where: { ["Console", "\u{63a7}\u{5236}\u{53f0}"].contains($0) })
 }
 func isConsoleTab(_ element: AXUIElement) -> Bool {
     consoleTab(role: text(element, kAXRoleAttribute), identifier: text(element, kAXIdentifierAttribute),
@@ -106,7 +107,7 @@ func activationMayWait(initial: pid_t?, current: pid_t?, target: pid_t) -> Bool 
 }
 func devToolsWindow(role: String, title: String, owner: pid_t, expectedOwner: pid_t) -> Bool {
     role == "AXWindow" && owner == expectedOwner &&
-        ["Developer Tools", "DevTools", "开发者工具"].contains(where: { title == $0 || title.hasPrefix($0 + " - ") })
+        ["Developer Tools", "DevTools", "\u{5f00}\u{53d1}\u{8005}\u{5de5}\u{5177}"].contains(where: { title == $0 || title.hasPrefix($0 + " - ") })
 }
 func contents(_ element: AXUIElement) -> String { text(element, kAXValueAttribute).trimmingCharacters(in: .newlines) }
 func focusedWithin<Element>(_ expected: Element, focused: Element?, parent: (Element) -> Element?, equal: (Element, Element) -> Bool) -> Bool {
@@ -127,7 +128,7 @@ final class Connector {
         guard let found = NSRunningApplication(processIdentifier: pid),
               found.bundleIdentifier == "com.anthropic.claudefordesktop",
               found.executableURL?.resolvingSymlinksInPath().path == URL(fileURLWithPath: executable).resolvingSymlinksInPath().path else {
-            try fail("needs-attention", "目标不是已发现的 Claude Desktop")
+            try fail("needs-attention", "대상이 발견되지 않았습니다 Claude Desktop")
         }
         app = found; root = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(root, 1)
@@ -137,25 +138,25 @@ final class Connector {
         // AppKit's dynamic application properties update on the main run loop.
         // Drain a ready event without sleeping before checking live foreground.
         _ = RunLoop.current.run(mode: .default, before: Date())
-        if let cancel = cancel, FileManager.default.fileExists(atPath: cancel.path) { try fail("cancelled", "已取消 Claude 连接") }
+        if let cancel = cancel, FileManager.default.fileExists(atPath: cancel.path) { try fail("cancelled", "취소 Claude 연결") }
         try requireDesktop(scanWindows: false)
-        if CGEventSource.keyState(.combinedSessionState, key: 53) { try fail("cancelled", "已取消 Claude 连接") }
+        if CGEventSource.keyState(.combinedSessionState, key: 53) { try fail("cancelled", "취소 Claude 연결") }
         guard !app.isTerminated, !foreground || NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
-            try fail("needs-attention", "焦点已离开 Claude，自动连接已停止，请重试")
+            try fail("needs-attention", "초점이 나갔어 Claude，자동 연결이 중지되었습니다. 다시 시도해 주세요.")
         }
         if let prompt = prompt {
-            guard let window = child(prompt, kAXWindowAttribute) else { try fail("needs-attention", "无法确认 Claude Console 输入焦点") }
+            guard let window = child(prompt, kAXWindowAttribute) else { try fail("needs-attention", "확인할 수 없습니다 Claude Console 입력 포커스") }
             try checkWindow(window)
             guard focusedWithin(prompt, focused: child(root, kAXFocusedUIElementAttribute),
                                 parent: { child($0, kAXParentAttribute) }, equal: { CFEqual($0, $1) }) else {
-                try fail("needs-attention", "Claude Console 输入焦点已改变，自动连接已停止")
+                try fail("needs-attention", "Claude Console 입력 포커스가 변경되어 자동 연결이 중지되었습니다.")
             }
         }
     }
     func checkWindow(_ window: AXUIElement) throws {
         try check()
         guard let focused = child(root, kAXFocusedWindowAttribute), CFEqual(window, focused) else {
-            try fail("needs-attention", "Claude 窗口已改变，自动连接已停止，请重试")
+            try fail("needs-attention", "Claude 창이 바뀌어 자동연결이 멈췄습니다. 다시 시도해 주세요.")
         }
     }
     func activate() throws {
@@ -173,16 +174,16 @@ final class Connector {
             let current = NSWorkspace.shared.frontmostApplication?.processIdentifier
             if current == app.processIdentifier { try check(); return }
             guard activationMayWait(initial: initial, current: current, target: app.processIdentifier) else {
-                try fail("needs-attention", "焦点已离开 Claude，自动连接已停止，请重试")
+                try fail("needs-attention", "초점이 나갔어 Claude，자동 연결이 중지되었습니다. 다시 시도해 주세요.")
             }
         } while Date() < deadline
-        try fail("needs-attention", "焦点已离开 Claude，自动连接已停止，请重试")
+        try fail("needs-attention", "초점이 나갔어 Claude，자동 연결이 중지되었습니다. 다시 시도해 주세요.")
     }
     func key(_ code: CGKeyCode, flags: CGEventFlags = [], prompt: AXUIElement? = nil) throws {
         if let prompt = prompt {
             guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
                   let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false) else {
-                try fail("needs-attention", "无法创建键盘事件")
+                try fail("needs-attention", "키보드 이벤트를 생성할 수 없습니다.")
             }
             down.flags = flags; up.flags = flags
             try check(prompt)
@@ -193,30 +194,30 @@ final class Connector {
         }
         for down in [true, false] {
             try check(prompt)
-            guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down) else { try fail("needs-attention", "无法创建键盘事件") }
+            guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down) else { try fail("needs-attention", "키보드 이벤트를 생성할 수 없습니다.") }
             event.flags = flags; event.postToPid(app.processIdentifier)
         }
     }
     func developerMode() throws {
         try activate()
-        guard let menu = child(root, kAXMenuBarAttribute), let help = find(menu, matching: { ["Help", "帮助"].contains(text($0, kAXTitleAttribute)) }) else {
-            try fail("needs-developer-mode", "请在 Claude 的帮助菜单中启用开发者模式，然后重试连接")
+        guard let menu = child(root, kAXMenuBarAttribute), let help = find(menu, matching: { ["Help", "\u{5e2e}\u{52a9}"].contains(text($0, kAXTitleAttribute)) }) else {
+            try fail("needs-developer-mode", "제발 Claude 도움말 메뉴에서 개발자 모드를 활성화하고 다시 연결해 보세요.")
         }
         try check(); AXUIElementPerformAction(help, kAXPressAction as CFString)
         Thread.sleep(forTimeInterval: 0.2)
-        let names = ["Enable Developer Mode…", "Enable Developer Mode...", "启用开发者模式…", "启用开发者模式..."]
+        let names = ["Enable Developer Mode…", "Enable Developer Mode...", "\u{542f}\u{7528}\u{5f00}\u{53d1}\u{8005}\u{6a21}\u{5f0f}\u{2026}", "\u{542f}\u{7528}\u{5f00}\u{53d1}\u{8005}\u{6a21}\u{5f0f}..."]
         guard let item = find(menu, matching: { names.contains(text($0, kAXTitleAttribute)) }) else {
-            try fail("needs-developer-mode", "请在 Claude 的帮助菜单中启用开发者模式，然后重试连接")
+            try fail("needs-developer-mode", "제발 Claude 도움말 메뉴에서 개발자 모드를 활성화하고 다시 연결해 보세요.")
         }
         try check(); AXUIElementPerformAction(item, kAXPressAction as CFString)
         // The native confirmation is left to the user. Never click Enable.
-        output("needs-developer-mode", "请确认 Claude 的开发者模式提示，完成后会继续连接")
+        output("needs-developer-mode", "확인해주세요 Claude 개발자 모드에서는 완료 후에도 연결이 계속된다는 메시지가 표시됩니다.")
     }
     func console() throws -> AXUIElement {
         try activate()
         // Electron may leave Chromium's AX tree dormant until an assistive client asks for it.
         _ = AXUIElementSetAttributeValue(root, "AXManualAccessibility" as CFString, kCFBooleanTrue)
-        guard let initial = child(root, kAXFocusedWindowAttribute) else { try fail("needs-attention", "无法确认 Claude Console 输入焦点") }
+        guard let initial = child(root, kAXFocusedWindowAttribute) else { try fail("needs-attention", "확인할 수 없습니다 Claude Console 입력 포커스") }
         if let prompt = find(initial, matching: isPrompt) { return prompt }
         // macOS Chromium exposes the tab name as AXDescription, with no title.
         // When DevTools is already open on Elements, select its Console directly.
@@ -229,12 +230,12 @@ final class Connector {
         let deadline = Date().addingTimeInterval(12)
         while Date() < deadline {
             Thread.sleep(forTimeInterval: 0.25); try check()
-            guard let window = child(root, kAXFocusedWindowAttribute) else { try fail("needs-attention", "无法确认 Claude Console 输入焦点") }
+            guard let window = child(root, kAXFocusedWindowAttribute) else { try fail("needs-attention", "확인할 수 없습니다 Claude Console 입력 포커스") }
             if !CFEqual(window, initial) {
                 var owner: pid_t = 0
                 guard AXUIElementGetPid(window, &owner) == .success,
                       devToolsWindow(role: text(window, kAXRoleAttribute), title: text(window, kAXTitleAttribute), owner: owner, expectedOwner: app.processIdentifier) else {
-                    try fail("needs-attention", "Claude 窗口已改变，自动连接已停止，请重试")
+                    try fail("needs-attention", "Claude 창이 바뀌어 자동연결이 멈췄습니다. 다시 시도해 주세요.")
                 }
             }
             if let prompt = find(window, matching: isPrompt) { return prompt }
@@ -242,7 +243,7 @@ final class Connector {
                 try checkWindow(window); AXUIElementPerformAction(tab, kAXPressAction as CFString)
             }
         }
-        try fail("failed", "未找到 Claude Console，请确认开发者工具窗口可用后重试")
+        try fail("failed", "찾을 수 없음 Claude Console，개발자 도구 창을 사용할 수 있는지 확인하고 다시 시도해 주세요.")
     }
     func verify(_ prompt: AXUIElement, _ expected: String) throws {
         var previous: String?
@@ -258,13 +259,13 @@ final class Connector {
                expected.contains(observed), observed == previous { return }
             previous = observed
         }
-        try fail("needs-attention", "Console 无法确认输入内容，未执行连接脚本，请重试")
+        try fail("needs-attention", "Console 입력 내용을 확인할 수 없어 연결 스크립트가 실행되지 않았습니다. 다시 시도해 주세요.")
     }
     func submit(_ prompt: AXUIElement) throws {
         try check(prompt)
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: true),
               let up = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: false) else {
-            try fail("failed", "无法创建 Console 提交事件，连接脚本已保留")
+            try fail("failed", "생성할 수 없습니다. Console 이벤트 제출, 연결 스크립트가 유지되었습니다.")
         }
         // Chromium accepted the source but did not submit Return posted only
         // to its PID. Enter the HID stream once, guarded by the actual prompt.
@@ -281,13 +282,13 @@ final class Connector {
     func inject(_ path: String) throws {
         let source = try String(contentsOfFile: path, encoding: .utf8)
         guard source.hasPrefix("/* codex bridge connector */"), source.utf8.count < 300000,
-              !source.contains("\n"), !source.contains("\r") else { try fail("needs-attention", "连接脚本格式无效") }
+              !source.contains("\n"), !source.contains("\r") else { try fail("needs-attention", "잘못된 연결 스크립트 형식") }
         let prompt = try console()
-        guard let window = child(prompt, kAXWindowAttribute) else { try fail("needs-attention", "无法确认 Claude Console 输入焦点") }
+        guard let window = child(prompt, kAXWindowAttribute) else { try fail("needs-attention", "확인할 수 없습니다 Claude Console 입력 포커스") }
         try checkWindow(window)
         let old = contents(prompt)
         guard old.isEmpty || old.hasPrefix("/* codex bridge connector */") else {
-            try fail("needs-attention", "Console 中已有未提交内容，已保留，请处理后重试连接")
+            try fail("needs-attention", "Console 예약된 파일에 제출되지 않은 콘텐츠가 있습니다. 처리한 후 다시 연결해 보세요.")
         }
         try checkWindow(window)
         AXUIElementSetAttributeValue(prompt, kAXFocusedAttribute as CFString, kCFBooleanTrue)
@@ -298,7 +299,7 @@ final class Connector {
         var settable = DarwinBoolean(false)
         if AXUIElementIsAttributeSettable(prompt, kAXValueAttribute as CFString, &settable) == .success && settable.boolValue {
             try check(prompt)
-            if AXUIElementSetAttributeValue(prompt, kAXValueAttribute as CFString, source as CFString) != .success { try fail("needs-attention", "Console 拒绝输入连接脚本") }
+            if AXUIElementSetAttributeValue(prompt, kAXValueAttribute as CFString, source as CFString) != .success { try fail("needs-attention", "Console 입력 연결 스크립트 거부") }
             try verify(prompt, source)
         } else {
             let units = Array(source.utf16)
@@ -307,7 +308,7 @@ final class Connector {
                 let end = min(start + 32, units.count), chunk = Array(units[start..<end])
                 for down in [true, false] {
                     try check(prompt)
-                    guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down) else { try fail("needs-attention", "无法创建键盘事件") }
+                    guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down) else { try fail("needs-attention", "키보드 이벤트를 생성할 수 없습니다.") }
                     event.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk)
                     event.postToPid(app.processIdentifier)
                 }
@@ -316,7 +317,7 @@ final class Connector {
             try verify(prompt, source)
         }
         try submit(prompt)
-        output("submitted", "连接脚本已输入，正在等待 Claude 确认")
+        output("submitted", "연결 스크립트가 입력되었으며 대기 중입니다. Claude 확인")
     }
     func closeConsole() throws {
         // Only called after the Python owner verifies the signed heartbeat.
@@ -336,7 +337,7 @@ final class Connector {
             guard let close = child(window, kAXCloseButtonAttribute),
                   AXUIElementGetPid(close, &owner) == .success, owner == app.processIdentifier,
                   AXUIElementPerformAction(close, kAXPressAction as CFString) == .success else {
-                try fail("needs-attention", "Claude 已连接，但未能关闭开发者工具窗口")
+                try fail("needs-attention", "Claude 연결되었지만 개발자 도구 창을 닫지 못했습니다.")
             }
             let deadline = Date().addingTimeInterval(3)
             var closed = false
@@ -345,10 +346,10 @@ final class Connector {
                    !remaining.contains(where: { CFEqual($0, window) }) { closed = true; break }
                 Thread.sleep(forTimeInterval: 0.1)
             }
-            if !closed { try fail("needs-attention", "Claude 已连接，但未能关闭开发者工具窗口") }
+            if !closed { try fail("needs-attention", "Claude 연결되었지만 개발자 도구 창을 닫지 못했습니다.") }
         }
-        if find(root, matching: isPrompt) != nil { try fail("needs-attention", "Claude 已连接；开发者工具未自动关闭，请手动关闭") }
-        output("connected", "Claude 已连接")
+        if find(root, matching: isPrompt) != nil { try fail("needs-attention", "Claude 연결됨; 개발자 도구가 자동으로 닫히지 않았습니다. 수동으로 닫아주세요.") }
+        output("connected", "Claude 연결됨")
     }
     func inspectError(marker: String?) {
         let conflict = marker.flatMap { expected in find(root, matching: {
@@ -359,9 +360,9 @@ final class Connector {
         if let conflict = conflict, let marker = marker {
             let value = text(conflict, kAXValueAttribute).isEmpty ? text(conflict, kAXTitleAttribute) : text(conflict, kAXValueAttribute)
             let issue = bridgeOwnerIssue(value, marker: marker)
-            let reason = issue == "busy" ? "Claude 桥接仍有请求进行中，请稍后重试连接" :
-                issue == "unconfirmed" ? "旧网关仍有未确认请求或未完成接替，请在旧网关检查结果后重试" :
-                "旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）"
+            let reason = issue == "busy" ? "Claude 아직 브릿지 요청이 진행 중입니다. 나중에 다시 연결해 보세요." :
+                issue == "unconfirmed" ? "이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요." :
+                "이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）"
             output("owner-conflict", reason)
             return
         }
@@ -369,11 +370,11 @@ final class Connector {
             guard text($0, kAXRoleAttribute) == "AXStaticText" else { return false }
             let value = text($0, kAXValueAttribute).isEmpty ? text($0, kAXTitleAttribute) : text($0, kAXValueAttribute)
             return (value.hasPrefix("Error:") || value.hasPrefix("Uncaught")) &&
-                (value.contains("尚未信任目录") || value.contains("WorkspaceTrustError") || value.contains("trust_required"))
+                (value.contains("아직 신뢰할 수 없는 디렉터리") || value.contains("WorkspaceTrustError") || value.contains("trust_required"))
         })
         output(error == nil ? "failed" : "needs-trust", error == nil
-               ? "未收到 Claude 连接确认，请检查登录和目录信任后重试"
-               : "请在 Claude Code 中确认连接目录信任，然后重新连接")
+               ? "받지 못함 Claude 연결이 확인되었습니다. 로그인 및 디렉터리 신뢰도를 확인한 후 다시 시도해 주세요."
+               : "제발 Claude Code 연결 디렉터리 신뢰를 확인한 후 다시 연결하세요.")
     }
 }
 
@@ -390,7 +391,7 @@ do {
         // Observed Claude 2.26454.0: Elements selected, Console has only a
         // description; after selecting it the editor is "Console prompt".
         guard consoleTab(role: "AXRadioButton", identifier: "", description: "Console", title: ""),
-              consoleTab(role: "AXTab", identifier: "", description: "控制台", title: ""),
+              consoleTab(role: "AXTab", identifier: "", description: "\u{63a7}\u{5236}\u{53f0}", title: ""),
               consoleTab(role: "AXButton", identifier: "", description: "", title: "Console"),
               consoleTab(role: "AXTab", identifier: "Console", description: "", title: ""),
               !consoleTab(role: "AXTextArea", identifier: "", description: "Console", title: ""),
@@ -424,22 +425,22 @@ do {
         while currentDesktopIssue() != nil {
             RunLoop.current.run(until: Date().addingTimeInterval(2))
         }
-        output("ready", "桌面会话可交互")
+        output("ready", "데스크톱 세션은 대화형입니다.")
     } else {
         try requireDesktop()
         let prompt = args.first == "--request-permission"
         let trusted = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt] as CFDictionary)
-        guard trusted else { try fail("needs-permission", "请在系统设置的辅助功能中授权网关 App（不是 Claude），完成后会继续连接") }
-        if args.first == "--check" || prompt { output("ready", "辅助功能已授权") }
+        guard trusted else { try fail("needs-permission", "시스템 설정의 접근성 기능에서 게이트웨이를 승인해주세요 App（아니요 Claude），완료 후에도 연결은 계속됩니다") }
+        if args.first == "--check" || prompt { output("ready", "접근성 승인됨") }
         else {
-            guard args.count >= 3, let pid = Int32(args[1]) else { try fail("needs-attention", "连接组件参数无效") }
+            guard args.count >= 3, let pid = Int32(args[1]) else { try fail("needs-attention", "잘못된 연결 구성요소 매개변수") }
             let connector = try Connector(pid: pid, executable: args[2], cancelPath: args.count > 4 ? args[4] : nil)
             if args[0] == "--enable-devtools" { try connector.developerMode() }
             else if args[0] == "--connect" && args.count == 5 { try connector.inject(args[3]) }
             else if args[0] == "--close-devtools" { try connector.closeConsole() }
             else if args[0] == "--inspect-error" { connector.inspectError(marker: args.count > 3 ? args[3] : nil) }
-            else { try fail("needs-attention", "连接组件参数无效") }
+            else { try fail("needs-attention", "잘못된 연결 구성요소 매개변수") }
         }
     }
 } catch let error as SetupError { output(error.state, error.reason) }
-catch { output("needs-attention", "Claude 连接组件未能完成操作，请重试") }
+catch { output("needs-attention", "Claude 연결 구성요소가 작업을 완료하지 못했습니다. 다시 시도해 주세요.") }

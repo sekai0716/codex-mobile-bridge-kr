@@ -31,7 +31,7 @@ async def page(self, request):
     if request.path == '/fixture/desktop.js':
         return web.Response(body=(ROOT/'desktop/features/connections/shared-relay.js').read_bytes(), content_type='text/javascript')
     if request.path == '/fixture/setup.js':
-        return web.Response(text="window.BridgeI18n={locale:()=> 'zh'};window.bridgeDesktop={sharedRelay:async value=>{const r=await fetch('/fixture/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});const data=await r.json();if(!r.ok)throw Error(data.error);return data;}};", content_type='text/javascript')
+        return web.Response(text="window.BridgeI18n={locale:()=> 'ko'};window.bridgeDesktop={sharedRelay:async value=>{const r=await fetch('/fixture/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});const data=await r.json();if(!r.ok)throw Error(data.error);return data;}};", content_type='text/javascript')
     return await original_page(self, request)
 
 

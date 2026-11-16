@@ -34,7 +34,7 @@ class DesktopSessionGuards(unittest.TestCase):
 precondition(bridgeOwnerIssue("Error: BRIDGE_OWNER_BUSY [current]", marker: "current") == "busy")
 precondition(bridgeOwnerIssue("Error: BRIDGE_OWNER_UNCONFIRMED [current]", marker: "current") == "unconfirmed")
 precondition(bridgeOwnerIssue("Error: BRIDGE_OWNER_LEGACY [current]", marker: "current") == "legacy")
-precondition(bridgeOwnerIssue("Error: Claude 桥接连接被其他网关占用 [current]", marker: "current") == "legacy")
+precondition(bridgeOwnerIssue("Error: Claude \u6865\u63a5\u8fde\u63a5\u88ab\u5176\u4ed6\u7f51\u5173\u5360\u7528 [current]", marker: "current") == "legacy")
 precondition(bridgeOwnerIssue("Error: BRIDGE_OWNER_BUSY [old]", marker: "current") == nil)
 precondition(bridgeOwnerIssue("Error: BRIDGE_OWNER_BUSY", marker: "current") == nil)
 print("owner error marker fixtures passed")
@@ -538,7 +538,7 @@ class QuitFixture {
                     code = wait(helper, 15)
                     if mode == 'initialize':
                         self.assertEqual(code, 1, output.read_text(encoding='utf-8-sig'))
-                        self.assertIn('桌面不可用', output.read_text(encoding='utf-8-sig'))
+                        self.assertIn('데스크톱을 사용할 수 없습니다.', output.read_text(encoding='utf-8-sig'))
                         self.assertLess(time.monotonic()-started, 3, 'initialization must fail before window restore')
                         self.assertFalse(marker.exists())
                         self.assertFalse(exited(app))
@@ -574,8 +574,8 @@ class QuitFixture {
                         # restore a hidden window or expand a menu to find it.
                         self.assertEqual(code, 1, result)
                         self.assertEqual(result['quitState'], 'failed', result)
-                        self.assertIn('尚未提交退出', result['reason'])
-                        self.assertIn('电脑端正常退出', result['reason'])
+                        self.assertIn('아직 종료를 위해 제출되지 않았습니다.', result['reason'])
+                        self.assertIn('컴퓨터에서 정상적으로 종료', result['reason'])
                         self.assertLess(time.monotonic()-started, 12)
                         self.assertFalse(marker.exists())
                         self.assertEqual(len(replies), 1, 'unsubmitted failure must not report dispatch')

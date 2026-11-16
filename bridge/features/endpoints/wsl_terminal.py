@@ -16,7 +16,7 @@ class WslTerminals:
         if action in ('info', 'open'):
             root = entry.store.get(identifier).get('cwd')
             if not isinstance(root, str) or not PurePosixPath(root).is_absolute() or '\x00' in root:
-                raise ValueError('聊天项目目录不可用')
+                raise ValueError('채팅 프로젝트 디렉터리를 사용할 수 없습니다.')
             if action == 'info':
                 return {'cwd': root, 'host': entry.host, 'mode': 'pty', 'shell': None}
             def transport(source):
@@ -27,7 +27,7 @@ class WslTerminals:
             return self.manager.open_session(owner, identifier, params.get('id', ''), root,
                 params.get('cols'), params.get('rows'), session_factory=factory)
         if action not in ('input', 'resize', 'close', 'poll', 'complete'):
-            raise ValueError('未知终端操作')
+            raise ValueError('알 수 없는 터미널 작업')
         session = self.manager.session(owner, identifier, params.get('id', ''))
         if action == 'input':
             return session.write(params.get('inputId'), params.get('data'))
@@ -40,9 +40,9 @@ class WslTerminals:
             return {'closed': True}
         after, wait = params.get('after', 0), params.get('waitMs', 0)
         if type(after) is not int or not 0 <= after <= 10**12:
-            raise ValueError('无效输出游标')
+            raise ValueError('잘못된 출력 커서')
         if type(wait) is not int or not 0 <= wait <= 1000:
-            raise ValueError('无效等待时间')
+            raise ValueError('잘못된 대기 시간')
         return session.read(after, wait)
 
     def close(self):

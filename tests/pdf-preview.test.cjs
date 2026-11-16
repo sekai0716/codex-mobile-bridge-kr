@@ -265,7 +265,7 @@ test('PDF preview enforces preview and click-download limits before loading', as
     assert.equal(pdf.allowed({size:null,clickDownloadMiB:20}),false);
     const reader=pdf.create({url:'/api/workspace/download',info:{size:21*1024*1024,clickDownloadMiB:100}});
     await reader.load();
-    assert.match(reader.element.textContent,/PDF 超过在线预览/);
+    assert.match(reader.element.textContent,/이 PDF는 미리보기 또는 현재 다운로드 제한을 초과합니다\. 다운로드하여 열어보세요\./);
     reader.dispose(); reader.dispose();
   } finally { cleanup(); }
 });
@@ -356,7 +356,7 @@ test('text layer reads chunks without ReadableStream async iteration', async () 
   setup();
   try {
     const chunks=[
-      {items:[{str:'one'}],styles:{first:{fontFamily:'sans-serif'}},lang:'zh'},
+      {items:[{str:'one'}],styles:{first:{fontFamily:'sans-serif'}},lang:'ko'},
       {items:[{str:'two'}],styles:{second:{fontFamily:'serif'}},lang:'en'}
     ];
     const fake=fixture(1,false,chunks);
@@ -372,7 +372,7 @@ test('text layer reads chunks without ReadableStream async iteration', async () 
     assert.equal(rendered,1);
     assert.deepEqual(content.items,chunks.flatMap(chunk=>chunk.items));
     assert.deepEqual(Object.keys(content.styles),['first','second']);
-    assert.equal(content.lang,'zh');
+    assert.equal(content.lang,'ko');
     assert.ok(fake.events.includes('stream 1'));
     assert.ok(fake.events.includes('text release 1'));
     reader.dispose();
@@ -533,7 +533,7 @@ test('workbench uses download info and disposes PDF when the tab closes', async 
 });
 
 test('HTML preview switches to the original source and disposes its script frame', async () => {
-  const lifecycle=[], original='<button>中文</button>\r\n<script>go()</script>';
+  const lifecycle=[], original='<button>중국어</button>\r\n<script>go()</script>';
   const context={window:{},AbortController,BridgeI18n:{t:text=>text},
     BridgeHtmlPreview:{create:({text})=>{assert.equal(text,original);lifecycle.push('create');return {element:element('frame'),dispose:()=>lifecycle.push('dispose')};}},
     BridgeSourceView:{create:({text})=>{const view=element('source');view.textContent=text;return view;}},

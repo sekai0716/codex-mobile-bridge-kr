@@ -1,47 +1,47 @@
-# Agent Note: 本轮自有的 Mac Claude CLI 退出与明确强制
+# Agent Note: 이번 라운드는 자신의 Mac Claude CLI 종료 및 명시적 시행
 
 Status: implemented
 
-## 问题
+## 문제
 
-Claude stdio 执行器是每个会话独占的原生进程。正常 interrupt 与 EOF 可以沿用，但 wrapper 退出不能证明原生 writer 已解除；任务状态读取失败时也不能让用户永远无法明确结束本轮自己创建的 CLI。相反，扫描同名进程或凭历史 PID 退出会误伤其他会话与 PID 的新代次。
+Claude stdio 실행자는 각 세션에만 사용되는 기본 프로세스입니다. 정상 interrupt 및 EOF 계속 사용할 수 있지만 wrapper 출구는 원주민임을 증명할 수 없습니다 writer 해고되었습니다. 작업 상태 읽기에 실패하면 사용자는 이번 라운드에서 자신이 만든 작업을 명시적으로 종료할 수 없습니다. CLI。대신 이름이나 기록이 같은 프로세스를 검색하세요. PID 종료하면 실수로 다른 세션이 손상되고 PID 새로운 세대。
 
-## 决策
+## 결정
 
-仅本机 macOS 的明确创建或恢复捕获所选 profile 的目录身份、已解析 executable、原 native ID/cwd，以及实际 Popen PID 的 Mac Native 身份。绑定要求同 UID/ruid、真实映像吻合、非 zombie，内核 birth 与 started 在捕获前后保持。initialize 返回的 pid 若存在必须吻合；未返回 pid 或零 turn 未产生 registry 不否定已证明的直接原生 spawn。catalog 和 registry 不作为凭名称接管外部进程的入口。
+이 기계만 macOS 명시적으로 캡처 생성 또는 복원 선택 profile 디렉터리 ID, 해결됨 executable、기존 native ID/cwd，뿐만 아니라 실제 Popen PID 의 Mac Native 신원. 바인딩 요구 사항은 다음과 같습니다. UID/ruid、실제 이미지 일관성, 비- zombie，핵심 birth 및 started 캡처 전후 유지。initialize 반환 pid 존재하는 경우 일치해야 합니다. 반환되지 않음 pid 또는 0 turn 생산되지 않음 registry 입증된 직접 네이티브를 부정하지 마십시오. spawn。catalog 및 registry 이름으로 외부 프로세스를 인수하기 위한 진입점 역할을 하지 않습니다.。
 
-正常释放保持 active 等待、明确 stop 的原生 interrupt、最后 stdin EOF，随后检查原内核代次。已发 EOF 的未知结果只检查，不重发 interrupt 或 EOF；Popen 的 exit0 本身不冒充原生退出。缺少内核绑定时正常控制保留，结果明确待核验。
+일반 릴리즈 홀드 active 잠깐, 분명히 해라 stop 원주민의 interrupt、마침내 stdin EOF，그런 다음 원래 커널 생성을 확인하십시오. 전송된 EOF 알 수 없는 결과는 확인만 가능하며 재발행되지 않습니다. interrupt 또는 EOF；Popen 의 exit0 기본 종료인 척하지 않습니다. 커널 바인딩이 없어도 정상적인 제어가 유지되며 결과를 명확하게 확인할 수 있습니다.。
 
-单连接 forcePreview/force/check 复用 `CliConnections` 回调和持久操作账本。预览只读、不读取认证或重新选 profile，确认摘要绑定完整原进程与 spawn 证据。显式 force 可以越过未知任务或审批状态，但仍须再次核验同用户、映像和出生代次，使用既有 Mac audit-token 只向原代派发一次 SIGKILL，不使用进程组或按名称退出。原代已消失或 PID 换代只回退出事实；同代映像等身份变化保持 unknown，不写成 released。
+단일 연결 forcePreview/force/check 재사용 `CliConnections` 원장에 대한 콜백 및 지속적인 작업. 미리보기가 읽기 전용이거나 인증서를 읽지 않거나 다시 선택합니다. profile，요약이 완전한 원래 프로세스와 결합되어 있는지 확인하십시오. spawn 증거. 명백한 force 알 수 없는 작업이나 승인 상태는 우회할 수 있지만, 동일한 사용자, 이미지, 생성 세대는 여전히 다시 검증해야 하며, 기존 Mac audit-token 원래 세대에 한 번만 배포됩니다. SIGKILL，프로세스 그룹을 사용하지 않거나 이름을 사용하지 않고 종료합니다. 원래 세대가 사라졌거나 PID 세대 변경은 종료 사실만 반환합니다. 동세대 이미지 등 정체성 변화는 여전 unknown，쓰지 않은 released。
 
-每个随机连接 token 在 Bridge 私有 0700 目录保存一份 0600 原绑定，force 派发前以独占创建和 fsync 持久写入意图。同代已有意图只检查，包含调用返回丢失、信号失败或写入后异常；不凭新的操作 ID 自动再发信号。网关重启只接受原操作保存行的 provider/host/sessionId/token 对应的精确绑定，不扫描进程或目录接管旧 owner。存储不可用时保留内存中的正常退出证明，禁用未持久化的 force。
+모든 무작위 연결 token 에서 Bridge 사적인 0700 디렉터리 복사본 저장 0600 원래 제본，force 생성 및 fsync 지속적인 쓰기 의도. 호출 반환 손실, 신호 실패 또는 쓰기 후 예외를 포함하여 동일한 세대의 기존 의도만 확인합니다. 새로운 작업에 의존하지 않음 ID 자동으로 재신호를 보냅니다. 게이트웨이가 다시 시작되고 원래 작업 저장 라인만 허용됩니다. provider/host/sessionId/token 해당하는 정확한 바인딩은 이전 바인딩을 인계받기 위해 프로세스나 디렉터리를 검색하지 않습니다. owner。스토리지를 사용할 수 없을 때 메모리 내 우아한 종료 증명을 유지하고, 지속되지 않는 종료 증명을 비활성화합니다. force。
 
-释放成功只移除原连接 token，旧回调不删除后来恢复的新 owner。`DesktopSessions` 只薄转发本机 Claude 回调；SSH/WSL 与其他系统保持原通路，本点不新增远端强制原语或集合管理器。正常退出不删除原生 registry/history，不换 session ID、账号、provider 或 cwd。
+해제가 성공하면 원래 연결만 제거됩니다. token，이전 콜백은 나중에 복원되는 새 콜백을 삭제하지 않습니다. owner。`DesktopSessions` 이 기기만 전달하세요 Claude 콜백；SSH/WSL 다른 시스템과 함께 원래 경로를 유지하고, 이 시점에서는 새로운 원격 강제 기본 요소나 컬렉션 관리자가 추가되지 않습니다. 원본을 삭제하지 않고 정상적으로 종료합니다. registry/history，변경하지 않음 session ID、계정、provider 또는 cwd。
 
-连接列表的只读 `configurationKey` / `configurationLabel` 来自已绑定 profile 的 canonical 目录、UID 与目录 device/inode，跨会话和进程代次稳定，目录身份改变时分组改变。仅展示用途，不是共享 daemon 的 `scopeKey`，不增加 `sharedHome` 或 `_scope_*` 回调。同配置的普通批量释放仍由现有 `CliConnections` 接收明确的 exactKeys 后逐个 `_Owned` 正常退出；force 仍只确认一个进程。元数据不足或来源非本机时不猜同组，不为列表新增文件扫描、profile 选择或认证读取。
+읽기 전용 연결 목록 `configurationKey` / `configurationLabel` 경계에서 profile 의 canonical 폴더、UID 디렉토리 포함 device/inode，세션 및 프로세스 세대 전반에 걸쳐 안정적이며 디렉터리 ID가 변경되면 변경 사항을 그룹화합니다. 공유용이 아닌 전시용으로만 사용하세요 daemon 의 `scopeKey`，증가 없음 `sharedHome` 또는 `_scope_*` 콜백. 동일한 구성의 일반 배치 릴리스는 여전히 기존에 의해 수행됩니다. `CliConnections` 명시적으로 받다 exactKeys 하나씩 `_Owned` 정상적으로 종료；force 아직 한 가지 프로세스만 확인되었습니다. 메타데이터가 충분하지 않거나 소스가 로컬이 아닌 경우 동일한 그룹이 추측되지 않으며 새 파일에서 목록을 검색하지 않습니다.、profile 읽기 선택 또는 인증。
 
-## 备选方案
+## 대안
 
-仅凭 stdin wrapper 的退出码实现最小，但不能证明 native writer 已结束。把 registry/catalog 必有字段作为硬门槛可增加会话佐证，却会阻挡已有直接内核绑定的自有进程，因此只接受正向一致性核对，不补发首句取证。按名称扫描便于找回丢失 owner，但不能证明属于本轮明确创建；只恢复保存的精确可信绑定。另建 Claude 释放队列会复制共享业务，本点沿用既有操作与回执。
+오직 stdin wrapper 종료 코드 구현은 최소한이지만 입증할 수 없습니다. native writer 종료되었습니다. 묶음 registry/catalog 필수 필드는 세션 증거를 늘리기 위한 엄격한 임계값 역할을 하지만 커널에 직접 바인딩된 자체 프로세스를 차단합니다. 따라서 순방향 일관성 검사만 허용되며 첫 번째 문장 증거는 재발급되지 않습니다. 분실물을 쉽게 검색하려면 이름으로 스캔하세요. owner，그러나 이번 라운드에서 그것이 명시적으로 생성되었는지는 증명할 수 없습니다. 저장된 정확한 신뢰할 수 있는 바인딩만 복원됩니다. 또 다른 구축 Claude 대기열을 해제하면 공유 비즈니스가 복사되며 기존 작업 및 영수증이 여기에 사용됩니다.。
 
-## 验证
+## 검증
 
-新直接回归覆盖缺 catalog pid、相反 pid、错 UID/ruid/映像、错确认摘要、同 PID 新出生代、同代映像变化、EOF 后只检查、正常 interrupt、错误任务仍可明确 force、持久意图后的未知/重复/重启不重发、私有文件损坏和外链拒绝，以及旧 token 不移除新 owner。与既有 `CliReleaseTests` 共 33 项通过；Claude 合成用例 48 项通过，跳过会调用已安装 CLI 的 effort 用例。模块与平台边界 8 项通过，未增加跨 provider 依赖或例外。需求复审指出未持久绑定读取意图会误伤普通控制后，新增真实 `_Owned.write`/审批响应/control interrupt 回归：存储失败不读意图，正常控制可用；持久绑定的意图不可读仍阻断新写入。
+새로운 직접 반품 보장이 누락되었습니다. catalog pid、반대로 pid、잘못된 UID/ruid/이미지, 오류 확인 요약, 동일 PID 신세대와 동세대의 이미지 변화、EOF 나중에 확인하세요, 정상 interrupt、오류 작업은 여전히 ​​명확하게 정의될 수 있습니다. force、지속적인 의도 뒤에 숨겨진 알 수 없는 사실/반복하다/재시작 후 재전송 불가, 개인 파일 손상, 외부 링크 거부 및 오래된 token 새로 제거하지 않음 owner。기존과 `CliReleaseTests` 흔한 33 항목이 통과됨；Claude 합성 사용 사례 48 항목이 전달되면 건너뛰면 설치된 항목이 호출됩니다. CLI 의 effort 사용 사례. 모듈 및 플랫폼 경계 8 교차 증가 없이 항목이 통과되었습니다. provider 종속성 또는 예외. 요구 사항 검토를 통해 읽기 의도를 지속적으로 구속하지 않으면 실수로 일반 제어가 손상될 수 있다는 점을 지적한 후 새로운 실생활 `_Owned.write`/승인 응답/control interrupt 회귀: 저장 실패는 의도를 읽지 않으며 정상적인 제어가 가능합니다. 지속적으로 바인딩된 인텐트는 읽을 수 없으며 여전히 새로운 쓰기를 차단합니다.。
 
-已安装 Mac 2.1.292 的单次隔离 initialize 预检证明 catalog.pid 与直接 Mach-O PID 一致，零 user frame 也产生本轮 sessions registry，EOF 后原代已退出。该预检没有发模型首句、没有信号。
+설치됨 Mac 2.1.292 단일 격리 initialize 사전검사 증명서 catalog.pid 직접적으로 Mach-O PID 일관성, 제로 user frame 주전원도 생성 sessions registry，EOF 포스트오리지널 세대는 사라졌다. 사전 점검에서는 모델의 첫 번째 문장을 보내지 않았고 신호도 없었습니다.。
 
-随后新建一个独立 0700 HOME/config/project 的真实 Mach-O 执行器，bare 与白名单环境仅使用合成 key 和回环拒绝端点。通过真实 `_Owned` 单次 initialize 后，仅在夹具中登记其目标行及合成未知任务状态，未调用会发送首句的创建流程。真实 `CliConnections` 默认 wait 返回 unknown、零信号；明确 forcePreview/force 调用一次 audit-token，PID86026、UID501、birth21929933/34122238 的原代退出，Popen 回收为 -9。相同操作 ID 和精确旧绑定恢复后都只回执，原 unknown 历史保留，连接移除。八项检查全通过；另一次独立 Native 观察确认该 native 和夹具父 PID 均 absent，产品/夹具字节与执行 manifest 一致。全程零用户输入、未主动发起模型请求，回环服务未收到 HTTP/POST；此计数不作进程级零外发证明。证据 `.tmp/feedback-20261111-10/mac-claude-owned-force/run1/result.json` 与 `independent-observer.json`；正式 App、账号与用户会话未纳入。
+그런 다음 새로운 독립을 만듭니다. 0700 HOME/config/project 현실의 Mach-O 액추에이터，bare 허용된 환경에서만 컴포지션을 사용하세요. key 루프백 거부 엔드포인트. 진실을 통해 `_Owned` 하나의 initialize 이후에는 해당 타겟 행과 알 수 없는 작업 상태만 픽스처에서 합성되고 첫 번째 문장을 보낼 생성 프로세스는 호출되지 않습니다. 현실 `CliConnections` 기본 wait 뒤로 unknown、제로 신호; 분명한 forcePreview/force 한 번 전화해 audit-token，PID86026、UID501、birth21929933/34122238 원래 세대가 종료됩니다.，Popen 다음과 같이 재활용 -9。동일한 작업 ID 정확한 이전 바인딩을 복원한 후에는 영수증만 반환됩니다. unknown 기록은 유지되고 연결은 삭제되었습니다. 8개 검사 모두 통과했습니다. 또 다른 독립 Native 관찰은 이것을 확인합니다 native 및 고정 장치 상위 PID 모두 absent，제품/픽스처 바이트 및 실행 manifest 일관된. 전체 프로세스에서 사용자 입력이 없고 모델 요청이 적극적으로 시작되지 않으며 루프백 서비스가 수신되지 않습니다. HTTP/POST；이 개수는 프로세스 수준의 송신이 0임을 증명하지 않습니다. 증거 `.tmp/feedback-20261111-10/mac-claude-owned-force/run1/result.json` 및 `independent-observer.json`；공식적인 App、계정 및 사용자 세션은 포함되지 않습니다.。
 
-只读配置投影另有三项直接回归，覆盖同 profile 跨 native/token/出生代稳定、不同目录身份分离、缺字段与远端来源不补猜值，以及同组两个独占进程经已有 exactKeys wait 分别退出、其它 profile 的连接保持。该增量没有重跑真实 force 或共享 daemon 原语。
+읽기 전용 구성 투영에는 동일한 내용을 다루는 세 가지 직접 회귀도 있습니다. profile 가로질러 native/token/생성 세대는 안정적이고, 서로 다른 디렉터리의 ID는 분리되어 있으며, 누락된 필드와 원격 소스는 추측값을 채우지 않으며, 동일한 그룹에 있는 두 개의 독점 프로세스가 이미 exactKeys wait 각각 출구 및 기타 profile 연결이 유지됩니다. 이 증분은 실제를 다시 실행하지 않습니다. force 또는 공유 daemon 원어。
 
-## 影响
+## 영향
 
-用户可以在安全正常释放之外，明确结束一个已证明为本轮自有的 Mac Claude CLI，并核验原代真正退出。未知结果保留、不自动重放；无法证明的旧连接继续如实显示能力不可用，不通过扫描扩大权限。持久绑定与意图保留在 Bridge 数据目录，带来少量文件存储；本点不宣称 SSH/WSL/Windows/Linux 已获得同样原生控制能力。
+사용자는 안전하고 정상적인 릴리스 외에도 현재 라운드에서 소유한 것으로 입증된 트랜잭션을 명시적으로 종료할 수 있습니다. Mac Claude CLI，그리고 원래 세대가 실제로 종료되었는지 확인합니다. 알 수 없는 결과는 유지되며 자동으로 재생되지 않습니다. 입증할 수 없는 오래된 연결은 계속해서 진실되게 표시될 수 없으며 계속해서 진실되게 표시하는 기능을 사용할 수 없으며 검색을 통해 권한이 확장되지 않습니다. 인텐트가 있는 영구 바인딩은 그대로 유지됩니다. Bridge 소량의 파일 저장 공간을 제공하는 데이터 디렉토리 이 점은 주장하지 않는다 SSH/WSL/Windows/Linux 동일한 기본 제어 기능을 얻었습니다.。
 
-## 相关记录审计
+## 관련 기록 감사
 
-- [主动释放 CLI 连接](2026-11-01-cli-connection-release.md)：部分重叠，保留正常 EOF 与明确激活，只补本轮 Mac 内核退出证明及单条明确 force。
-- [CLI 释放与安全恢复](../bug-fix/2026-11-10-cli-release-and-safe-recovery.md)：部分重叠，沿用未知结果不重放、原身份与真实退出语义，不改变 Codex 共享 daemon。
-- [显式强制退出 CLI 服务](2026-11-11-cli-explicit-force.md)：复用共享确认/操作回执与 Mac Native audit-token，Claude 独占进程不伪装成共享 home 服务。
-- [Claude 会话账号边界](../bug-fix/2026-11-02-claude-session-account-boundary.md)：保留原 profile/session/cwd 选择，本点退出不重新选择账号。
-- 其他 proposed TCC、远端目录预检及手机绑定记录与本点无关，保持原样。
+- [활성 릴리스 CLI 연결](2026-11-01-cli-connection-release.md)：부분적 중복, 정상 유지 EOF 명확한 활성화로 이번 라운드만 보충하세요 Mac 커널 종료 인증서 및 단일 설명 force。
+- [CLI 석방 및 안전한 회복](../bug-fix/2026-11-10-cli-release-and-safe-recovery.md)：부분 중복, 알 수 없는 결과는 재생되지 않으며 원래 ID와 실제 종료 의미는 변경되지 않습니다. Codex 공유됨 daemon。
+- [명시적 강제 종료 CLI 제공하다](2026-11-11-cli-explicit-force.md)：공유 확인 재사용/작업 영수증 및 Mac Native audit-token，Claude 독점 프로세스는 공유된 척하지 않습니다. home 제공하다。
+- [Claude 세션 계정 경계](../bug-fix/2026-11-02-claude-session-account-boundary.md)：원본 유지 profile/session/cwd 선택, 계정을 다시 선택하지 않고 이 시점에서 종료。
+- 다른 proposed TCC、원격 디렉터리 프리플라이트 및 휴대폰 바인딩 기록은 이 시점과 아무런 관련이 없으며 변경되지 않은 상태로 유지됩니다.。

@@ -45,7 +45,7 @@ test('PTY shell stays beside live status below the screen, including cmd hint',(
   assert.equal(footer.children[1],p.location);
   p.apply({cursor:1,running:true,shell:'/very/long/path/to/zsh',cwd:'/project'});
   assert.equal(p.location.title,'/very/long/path/to/zsh');
-  assert.match(p.status.textContent,/连续会话/);
+  assert.match(p.status.textContent,/영구 세션 · 이 탭을 닫으면 터미널이 종료됩니다\./);
 });
 
 function cachedTerminal(){
@@ -237,7 +237,7 @@ test('multiple, empty and stale completions preserve draft until a current choic
   await f.panel.complete();assert.equal(f.panel.input.value,'cd ab');assert.equal(f.panel.completions.hidden,false);
   f.panel.completions.children[1].click();assert.equal(f.panel.input.value,'cd abc/');assert.equal(f.panel.operations.length,0);
   f.panel.workbench.request=async()=>({replaceStart:3,replaceEnd:7,candidates:[]});await f.panel.complete();
-  assert.equal(f.panel.input.value,'cd abc/');assert.equal(f.panel.completions.children[0].textContent,'没有匹配的路径');
+  assert.equal(f.panel.input.value,'cd abc/');assert.equal(f.panel.completions.children[0].textContent,'일치하는 경로가 없습니다.');
   let finish;f.panel.workbench.request=()=>new Promise(resolve=>finish=resolve);
   const pending=f.panel.complete();f.panel.input.value='edited';f.panel.clearCompletion();finish({replaceStart:0,replaceEnd:2,candidates:[{insertText:'bad'}]});await pending;
   assert.equal(f.panel.input.value,'edited');
@@ -255,7 +255,7 @@ test('pending completion shows local feedback and duplicate Tab shares one reque
   const f=fixture();f.panel.input.value='cd src';f.panel.input.selectionStart=f.panel.input.selectionEnd=6;
   let finish,calls=0;f.panel.workbench.request=()=>{calls++;return new Promise(resolve=>finish=resolve);};
   const pending=f.panel.complete();await f.panel.complete();
-  assert.equal(calls,1);assert.equal(f.panel.completions.children[0].textContent,'正在补全…');
+  assert.equal(calls,1);assert.equal(f.panel.completions.children[0].textContent,'일치하는 경로를 찾는 중…');
   finish({replaceStart:3,replaceEnd:6,candidates:[{label:'src/',insertText:'src/'}]});await pending;
   assert.equal(f.panel.input.value,'cd src/');assert.equal(f.panel.completions.hidden,true);
 });
@@ -432,7 +432,7 @@ test('phone direct enables xterm input; compose disables it and makes its hidden
   assert.equal(f.panel.term.options.disableStdin,false);
   assert.equal(f.panel.term.textarea.readOnly,false);
   assert.equal(f.panel.modeButton.hidden,false);
-  assert.equal(f.panel.modeButton.textContent,'终端直接输入模式');
+  assert.equal(f.panel.modeButton.textContent,'직접 입력 모드');
   assert.equal(f.panel.term.focused,undefined,'layout does not open the mobile keyboard');
   f.panel.inputMode='draft';f.context.document.activeElement=f.panel.term.textarea;
   f.panel.term.blur=()=>{f.panel.term.blurred=true;};f.panel.layout();
@@ -440,7 +440,7 @@ test('phone direct enables xterm input; compose disables it and makes its hidden
   assert.equal(f.panel.term.textarea.readOnly,true);
   assert.equal(f.panel.term.textarea.tabIndex,-1);
   assert.equal(f.panel.term.blurred,true);
-  assert.equal(f.panel.modeButton.textContent,'编写后发送模式');
+  assert.equal(f.panel.modeButton.textContent,'작성 후 보내기');
   f.panel.inputMode='direct';f.panel.layout();
   assert.equal(f.panel.term.options.disableStdin,false);
   assert.equal(f.panel.term.textarea.readOnly,false);
@@ -457,10 +457,10 @@ test('phone direct Tab bypasses stale draft completion and compose Tab uses it',
 test('Enter shortcut sends only one CR in every mode and preserves the unsent draft',()=>{
   for(const [mobile,mode] of [[true,'draft'],[false,'draft'],[false,'direct']]){
     const f=fixture();f.context.navigator.userAgent=mobile?'iPhone Mobile':'Desktop';f.panel.inputMode=mode;
-    f.panel.input.value='unsent 中文';f.panel.input.selectionStart=f.panel.input.selectionEnd=2;
+    f.panel.input.value='unsent 중국어';f.panel.input.selectionStart=f.panel.input.selectionEnd=2;
     f.panel.enqueue('/model\r');f.panel.shortcut('Enter','\r');
     assert.equal(f.panel.operations[0].data,'/model\r\r');
-    assert.equal(f.panel.input.value,'unsent 中文');assert.equal(f.panel.input.selectionStart,2);
+    assert.equal(f.panel.input.value,'unsent 중국어');assert.equal(f.panel.input.selectionStart,2);
   }
 });
 
@@ -483,10 +483,10 @@ test('duplex sends ordered resize and several inputs without waiting for each ac
   f.context.WebSocket=FakeSocket;f.context.URL=URL;f.context.location={href:'http://local.example/'};
   f.panel.workbench.csrf=()=> 'csrf-secret';f.panel.layout=()=>{};
   f.panel.startDuplex();const socket=sockets[0];socket.readyState=1;socket.onopen();
-  f.panel.queueChunk('你');f.panel.queueChunk('😀');f.panel.pendingResize={cols:100,rows:30};
+  f.panel.queueChunk('\u4f60');f.panel.queueChunk('😀');f.panel.pendingResize={cols:100,rows:30};
   f.panel.flushDuplex();
   assert.deepEqual(socket.sent.map(item=>item.action),['resize','input']);
-  assert.equal(socket.sent[1].data,'你😀');
+  assert.equal(socket.sent[1].data,'\u4f60😀');
   assert.equal(f.panel.operations.length,1);
   socket.onmessage({data:JSON.stringify({type:'ack',action:'input',id:f.panel.operations[0].id})});
   assert.equal(f.panel.operations.length,0);
@@ -592,13 +592,13 @@ test('WebSocket send failure retains the input and shows the unconfirmed state',
   f.panel.startDuplex();const socket=f.panel.duplex;socket.readyState=1;socket.onopen();
   f.panel.queueChunk('still pending');const id=f.panel.operations[0].id;f.panel.flushDuplex();
   assert.equal(f.panel.inputError,true);assert.equal(f.panel.operations[0].id,id);
-  assert.match(f.panel.status.textContent,/输入结果未确认/);
+  assert.match(f.panel.status.textContent,/(?:· 입력이 확인되지 않았습니다\. 다시 시도하면 복제되지 않습니다\.|터미널 연결이 끊겼습니다\. · 입력이 확인되지 않았습니다\. 다시 시도하면 복제되지 않습니다\.)/);
 });
 
 test('new terminal notices have English translations',()=>{
   const dictionary=require('../web/shared/i18n.js').dictionary;
-  for(const key of ['终端输入过长或队列已满；草稿仍在，请稍后重试','终端输入队列已满；这部分输入未发送',
-                    '终端连接中断 · 输入结果未确认；重试不会重复输入。','终端连接失败']){
+  for(const key of ['터미널 입력이 너무 길거나 대기열이 가득 찼습니다. 귀하의 초안은 아직 여기에 있습니다. 나중에 다시 시도해 보세요.','터미널 입력 대기열이 가득 찼습니다. 이 입력은 전송되지 않았습니다.',
+                    '터미널 연결이 끊겼습니다. · 입력이 확인되지 않았습니다. 다시 시도하면 복제되지 않습니다.','터미널 연결 실패']){
     assert.ok(dictionary[key]);
   }
 });

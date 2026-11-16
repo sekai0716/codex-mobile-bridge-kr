@@ -31,15 +31,15 @@ async function runModeTests(){
     select.value='goal';select.onchange();$('message').value='Goal fixture';
     await $('composer').onsubmit({preventDefault(){}});
     check(writes[2].body.workMode==='goal'&&select.value==='default','Goal reaches send API and next message returns to ordinary mode');
-    check(writes[2].body.uiLocale==='zh-CN','Goal sends retain the active UI locale');
+    check(writes[2].body.uiLocale==='ko-KR','Goal sends retain the active UI locale');
     renderState({...meta,status:'active',host:'remote:fixture'});$('send-mode').value='steer';$('send-mode').onchange();$('message').value='Additional context';
     await $('composer').onsubmit({preventDefault(){}});
     check(writes[3].body.workMode===null&&writes[3].body.mode==='steer','Steering never silently changes the active mode');
     const request={id:'implement-plan:test',method:'item/plan/requestImplementation',supported:true,params:{planContent:'# Fixture plan\n\nReply OK.',turnId:'test'}};
     renderState({...meta,host:'remote:fixture',requests:[request]});
-    check($('approvals').textContent.includes('执行计划')&&!$('approvals').textContent.includes('请在桌面 App'),'Plan confirmation offers a working action instead of desktop fallback');
+    check($('approvals').textContent.includes('실행 계획')&&!$('approvals').textContent.includes('데스크탑에서 해주세요 App'),'Plan confirmation offers a working action instead of desktop fallback');
     let card=$('approvals').firstElementChild;await card.querySelector('.secondary').onclick();
-    check(writes.length===4&&card.querySelector('.error').textContent.includes('修改意见'),'Revision requires feedback without submitting an empty request');
+    check(writes.length===4&&card.querySelector('.error').textContent.includes('댓글 수정'),'Revision requires feedback without submitting an empty request');
     card.querySelector('textarea').value='Shorter please';await card.querySelector('.secondary').onclick();
     check(writes[4].body.response.action==='revise'&&writes[4].body.response.text==='Shorter please','Revision submits the actual requested changes');
     check(select.value==='plan','Revision continues in plan mode');
@@ -48,9 +48,9 @@ async function runModeTests(){
     check(writes.length===6&&writes[5].body.response.action==='implement','Repeated plan clicks submit one implementation');
     check(select.value==='default','Implementation returns composer to ordinary mode');
     renderState({...meta,goalSubmission:{status:'pending'}});
-    check($('goal-state').textContent.includes('等待桌面确认')&&!$('goal-state').textContent.includes('目标进行中'),'Accepted goal request does not imply an active native goal');
+    check($('goal-state').textContent.includes('데스크톱 확인을 기다립니다.')&&!$('goal-state').textContent.includes('목표 진행 중'),'Accepted goal request does not imply an active native goal');
     renderState({...meta,goal:{objective:'Real goal from desktop',status:'active',tokensUsed:7}});
-    check($('goal-state').textContent.includes('Real goal from desktop')&&$('goal-state').textContent.includes('目标进行中'),'Native state controls the visible active goal');
+    check($('goal-state').textContent.includes('Real goal from desktop')&&$('goal-state').textContent.includes('목표 진행 중'),'Native state controls the visible active goal');
     const goal=state.goal,writesBeforeHide=writes.length;
     $('goal-state').querySelector('.goal-close').click();
     check($('goal-state').hidden&&!$('goal-toggle').hidden&&writes.length===writesBeforeHide&&goal.status==='active','Hiding only changes visibility and makes the restore action available');
@@ -62,7 +62,7 @@ async function runModeTests(){
     check($('goal-toggle').title==='Goal progress','Hidden-goal restore action translates to English');
     $('goal-toggle').click();
     check(!$('goal-state').hidden&&$('goal-toggle').hidden&&writes.length===writesBeforeHide,'Restoring shows the original goal without sending a message');
-    check($('send-mode').value==='auto'&&$('send-mode').options[0].textContent==='默认'&&$('send-mode').options[1].textContent==='引导','Mode selectors use compact centered labels');
+    check($('send-mode').value==='auto'&&$('send-mode').options[0].textContent==='기본'&&$('send-mode').options[1].textContent==='가이드','Mode selectors use compact centered labels');
     renderState({...meta,status:'active'});$('message').value='Queue fixture';
     await $('composer').onsubmit({preventDefault(){}});
     check(writes.at(-1).body.mode==='queue'&&writes.at(-1).body.workMode==='default','Default mode queues when a task is active');
@@ -70,8 +70,8 @@ async function runModeTests(){
     renderState({...meta,status:'idle'});$('message').value='Send fixture';
     await $('composer').onsubmit({preventDefault(){}});
     check(writes.at(-1).body.mode==='send'&&writes.at(-1).body.workMode==='default','Default mode sends immediately when idle');
-    BridgeI18n.setLanguage('zh');BridgeI18n.apply();
-    check($('goal-state').textContent.includes('Goal active')&&$('work-mode').options[1].textContent==='计划','Mode and native goal controls translate to localized labels');
+    BridgeI18n.setLanguage('ko');BridgeI18n.apply();
+    check($('goal-state').textContent.includes('Goal active')&&$('work-mode').options[1].textContent==='계획','Mode and native goal controls translate to localized labels');
     return {passed:checks.length,checks};
   }finally{chatTimeline?.dispose();chatTimeline=null;window.fetch=original;}
 }

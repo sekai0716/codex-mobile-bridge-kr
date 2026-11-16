@@ -30,8 +30,8 @@
   const account = document.getElementById('accounts-button');
   if (account) {
     const labelAccount = () => {
-      if (account.getAttribute('data-i18n') === '账号与额度') {
-        const label = document.documentElement.lang.startsWith('en') ? 'Official account' : '官方账号';
+      if (account.getAttribute('data-i18n') === "계정 및 할당량") {
+        const label = document.documentElement.lang.startsWith('en') ? 'Official account' : '공식 계정';
         if (account.textContent !== label) account.textContent = label;
       }
     };
@@ -41,7 +41,7 @@
   const footer = document.querySelector('.sidebar-foot');
   if (footer && !document.querySelector('.client-navigation')) {
     document.body.appendChild(footer);
-    const home = document.createElement('a'); home.href = 'codexbridge://home'; home.className = 'plain bridge-home'; home.dataset.i18n = '返回电脑列表'; home.textContent = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t('返回电脑列表') : '返回电脑列表';
+    const home = document.createElement('a'); home.href = 'codexbridge://home'; home.className = 'plain bridge-home'; home.dataset.i18n = "컴퓨터 목록으로 돌아가기"; home.textContent = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t("컴퓨터 목록으로 돌아가기") : "컴퓨터 목록으로 돌아가기";
     footer.appendChild(home);
   }
   const computer = document.getElementById('connected-computer');
@@ -55,7 +55,7 @@
       const render = () => {
         const actual = computer.dataset.deviceName || location.host;
         name.textContent = device ? actual : connectionName;
-        const text = device ? '点击显示连接名称' : '点击显示电脑真实名称';
+        const text = device ? "저장된 연결 이름 표시" : "컴퓨터의 장치 이름 표시";
         const hint = typeof BridgeI18n !== 'undefined' ? BridgeI18n.t(text) : text;
         computer.title = hint + ' · ' + (device ? connectionName : actual);
         computer.setAttribute('aria-label', name.textContent + ' · ' + hint);

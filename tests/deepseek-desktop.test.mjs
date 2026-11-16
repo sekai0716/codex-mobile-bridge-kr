@@ -13,7 +13,7 @@ const row={sessionId:'session-one',cwd:folder,running:true,updatedAt:1,projectio
 const ctx={sessionController:{list:async()=>({items:[row]}),projections:async()=>({asOfSeq:3}),page:async()=>({records:[{event:{seq:1,type:'request/header',data:{token:'PRIVATE'}}},{event:{seq:2,type:'user/message',data:{content:[{type:'text',text:'hello'}]}}}],hasMore:false}),
   modelCatalog:async()=>{modelReads++;return {default:defaultSelection,groups:[{id:'deepseek',name:'DeepSeek API',models:[{id:'chat',name:'Chat',reasoning:{efforts:[{id:'high'}],defaultEffort:'high'}}]},{id:'deepseek-account',name:'DeepSeek Account',models:[{id:'chat',name:'Chat'}]}]};},
   prompt:async value=>{calls.push(value);return {accepted:promptAccepted};},cancel:async value=>calls.push(value),selectModel:async value=>{calls.push(value);return {selected:{...value,reasoningEffort:'high'}};},create:async value=>{calls.push(value);return value;}},
-  pluginInventory:{list:async()=>{pluginReads++;return {entries:[{moduleName:'@deepseek-ai/dsh-skill-office',enabled:true,fiberPhase:'active',meta:{title:{'zh-CN':'Office 文档'}}}],agentPresets:[{id:'default',rows:[{moduleName:'@deepseek-ai/dsh-skill-office',enabled:true,fiberPhase:'active'},{moduleName:'@deepseek-ai/dsh-tool-browser',enabled:false,fiberPhase:null}]}]};}},
+  pluginInventory:{list:async()=>{pluginReads++;return {entries:[{moduleName:'@deepseek-ai/dsh-skill-office',enabled:true,fiberPhase:'active',meta:{title:{'ko-KR':'Office 문서'}}}],agentPresets:[{id:'default',rows:[{moduleName:'@deepseek-ai/dsh-skill-office',enabled:true,fiberPhase:'active'},{moduleName:'@deepseek-ai/dsh-tool-browser',enabled:false,fiberPhase:null}]}]};}},
   sessionSkillCatalog:{list:async()=>({skills:[{name:'review',description:'Review'}]})},permissionPresets:{catalog:()=>({options:[{value:'default',name:'Default'},{value:'full-access',name:'Full access'}]}),set:(session,mode)=>{calls.push({permissionSession:session,mode});}},workspaceRegistry:{list:()=>[]},agents:{list:()=>[],get:()=>({session:{id:'native-session'}})},on:(name,fn)=>handlers.set(name,fn),effect:setup=>{const dispose=setup();disposers.push(dispose);return dispose;}};
 await apply(ctx,{configPath});const {port}=JSON.parse(await readFile(endpoint,'utf8'));
 const request=async(action,body={},token='fixture-secret',sid='session-one')=>{const response=await fetch(`http://127.0.0.1:${port}/mobile`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({action,sid,body})});return response;};
@@ -63,7 +63,7 @@ try{
   services.agentDefaultModel={currentSelection:()=>defaultSelection};
   assert.equal((await(await request('detail')).json()).session.model,'deepseek/chat');
   row.projections.values.modelSelection=originalProjection;
-  assert.equal(models.skills.filter(p=>p.id==='installed:@deepseek-ai/dsh-skill-office').length,1);assert.equal(models.skills.find(p=>p.name==='Office 文档').selectable,false);
+  assert.equal(models.skills.filter(p=>p.id==='installed:@deepseek-ai/dsh-skill-office').length,1);assert.equal(models.skills.find(p=>p.name==='Office 문서').selectable,false);
   const before=pluginReads;await request('catalog',{section:'models'});assert.equal(pluginReads,before);
   const modelBefore=modelReads;const plugins=await(await request('catalog',{section:'plugins'})).json();assert.equal(modelReads,modelBefore);assert.equal(plugins.models,undefined);
   assert.equal((await request('send',{id:'invalid',text:'no',plugins:['installed:@deepseek-ai/dsh-skill-office']})).status,400);assert.equal(calls.length,0);

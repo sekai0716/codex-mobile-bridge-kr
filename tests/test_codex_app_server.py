@@ -174,7 +174,7 @@ class AppServerTests(unittest.TestCase):
         self.client.connect()
         process = self.processes[0]
         process.errors['thread/delete'] = {'code': -32600, 'message': 'thread thread-a already has an active writer'}
-        with self.assertRaisesRegex(DeleteRejected, '尚未删除'):
+        with self.assertRaisesRegex(DeleteRejected, "원래\\ 클라이언트는\\ 여전히\\ 이\\ 채팅을\\ 보유하고\\ 있습니다\\.\\ 아무것도\\ 삭제되지\\ 않았습니다\\.\\ 거기에서\\ 삭제하시거나,\\ 채팅을\\ 해제하고\\ 다시\\ 확인해\\ 주세요\\."):
             self.client.request('thread/delete', {'threadId': 'thread-a'})
         process.errors['thread/delete'] = {'code': -32600, 'message': 'cleanup failed'}
         with self.assertRaises(CreationError) as caught:

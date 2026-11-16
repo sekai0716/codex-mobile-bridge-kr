@@ -35,11 +35,11 @@ class ProfileRegistryTests(unittest.TestCase):
         result = self.registry.local_profiles(scan=True)
         self.assertIn(str(self.other), [r['home'] for r in result['candidates']])
         self.assertNotIn(str(self.default), [r['home'] for r in result['candidates']])
-        with self.assertRaisesRegex(ValueError, '默认'): self.registry.save_local(str(self.default), 'Duplicate')
+        with self.assertRaisesRegex(ValueError, '기본'): self.registry.save_local(str(self.default), 'Duplicate')
         alias = self.root/'alias'; alias.symlink_to(self.other, target_is_directory=True)
         result = self.registry.save_local(str(alias), 'IDE')
         self.assertEqual(result['entry'], local_entry_id(self.other))
-        with self.assertRaisesRegex(ValueError, '已登记'): self.registry.save_local(str(self.other), 'Duplicate')
+        with self.assertRaisesRegex(ValueError, "이\\ Codex\\ 구성\\ 디렉터리가\\ 등록되었습니다\\.\\ 기존\\ 입구를\\ 이용하세요\\."): self.registry.save_local(str(self.other), 'Duplicate')
         self.factory.assert_not_called()
         again = Entries(self.root/'bridge', self.default, self.factory)
         self.addCleanup(again.close)
@@ -49,7 +49,7 @@ class ProfileRegistryTests(unittest.TestCase):
     def test_replaced_directory_cannot_redirect_an_existing_entry(self):
         entry = self.registry.save_local(str(self.other), 'IDE')['entry']
         self.other.rename(self.root/'old-home'); self.home('.codex-vscode')
-        with self.assertRaisesRegex(ValueError, '身份已变化'): self.registry.get(entry)
+        with self.assertRaisesRegex(ValueError, "Codex\\ 구성\\ 디렉터리\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."): self.registry.get(entry)
         self.factory.assert_not_called()
 
     def test_external_sqlite_directory_is_not_silently_read_from_another_profile(self):
@@ -125,13 +125,13 @@ class IdeProfileTests(CliBridgeFixture):
 
     def test_owner_timeout_never_starts_a_competing_writer(self):
         self.bridge.ipc.connect = Mock()
-        self.bridge.ipc.owner.side_effect = IPCError('桌面读取超时；尚未取得实时会话状态。')
-        with self.assertRaisesRegex(IPCError, 'VS Code 原会话未响应'):
+        self.bridge.ipc.owner.side_effect = IPCError('데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。')
+        with self.assertRaisesRegex(IPCError, "VS\\ Code\\ 원래\\ 세션이\\ 응답하지\\ 않았으며\\ 실행\\ 소유권이\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 다시\\ 연결하세요\\.\\ 이전\\ 버전을\\ 사용하는\\ 경우\\ Codex\\ 확장\\ 프로그램,\\ 먼저\\ 확장\\ 프로그램을\\ 업데이트하세요。"):
             self.bridge.activate(self.thread_id)
         self.cli.attach.assert_not_called()
 
     def test_mutation_after_editor_closes_requires_explicit_headless_resume(self):
-        with self.assertRaisesRegex(IPCError, '主动继续'):
+        with self.assertRaisesRegex(IPCError, "VS\\ Code\\ 원래\\ 세션이\\ 아직\\ 연결되지\\ 않았습니다\\.\\ 편집기가\\ 닫혀\\ 있으면\\ 이\\ 세션을\\ 적극적으로\\ 계속하여\\ 백그라운드\\ 연결을\\ 활성화하십시오\\.。"):
             self.bridge._target(self.thread_id)
         self.cli.attach.assert_not_called()
         self.assertTrue(self.bridge.activate(self.thread_id).connected)
@@ -159,7 +159,7 @@ class IdeProfileTests(CliBridgeFixture):
             same.assert_called_once_with(session.saved_cwd, state['cwd'])
             emit({'type': 'snapshot', 'conversationState': state, 'revision': 3}, version=7)
         self.assertFalse(session.connected)
-        self.assertIn('更新 Bridge', session.error)
+        self.assertIn("Codex 세션 형식이 변경되었습니다. Bridge 업데이트; 기록과 초안은 계속 사용할 수 있습니다.", session.error)
         self.assertFalse(session.access['canEditMessages'])
         self.cli.attach.assert_not_called()
 
@@ -175,7 +175,7 @@ class IdeProfileTests(CliBridgeFixture):
 
     def test_other_owner_failures_cannot_bypass_identity_checks(self):
         self.bridge.ipc.connect = Mock()
-        self.bridge.ipc.owner.side_effect = IPCError('现有 Codex App 连接与此会话不匹配，未连接')
+        self.bridge.ipc.owner.side_effect = IPCError("현재 Codex 앱 연결이 이 채팅과 일치하지 않습니다. 연결되지 않았습니다.")
         with self.assertRaises(IPCError): self.bridge.activate(self.thread_id)
         self.cli.attach.assert_not_called()
 
@@ -183,7 +183,7 @@ class IdeProfileTests(CliBridgeFixture):
         default_store = Mock(); default_store.home = self.home
         registry = Entries(self.home/'registry', self.home)
         self.addCleanup(registry.close)
-        with self.assertRaisesRegex(IPCError, '同 ID'):
+        with self.assertRaisesRegex(IPCError, "다른\\ Codex\\ 동일한\\ 구성이\\ 존재합니다\\.\\ ID\\ 세션,\\ 원본을\\ 확인할\\ 수\\ 없음\\ owner\\ 소유;\\ 다른\\ 실행자는\\ 연결되어\\ 있지\\ 않습니다"):
             registry.check_ipc_scope(self.bridge.host, self.thread_id, default_store)
         default_store.get.side_effect = KeyError(self.thread_id)
         registry.check_ipc_scope(self.bridge.host, self.thread_id, default_store)
@@ -195,7 +195,7 @@ class IdeProfileTests(CliBridgeFixture):
         self.bridge.ipc.client_id='current'; self.bridge.ipc.follow=Mock(); self.cli.cli_connections.return_value=[]
         row=self.bridge.cli_connections()[0]
         self.bridge.ipc.client_id='replacement'
-        with self.assertRaisesRegex(ValueError, '变化'): row['_release'](False)
+        with self.assertRaisesRegex(ValueError, "기존\\ VS\\ Code\\ 연결이\\ 변경되었으며\\ 새\\ 연결이\\ 해제되지\\ 않았습니다\\."): row['_release'](False)
         self.bridge.ipc.follow.assert_not_called()
         self.bridge.ipc.client_id='current'
         result=row['_release'](False)
@@ -223,9 +223,9 @@ class ProfileCloseTests(ProfileRegistryTests):
             worker.start();self.assertTrue(entered.wait(2));stopper.start()
             self.assertFalse(closed.wait(.05));finish.set();worker.join(3);stopper.join(3)
             self.assertTrue(closed.is_set())
-            with self.assertRaisesRegex(ValueError,'已关闭'):
+            with self.assertRaisesRegex(ValueError,"Codex\\ 입구가\\ 닫혀\\ 있으니\\ 다시\\ 열어주세요"):
                 target.workspace(str(uuid.uuid4()),'upload',{})
-            with self.assertRaisesRegex(ValueError,'已关闭'):
+            with self.assertRaisesRegex(ValueError,"Codex\\ 입구가\\ 닫혀\\ 있으니\\ 다시\\ 열어주세요"):
                 target.register_project(str(self.other),host=target.host,kind='cli')
             self.assertEqual(native.call_count,1)
 
@@ -234,7 +234,7 @@ class IndependentAccountsTests(ProfileRegistryTests):
         super().setUp()
         self.bridge = Bridge(self.default, self.root/'accounts-gateway', codex_bin=self.root/'absent')
         self.addCleanup(self.bridge.close)
-        self.entry = self.bridge.entries.save_local(str(self.other), '独立 Codex')['entry']
+        self.entry = self.bridge.entries.save_local(str(self.other), '독립적인 Codex')['entry']
         self.target = self.bridge.account_target(self.entry)
 
     def test_accounts_are_private_to_the_selected_instance(self):
@@ -252,7 +252,7 @@ class IndependentAccountsTests(ProfileRegistryTests):
             self.bridge.accounts_control({'action':'rename','id':identifier,'name':'Cross-scope'})
         self.assertFalse((self.default/'auth.json').exists())
         self.assertIsNone(result['desktopExecutable'])
-        with self.assertRaisesRegex(ValueError, '默认 Codex Desktop'):
+        with self.assertRaisesRegex(ValueError, "독립\\ 실행형\\ 구성은\\ 기본값을\\ 관리하지\\ 않습니다\\.\\ Codex\\ Desktop"):
             self.bridge.accounts_control({'entry':self.entry,'action':'scanDesktop'})
 
     def test_disabled_and_unknown_accounts_never_fall_back_to_default(self):
@@ -280,7 +280,7 @@ class IndependentAccountsTests(ProfileRegistryTests):
         with patch('bridge.clients.codex.cli_session._managed_cli',return_value=self.root/'codex'), \
              patch('bridge.platforms.codex_daemon_env.read_daemon_environment',return_value=({},('generation',))), \
              patch('bridge.platforms.codex_daemon_env.stop_daemon_gracefully') as stop:
-            with self.assertRaisesRegex(ValueError,'正在运行'):
+            with self.assertRaisesRegex(ValueError,"실행\\ 중"):
                 LocalCliSync(self.target).prepare_profile_switch()
             stop.assert_not_called()
 

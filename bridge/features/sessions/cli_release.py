@@ -40,7 +40,7 @@ class CliConnections:
         for job in self.jobs.values():
             for row in job['results']:
                 if row['status'] in ('waiting', 'releasing'):
-                    row.update(status='unknown', error='网关已重启，请核对原会话；不会自动重放释放操作')
+                    row.update(status='unknown', error='게이트웨이가 다시 시작되었습니다. 원래 세션을 확인하세요. 해제 작업은 자동으로 재생되지 않습니다.')
 
     def _connections(self):
         rows = []
@@ -64,17 +64,17 @@ class CliConnections:
     def _scope_preview(self, body):
         scope = body.get('scopeKey')
         if not isinstance(scope, str) or not scope:
-            raise ValueError('请选择当前主机与配置的 CLI 范围')
+            raise ValueError('현재 호스트와 구성을 선택하십시오. CLI 범위')
         all_selected = body.get('all') is True
         fields = {'mode', 'scopeKey', 'all' if all_selected else 'connections'}
         if set(body) != fields:
-            raise ValueError('CLI 范围预览无效')
+            raise ValueError('CLI 범위 미리보기가 잘못되었습니다.')
         available = {row['key']: row for row in self._connections()}
         selected = (sorted(key for key, row in available.items() if row.get('scopeKey') == scope)
                     if all_selected else body.get('connections'))
         if (not isinstance(selected, list) or not 1 <= len(selected) <= 256
                 or any(not isinstance(key, str) for key in selected) or len(set(selected)) != len(selected)):
-            raise ValueError('请选择当前范围中的 CLI 连接')
+            raise ValueError('현재 범위에서 선택하세요. CLI 연결')
         selected = sorted(selected)
         with self.lock:
             for key in selected:
@@ -84,7 +84,7 @@ class CliConnections:
                         available[key] = row
         if any(key not in available or available[key].get('scopeKey') != scope
                or '_scope_preview' not in available[key] for key in selected):
-            raise ValueError('连接已变化或不属于当前范围，请重新选择')
+            raise ValueError('연결이 변경되었거나 현재 범위에 속하지 않습니다. 다시 선택하십시오.')
         row = available[selected[0]]
         preview = row['_scope_preview']()
         if not preview.get('generation') or preview.get('scopeKey') != scope:
@@ -99,11 +99,11 @@ class CliConnections:
             return self._scope_preview(body)[0]
         if mode == 'scopeCancel':
             if set(body) != {'mode', 'id'} or not isinstance(body['id'], str):
-                raise ValueError('CLI 范围取消请求无效')
+                raise ValueError('CLI 잘못된 범위 취소 요청')
             with self.lock:
                 job = self.jobs.get(body['id'])
                 if not job or job['mode'] != 'scopeWait' or not any(row['status'] in ('waiting', 'releasing') for row in job['results']):
-                    raise ValueError('此等待已开始退出或结束，不能取消')
+                    raise ValueError('이 대기는 종료되기 시작했거나 종료되었으므로 취소할 수 없습니다.')
                 callback = self.callbacks[job['connections'][0]]['_scope_cancel']
             result = callback(job['id'])
             with self.lock:
@@ -113,23 +113,23 @@ class CliConnections:
                 return json.loads(json.dumps(job))
         if (set(body) != {'mode', 'id', 'scopeKey', 'connections', 'generation'}
                 or mode not in ('scopeWait', 'scopeForce') or not isinstance(body['generation'], str)):
-            raise ValueError('请预览并确认 CLI 释放范围')
+            raise ValueError('미리보고 확인해주세요 CLI 출시 범위')
         uuid.UUID(body['id'])
         with self.lock:
             old = self.jobs.get(body['id'])
             if old:
                 if any(old.get(name) != value for name, value in body.items()):
-                    raise ValueError('释放请求 ID 已用于其他操作')
+                    raise ValueError('릴리스 요청 ID 이미 다른 작업에 사용됨')
                 return json.loads(json.dumps(old))
         preview, available = self._scope_preview({name: body[name] for name in ('scopeKey', 'connections')}
                                                | {'mode': 'scopePreview'})
         if preview.get('generation') != body['generation'] or not preview.get('canForce' if mode == 'scopeForce' else 'canRelease'):
-            raise ValueError('CLI 范围、进程或配置已变化，请重新预览')
+            raise ValueError('CLI 범위, 프로세스 또는 구성이 변경되었습니다. 다시 미리보세요.')
         with self.lock:
             old = self.jobs.get(body['id'])
             if old:
                 if any(old.get(name) != value for name, value in body.items()):
-                    raise ValueError('释放请求 ID 已用于其他操作')
+                    raise ValueError('릴리스 요청 ID 이미 다른 작업에 사용됨')
                 return json.loads(json.dumps(old))
             for job in self.jobs.values():
                 if job.get('scopeKey') != body['scopeKey'] or not any(
@@ -138,7 +138,7 @@ class CliConnections:
                     continue
                 if mode != 'scopeForce' or job['mode'] == 'scopeForce' and any(
                         row['status'] in ('waiting', 'releasing') for row in job['results']):
-                    raise ValueError('此范围已有释放请求，请先核对或明确强制释放')
+                    raise ValueError('이 범위에 대한 릴리스 요청이 있습니다. 먼저 확인하거나 명시적으로 릴리스를 강제하십시오.')
             job = {**body, 'scopeGeneration': preview['scopeGeneration'], 'impact': preview['impact'],
                    'results': [{name: value for name, value in available[key].items() if not name.startswith('_')}
                                | {'status': 'waiting'} for key in body['connections']]}
@@ -181,7 +181,7 @@ class CliConnections:
                             if prior['status'] in ('waiting', 'unknown'):
                                 prior['supersededBy'] = job['id']
                                 if prior['status'] == 'waiting':
-                                    prior.update(status='superseded', notice='已改为明确强制释放此范围')
+                                    prior.update(status='superseded', notice='이 범위를 명시적으로 강제 해제하도록 변경되었습니다.')
                 self.save(self.path, self.jobs)
             if result.get('status') != 'waiting':
                 return
@@ -207,43 +207,43 @@ class CliConnections:
         if isinstance(body, dict) and body.get('mode') == 'forcePreview':
             keys = body.get('connections')
             if set(body) != {'connections', 'mode'} or not isinstance(keys, list) or len(keys) != 1 or not isinstance(keys[0], str):
-                raise ValueError('请选择一个需要强制释放的 CLI 连接')
+                raise ValueError('강제로 해제해야 하는 항목을 선택하세요. CLI 연결')
             with self.lock:
                 row = self._force_available(keys[0], {**self.callbacks, **{item['key']: item for item in self._connections()}})
             if not row:
-                return {'canForce': False, 'message': '当前无法核验此 CLI 连接及原生进程。'}
+                return {'canForce': False, 'message': "이 CLI 연결 및 네이티브 프로세스는 현재 확인할 수 없습니다."}
             return row['_force_preview']()
         force = isinstance(body, dict) and body.get('mode') == 'force'
         fields = {'id', 'connections', 'mode', 'generation'} if force else {'id', 'connections', 'mode'}
         if (not isinstance(body, dict) or set(body) != fields
                 or body['mode'] not in ('wait', 'stop', 'check', 'unload', 'force')
                 or force and not isinstance(body['generation'], str)):
-            raise ValueError('CLI 释放请求无效')
+            raise ValueError('CLI 잘못된 릴리스 요청')
         uuid.UUID(body['id'])
         selected = body['connections']
         if (not isinstance(selected, list) or not 1 <= len(selected) <= 256
                 or any(not isinstance(key, str) for key in selected) or len(set(selected)) != len(selected)):
-            raise ValueError('请选择需要释放的 CLI 连接')
+            raise ValueError("해제할 CLI 연결을 선택하세요.")
         if force and len(selected) != 1:
-            raise ValueError('请选择一个需要强制释放的 CLI 连接')
+            raise ValueError('강제로 해제해야 하는 항목을 선택하세요. CLI 연결')
         with self.lock:
             previous = self.jobs.get(body['id'])
             if previous:
                 if (previous['connections'] != selected or previous['mode'] != body['mode']
                         or force and previous.get('generation') != body['generation']):
-                    raise ValueError('释放请求 ID 已用于其他操作')
+                    raise ValueError('릴리스 요청 ID 이미 다른 작업에 사용됨')
                 return json.loads(json.dumps(previous))
             busy = [row for job in self.jobs.values() for row in job['results']
                     if row['key'] in selected and row['status'] in ('waiting', 'releasing', 'unknown')
                     and not row.get('supersededBy')]
             if body['mode'] == 'check' and any(row['status'] != 'unknown' for row in busy):
-                raise ValueError('释放操作仍在进行，请等待此次检查完成')
+                raise ValueError('릴리스 작업이 아직 진행 중입니다. 확인이 완료될 때까지 기다려 주세요.')
             if (force and any(row['status'] == 'releasing' for row in busy) or not force and body['mode'] != 'check'
                     and any(body['mode'] != 'stop' or row['status'] != 'waiting' for row in busy)):
-                raise ValueError('所选连接已有释放请求，请先核对该请求的结果')
+                raise ValueError('선택한 연결이 해제되었습니다. 먼저 요청 결과를 확인하시기 바랍니다.')
             if force and any(job['mode'] == 'force' and any(row['key'] == selected[0]
                     and row['status'] in ('waiting', 'releasing') for row in job['results']) for job in self.jobs.values()):
-                raise ValueError('此连接已有强制释放请求')
+                raise ValueError('이 연결에는 이미 강제 해제 요청이 있습니다.')
             available = {row['key']: row for row in self._connections()}
             if body['mode'] in ('check', 'unload'):
                 available = {**self.callbacks, **available}
@@ -256,19 +256,19 @@ class CliConnections:
             if force:
                 row = self._force_available(selected[0], {**self.callbacks, **available})
                 if not row:
-                    raise ValueError('当前无法核验此 CLI 连接及原生进程')
+                    raise ValueError('현재로서는 확인할 수 없습니다. CLI 연결 및 기본 프로세스')
                 available = {selected[0]: row}
             if any(key not in available for key in selected):
-                raise ValueError('连接已变化，请刷新后重新选择')
+                raise ValueError('연결이 변경되었습니다. 새로고침한 후 다시 선택하세요.')
             if body['mode'] == 'check' and any('_check' not in available[key] for key in selected):
-                raise ValueError('此连接无法自动核验，请在原客户端核对；未重放操作')
+                raise ValueError('이 연결은 자동으로 확인할 수 없습니다. 원래 클라이언트에서 확인하세요. 작업이 재생되지 않습니다')
             if body['mode'] == 'unload' and any('_unload' not in available[key] or not any(
                     row['key'] == key and row['status'] == 'detached' for old in self.jobs.values() for row in old['results'])
                     for key in selected):
-                raise ValueError('请先核对已退订的原连接，再明确释放原生占用')
+                raise ValueError('먼저 구독 취소된 원래 연결을 확인한 후 원래 직업을 명시적으로 해제하세요.')
             for row in busy:
                 if body['mode'] == 'stop':
-                    row.update(status='superseded', notice='已改为停止任务并释放；请查看新的释放请求')
+                    row.update(status='superseded', notice='작업을 중지하고 해제하도록 변경되었습니다. 새로운 출시 요청 보기')
             job = {**body, 'results': [{k: v for k, v in available[key].items() if not k.startswith('_')}
                                      | {'status': 'waiting'} for key in selected]}
             if force and available[selected[0]].get('scopeKey'):
@@ -322,7 +322,7 @@ class CliConnections:
                                         and prior.get('scopeKey') == job['scopeKey']) and prior['status'] in ('waiting', 'unknown'):
                                     prior['supersededBy'] = job['id']
                                     if prior['status'] == 'waiting':
-                                        prior.update(status='superseded', notice='已改为明确强制释放；请查看新的释放请求')
+                                        prior.update(status='superseded', notice='명시적인 강제 해제로 변경되었습니다. 새로운 출시 요청 보기')
                     if result.get('status') in ('released', 'detached'):
                         for old in self.jobs.values():
                             for prior in old['results']:

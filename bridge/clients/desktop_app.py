@@ -33,7 +33,7 @@ class DesktopApp:
             try:
                 self.executable = native_discovery('darwin').bundle_executable(self.executable)
             except (OSError, ValueError, KeyError):
-                raise ValueError('请选择有效的 Codex / ChatGPT 应用程序包') from None
+                raise ValueError("유효한 Codex/ChatGPT 앱 번들을 선택하세요.") from None
         self.home = Path(home).resolve()
 
     @staticmethod
@@ -68,19 +68,19 @@ class DesktopApp:
                 app = DesktopApp(bundle, home)
                 app.validate(runtime)
                 return str(app.executable)
-        raise ValueError('未找到 Codex 桌面程序，请选择已安装的应用程序包或可执行文件')
+        raise ValueError("Codex 데스크톱 앱을 찾을 수 없습니다. 설치된 앱 번들 또는 실행 파일을 선택합니다.")
 
     def validate(self, runtime):
         if not self.executable.is_file() or not os.access(self.executable, os.X_OK):
-            raise ValueError('请选择已安装的 Codex / ChatGPT 桌面程序')
+            raise ValueError('설치된 것을 선택해주세요 Codex / ChatGPT 데스크탑 프로그램')
         if runtime and (str(self.executable).casefold() == str(Path(runtime).resolve()).casefold()
                         if sys.platform == 'win32' else self.executable == Path(runtime).resolve()):
-            raise ValueError('桌面程序不能选择内置 Codex 命令行运行时')
+            raise ValueError('데스크탑 프로그램은 내장을 선택할 수 없습니다 Codex 명령줄 런타임')
         # Launch scripts cannot be matched reliably to the resulting GUI process.
         with self.executable.open('rb') as stream:
             script = stream.read(2) == b'#!'
         if script:
-            raise ValueError('请选择桌面程序的实际可执行文件，而不是启动脚本')
+            raise ValueError('시작 스크립트가 아닌 데스크톱 프로그램의 실제 실행 파일을 선택하세요.')
 
     def processes(self):
         expected = os.path.normcase(str(self.executable))
@@ -113,7 +113,7 @@ class DesktopApp:
         deadline = time.monotonic() + 25
         while set(self.processes()) & set(pids):
             if time.monotonic() >= deadline:
-                raise ValueError('桌面程序尚未退出，请在电脑上关闭后重试；尚未强制结束进程')
+                raise ValueError('데스크톱 프로그램이 종료되지 않았습니다. 컴퓨터에서 프로그램을 닫고 다시 시도하세요. 프로세스가 강제로 종료되지 않았습니다.')
             time.sleep(.25)
 
     def launch(self, *, cancelled=None, **options):

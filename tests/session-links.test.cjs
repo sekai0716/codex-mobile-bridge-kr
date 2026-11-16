@@ -5,7 +5,7 @@ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../web/feat
 const text=context.window.BridgeSessionLinks.text,id='019d0000-1234-7123-8123-123456789abc';
 test('copies native Codex thread identity locally and on SSH without launching',()=>{
  assert.equal(text({provider:'codex',id}),'codex://threads/'+id);
- assert.equal(text({provider:'codex',id,host:'remote ssh / 主机'}),'codex://threads/'+id+'?hostId=remote%20ssh%20%2F%20%E4%B8%BB%E6%9C%BA');
+ assert.equal(text({provider:'codex',id,host:'remote ssh / \u4e3b\u673a'}),'codex://threads/'+id+'?hostId=remote%20ssh%20%2F%20%E4%B8%BB%E6%9C%BA');
 });
 test('endpoint digests, WSL runtime, invalid threads and unknown providers do not claim deep links',()=>{
  for(const identity of [{provider:'codex',id,host:'wsl:abc'},{provider:'codex',id,runtime:'wsl'},{provider:'codex',id:'bridge-only'},{provider:'claude',id},{provider:'codex',id,host:null}])assert.equal(text(identity),null);
@@ -32,7 +32,7 @@ test('provider title delegates native ID and provider to the shared renderer',()
   const c=vm.createContext({sessionUrl:(id,action,host)=>`/${host}/${id}/${action}`,listIdentity:'gateway',csrf:'token',sessionAccess:()=>({}),sourceLabel:()=> 'APP',clientNavigation:{provider,clients:[]},currentId:chat.id,currentHost:'local',state:chat,desktopSessions:{provider,sid:chat.id,state:chat},sessionPins:{value:()=>false},window:{BridgeSessionLinks:{text:()=>null}},t:v=>v,uuid:()=> 'request'});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../web/features/clients/client-lifecycle.js'),'utf8'),c);
   vm.runInContext(source.slice(start,end),c);const menu=c.sessionMenuContext(chat,provider);
-  assert.equal(menu.sessionId,native);assert.equal(menu.details.find(row=>row[0]==='会话 ID')[1],native);assert.equal(chat.id,'session-'+provider);
+  assert.equal(menu.sessionId,native);assert.equal(menu.details.find(row=>row[0]==='세션 ID')[1],native);assert.equal(chat.id,'session-'+provider);
   if(provider==='claude'){delete chat.nativeId;assert.equal(c.sessionMenuContext(chat,provider).sessionId,null,'legacy cached gateway ID is not advertised as native');}
  }
 });

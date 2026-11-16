@@ -25,20 +25,20 @@ class AccountsPanel {
   build(){
     this.root.replaceChildren();this.root.classList.add('accounts-panel');
     const header=this.toolbar||this.node('div',undefined,'accounts-toolbar');
-    if(this.desktop)header.append(this.node('h2','已保存的接入'));
-    this.refreshButton=this.button('刷新',()=>this.refresh());this.refreshButton.className='accounts-refresh';header.append(this.refreshButton);if(!this.toolbar)this.root.append(header);
-    this.switchHint=this.node('p','此电脑的 Codex Desktop 与 CLI 共用接入；桌面运行时切换会重启桌面应用。','account-muted');this.root.append(this.switchHint);
+    if(this.desktop)header.append(this.node('h2','저장된 연결'));
+    this.refreshButton=this.button('새로고침',()=>this.refresh());this.refreshButton.className='accounts-refresh';header.append(this.refreshButton);if(!this.toolbar)this.root.append(header);
+    this.switchHint=this.node('p','Codex 데스크톱 및 CLI는 이 컴퓨터에 대한 액세스를 공유합니다. 전환하면 Desktop이 실행 중일 때 다시 시작됩니다.','account-muted');this.root.append(this.switchHint);
     this.status=this.node('p',undefined,'account-muted');this.status.setAttribute('role','status');
     this.managementNotice=this.node('p',undefined,'account-muted');this.root.append(this.managementNotice);
     if(this.desktop){
-      const label=this.node('label','接入配置管理');this.managementMode=document.createElement('select');
-      for(const [value,text] of [['auto','自动识别'],['external','由 Magpie 等外部工具管理']]){const option=this.node('option',text);option.value=value;this.managementMode.append(option);}
+      const label=this.node('label','연결 구성 관리');this.managementMode=document.createElement('select');
+      for(const [value,text] of [['auto','자동 감지'],['external','Magpie 또는 다른 도구로 관리']]){const option=this.node('option',text);option.value=value;this.managementMode.append(option);}
       this.managementMode.onchange=()=>this.perform({action:'management',mode:this.managementMode.value});label.append(this.managementMode);this.root.append(label);
     }
     this.error=this.node('p',undefined,'error');this.error.setAttribute('role','alert');
     this.globalReset=this.node('section',undefined,'accounts-global-reset');this.globalReset.hidden=true;
     this.rows=this.node('div',undefined,'accounts-list');
-    this.currentReset=this.button('查看并使用重置卡',()=>this.onReset?.());this.currentReset.hidden=true;
+    this.currentReset=this.button('재설정 크레딧 보기 및 사용',()=>this.onReset?.());this.currentReset.hidden=true;
     this.current=this.node('p',undefined,'accounts-current');this.blocked=this.node('div',undefined,'account-muted');this.root.append(this.current,this.status,this.error,this.currentReset,this.blocked,this.globalReset,this.rows);
     this.management=ApiAccessEditor.management(this.root,this.node.bind(this));
     this.sshHosts=this.node('section');this.sshHosts.hidden=true;this.root.append(this.sshHosts);
@@ -46,47 +46,47 @@ class AccountsPanel {
     this.reminders=this.node('div');this.updates=this.node('section');this.tools.append(this.reminders,this.updates);this.management.append(this.tools);
     this.desktopRuntime=this.node('section');this.desktopRuntime.hidden=true;
     this.runtimeStatus=this.node('p',undefined,'account-muted');
-    this.initializeRuntime=this.button('初始化连接',()=>{if(window.confirm(this.text('确认所有 Codex 桌面任务已结束，并初始化原生连接？正在运行的 App 会正常退出并重新启动；账号和聊天记录保持不变。')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true});});
-    this.forceInitializeRuntime=this.button('强制继续初始化',()=>{if(window.confirm(this.text('部分任务状态无法核验。继续会正常重启 Codex App，可能中断这些任务或待确认操作；聊天记录保留，可稍后继续。是否继续？')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true,acknowledgeUnavailable:true});});this.forceInitializeRuntime.hidden=true;
-    this.desktopRuntime.append(this.node('h3','Codex 原生会话连接'),this.runtimeStatus,this.initializeRuntime,this.forceInitializeRuntime);this.tools.append(this.desktopRuntime);
-    if(!this.desktop){this.root.append(this.node('p','官方账号登录请在电脑端完成。','account-muted'));return;}
-    const scanDetails=this.node('details');scanDetails.append(this.node('summary','扫描本机配置'));
-    this.scanSource=this.field('Codex 配置目录');this.scanSource.input.placeholder=this.configurationPlaceholder||this.text('留空使用当前 Codex 数据目录');
+    this.initializeRuntime=this.button('연결 초기화',()=>{if(window.confirm(this.text('Codex 데스크톱의 모든 작업이 끝났는지 확인한 뒤 네이티브 연결을 초기화하시겠습니까? 실행 중인 앱은 정상 종료 후 재시작됩니다. 계정과 채팅 기록은 보존됩니다.')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true});});
+    this.forceInitializeRuntime=this.button('그래도 초기화를 계속하세요',()=>{if(window.confirm(this.text('일부 작업 상태를 확인하지 못했습니다. 계속하면 Codex 앱이 정상 종료 후 재시작되며, 해당 작업이나 대기 중인 승인이 중단될 수 있습니다. 채팅 기록은 보존되며 나중에 이어갈 수 있습니다. 계속하시겠습니까?')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true,acknowledgeUnavailable:true});});this.forceInitializeRuntime.hidden=true;
+    this.desktopRuntime.append(this.node('h3','Codex 네이티브 채팅 연결'),this.runtimeStatus,this.initializeRuntime,this.forceInitializeRuntime);this.tools.append(this.desktopRuntime);
+    if(!this.desktop){this.root.append(this.node('p','컴퓨터에서 공식 계정에 로그인하세요.','account-muted'));return;}
+    const scanDetails=this.node('details');scanDetails.append(this.node('summary','로컬 구성 스캔'));
+    this.scanSource=this.field('Codex 구성 디렉터리');this.scanSource.input.placeholder=this.configurationPlaceholder||this.text('현재 Codex 데이터 디렉터리를 사용하려면 비워 두세요.');
     this.scanSource.input.oninput=()=>{this.scannedSource=null;this.scanSelection='';this.render();};
-    this.scanChoice=document.createElement('select');this.scanChoice.setAttribute('aria-label',this.text('选择要保存的配置'));this.scanChoice.hidden=true;
+    this.scanChoice=document.createElement('select');this.scanChoice.setAttribute('aria-label',this.text('저장할 구성을 선택하세요.'));this.scanChoice.hidden=true;
     this.scanChoice.onchange=()=>{this.scanSelection=this.scanChoice.value;this.render();};
-    this.scanButton=this.button('扫描配置',async()=>{const source=this.scanSource.input.value;if(await this.perform({action:'scan',source})){this.scannedSource=source;const rows=this.scanCandidates();this.scanSelection=rows.length===1?rows[0].id:'';this.render();}});
-    this.saveScanButton=this.button('保存配置',()=>{const row=this.scanCandidates().find(value=>value.id===this.scanSelection);if(row)return this.importCandidate(row);});
+    this.scanButton=this.button('구성 검색',async()=>{const source=this.scanSource.input.value;if(await this.perform({action:'scan',source})){this.scannedSource=source;const rows=this.scanCandidates();this.scanSelection=rows.length===1?rows[0].id:'';this.render();}});
+    this.saveScanButton=this.button('설정 저장',()=>{const row=this.scanCandidates().find(value=>value.id===this.scanSelection);if(row)return this.importCandidate(row);});
     const scanActions=this.node('div',undefined,'account-actions');scanActions.append(this.scanButton,this.saveScanButton);
     this.scanRows=this.node('div');scanDetails.append(this.scanSource.wrap,this.scanChoice,scanActions,this.scanRows);this.management.append(scanDetails);
-    this.renameForm=this.node('form');this.renameForm.hidden=true;this.renameName=this.field('名称');this.renameName.input.maxLength=80;this.renameName.input.required=true;
-    this.renameSave=this.node('button','保存名称');this.renameSave.type='submit';
-    this.renameForm.append(this.renameName.wrap,this.renameSave,this.button('取消编辑',()=>{this.renameForm.hidden=true;}));
+    this.renameForm=this.node('form');this.renameForm.hidden=true;this.renameName=this.field('이름');this.renameName.input.maxLength=80;this.renameName.input.required=true;
+    this.renameSave=this.node('button','이름 저장');this.renameSave.type='submit';
+    this.renameForm.append(this.renameName.wrap,this.renameSave,this.button('변경 취소',()=>{this.renameForm.hidden=true;}));
     this.renameForm.onsubmit=async event=>{event.preventDefault();if(await this.perform({action:'rename',id:this.renameId,name:this.renameName.input.value}))this.renameForm.hidden=true;};
     this.root.append(this.renameForm);
-    const details=this.node('details');details.append(this.node('summary','添加账号或 API'));
-    this.form=this.node('form');this.name=this.field('名称');this.name.input.maxLength=80;this.name.input.required=true;
-    this.kind=document.createElement('select');this.kind.setAttribute('aria-label',this.text('接入类型'));
-    for(const [value,label] of [['chatgpt','官方 ChatGPT 账号'],['api','自定义 API']]){const option=this.node('option',label);option.value=value;this.kind.append(option);}
-    this.url=this.field('API 地址');this.url.input.placeholder='https://api.example.com/v1';
-    this.key=this.field('API Key','password');this.key.input.autocomplete='new-password';this.key.input.maxLength=8192;
-    this.model=this.field('默认模型');this.model.input.maxLength=200;
-    this.modelOptions=this.node('select');this.modelOptions.setAttribute('aria-label',this.text('上游模型'));this.modelOptions.hidden=true;
+    const details=this.node('details');details.append(this.node('summary','계정 추가 또는 API'));
+    this.form=this.node('form');this.name=this.field('이름');this.name.input.maxLength=80;this.name.input.required=true;
+    this.kind=document.createElement('select');this.kind.setAttribute('aria-label',this.text('제공자 유형'));
+    for(const [value,label] of [['chatgpt','공식 ChatGPT 계정'],['api','사용자 정의 API']]){const option=this.node('option',label);option.value=value;this.kind.append(option);}
+    this.url=this.field('API URL');this.url.input.placeholder='https://api.example.com/v1';
+    this.key=this.field('API 키','password');this.key.input.autocomplete='new-password';this.key.input.maxLength=8192;
+    this.model=this.field('기본 모델');this.model.input.maxLength=200;
+    this.modelOptions=this.node('select');this.modelOptions.setAttribute('aria-label',this.text('공급자 모델'));this.modelOptions.hidden=true;
     this.modelOptions.onchange=()=>{if(this.modelOptions.value)this.model.input.value=this.modelOptions.value;};
-    this.modelsButton=this.button('获取上游模型',()=>ApiAccessEditor.discover(this.apiEditor));
+    this.modelsButton=this.button('공급자 모델 가져오기',()=>ApiAccessEditor.discover(this.apiEditor));
     this.modelMessage=this.node('p',undefined,'account-muted');
-    this.submit=this.node('button','继续');this.submit.type='submit';
+    this.submit=this.node('button','계속하다');this.submit.type='submit';
     const panel=this,asField=value=>({label:value.wrap,input:value.input});
     this.apiEditor={t:this.text.bind(this),node:this.node.bind(this),get busy(){return panel.busy;},draftRevision:0,draftModelMode:'legacy',draftManualToggle:false,
-      model:asField(this.model),baseUrl:asField(this.url),key:asField(this.key),save:this.submit,modelSelect:this.modelOptions,modelCaption:this.model.wrap,modelFeedback:this.modelMessage,fetchModels:this.modelsButton,manualModel:this.button('手动填写',()=>{}),request:payload=>this.request(payload),
+      model:asField(this.model),baseUrl:asField(this.url),key:asField(this.key),save:this.submit,modelSelect:this.modelOptions,modelCaption:this.model.wrap,modelFeedback:this.modelMessage,fetchModels:this.modelsButton,manualModel:this.button('수동으로 입력',()=>{}),request:payload=>this.request(payload),
       draftModelContext:()=>JSON.stringify([this.generation,this.importId,this.editId,this.kind.value,this.url.input.value,this.key.input.value]),
       draftModelRequest:()=>this.importId?{action:'models',candidateId:this.importId}:{action:'models',id:this.editId,baseUrl:this.url.input.value,apiKey:this.key.input.value},
       onDraftStart:()=>{this.operationError=false;this.error.textContent='';},onDraftError:error=>{this.operationError=true;this.error.textContent=this.text(String(error.message).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));},
-      draftModelSuccess:'模型列表不保证支持 Responses API，请选择可用于对话的模型。'};
+      draftModelSuccess:'목록에는 응답 API를 지원하지 않는 모델이 포함될 수 있습니다. 호환되는 채팅 모델을 선택하세요.'};
     const clearModels=()=>ApiAccessEditor.clear(this.apiEditor);
     this.url.input.oninput=clearModels;this.key.input.oninput=clearModels;this.clearModels=clearModels;
     const fields=()=>{this.modelsButton.hidden=this.kind.value!=='api';if(this.kind.value!=='api')clearModels();for(const field of [this.url,this.key,this.model])field.wrap.hidden=this.kind.value!=='api';};this.kind.onchange=fields;fields();
-    this.cancelEdit=this.button('取消编辑',()=>{this.resetForm();fields();});
+    this.cancelEdit=this.button('변경 취소',()=>{this.resetForm();fields();});
     this.form.append(this.name.wrap,this.kind,this.url.wrap,this.key.wrap,this.model.wrap,this.modelsButton,this.modelOptions,this.modelMessage,this.submit,this.cancelEdit);
     this.form.onsubmit=async event=>{
       event.preventDefault();const payload={name:this.name.input.value};
@@ -95,13 +95,13 @@ class AccountsPanel {
       else Object.assign(payload,{action:'login',replaceId:this.editId});
       if(await this.perform(payload)){this.resetForm();fields();}
     };
-    details.append(this.form,this.node('p','账号凭据仅保存在此电脑的私有目录中。自定义 API 需要兼容 Responses API。','account-muted'));
+    details.append(this.form,this.node('p','자격 증명은 이 컴퓨터의 개인 디렉터리에 유지됩니다. 사용자 정의 API는 API 응답을 지원해야 합니다.','account-muted'));
     this.loginBox=this.node('div');details.append(this.loginBox);this.management.append(details);this.addDetails=details;
-    const settings=this.node('details');settings.append(this.node('summary','桌面程序与恢复'));
-    this.executable=this.field('桌面程序路径');this.executable.input.placeholder=this.text('可选择 .app 应用程序包或桌面可执行文件');
-    this.scanDesktop=this.button('扫描桌面程序',()=>this.perform({action:'scanDesktop'}));
-    this.desktopSettings=settings;settings.append(this.executable.wrap,this.scanDesktop,this.button('保存程序路径',()=>this.perform({action:'configure',desktopExecutable:this.executable.input.value})));
-    this.recover=this.button('恢复原接入',()=>{if(window.confirm(this.text('确认恢复原接入并重启 Codex 桌面应用？')))this.perform({action:'recover',confirmed:true});});
+    const settings=this.node('details');settings.append(this.node('summary','데스크탑 애플리케이션 및 복구'));
+    this.executable=this.field('데스크탑 실행 파일');this.executable.input.placeholder=this.text('.app 번들 또는 데스크톱 실행 파일 선택');
+    this.scanDesktop=this.button('데스크톱 앱 검색',()=>this.perform({action:'scanDesktop'}));
+    this.desktopSettings=settings;settings.append(this.executable.wrap,this.scanDesktop,this.button('응용 프로그램 경로 저장',()=>this.perform({action:'configure',desktopExecutable:this.executable.input.value})));
+    this.recover=this.button('이전 계정 복원',()=>{if(window.confirm(this.text('이전 계정을 복원하고 Codex를 다시 시작하시겠습니까?')))this.perform({action:'recover',confirmed:true});});
     settings.append(this.recover);this.management.append(settings);
   }
   resetForm(){this.editId=null;this.importId=null;this.form.reset();this.key.input.value='';this.kind.disabled=false;this.url.input.disabled=false;this.key.input.disabled=false;this.clearModels();}
@@ -121,7 +121,7 @@ class AccountsPanel {
     if(this.visible()!==this.lastVisible)return this.resume();
     clearTimeout(this.timer);if(this.loading||this.busy)return;this.loading=true;const generation=this.generation,visit=this.visit;
     try{const value=await this.read(forceReset);if(generation===this.generation&&visit===this.visit){this.readFailed=false;if(forceReset)this.finishGlobalResetRefresh(value.globalReset,true);if(!this.operationError)this.error.textContent='';this.accept(value);await this.loadUsage(generation);}}
-    catch(error){if(generation===this.generation&&visit===this.visit){this.readFailed=true;if(this.globalResetRefreshIntent){this.globalResetRefreshIntent=null;this.notify(this.text('连接失败，请稍后重试'));}this.error.textContent=this.text(String(error.message).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}}
+    catch(error){if(generation===this.generation&&visit===this.visit){this.readFailed=true;if(this.globalResetRefreshIntent){this.globalResetRefreshIntent=null;this.notify(this.text('연결에 실패했습니다. 나중에 다시 시도해 주세요'));}this.error.textContent=this.text(String(error.message).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}}
     finally{if(generation===this.generation){this.loading=false;this.render();if(this.resumePending&&this.visible()){this.resumePending=false;this.refresh();}else this.schedule();}}
   }
   schedule(){
@@ -153,8 +153,8 @@ class AccountsPanel {
       this.accept(value);
     }
   }
-  relative(minutes){const days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),rest=minutes%60;return [days?days+this.text(' 天'):'',hours?hours+this.text(' 小时'):'',rest?rest+this.text(' 分钟'):''].filter(Boolean).join(' ');}
-  resetTime(stamp){const minutes=Math.ceil((stamp*1000-Date.now())/60000);return (minutes>0?this.relative(minutes)+this.text('后恢复'):this.text('等待刷新'))+' · '+new Date(stamp*1000).toLocaleString(BridgeI18n.locale());}
+  relative(minutes){const days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),rest=minutes%60;return [days?days+this.text('일'):'',hours?hours+this.text('시간'):'',rest?rest+this.text('분'):''].filter(Boolean).join(' ');}
+  resetTime(stamp){const minutes=Math.ceil((stamp*1000-Date.now())/60000);return (minutes>0?this.relative(minutes)+this.text('재설정될 때까지'):this.text('새로고침을 기다리는 중'))+' · '+new Date(stamp*1000).toLocaleString(BridgeI18n.locale());}
   shortTime(stamp,timeOnly=false){
     const date=new Date(stamp*1000),now=new Date(Date.now()),options={hour:'2-digit',minute:'2-digit'};
     if(!timeOnly||date.toDateString()!==now.toDateString())Object.assign(options,{month:'short',day:'numeric',...(date.getFullYear()!==now.getFullYear()?{year:'numeric'}:{})});
@@ -163,20 +163,20 @@ class AccountsPanel {
   accountUsage(card,row){
     if(row.kind==='chatgpt'){
       const usage=row.details?.usage,box=this.node('div',undefined,'accounts-usage');
-      if(usage?.status==='loading'&&!usage.limits)box.append(this.node('span','查询中…','account-query'));
-      else if(!usage)box.append(this.node('span','正在读取额度…','account-muted'));
+      if(usage?.status==='loading'&&!usage.limits)box.append(this.node('span','확인 중…','account-query'));
+      else if(!usage)box.append(this.node('span','사용량 불러오는 중…','account-muted'));
       else if(usage.status==='error')box.append(this.node('span',usage.error,'account-muted'));
       if(usage?.limits){
         for(const bucket of usage.limits||[])for(const window of bucket.windows||[]){
           const line=this.node('div',undefined,'accounts-window'),minutes=window.windowDurationMins;
-          const label=minutes?minutes%1440===0?minutes/1440+this.text(' 天'):minutes%60===0?minutes/60+this.text(' 小时'):minutes+this.text(' 分钟'):this.text('额度窗口');
-          line.append(this.node('span',bucket.name+' · '+label),this.node('strong',window.remainingPercent==null?this.text('暂未提供'):this.text('剩余 ')+Math.round(window.remainingPercent*10)/10+'%'));
-          if(window.remainingPercent!=null){const progress=this.node('progress');progress.max=100;progress.value=window.remainingPercent;progress.setAttribute('aria-label',this.text('剩余额度'));line.append(progress);}
+          const label=minutes?minutes%1440===0?minutes/1440+this.text('일'):minutes%60===0?minutes/60+this.text('시간'):minutes+this.text('분'):this.text('사용량 창');
+          line.append(this.node('span',bucket.name+' · '+label),this.node('strong',window.remainingPercent==null?this.text('사용할 수 없음'):this.text('남은')+Math.round(window.remainingPercent*10)/10+'%'));
+          if(window.remainingPercent!=null){const progress=this.node('progress');progress.max=100;progress.value=window.remainingPercent;progress.setAttribute('aria-label',this.text('남은 할당량'));line.append(progress);}
           if(window.resetsAt){const reset=this.node('small',undefined,'account-reset-time');reset.textContent=this.resetTime(window.resetsAt);line.append(reset);}box.append(line);
         }
-        if(!usage.limits?.length)box.append(this.node('span','暂未提供额度信息','account-muted'));
-        for(const bucket of usage.limits||[])if(bucket.credits){const credit=bucket.credits;if(credit.unlimited||credit.balance!=null&&String(credit.balance).trim()!=='')box.append(this.node('p',bucket.name+' · Credits: '+(credit.unlimited?this.text('不限量'):credit.balance),'account-muted'));}
-        if(usage.status==='error')box.append(this.node('small','保留上次结果，数据尚未更新','account-muted'));
+        if(!usage.limits?.length)box.append(this.node('span','아직 사용량 한도를 확인할 수 없습니다.','account-muted'));
+        for(const bucket of usage.limits||[])if(bucket.credits){const credit=bucket.credits;if(credit.unlimited||credit.balance!=null&&String(credit.balance).trim()!=='')box.append(this.node('p',bucket.name+' · Credits: '+(credit.unlimited?this.text('제한 없는'):credit.balance),'account-muted'));}
+        if(usage.status==='error')box.append(this.node('small','마지막 결과를 표시합니다. 데이터가 업데이트되지 않았습니다','account-muted'));
       }
       card.append(box);
     }
@@ -186,29 +186,29 @@ class AccountsPanel {
     const period=usage.subscription?.periodEndsAt,online=usage.subscription?.source==='online',hasDate=Number.isFinite(period)&&(online||period>Date.now()/1000);
     const date=hasDate?new Date(period*1000):null,fullDate=date?.toLocaleString(BridgeI18n.locale());
     const shortDate=date?.toLocaleDateString(BridgeI18n.locale(),{month:'short',day:'numeric',...(date.getFullYear()!==new Date(Date.now()).getFullYear()?{year:'numeric'}:{})});
-    const label=hasDate?this.text(online?'订阅周期至 ':'登录记录中的订阅日期（非实时）：')+shortDate:this.text('订阅有效期暂未确认');
-    const source=this.text(online?'订阅日期来自在线查询，续订与扣费状态请以 ChatGPT 订阅页面为准。':'登录记录可能滞后，请以 ChatGPT 订阅页面为准。');
-    const note=this.node('p',(hasDate?this.text(online?'订阅周期截至：':'登录记录中的订阅日期（非实时）：')+fullDate+' · ':'')+source,'account-muted account-subscription-note');note.hidden=!this.expandedSubscriptions.has(row.id);
+    const label=hasDate?this.text(online?'구독 기간 종료':'로그인 기록의 구독 날짜(실시간 아님):')+shortDate:this.text('구독 종료 날짜가 확인되지 않았습니다.');
+    const source=this.text(online?'온라인에서 검색된 날짜입니다. 갱신 및 청구 상태는 ChatGPT 구독 페이지를 확인하세요.':'로그인 기록이 오래되었을 수 있습니다. ChatGPT 구독 페이지를 참조하세요.');
+    const note=this.node('p',(hasDate?this.text(online?'구독 기간 종료:':'로그인 기록의 구독 날짜(실시간 아님):')+fullDate+' · ':'')+source,'account-muted account-subscription-note');note.hidden=!this.expandedSubscriptions.has(row.id);
     const info=this.button(label,()=>{note.hidden=!note.hidden;if(note.hidden)this.expandedSubscriptions.delete(row.id);else this.expandedSubscriptions.add(row.id);info.setAttribute('aria-expanded',String(!note.hidden));});
-    info.className='account-subscription-info';info.title=note.textContent;info.setAttribute('aria-label',this.text('订阅日期说明'));info.setAttribute('aria-expanded',String(!note.hidden));
+    info.className='account-subscription-info';info.title=note.textContent;info.setAttribute('aria-label',this.text('구독 날짜에 대해'));info.setAttribute('aria-expanded',String(!note.hidden));
     const subscription=this.node('div',undefined,'account-subscription');subscription.append(info);card.append(subscription,note);
     if(usage.subscription?.error)card.append(this.node('p',usage.subscription.error,'account-muted'));
   }
   accountReset(card,row,switching){
     const credits=row.details?.usage?.resetCredits;
     const summary=this.node('div',undefined,'accounts-reset-summary'),info=this.node('div',undefined,'accounts-reset-info'),count=credits?.availableCount;
-    info.append(this.node('div',this.text('重置卡')+' · '+(count==null?this.text('暂未提供'):count+this.text(' 张可用')),'accounts-reset-count'));
+    info.append(this.node('div',this.text('사용량 재설정')+' · '+(count==null?this.text('사용할 수 없음'):count+this.text('개 사용 가능')),'accounts-reset-count'));
     const expiry=credits?.credits?.filter(c=>c.status==='available'&&c.resetType==='codexRateLimits'&&Number.isFinite(c.expiresAt)&&c.expiresAt>Date.now()/1000).map(c=>c.expiresAt).sort((a,b)=>a-b)[0];
-    if(expiry){const time=this.node('time',this.shortTime(expiry));time.title=new Date(expiry*1000).toLocaleString(BridgeI18n.locale());time.dateTime=new Date(expiry*1000).toISOString();const line=this.node('div',undefined,'accounts-reset-expiry account-muted');line.append(this.node('span','最近到期：'),time);info.append(line);}
-    else if(count>0)info.append(this.node('div','未提供到期时间','accounts-reset-expiry account-muted'));
+    if(expiry){const time=this.node('time',this.shortTime(expiry));time.title=new Date(expiry*1000).toLocaleString(BridgeI18n.locale());time.dateTime=new Date(expiry*1000).toISOString();const line=this.node('div',undefined,'accounts-reset-expiry account-muted');line.append(this.node('span','다음 만료:'),time);info.append(line);}
+    else if(count>0)info.append(this.node('div','만료 기간이 제공되지 않음','accounts-reset-expiry account-muted'));
     summary.append(info);
-    const reset=this.button('使用重置卡',()=>this.openReset(row));reset.className='accounts-reset';reset.disabled=this.busy||switching;reset.setAttribute('aria-label',this.text('查看并使用所选账号的重置卡'));summary.append(reset);
+    const reset=this.button('재설정 사용',()=>this.openReset(row));reset.className='accounts-reset';reset.disabled=this.busy||switching;reset.setAttribute('aria-label',this.text('선택한 계정의 재설정 크레딧 보기 및 사용'));summary.append(reset);
     card.append(summary);
   }
   async openReset(row){
     if(this.resetDialog?.open)return;
-    const dialog=this.node('dialog',undefined,'picker account-reset-dialog'),heading=this.node('h2',this.text('重置卡')+' · '+row.name);
-    const close=this.button('关闭',()=>dialog.close()),content=this.node('div'),button=this.node('button');
+    const dialog=this.node('dialog',undefined,'picker account-reset-dialog'),heading=this.node('h2',this.text('사용량 재설정')+' · '+row.name);
+    const close=this.button('닫기',()=>dialog.close()),content=this.node('div'),button=this.node('button');
     const header=this.node('div',undefined,'picker-head');header.append(heading,close);dialog.append(header,content);
     const panel=new AccountPanel({root:content,button,resetOnly:true,
       read:refresh=>this.request({action:'account',id:row.id,operation:'read',refresh}),
@@ -225,18 +225,18 @@ class AccountsPanel {
   }
   accountActions(card,row,footer){
     const models=row.details?.models,opened=this.expandedModels.has(row.id);
-    {const show=this.button(opened?'收起模型':'查看可用模型',()=>{if(opened){this.expandedModels.delete(row.id);this.render();}else{this.expandedModels.add(row.id);this.perform({action:'details',id:row.id,section:'models'});}});show.disabled=this.busy;footer.append(show);}
+    {const show=this.button(opened?'모델 숨기기':'사용 가능한 모델 보기',()=>{if(opened){this.expandedModels.delete(row.id);this.render();}else{this.expandedModels.add(row.id);this.perform({action:'details',id:row.id,section:'models'});}});show.disabled=this.busy;footer.append(show);}
     if(opened){const identity=row.accountKey||JSON.stringify([row.kind,row.baseUrl,row.model,row.email]);let box=this.modelBoxes.get(row.id);
       if(box?.identity!==identity){this.modelBoxes.delete(row.id);box=null;}
-      if(!box){box=this.node('div',undefined,'accounts-models');box.identity=identity;box.ontouchstart=()=>{box.touching=true;};box.ontouchend=box.ontouchcancel=()=>{box.touching=false;};box.controls=this.node('div',undefined,'accounts-model-controls');box.refresh=this.button('刷新模型',()=>this.perform({action:'details',id:row.id,section:'models',refresh:true}));box.updated=this.node('small',undefined,'account-muted');box.content=this.node('div');box.controls.append(box.refresh,box.updated);box.append(box.controls,box.content);this.modelBoxes.set(row.id,box);}
+      if(!box){box=this.node('div',undefined,'accounts-models');box.identity=identity;box.ontouchstart=()=>{box.touching=true;};box.ontouchend=box.ontouchcancel=()=>{box.touching=false;};box.controls=this.node('div',undefined,'accounts-model-controls');box.refresh=this.button('모델 새로 고침',()=>this.perform({action:'details',id:row.id,section:'models',refresh:true}));box.updated=this.node('small',undefined,'account-muted');box.content=this.node('div');box.controls.append(box.refresh,box.updated);box.append(box.controls,box.content);this.modelBoxes.set(row.id,box);}
       box.refresh.disabled=this.busy||models?.status==='loading';
-      const updated=models?.cache?.updatedAt;box.updated.hidden=!(Number.isFinite(updated)&&updated>0);box.updated.textContent=box.updated.hidden?'':this.text('更新于：')+this.shortTime(updated);
+      const updated=models?.cache?.updatedAt;box.updated.hidden=!(Number.isFinite(updated)&&updated>0);box.updated.textContent=box.updated.hidden?'':this.text('업데이트 날짜:')+this.shortTime(updated);
       const key=JSON.stringify([models?.status,models?.error,models?.models,BridgeI18n.locale()]);
       if(box.modelKey!==key){box.modelKey=key;box.content.replaceChildren();
-        if((!models||models.status==='loading')&&!models?.models?.length)box.content.append(this.node('p','正在读取模型…'));
+        if((!models||models.status==='loading')&&!models?.models?.length)box.content.append(this.node('p','모델 로드 중…'));
         if(models?.status==='error')box.content.append(this.node('p',models.error,'error'));
         if(models?.models?.length)for(const model of models.models){const line=this.node('div');line.textContent=!model.name||model.name===model.id?model.id:model.name+' · '+model.id;if(model.efforts?.length)line.append(this.node('small',' · '+model.efforts.map(effort=>this.text(effort)).join(' / '),'account-muted'));box.content.append(line);}
-        else if(models?.status==='ready')box.content.append(this.node('p','暂未提供可用模型'));
+        else if(models?.status==='ready')box.content.append(this.node('p','사용 가능한 모델이 없습니다.'));
       }if(!box.parentNode)card.append(box);
     }
   }
@@ -244,9 +244,9 @@ class AccountsPanel {
     const controls=this.node('div',undefined,'accounts-usage-controls'),usage=row.details?.usage;
     const refresh=this.button('',()=>this.perform({action:'details',id:row.id,section:'usage',refresh:true}));refresh.className='accounts-usage-refresh';
     refresh.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8M20 3v5h-5"/></svg>';
-    refresh.title=this.text('查看剩余额度');refresh.setAttribute('aria-label',refresh.title);
+    refresh.title=this.text('남은 할당량 보기');refresh.setAttribute('aria-label',refresh.title);
     refresh.disabled=this.busy||usage?.status==='loading';
-    if(usage?.updatedAt){const updated=this.node('small',this.text('{time} 更新').replace('{time}',this.shortTime(usage.updatedAt,true))+(usage.status==='loading'?' · '+this.text('查询中…'):''),'account-updated account-muted');updated.title=new Date(usage.updatedAt*1000).toLocaleString(BridgeI18n.locale());controls.append(updated);}
+    if(usage?.updatedAt){const updated=this.node('small',this.text('업데이트됨 {time}').replace('{time}',this.shortTime(usage.updatedAt,true))+(usage.status==='loading'?' · '+this.text('확인 중…'):''),'account-updated account-muted');updated.title=new Date(usage.updatedAt*1000).toLocaleString(BridgeI18n.locale());controls.append(updated);}
     controls.append(refresh);return controls;
   }
   accept(value){const old=this.value;if(!this.desktop&&old?.canSwitch===false&&value.canSwitch===undefined)value={...value,canSwitch:false};this.value=value;if(!value.resetDynamicEnabled)this.globalResetRefreshIntent=null;this.finishGlobalResetRefresh(value.globalReset);if(old&&(old.activeId!==value.activeId||old.current?.kind!==value.current?.kind||old.current?.name!==value.current?.name||old.switch?.phase!==value.switch?.phase))this.onChanged(value);this.onUpdate(value);this.render();}
@@ -261,32 +261,32 @@ class AccountsPanel {
     if(receipt?.operation==='cliAuth'&&receipt.phase==='authUnknown'&&receipt.targetId===row.id){
       await this.perform({action:'switch',id:row.id,requestId:receipt.requestId,confirmed:true,tasksConfirmed:true});this.refresh();return;
     }
-    if(!window.confirm(this.text(this.value?.scope==='profile'?'确认此配置中的所有任务（包括其他客户端的任务）已结束，并同步共享的 Codex 账号？切换完成前请勿从其他客户端发起任务；仅在需要时正常退出空闲服务。':'确认所有任务（包括未在网页显示的任务）已结束，并切换此电脑共享的 Codex 接入？切换完成前请勿从其他客户端发起任务；仅在需要时正常退出并重启桌面运行时。')+'\n'+row.name))return;
+    if(!window.confirm(this.text(this.value?.scope==='profile'?'이 구성의 모든 작업(다른 클라이언트의 작업 포함)이 끝났는지 확인하고 공유 Codex 계정을 동기화하시겠습니까? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요. 필요한 경우에만 유휴 공유 서비스를 정상 종료합니다.':'모든 작업(이 웹 페이지에 표시되지 않는 작업 포함)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다.')+'\n'+row.name))return;
     try{await this.perform({action:'switch',id:row.id,requestId:this.requestId(),confirmed:true,tasksConfirmed:true,
       syncLocalCli:true});this.refresh();}
-    catch(error){this.operationError=true;this.error.textContent=this.text('无法创建切换请求，请刷新页面后重试');}
+    catch(error){this.operationError=true;this.error.textContent=this.text('전환 요청을 생성할 수 없습니다. 새로고침하고 다시 시도하세요.');}
   }
   renderTools(){
     const value=this.value;if(!value)return;
     this.reminders.replaceChildren();
-    this.reminders.append(this.node('p','提醒通过电脑端已配置的 Bark、ntfy 或 PushPlus 发送，电脑与网关需要保持运行。','account-muted'));
-    const labels={globalReset:'重置动态提醒',lowQuota:'额度不足 10% 时提醒',quotaReset:'确认额度恢复后提醒',resetExpiry:'重置卡到期前 24 小时提醒',subscriptionExpiry:'订阅周期截止前 7／3／1 天提醒',desktopUpdate:'Codex Desktop 新版本提醒'};
+    this.reminders.append(this.node('p','미리 알림은 컴퓨터에 구성된 Bark, ntfy 또는 PushPlus를 사용합니다. 컴퓨터와 게이트웨이를 계속 실행하세요.','account-muted'));
+    const labels={globalReset:'Outlook 알림 재설정',lowQuota:'할당량이 10% 이하일 때 알림',quotaReset:'할당량 복구 확인 후 알림',resetExpiry:'재설정 크레딧이 만료되기 24시간 전에 알림',subscriptionExpiry:'구독 기간이 종료되기 7일, 3일, 1일 전에 알림을 받으세요.',desktopUpdate:'새로운 Codex 데스크탑 릴리스에 대해 알림'};
     for(const [key,label] of Object.entries(labels)){if(value.scope==='profile'&&key==='desktopUpdate')continue;
       const wrap=this.node('label',undefined,'account-reminder'),input=document.createElement('input');input.type='checkbox';input.checked=!!value.reminders?.[key];input.disabled=this.busy;
       input.onchange=()=>this.perform({action:'reminders',preferences:{[key]:input.checked}});wrap.append(input,this.node('span',label));this.reminders.append(wrap);
     }
     if(value.reminderError)this.reminders.append(this.node('p',value.reminderError,'error'));
-    const update=value.desktopUpdate||{state:'idle'},labelsUpdate={idle:'尚未检查',checking:'正在检查官方更新渠道…',available:'官方渠道有新版本',checked:'本次未发现更高的公开版本',unsupported:'需要在电脑端检查',error:'更新检查失败',requesting:'正在打开原生更新器…',needsDesktop:'等待电脑端确认'};
-    this.updates.replaceChildren(this.node('h3','Codex Desktop 更新'),this.node('p',update.failureReason?'未能打开更新器':labelsUpdate[update.state]||update.state));
-    this.updates.append(this.node('p','可远程查看新版本；下载和安装仍需在电脑端确认。','account-muted'));
-    if(update.currentVersion)this.updates.append(this.node('p',this.text('当前版本：')+update.currentVersion+(update.targetVersion?' → '+update.targetVersion:''),'account-muted'));
-    if(update.installation?.state==='verified'){const installed=this.node('p',undefined,'account-muted');installed.textContent=this.text('已核验电脑端安装版本已更新')+' · '+update.installation.previousBuild+' → '+update.installation.currentBuild;this.updates.append(installed);}
+    const update=value.desktopUpdate||{state:'idle'},labelsUpdate={idle:'확인 안 함',checking:'공식 업데이트 채널 확인 중…',available:'공식 채널에 새 버전이 게시되었습니다.',checked:'이 검사에는 최신 공개 버전이 없습니다.',unsupported:'컴퓨터에서 확인하세요',error:'업데이트 확인 실패',requesting:'네이티브 업데이트 프로그램을 여는 중…',needsDesktop:'컴퓨터에서 확인을 기다리는 중'};
+    this.updates.replaceChildren(this.node('h3','Codex 데스크탑 업데이트'),this.node('p',update.failureReason?'업데이트 프로그램을 열 수 없습니다.':labelsUpdate[update.state]||update.state));
+    this.updates.append(this.node('p','원격으로 새 버전을 확인할 수 있습니다. 다운로드 및 설치에는 여전히 컴퓨터에서 확인이 필요합니다.','account-muted'));
+    if(update.currentVersion)this.updates.append(this.node('p',this.text('현재 버전:')+update.currentVersion+(update.targetVersion?' → '+update.targetVersion:''),'account-muted'));
+    if(update.installation?.state==='verified'){const installed=this.node('p',undefined,'account-muted');installed.textContent=this.text('설치된 데스크톱 버전이 업데이트된 것으로 확인되었습니다.')+' · '+update.installation.previousBuild+' → '+update.installation.currentBuild;this.updates.append(installed);}
     if(update.message)this.updates.append(this.node('p',update.message,'account-muted'));
-    if(update.checkedAt)this.updates.append(this.node('small',this.text('检查于：')+new Date(update.checkedAt*1000).toLocaleString(BridgeI18n.locale()),'account-muted'));
+    if(update.checkedAt)this.updates.append(this.node('small',this.text('확인 장소:')+new Date(update.checkedAt*1000).toLocaleString(BridgeI18n.locale()),'account-muted'));
     const checking=['checking','requesting'].includes(update.state),denied=!this.desktop&&(value.canManageDesktop??value.canSwitch)===false;
-    const check=this.button('查看 Codex 新版本',()=>this.perform({action:'checkDesktopUpdate'}));check.disabled=this.busy||checking||denied;this.updates.append(check);
-    if(update.canRequest&&update.currentBuild){const request=this.button('打开电脑端更新窗口',()=>{
-      if(window.confirm(this.text('确认所有桌面任务（包括未在网页显示的任务）已结束，并在电脑上打开 Codex 的“检查更新”界面？后续检查、下载与安装由 Codex 自行处理。')))
+    const check=this.button('새로운 Codex 버전 확인',()=>this.perform({action:'checkDesktopUpdate'}));check.disabled=this.busy||checking||denied;this.updates.append(check);
+    if(update.canRequest&&update.currentBuild){const request=this.button('컴퓨터에서 업데이터를 엽니다.',()=>{
+      if(window.confirm(this.text('여기에 표시되지 않는 작업을 포함하여 모든 데스크톱 작업이 완료되었는지 확인하고 컴퓨터에서 Codex의 업데이트 확인을 여시겠습니까? Codex는 업데이트 확인, 다운로드 및 설치를 처리합니다.')))
         this.perform({action:'requestDesktopUpdate',requestId:this.requestId(),currentBuild:update.currentBuild,confirmed:true,tasksConfirmed:true});
     });request.disabled=this.busy||checking||denied;this.updates.append(request);}
   }
@@ -316,19 +316,19 @@ class AccountsPanel {
     const intent=this.globalResetRefreshIntent;if(!intent||(!acknowledged&&intent.id===null))return;
     const refresh=value?.refresh,now=Date.now()/1000;
     if(refresh?.instanceId&&intent.instanceId&&refresh.instanceId!==intent.instanceId){
-      this.globalResetRefreshIntent=null;if(this.visible())this.notify(this.text('网关已重连，请重新刷新'));return;
+      this.globalResetRefreshIntent=null;if(this.visible())this.notify(this.text('게이트웨이가 다시 연결되었습니다. 다시 새로고침해 주세요'));return;
     }
     if(acknowledged&&refresh?.instanceId)intent.instanceId=refresh.instanceId;
     if(!acknowledged&&(!refresh||refresh.id<intent.id))return;
     if(refresh?.checking){if(acknowledged)intent.id=refresh.id;return;}
     let message;
     if(refresh&&(refresh.id>intent.baseline||(intent.id!==null&&refresh.id>=intent.id))&&value.state==='ready'){
-      message=this.text(refresh.changed?'已更新':'已检查，暂无新动态');
+      message=this.text(refresh.changed?'업데이트됨':'확인됨; 새로운 업데이트 없음');
     }else if(refresh?.retryAt>now){
-      message=this.text('暂时无法更新，{minutes} 分钟后可重试').replace('{minutes}',Math.ceil((refresh.retryAt-now)/60));
+      message=this.text('일시적으로 사용할 수 없습니다. {minutes}분 후에 다시 시도하세요.').replace('{minutes}',Math.ceil((refresh.retryAt-now)/60));
     }else if(refresh?.cooldownUntil>now){
-      message=this.text('刚刚检查过，{seconds} 秒后可刷新').replace('{seconds}',Math.ceil(refresh.cooldownUntil-now));
-    }else message=this.text(refresh?'查询失败，请稍后重试':'已读取缓存');
+      message=this.text('최근에 확인했습니다. {seconds}초 후에 다시 새로고침').replace('{seconds}',Math.ceil(refresh.cooldownUntil-now));
+    }else message=this.text(refresh?'확인에 실패했습니다. 나중에 다시 시도해 주세요':'캐시된 상태가 로드됨');
     this.globalResetRefreshIntent=null;if(this.visible())this.notify(message);
   }
 
@@ -342,10 +342,10 @@ class AccountsPanel {
     const header=this.node('div',undefined,'accounts-global-heading');
     const reminderEnabled=!!(this.value.reminders?.globalReset||this.value.reminders?.globalResetSignal);
     const reminder=this.button('',()=>this.perform({action:'reminders',preferences:{globalReset:!reminderEnabled,globalResetSignal:!reminderEnabled}}));
-    reminder.className='accounts-global-reminder';reminder.disabled=this.busy;reminder.title=this.text(reminderEnabled?'关闭重置动态提醒':'开启重置动态提醒');reminder.setAttribute('aria-label',reminder.title);reminder.setAttribute('aria-pressed',String(reminderEnabled));reminder.setAttribute('data-enabled',String(reminderEnabled));
+    reminder.className='accounts-global-reminder';reminder.disabled=this.busy;reminder.title=this.text(reminderEnabled?'업데이트 알림 재설정 비활성화':'업데이트 알림 재설정 활성화');reminder.setAttribute('aria-label',reminder.title);reminder.setAttribute('aria-pressed',String(reminderEnabled));reminder.setAttribute('data-enabled',String(reminderEnabled));
     reminder.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path class="accounts-global-bell" d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>';
-    reminder.append(this.node('span',reminderEnabled?'提醒已开启':'提醒已关闭'));
-    header.append(this.node('h3','Tibo 重置动态'),reminder);this.globalReset.append(header,this.node('p','第三方统计与预测，仅供参考；个人额度以账号卡片为准。','account-muted'));
+    reminder.append(this.node('span',reminderEnabled?'알림 켜짐':'알림 꺼짐'));
+    header.append(this.node('h3','티보 리셋 전망'),reminder);this.globalReset.append(header,this.node('p','제3자 통계 및 예측은 참고용입니다. 실제 할당량은 계정 카드를 확인하세요.','account-muted'));
     const today=new Date(Date.now()),now=today.getTime()/1000;
     const {stale,resetToday,status,showAnnouncement,showForecast}=resetCardState(value,today);
     clearTimeout(this.resetMidnightTimer);this.resetMidnightTimer=null;
@@ -354,81 +354,81 @@ class AccountsPanel {
       this.resetMidnightTimer=setTimeout(()=>{this.resetMidnightTimer=null;this.globalResetKey=null;this.renderGlobalReset();},midnight.getTime()-today.getTime());
     }
     if(value.lastResetAt){
-      const label=resetToday?'今日已全局重置':'上次全局重置';
+      const label=resetToday?'오늘 글로벌 리셋':'마지막 전역 재설정';
       const time=resetToday?this.shortTime(value.lastResetAt,true):this.globalTime(value.lastResetAt);
       const last=this.node('p',this.text(label)+' · '+time,'accounts-global-state');
       last.setAttribute('data-state',resetToday&&!stale?'confirmed':'quiet');this.globalReset.append(last);
     }
     let text='',tone='quiet';
-    if(status==='delayed'){text=value.updatedAt?'数据延迟 · 等待更新':'重置动态暂时加载失败';tone='delayed';}
-    else if(status==='loading')text='正在读取重置动态…';
+    if(status==='delayed'){text=value.updatedAt?'데이터 지연 · 업데이트 대기 중':'일시적으로 업데이트 재설정을 사용할 수 없습니다.';tone='delayed';}
+    else if(status==='loading')text='전망 재설정 로드 중…';
     else if(status==='signal'){
       const end=value.officialSignal.endsAt;
-      text=this.text('官方已预告')+' · '+(end>now?this.globalTime(end)+this.text('前重置'):this.text(end?'等待重置完成':'即将重置'));tone='signal';
+      text=this.text('공식 발표')+' · '+(end>now?this.globalTime(end)+this.text('기한 재설정'):this.text(end?'재설정 완료 대기 중':'곧 재설정 예정'));tone='signal';
     }
     if(text){const state=this.node('p',text,'accounts-global-state');state.setAttribute('data-state',tone);state.setAttribute('role','status');this.globalReset.append(state);}
     if(showAnnouncement)this.renderGlobalAnnouncement(value.officialSignal);
     if(showForecast){
       const odds=value.probabilities||{},row=this.node('div',undefined,'accounts-global-odds');
-      for(const [key,label] of [['h24','24 小时内'],['h48','48 小时内']])if(Number.isFinite(odds[key])){
+      for(const [key,label] of [['h24','24시간 이내'],['h48','48시간 이내']])if(Number.isFinite(odds[key])){
         const item=this.node('span');item.append(this.node('span',label),this.node('strong',odds[key]+'%'));row.append(item);
       }
-      if(row.children.length){this.globalReset.append(row);const confidence={low:'低置信度',medium:'中置信度',high:'高置信度'}[value.confidence];this.globalReset.append(this.node('p',this.text('预测重置概率')+(confidence?' · '+this.text(confidence):''),'accounts-global-confidence'));}
+      if(row.children.length){this.globalReset.append(row);const confidence={low:'낮은 신뢰도',medium:'중간 신뢰도',high:'높은 신뢰도'}[value.confidence];this.globalReset.append(this.node('p',this.text('예상 재설정 확률')+(confidence?' · '+this.text(confidence):''),'accounts-global-confidence'));}
     }
     if(this.globalResetMessage){const feedback=this.node('p',this.globalResetMessage,'accounts-global-feedback');feedback.setAttribute('role','status');this.globalReset.append(feedback);}
-    const footer=this.node('div',undefined,'accounts-global-source'),source=this.node('a','来源 codex-reset.com ↗');source.href='https://codex-reset.com/zh/';source.target='_blank';source.rel='noopener noreferrer';
+    const footer=this.node('div',undefined,'accounts-global-source'),source=this.node('a','출처: codex-reset.com ↗');source.href='https://codex-reset.com/zh/';source.target='_blank';source.rel='noopener noreferrer';
     const actions=this.node('div',undefined,'accounts-global-footer-actions');
-    if(value.updatedAt){const updated=this.node('span',this.text('更新于 ')+this.shortTime(value.updatedAt,true));if(value.checkedAt)updated.title=this.text('本次检查于 ')+this.shortTime(value.checkedAt);actions.append(updated);}
-    const refresh=this.button('',()=>this.refreshGlobalReset());refresh.className='accounts-global-refresh';refresh.title=this.text('刷新重置动态');refresh.setAttribute('aria-label',refresh.title);
+    if(value.updatedAt){const updated=this.node('span',this.text('업데이트: ')+this.shortTime(value.updatedAt,true));if(value.checkedAt)updated.title=this.text('마지막 확인')+this.shortTime(value.checkedAt);actions.append(updated);}
+    const refresh=this.button('',()=>this.refreshGlobalReset());refresh.className='accounts-global-refresh';refresh.title=this.text('재설정 업데이트 새로 고침');refresh.setAttribute('aria-label',refresh.title);
     const refreshing=!!this.refreshingGlobalReset||!!this.globalResetRefreshIntent||!!value.refresh?.checking||value.state==='loading';refresh.disabled=this.busy||this.loading||refreshing;refresh.setAttribute('aria-busy',String(refreshing));
     refresh.innerHTML=this.refreshIcon();
     actions.append(refresh);footer.append(source,actions);this.globalReset.append(footer);
   }
   renderGlobalAnnouncement(signal){
-    const original=signal.text||signal.summary,translation=signal.text&&signal.translation?.locale==='zh'&&typeof signal.translation.text==='string'?signal.translation.text:null;
+    const original=signal.text||signal.summary,translation=signal.text&&signal.translation?.locale==='ko'&&typeof signal.translation.text==='string'?signal.translation.text:null;
     const language=BridgeI18n.language(),key=JSON.stringify([signal.at,signal.url,original,translation,language]);
-    if(this.globalAnnouncementKey!==key){this.globalAnnouncementKey=key;this.globalAnnouncementExpanded=false;this.globalAnnouncementOriginal=language!=='zh';}
+    if(this.globalAnnouncementKey!==key){this.globalAnnouncementKey=key;this.globalAnnouncementExpanded=false;this.globalAnnouncementOriginal=language!=='ko';}
     const translated=!!translation&&!this.globalAnnouncementOriginal,content=translated?translation:original;
     if(!content&&!signal.url)return;
     const section=this.node('div',undefined,'accounts-global-announcement');
     if(content){
-      const meta=this.node('div',undefined,'accounts-global-announcement-meta');meta.append(this.node('span',translated?'机器翻译':signal.text?'公告原文':'来源摘要'));
-      if(signal.at)meta.append(this.node('span',this.text('发布于 ')+this.globalTime(signal.at)));section.append(meta);
+      const meta=this.node('div',undefined,'accounts-global-announcement-meta');meta.append(this.node('span',translated?'기계 번역':signal.text?'원본 게시물':'소스 요약'));
+      if(signal.at)meta.append(this.node('span',this.text('게시됨')+this.globalTime(signal.at)));section.append(meta);
       const body=this.node('p',undefined,'accounts-global-announcement-text');body.textContent=content;body.setAttribute('data-expanded',String(!!this.globalAnnouncementExpanded));section.append(body);
-      const toggle=this.button(this.globalAnnouncementExpanded?'收起全文':'展开全文',()=>{
+      const toggle=this.button(this.globalAnnouncementExpanded?'텍스트 접기':'텍스트 확장',()=>{
         this.globalAnnouncementExpanded=!this.globalAnnouncementExpanded;body.setAttribute('data-expanded',String(this.globalAnnouncementExpanded));
-        toggle.textContent=this.text(this.globalAnnouncementExpanded?'收起全文':'展开全文');toggle.setAttribute('aria-expanded',String(this.globalAnnouncementExpanded));
+        toggle.textContent=this.text(this.globalAnnouncementExpanded?'텍스트 접기':'텍스트 확장');toggle.setAttribute('aria-expanded',String(this.globalAnnouncementExpanded));
       });toggle.className='accounts-global-expand';toggle.setAttribute('aria-expanded',String(!!this.globalAnnouncementExpanded));
       toggle.hidden=content.length<=120&&!content.includes('\n');section.append(toggle);
       window.requestAnimationFrame?.(()=>{if(body.isConnected&&!this.globalAnnouncementExpanded)toggle.hidden=body.scrollHeight<=body.clientHeight+1;});
     }
     if(translation){
-      const languageToggle=this.button(translated?'查看原文':'查看译文',()=>{
+      const languageToggle=this.button(translated?'원본 보기':'번역 보기',()=>{
         this.globalAnnouncementOriginal=!this.globalAnnouncementOriginal;this.globalAnnouncementExpanded=false;this.globalResetKey=null;this.renderGlobalReset();
       });languageToggle.className='accounts-global-language';section.append(languageToggle);
     }
     if(signal.url){
       try{const url=new URL(signal.url);if(url.protocol==='https:'&&['x.com','twitter.com'].includes(url.hostname)){
-        const link=this.node('a','查看原帖 ↗');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';section.append(link);
+        const link=this.node('a','원본 게시물 보기 ↗');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';section.append(link);
       }}catch{}
     }
     this.globalReset.append(section);
   }
   globalTime(stamp){
     const date=new Date(stamp*1000),today=new Date(Date.now()),yesterday=new Date(Date.now());yesterday.setDate(today.getDate()-1);
-    const prefix=date.toDateString()===today.toDateString()?this.text('今天 '):date.toDateString()===yesterday.toDateString()?this.text('昨天 '):'';
+    const prefix=date.toDateString()===today.toDateString()?this.text('오늘'):date.toDateString()===yesterday.toDateString()?this.text('어제'):'';
     return prefix+(prefix?date.toLocaleString(BridgeI18n.locale(),{hour:'2-digit',minute:'2-digit'}):this.shortTime(stamp));
   }
   renderSshHosts(){
     const hosts=this.value?.sshHosts||[];this.sshHosts.hidden=!hosts.length;this.sshHosts.replaceChildren();
     if(!hosts.length)return;
-    this.sshHosts.append(this.node('h3','SSH 连接'));
+    this.sshHosts.append(this.node('h3','SSH 연결 목록'));
     for(const host of hosts){
       const row=this.node('div',undefined,'account-bucket'),name=this.node('strong');name.textContent=host.label;
-      const status=this.node('p',undefined,'account-muted'),labels={online:'可连接',offline:'连接不可用',checking:'正在重试连接…',unknown:'尚未检查'};
+      const status=this.node('p',undefined,'account-muted'),labels={online:'도달 가능',offline:'연결할 수 없음',checking:'연결을 다시 시도하는 중…',unknown:'확인 안 함'};
       status.textContent=this.text(labels[host.state]||labels.unknown);
-      if(host.state==='offline'&&host.nextRetryAt)status.textContent+=' · '+this.text('下次自动重试：')+this.shortTime(host.nextRetryAt,true);
-      const retry=this.button('重试 SSH 连接',()=>this.perform({action:'retrySsh',host:host.host}));retry.disabled=this.busy||host.state==='checking';
+      if(host.state==='offline'&&host.nextRetryAt)status.textContent+=' · '+this.text('다음 자동 재시도:')+this.shortTime(host.nextRetryAt,true);
+      const retry=this.button('SSH 연결 재시도',()=>this.perform({action:'retrySsh',host:host.host}));retry.disabled=this.busy||host.state==='checking';
       row.append(name,status,retry);this.sshHosts.append(row);
     }
   }
@@ -438,20 +438,20 @@ class AccountsPanel {
     this.renderSshHosts();
     const external=value.management?.external===true;
     this.switchHint.hidden=external;
-    this.switchHint.textContent=this.text(value.scope==='profile'?'此配置的账号与默认 Codex 独立；切换仅作用于此配置。':'此电脑的 Codex Desktop 与 CLI 共用接入；桌面运行时切换会重启桌面应用。');
-    this.toolsTitle.textContent=this.text(value.scope==='profile'?'账号提醒':'提醒与 Codex Desktop 更新');
+    this.switchHint.textContent=this.text(value.scope==='profile'?'이 구성의 계정 및 기본값 Codex 독립형; 스위치는 이 구성에만 영향을 미칩니다.。':'Codex 데스크톱 및 CLI는 이 컴퓨터에 대한 액세스를 공유합니다. 전환하면 Desktop이 실행 중일 때 다시 시작됩니다.');
+    this.toolsTitle.textContent=this.text(value.scope==='profile'?'계정 알림':'미리 알림 및 Codex 데스크탑 업데이트');
     this.updates.hidden=value.scope==='profile';
     if(this.desktopSettings)this.desktopSettings.hidden=value.scope==='profile';
     if(this.recover)this.recover.hidden=value.scope==='profile';
     this.tools.hidden=value.scope==='wsl';
     this.managementNotice.textContent=[value.scopeLabel,value.scope==='profile'?value.codexHome:'',this.text(value.management?.reason||'')].filter(Boolean).join(' · ');this.managementNotice.hidden=!external&&value.scope!=='profile';
     if(this.managementMode){this.managementMode.value=value.management?.mode||'auto';this.managementMode.disabled=this.busy;}
-    const phase=value.switch?.phase||'idle',labels={idle:'请选择已保存的接入',preparing:'正在准备账号',stopping:'正在退出 Codex 桌面应用',applying:'正在应用接入配置',starting:'正在启动 Codex 桌面应用',verifying:'正在核验账号与桌面连接',authUnknown:'账号同步结果待核验',complete:'切换完成',restoring:'正在恢复原接入',restored:'已恢复原接入',failed:'切换未完成',interrupted:'需要在桌面端恢复原接入'};
+    const phase=value.switch?.phase||'idle',labels={idle:'저장된 계정을 선택하세요',preparing:'계정 준비 중',stopping:'Codex 종료',applying:'계정 설정 적용 중',starting:'Codex 시작 중',verifying:'계정 및 데스크톱 연결 확인 중',authUnknown:'계정 동기화 결과가 확인 대기 중입니다.',complete:'계정이 전환됨',restoring:'이전 계정 복원 중',restored:'이전 계정이 복원되었습니다.',failed:'전환이 완료되지 않았습니다.',interrupted:'데스크톱 앱에서 이전 계정 복원'};
     const switching=!['idle','complete','restored','failed'].includes(phase);
     const runtime=value.desktopRuntime||{};this.desktopRuntime.hidden=runtime.supported!==true||value.scope==='profile';
     const preparation=runtime.preparation||{};
-    this.runtimeStatus.textContent=this.text(runtime.error||({ready:'原生侧聊连接已准备好',checking:'正在自动检查原生侧聊连接',preparing:'正在自动准备原生侧聊连接',waiting:'等待桌面空闲后自动准备；现有聊天可继续使用',failed:'自动准备未完成，请重新准备连接'}[preparation.state])||(runtime.configured?'已保存原生连接设置；由网关启动 App 时生效。':'网关启动时会自动准备原生侧聊连接。'))+(preparation.reason?' · '+this.text(preparation.reason):'');
-    this.initializeRuntime.textContent=this.text('重新准备连接');
+    this.runtimeStatus.textContent=this.text(runtime.error||({ready:'기본 사이드 채팅 연결이 준비되었습니다.',checking:'기본 사이드 채팅 연결 자동 확인',preparing:'기본 사이드 채팅 연결을 자동으로 준비하는 중',waiting:'데스크톱이 사용 가능해지면 자동으로 준비합니다. 기존 채팅은 계속 사용할 수 있습니다',failed:'자동 준비가 완료되지 않았습니다. 연결을 다시 준비하십시오.'}[preparation.state])||(runtime.configured?'네이티브 연결 설정을 저장했습니다. 게이트웨이에서 앱을 시작할 때 적용됩니다.':'게이트웨이가 시작되면 기본 사이드 채팅 연결이 자동으로 준비됩니다.。'))+(preparation.reason?' · '+this.text(preparation.reason):'');
+    this.initializeRuntime.textContent=this.text('다시 연결 준비');
     this.initializeRuntime.disabled=this.busy||switching||external||(!this.desktop&&value.canSwitch===false);
     this.forceInitializeRuntime.hidden=!(value.switch?.operation==='desktopRuntime'&&phase==='failed'&&value.switch?.taskStateUnavailable===true||preparation.state==='waiting'&&preparation.taskStateUnavailable===true);
     this.forceInitializeRuntime.disabled=this.initializeRuntime.disabled;
@@ -459,76 +459,76 @@ class AccountsPanel {
     if(this.resetDialog?.open&&(switching||!resetAccount||this.resetAccountKey&&this.resetAccountKey!==resetAccount.accountKey))this.resetDialog.close();
     this.status.textContent=this.text(labels[phase]||phase)+(value.switch?.error?' · '+this.text(value.switch.error):'');
     if(value.switch?.operation==='desktopRuntime'){
-      const runtimeLabels={preparing:'正在准备原生连接',applying:'正在保存原生连接设置',verifying:'正在核验原生连接',complete:'原生连接初始化完成',failed:'原生连接初始化未完成'};
+      const runtimeLabels={preparing:'네이티브 연결 준비 중',applying:'네이티브 연결 설정 저장 중',verifying:'네이티브 연결 확인 중',complete:'네이티브 연결 초기화 완료',failed:'네이티브 연결 초기화를 완료하지 못했습니다.'};
       this.status.textContent=this.text(runtimeLabels[phase]||labels[phase]||phase)+(value.switch.error?' · '+this.text(value.switch.error):'');
     }
-    if(value.switch?.cliSync?.status==='verified')this.status.textContent+=' · '+this.text('本机 CLI 已核验');
-    else if(value.switch?.cliSync?.status==='failed')this.status.textContent+=' · '+this.text('桌面已切换；本机 CLI 核验失败：')+this.text(value.switch.cliSync.error||'请检查接入');
-    else if(value.switch?.cliSync?.status==='shared-config-unverified')this.status.textContent+=' · '+this.text('共享配置已变更，本机 CLI 尚未核验');
+    if(value.switch?.cliSync?.status==='verified')this.status.textContent+=' · '+this.text('로컬 CLI가 확인되었습니다.');
+    else if(value.switch?.cliSync?.status==='failed')this.status.textContent+=' · '+this.text('데스크탑 전환; 로컬 CLI 확인 실패:')+this.text(value.switch.cliSync.error||'연결 상태 확인');
+    else if(value.switch?.cliSync?.status==='shared-config-unverified')this.status.textContent+=' · '+this.text('공유 구성이 변경되었습니다. 로컬 CLI가 확인되지 않았습니다.');
     this.status.hidden=!value.switch?.error&&(['complete','restored'].includes(phase)||(phase==='idle'&&value.current?.status==='ready'));
-    const current=value.current;this.current.textContent=this.text('当前接入：')+(current?.status==='ready'?(current.kind==='signedOut'?this.text('Codex 未登录'):current.name+(current.id||current.kind==='external'?'':this.text('（未保存到列表）'))):this.text(current?.status==='checking'?'正在识别…':'暂未识别'));
+    const current=value.current;this.current.textContent=this.text('현재 연결: ')+(current?.status==='ready'?(current.kind==='signedOut'?this.text('Codex가 로그아웃했습니다.'):current.name+(current.id||current.kind==='external'?'':this.text('(이 목록에는 저장되지 않음)'))):this.text(current?.status==='checking'?'식별 중…':'아직 식별되지 않음'));
     this.currentReset.hidden=!this.onReset||current?.kind!=='chatgpt'||!!value.activeId;this.currentReset.disabled=this.busy||switching;
-    this.blocked.replaceChildren();for(const row of value.blockers||[]){const line=this.node('p');line.textContent=this.text(({approval:'待确认',running:'运行中',queued:'排队中',unknown:'发送结果未确认'})[row.reason]||'运行中')+' · '+row.title;if(row.reason==='unknown'&&row.submissionId){
-      const ignore=this.button('忽略',()=>{if(window.confirm(this.text('忽略只会移除未确认提示，不会撤回或重发消息。请先检查聊天记录。')))return this.perform({action:'ignoreSubmission',threadId:row.id,submissionId:row.submissionId,host:row.host||'local'});});
+    this.blocked.replaceChildren();for(const row of value.blockers||[]){const line=this.node('p');line.textContent=this.text(({approval:'확인 필요',running:'실행 중',queued:'대기열',unknown:'알 수 없는 결과 보내기'})[row.reason]||'실행 중')+' · '+row.title;if(row.reason==='unknown'&&row.submissionId){
+      const ignore=this.button('무시하다',()=>{if(window.confirm(this.text('무시하면 확인되지 않은 기록만 무시됩니다. 메시지를 철회하거나 다시 보내지는 않습니다. 먼저 채팅 기록을 확인하세요.')))return this.perform({action:'ignoreSubmission',threadId:row.id,submissionId:row.submissionId,host:row.host||'local'});});
       ignore.disabled=this.busy||switching;line.append(ignore);
     }this.blocked.append(line);}
     this.refreshButton.disabled=this.loading;this.renderTools();const cards=[];
-    if(!this.accountRows().length&&!external)cards.push(this.node('p','尚未添加账号。请在电脑端添加官方账号或自定义 API。'));
+    if(!this.accountRows().length&&!external)cards.push(this.node('p','저장된 계정이 없습니다. 데스크탑 앱에서 ChatGPT 계정 또는 사용자 정의 API를 추가하세요.'));
     for(const row of [...this.accountRows()].sort((a,b)=>Number(b.id===value.loginAccount?.id)-Number(a.id===value.loginAccount?.id)||Number(b.id===value.activeId)-Number(a.id===value.activeId))){
       const card=this.node('section',undefined,'account-bucket'),active=value.activeId===row.id;card.accountRowId=row.id;
       if(active)card.classList.add('is-current');
       const actions=this.node('div',undefined,'accounts-card-footer');
       const identity=this.node('div',undefined,'accounts-identity'),name=this.node('div',undefined,'accounts-name');
       const heading=this.node('h3');heading.textContent=row.name;const title=this.node('div',undefined,'accounts-name-heading');title.append(heading);
-      if(row.id===value.loginAccount?.id)title.append(this.node('span','已登录','accounts-plan'));
+      if(row.id===value.loginAccount?.id)title.append(this.node('span','로그인됨','accounts-plan'));
       if(row.kind==='chatgpt'){
         identity.classList.add('accounts-official');
         if(row.details?.usage?.planType||row.planType)title.append(this.node('span',row.details?.usage?.planType||row.planType,'accounts-plan'));
       }
-      name.append(title,this.node('p',row.kind==='chatgpt'?(row.email||this.text('官方 ChatGPT 账号')):(row.baseUrl+' · '+row.model),'account-muted'));
+      name.append(title,this.node('p',row.kind==='chatgpt'?(row.email||this.text('공식 ChatGPT 계정')):(row.baseUrl+' · '+row.model),'account-muted'));
       if(row.kind==='chatgpt')this.accountSubscription(name,row);
       identity.append(name);this.accountUsage(identity,row);card.append(identity);
       if(row.kind==='chatgpt')this.accountReset(card,row,switching);
-      if(!row.transient){const verifyAuth=value.switch?.operation==='cliAuth'&&phase==='authUnknown'&&value.switch.targetId===row.id;const choose=this.button(verifyAuth?'核验账号同步':active?'当前接入':'切换到此接入',()=>this.choose(row));choose.disabled=this.busy||switching&&!verifyAuth||active||external||(!this.desktop&&value.canSwitch===false);actions.append(choose);}
+      if(!row.transient){const verifyAuth=value.switch?.operation==='cliAuth'&&phase==='authUnknown'&&value.switch.targetId===row.id;const choose=this.button(verifyAuth?'계정 동기화 확인':active?'현재 계정':'이 계정으로 전환',()=>this.choose(row));choose.disabled=this.busy||switching&&!verifyAuth||active||external||(!this.desktop&&value.canSwitch===false);actions.append(choose);}
 
       if(this.cliAccess&&row.kind==='api'&&!row.transient){
-        if(!active){const edit=this.button('修改',()=>{this.apiDetails.open=true;this.cliAccess.edit('codex',row);});edit.disabled=this.busy||switching||this.cliAccess.busy;actions.append(edit);}
-        for(const [label,action] of [['查看上游模型','models'],['测试模型接口','test']]){const probe=this.button(label,()=>{this.apiDetails.open=true;return this.cliAccess.probe(row,action);});probe.disabled=this.busy||switching||this.cliAccess.busy;actions.append(probe);}
+        if(!active){const edit=this.button('편집',()=>{this.apiDetails.open=true;this.cliAccess.edit('codex',row);});edit.disabled=this.busy||switching||this.cliAccess.busy;actions.append(edit);}
+        for(const [label,action] of [['업스트림 모델 나열','models'],['테스트 모델 엔드포인트','test']]){const probe=this.button(label,()=>{this.apiDetails.open=true;return this.cliAccess.probe(row,action);});probe.disabled=this.busy||switching||this.cliAccess.busy;actions.append(probe);}
       }
       if(this.desktop&&!row.transient){
-        const edit=this.button(row.kind==='chatgpt'?'重新登录':'修改',()=>{this.resetForm();this.editId=row.id;this.addDetails.open=true;this.name.input.value=row.name;this.kind.value=row.kind;this.kind.disabled=true;this.kind.onchange();this.url.input.value=row.baseUrl||'';this.model.input.value=row.model||'';this.key.input.value='';this.name.input.focus();});
+        const edit=this.button(row.kind==='chatgpt'?'다시 로그인':'편집',()=>{this.resetForm();this.editId=row.id;this.addDetails.open=true;this.name.input.value=row.name;this.kind.value=row.kind;this.kind.disabled=true;this.kind.onchange();this.url.input.value=row.baseUrl||'';this.model.input.value=row.model||'';this.key.input.value='';this.name.input.focus();});
         edit.hidden=active||row.kind==='api'&&!!this.cliAccess;edit.disabled=this.busy||switching||active;
-        const rename=this.button('重命名',()=>{this.renameId=row.id;this.renameName.input.value=row.name;this.renameForm.hidden=false;this.renameName.input.focus();});rename.disabled=this.busy||switching;
-        const remove=this.button('删除',()=>{if(window.confirm(this.text('删除此账号档案？')+'\n'+row.name))this.perform({action:'delete',id:row.id});});remove.hidden=active;remove.disabled=this.busy||switching||active;
+        const rename=this.button('이름 바꾸기',()=>{this.renameId=row.id;this.renameName.input.value=row.name;this.renameForm.hidden=false;this.renameName.input.focus();});rename.disabled=this.busy||switching;
+        const remove=this.button('삭제',()=>{if(window.confirm(this.text('저장된 계정을 삭제하시겠습니까?')+'\n'+row.name))this.perform({action:'delete',id:row.id});});remove.hidden=active;remove.disabled=this.busy||switching||active;
         actions.append(edit,rename,remove);
       }
       card.append(actions);this.accountActions(card,row,actions);if(row.kind==='chatgpt')actions.append(this.accountUsageControls(row));cards.push(card);
     }
-    if(!this.desktop&&value.canSwitch===false&&!external)cards.push(this.node('p','免密访问不能切换账号，请在桌面端操作'));
+    if(!this.desktop&&value.canSwitch===false&&!external)cards.push(this.node('p','인증 없이는 계정 전환이 불가능합니다. 데스크톱 앱을 사용하세요.'));
     this.reconcileRows(cards);
     if(this.desktop){
       this.scanDesktop.disabled=this.busy||switching;this.renameSave.disabled=this.busy||switching;this.scanButton.disabled=this.busy||switching;this.modelsButton.disabled=this.busy||switching||!!this.apiEditor?.draftLoading;this.submit.disabled=this.busy||switching||!!this.apiEditor?.draftLoading;
       const candidates=this.scanCandidates();this.scanChoice.replaceChildren();this.scanChoice.hidden=candidates.length<2;
-      const choose=this.node('option','选择要保存的配置');choose.value='';this.scanChoice.append(choose);
+      const choose=this.node('option','저장할 구성을 선택하세요.');choose.value='';this.scanChoice.append(choose);
       for(const row of candidates){const option=this.node('option');option.value=row.id;option.textContent=row.name;this.scanChoice.append(option);}this.scanChoice.value=this.scanSelection||'';
       this.saveScanButton.disabled=this.busy||switching||!candidates.some(row=>row.id===this.scanSelection);
-      this.scanSource.input.placeholder=value.codexHome||this.configurationPlaceholder||this.text('留空使用当前 Codex 数据目录');this.scanRows.replaceChildren();
+      this.scanSource.input.placeholder=value.codexHome||this.configurationPlaceholder||this.text('현재 Codex 데이터 디렉터리를 사용하려면 비워 두세요.');this.scanRows.replaceChildren();
       if(value.discovery){const scan=value.discovery;const source=this.node('p',undefined,'account-muted');source.textContent=scan.source||'';this.scanRows.append(source);
         if(scan.notice)this.scanRows.append(this.node('p',scan.notice,'account-muted'));
-        if(!scan.candidates.length)this.scanRows.append(this.node('p','没有发现可导入的账号或 API 配置。'));
+        if(!scan.candidates.length)this.scanRows.append(this.node('p','저장된 계정 또는 API 구성을 찾을 수 없습니다.'));
         for(const row of scan.candidates){const card=this.node('section',undefined,'account-bucket'),heading=this.node('h3');heading.textContent=row.name;
           const detail=this.node('p',undefined,'account-muted');detail.textContent=row.email||[row.baseUrl,row.model].filter(Boolean).join(' · ');card.append(heading,detail);
           if(row.reason)card.append(this.node('p',row.reason,'account-muted'));
-          const button=this.button(row.imported?'已导入':row.kind==='api'?'选择并导入':'导入账号',()=>this.importCandidate(row));button.disabled=this.busy||switching||row.imported||!row.canImport;
+          const button=this.button(row.imported?'수입됨':row.kind==='api'?'선택 및 가져오기':'계정 가져오기',()=>this.importCandidate(row));button.disabled=this.busy||switching||row.imported||!row.canImport;
           card.append(button);this.scanRows.append(card);}
       }
       if(document.activeElement!==this.executable.input&&!this.executable.input.value)this.executable.input.value=value.desktopExecutable||'';
       this.recover.disabled=this.busy||external||phase!=='interrupted';this.submit.disabled=this.busy||switching||['starting','waiting'].includes(value.enrollment?.phase);
       this.loginBox.replaceChildren();const login=value.enrollment;
       if(login){
-        this.loginBox.append(this.node('p',({starting:'正在准备登录',waiting:'请在此电脑的浏览器完成官方登录',complete:'账号已添加',failed:'登录未完成，请重新添加'})[login.phase]||''));
-        if(login.phase==='waiting'&&login.authUrl){this.loginBox.append(this.button('打开官方登录',()=>this.perform({action:'openLogin'})));}
-        if(['starting','waiting'].includes(login.phase))this.loginBox.append(this.button('取消登录',()=>this.perform({action:'cancelLogin'})));
+        this.loginBox.append(this.node('p',({starting:'로그인 준비 중',waiting:'이 컴퓨터의 브라우저에서 공식 로그인을 완료하세요.',complete:'계정이 추가됨',failed:'로그인이 완료되지 않았습니다. 다시 시도해 주세요.'})[login.phase]||''));
+        if(login.phase==='waiting'&&login.authUrl){this.loginBox.append(this.button('공식 로그인 열기',()=>this.perform({action:'openLogin'})));}
+        if(['starting','waiting'].includes(login.phase))this.loginBox.append(this.button('로그인 취소',()=>this.perform({action:'cancelLogin'})));
       }
     }
   }

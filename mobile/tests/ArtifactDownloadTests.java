@@ -58,7 +58,7 @@ public class ArtifactDownloadTests {
    check(ArtifactDownload.accepts(base+"/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/workspace/download?path=README.md",base),"workspace download accepted");
    check(!ArtifactDownload.accepts(base+"/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/workspace/upload",base),"workspace upload not downloaded");
    check(leaked.get()==0,"redirect never followed");
-   check(ArtifactDownload.filename("attachment; filename*=UTF-8''%E6%96%87%E4%BB%B6%2B1.apk").equals("文件+1.apk"),"Unicode and plus preserved");
+   check(ArtifactDownload.filename("attachment; filename*=UTF-8''%E6%96%87%E4%BB%B6%2B1.apk").equals("\u6587\u4ef6+1.apk"),"Unicode and plus preserved");
    check(ArtifactDownload.filename("attachment; filename=\"../../escape.apk\"").equals("escape.apk"),"path traversal removed");
    check(ArtifactDownload.filename("attachment; filename=\"..\"").equals("download"),"dot filename rejected");
    try(java.util.stream.Stream<Path> files=Files.list(directory)){check(files.count()==0,"failed transfers leave no files");}

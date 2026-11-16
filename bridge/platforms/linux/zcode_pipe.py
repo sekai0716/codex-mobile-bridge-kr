@@ -114,13 +114,13 @@ def runtime_owner(application, pid, *, timeout=15):
         owner = identity(pid)
         generation = (owner['uid'], owner['birth'], owner['started'])
         if first is None:first = generation
-        if generation != first:raise ValueError('原 ZCode 进程身份已变化')
+        if generation != first:raise ValueError('기존 ZCode 프로세스 ID가 변경되었습니다.')
         info = installation(application, pid=pid)
         if info and owner['image'] == info['executable'] and (
                 info.get('packageType') != 'appimage' or info.get('runtimeVerified')):
             return owner
         if time.monotonic() >= deadline:
-            raise ValueError('ZCode AppImage 运行身份尚未核验，请稍后重试连接')
+            raise ValueError('ZCode AppImage 실행 중인 ID가 확인되지 않았습니다. 나중에 다시 연결해 보세요.')
         time.sleep(.1)
 
 
@@ -132,7 +132,7 @@ def is_supported(application):
 def identity(pid):
     data = Native().identity(pid)
     if data['zombie'] or data['uid'] != os.getuid():
-        raise ProcessLookupError('ZCode 进程已退出或用户已变化')
+        raise ProcessLookupError('ZCode 프로세스가 종료되었거나 사용자가 변경되었습니다.')
     return {'pid': pid, 'uid': data['uid'], 'image': data['image'], 'birth': data['birth'],
             'started': Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
 
@@ -186,13 +186,13 @@ def main_processes(executable, candidates, commands):
 def _launch_context(application):
     found = installation(application)
     if not found:
-        raise ValueError('未找到所选的 ZCode 桌面安装')
+        raise ValueError('선택한 항목을 찾을 수 없습니다. ZCode 데스크탑 설치')
     if not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
-        raise ValueError('未检测到 Linux 图形会话，请在已登录的桌面中启动网关')
+        raise ValueError('감지되지 않음 Linux 그래픽 세션입니다. 로그인된 데스크탑에서 게이트웨이를 시작하십시오.')
     exe = found['application']
     runtime_images = {exe, found['executable']}
     if desktop.processes(lambda image: str(image) in runtime_images):
-        raise ValueError('ZCode 已在运行，请先在应用管理中核验并正常退出')
+        raise ValueError('ZCode 이미 실행 중입니다. 먼저 애플리케이션 관리에서 확인 후 정상적으로 종료하시기 바랍니다.')
     env = os.environ.copy()
     env.pop('ELECTRON_RUN_AS_NODE', None)
     # A gateway may itself run from an AppImage. Its runtime identity or an

@@ -39,17 +39,17 @@ final class SettingsPage extends Dialog implements SharedPreferences.OnSharedPre
   super(SettingsUi.themed(owner),owner.getResources().getIdentifier("SettingsTheme","style",owner.getPackageName()));this.owner=owner;initialScroll=position;this.entering=entering;this.previousFrame=previousFrame;prefs=owner.getSharedPreferences("bridge",0);ui=new SettingsUi(getContext());setOwnerActivity(owner);requestWindowFeature(Window.FEATURE_NO_TITLE);
   LinearLayout content=ui.column();content.setBackgroundColor(ui.page);
   LinearLayout toolbar=new LinearLayout(getContext());toolbar.setGravity(Gravity.CENTER_VERTICAL);toolbar.setPadding(ui.dp(12),ui.dp(8),ui.dp(12),ui.dp(8));toolbar.setBackgroundColor(ui.surface);
-  View back=ui.icon("back",ui.text);back.setContentDescription(ui.L("返回"));ui.clickable(back,this::close);toolbar.addView(back,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
-  TextView title=ui.text("设置",20,ui.text);title.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));toolbar.addView(title);content.addView(toolbar);
+  View back=ui.icon("back",ui.text);back.setContentDescription(ui.L("뒤로"));ui.clickable(back,this::close);toolbar.addView(back,new LinearLayout.LayoutParams(ui.dp(44),ui.dp(44)));
+  TextView title=ui.text("설정",20,ui.text);title.setTypeface(android.graphics.Typeface.create("sans-serif-medium",0));toolbar.addView(title);content.addView(toolbar);
   scroll=new ScrollView(getContext());scroll.setFillViewport(true);scroll.setClipToPadding(false);body=ui.column();body.setPadding(ui.dp(20),ui.dp(12),ui.dp(20),ui.dp(24));scroll.addView(body);content.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   notificationHost=ui.column();body.addView(notificationHost);
-  LinearLayout notifications=ui.section(notificationHost,"通知");
-  taskToggle=ui.toggle(notifications,"任务通知",prefs.getBoolean("alerts",false),owner::toggleNotifications);
-  backgroundToggle=ui.toggle(notifications,"后台通知",prefs.getBoolean("backgroundNotifications",false),owner::toggleBackgroundNotifications);backgroundDivider=notifications.getChildAt(1);
-  ui.hint(backgroundToggle.row,"后台通知功能说明",()->new AlertDialog.Builder(getContext()).setTitle(ui.L("后台通知功能说明")).setMessage(ui.L("后台通知仍在完善中，开启后可能增加耗电或发热。\n遇到问题或有改进建议，欢迎提交 Issue 或 PR。感谢支持！")).setPositiveButton(ui.L("关闭"),null).show());
+  LinearLayout notifications=ui.section(notificationHost,"알림");
+  taskToggle=ui.toggle(notifications,"작업 알림",prefs.getBoolean("alerts",false),owner::toggleNotifications);
+  backgroundToggle=ui.toggle(notifications,"백그라운드 알림",prefs.getBoolean("backgroundNotifications",false),owner::toggleBackgroundNotifications);backgroundDivider=notifications.getChildAt(1);
+  ui.hint(backgroundToggle.row,"백그라운드 알림 정보",()->new AlertDialog.Builder(getContext()).setTitle(ui.L("백그라운드 알림 정보")).setMessage(ui.L("백그라운드 알림은 계속 개선되고 있습니다. 이를 활성화하면 배터리 사용량이 증가하거나 장치가 과열될 수 있습니다.\n문제가 발생하거나 제안 사항이 있는 경우 문제 또는 PR를 제출해 주세요. 감사합니다!")).setPositiveButton(ui.L("닫기"),null).show());
   systemHost=ui.column();systemHost.setPadding(0,ui.dp(16),0,0);notificationHost.addView(systemHost);buildNotifications();
-  LinearLayout app=ui.section(body,"应用");themeRow(app);
-  LinearLayout update=ui.action(app,"检查更新","",()->{});TextView value=ui.value(update,owner.appVersion());
+  LinearLayout app=ui.section(body,"앱");themeRow(app);
+  LinearLayout update=ui.action(app,"업데이트 확인","",()->{});TextView value=ui.value(update,owner.appVersion());
   android.view.ViewGroup.LayoutParams valueLayout=value.getLayoutParams();update.removeView(value);update.addView(value,update.getChildCount()-1,valueLayout);
   update.setOnClickListener(v->owner.checkUpdate(this,update,value));
   screen=new FrameLayout(getContext());screen.addView(content,new FrameLayout.LayoutParams(-1,-1));setContentView(screen);
@@ -102,54 +102,54 @@ final class SettingsPage extends Dialog implements SharedPreferences.OnSharedPre
   boolean alerts=prefs.getBoolean("alerts",false),background=alerts&&prefs.getBoolean("backgroundNotifications",false);
   taskToggle.checked(alerts);backgroundToggle.checked(background);backgroundToggle.row.setVisibility(alerts?View.VISIBLE:View.GONE);backgroundDivider.setVisibility(alerts?View.VISIBLE:View.GONE);systemHost.setVisibility(alerts?View.VISIBLE:View.GONE);
   if(!alerts)return;
-  LinearLayout system=ui.section(systemHost,"系统权限");
+  LinearLayout system=ui.section(systemHost,"시스템 권한");
   boolean allowed=((NotificationManager)owner.getSystemService(Context.NOTIFICATION_SERVICE)).areNotificationsEnabled();
   boolean tasksBlocked=blocked("foreground-tasks"),backgroundBlocked=background&&blocked("background-monitor");
-  String permission=allowed?(tasksBlocked||backgroundBlocked?"需处理":"已允许"):"前往授权";
-  LinearLayout permissions=ui.action(system,"通知权限",permission,()->openSetting(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,owner.getPackageName())));
+  String permission=allowed?(tasksBlocked||backgroundBlocked?"조치 필요":"허용됨"):"알림 허용";
+  LinearLayout permissions=ui.action(system,"알림 권한",permission,()->openSetting(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,owner.getPackageName())));
   if(!allowed||tasksBlocked||backgroundBlocked)((TextView)permissions.getChildAt(1)).setTextColor(ui.danger);
   if(tasksBlocked||backgroundBlocked){
-   String warning=tasksBlocked?(backgroundBlocked?"任务提醒与后台运行频道已关闭":"任务提醒频道已关闭"):"后台运行频道已关闭";
+   String warning=tasksBlocked?(backgroundBlocked?"작업 및 백그라운드 알림 채널이 꺼져 있습니다.":"작업 알림 채널이 꺼져 있습니다"):"백그라운드 알림 채널이 꺼져 있습니다";
    LinearLayout labels=(LinearLayout)permissions.getChildAt(0);TextView detail=ui.text(warning,12,ui.danger);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=ui.dp(4);labels.addView(detail,p);
   }
   if(background){
-   ui.action(system,"后台运行设置","应用详情",()->openSetting(detailsIntent()));
+   ui.action(system,"백그라운드 설정","앱 세부정보",()->openSetting(detailsIntent()));
    PowerManager power=(PowerManager)owner.getSystemService(Context.POWER_SERVICE);
-   ui.action(system,"电池优化",power.isIgnoringBatteryOptimizations(owner.getPackageName())?"已豁免":"已启用",()->openSetting(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+   ui.action(system,"배터리 최적화",power.isIgnoringBatteryOptimizations(owner.getPackageName())?"최적화 제외":"사용 중",()->openSetting(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
   }
-  ui.action(system,"通知来源","",this::showNotificationSources);
-  ui.action(system,"发送测试通知","10 秒后提醒",owner::testNotification);
+  ui.action(system,"알림 소스","",this::showNotificationSources);
+  ui.action(system,"테스트 알림 보내기","10초 후",owner::testNotification);
   Map<String,String> connections=connectionStates();
-  if(connections.values().stream().anyMatch(value->!"已连接".equals(value))){
-   LinearLayout row=ui.action(system,"电脑连接","需处理",this::showConnections);((TextView)row.getChildAt(1)).setTextColor(ui.danger);
+  if(connections.values().stream().anyMatch(value->!"연결됨".equals(value))){
+   LinearLayout row=ui.action(system,"컴퓨터 연결","조치 필요",this::showConnections);((TextView)row.getChildAt(1)).setTextColor(ui.danger);
   }
  }
  private void showNotificationSources(){
   LinearLayout content=ui.column();content.setPadding(ui.dp(8),ui.dp(8),ui.dp(8),ui.dp(8));
-  TextView hint=ui.text("仅控制这台手机的任务提醒，不影响聊天和通知收件箱。",13,ui.muted);hint.setPadding(ui.dp(16),ui.dp(8),ui.dp(16),ui.dp(12));content.addView(hint);
-  if(owner.saved().isEmpty())content.addView(ui.text("尚未保存电脑连接",15,ui.muted));
+  TextView hint=ui.text("이 전화기에 대한 작업 알림을 선택하세요. 채팅 및 알림 받은 편지함은 계속 사용할 수 있습니다.",13,ui.muted);hint.setPadding(ui.dp(16),ui.dp(8),ui.dp(16),ui.dp(12));content.addView(hint);
+  if(owner.saved().isEmpty())content.addView(ui.text("저장된 컴퓨터 연결이 없습니다.",15,ui.muted));
   LinearLayout list=ui.column();content.addView(list);
   for(String address:new TreeSet<>(owner.saved())){
    SettingsUi.ToggleRow[] choice=new SettingsUi.ToggleRow[1];
    choice[0]=ui.toggle(list,owner.computerName(address),NotificationSources.enabled(prefs,address),()->{
     boolean enabled=!NotificationSources.enabled(prefs,address);
     NotificationSources.setEnabled(prefs,address,enabled);choice[0].checked(enabled);
-    choice[0].row.setContentDescription(owner.computerName(address)+", "+address+", "+ui.L(enabled?"已开启":"已关闭"));
+    choice[0].row.setContentDescription(owner.computerName(address)+", "+address+", "+ui.L(enabled?"켜짐":"꺼짐"));
     MonitorService.refresh();
    });
    LinearLayout labels=(LinearLayout)choice[0].row.getChildAt(0);
    TextView url=ui.text(address,12,ui.muted);url.setPadding(0,ui.dp(4),ui.dp(8),0);labels.addView(url);
-   choice[0].row.setContentDescription(owner.computerName(address)+", "+address+", "+ui.L(NotificationSources.enabled(prefs,address)?"已开启":"已关闭"));
+   choice[0].row.setContentDescription(owner.computerName(address)+", "+address+", "+ui.L(NotificationSources.enabled(prefs,address)?"켜짐":"꺼짐"));
   }
   ScrollView scroll=new ScrollView(getContext());scroll.addView(content);
-  new AlertDialog.Builder(getContext()).setTitle(ui.L("通知来源")).setView(scroll).setPositiveButton(ui.L("完成"),null).show();
+  new AlertDialog.Builder(getContext()).setTitle(ui.L("알림 소스")).setView(scroll).setPositiveButton(ui.L("완료"),null).show();
  }
  private boolean blocked(String id){NotificationChannel channel=((NotificationManager)owner.getSystemService(Context.NOTIFICATION_SERVICE)).getNotificationChannel(id);return channel!=null&&channel.getImportance()==NotificationManager.IMPORTANCE_NONE;}
  private Map<String,String> connectionStates(){
   Map<String,NotificationReceiver.Status> statuses=MonitorService.connectionStates();Map<String,String> result=new TreeMap<>();
   for(String address:owner.saved()){
    NotificationReceiver.Status status=statuses.get(address);
-   result.put(address,status==NotificationReceiver.Status.RECEIVING?"已连接":status==NotificationReceiver.Status.RETRYING?"正在重试":"请重新登录");
+   result.put(address,status==NotificationReceiver.Status.RECEIVING?"연결됨":status==NotificationReceiver.Status.RETRYING?"재시도 중":"다시 로그인하세요.");
   }
   return result;
  }
@@ -158,21 +158,21 @@ final class SettingsPage extends Dialog implements SharedPreferences.OnSharedPre
   for(Map.Entry<String,String> row:connectionStates().entrySet()){
    if(message.length()>0)message.append("\n\n");message.append(owner.computerName(row.getKey())).append('\n').append(row.getKey()).append('\n').append(ui.L(row.getValue()));
   }
-  new AlertDialog.Builder(getContext()).setTitle(ui.L("电脑连接")).setMessage(message).setNegativeButton(ui.L("关闭"),null).setPositiveButton(ui.L("刷新状态"),(d,w)->{MonitorService.refresh();showConnections();}).show();
+  new AlertDialog.Builder(getContext()).setTitle(ui.L("컴퓨터 연결")).setMessage(message).setNegativeButton(ui.L("닫기"),null).setPositiveButton(ui.L("상태 새로고침"),(d,w)->{MonitorService.refresh();showConnections();}).show();
  }
  private Intent detailsIntent(){return new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+owner.getPackageName()));}
- private void openSetting(Intent intent){try{owner.startActivity(intent);}catch(RuntimeException unavailable){try{owner.startActivity(detailsIntent());}catch(RuntimeException denied){Toast.makeText(getContext(),ui.L("请从系统设置打开本应用的详情页。"),Toast.LENGTH_LONG).show();}}}
+ private void openSetting(Intent intent){try{owner.startActivity(intent);}catch(RuntimeException unavailable){try{owner.startActivity(detailsIntent());}catch(RuntimeException denied){Toast.makeText(getContext(),ui.L("시스템 설정에서 이 앱의 세부정보를 엽니다."),Toast.LENGTH_LONG).show();}}}
  private void themeRow(LinearLayout app){
-  LinearLayout row=ui.action(app,"主题",themeName(),this::chooseTheme);
-  ui.hint(row,"主题功能说明",()->Toast.makeText(getContext(),ui.L("待开发项，暂时只支持设置页主题切换"),Toast.LENGTH_LONG).show());
+  LinearLayout row=ui.action(app,"테마",themeName(),this::chooseTheme);
+  ui.hint(row,"테마 안내",()->Toast.makeText(getContext(),ui.L("개발 중입니다. 테마 변경 사항은 현재 설정에만 적용됩니다."),Toast.LENGTH_LONG).show());
  }
- private String themeName(){String value=SettingsUi.theme(owner);return "light".equals(value)?"浅色":"dark".equals(value)?"深色":"跟随系统";}
+ private String themeName(){String value=SettingsUi.theme(owner);return "light".equals(value)?"밝게":"dark".equals(value)?"어둡게":"시스템 설정 따르기";}
  private void chooseTheme(){
   if(themePicker!=null&&themePicker.isShowing())return;
   LinearLayout sheet=ui.column();sheet.setPadding(ui.dp(16),ui.dp(20),ui.dp(16),ui.dp(28));
   android.graphics.drawable.GradientDrawable face=ui.face(ui.surface,20);float radius=ui.dp(20);face.setCornerRadii(new float[]{radius,radius,radius,radius,0,0,0,0});sheet.setBackground(face);
-  TextView title=ui.text("主题",20,ui.text);title.setPadding(ui.dp(16),0,ui.dp(16),ui.dp(12));sheet.addView(title);
-  String[] values={"system","light","dark"},labels={"跟随系统","浅色","深色"};
+  TextView title=ui.text("테마",20,ui.text);title.setPadding(ui.dp(16),0,ui.dp(16),ui.dp(12));sheet.addView(title);
+  String[] values={"system","light","dark"},labels={"시스템 설정 따르기","밝게","어둡게"};
   RadioGroup options=new RadioGroup(getContext());sheet.addView(options,new LinearLayout.LayoutParams(-1,-2));
   for(int i=0;i<values.length;i++){
    final String value=values[i];RadioButton option=new RadioButton(getContext());option.setText(ui.L(labels[i]));option.setTextSize(15);option.setTextColor(ui.text);option.setChecked(value.equals(SettingsUi.theme(owner)));option.setPadding(ui.dp(16),0,ui.dp(16),0);option.setMinimumHeight(ui.dp(52));
@@ -180,7 +180,7 @@ final class SettingsPage extends Dialog implements SharedPreferences.OnSharedPre
    option.setBackground(ui.face(option.isChecked()?ui.pressed:ui.surface,8));
    option.setOnClickListener(v->themePicker.close(()->prefs.edit().putString("settingsTheme",value).apply()));options.addView(option,new RadioGroup.LayoutParams(-1,-2));
   }
-  TextView cancel=ui.text("取消",15,ui.muted);cancel.setGravity(Gravity.CENTER);cancel.setMinimumHeight(ui.dp(48));ui.clickable(cancel,()->themePicker.close(null));sheet.addView(cancel,new LinearLayout.LayoutParams(-1,-2));
+  TextView cancel=ui.text("취소",15,ui.muted);cancel.setGravity(Gravity.CENTER);cancel.setMinimumHeight(ui.dp(48));ui.clickable(cancel,()->themePicker.close(null));sheet.addView(cancel,new LinearLayout.LayoutParams(-1,-2));
   themePicker=new SettingsMotion.Sheet(getContext(),sheet,ui.dp(24));themePicker.show();
  }
 }

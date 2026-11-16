@@ -1,116 +1,116 @@
-# 浏览器检查
+# 브라우저 확인
 
-本目录中的 `*.browser.js` 依赖真实 DOM、页面模块及隔离的网关夹具。它们由浏览器驱动加载并调用文件中声明的检查函数；Markdown 与公式脚本在加载后直接运行。各文件开头说明所需页面与前置状态。
+이 디렉토리에 `*.browser.js` 진실에 의지하다 DOM、페이지 모듈 및 격리된 게이트웨이 고정 장치. 브라우저 드라이버에 의해 로드되고 파일에 선언된 확인 기능을 호출합니다.；Markdown 수식 스크립트를 사용하면 로드 후 바로 실행됩니다. 필수 페이지와 사전 상태는 각 파일의 시작 부분에 설명되어 있습니다.。
 
-仅使用合成会话和测试工作区。不要在真实用户会话中运行会发送消息、修改文件或操作 Git 的夹具。
+작성 세션 및 테스트 작업공간만 사용하십시오. 메시지를 보내거나, 파일을 수정하거나, 실제 사용자 세션에서 작업을 실행하지 마세요. Git 고정물。
 
-会话菜单检查：在只加载生产 `session-menu.js`、`session-menu.css` 和基础样式的隔离页面加载 `session-menu.browser.js`，调用并等待 `runSessionMenuBrowserChecks()`。它以合成回调验证置顶、名称转义、详情复制、原生项目与分区选择、当前归属标记、读取错误与迟到响应隔离、归档确认和取消、恢复、认证变化阻断、长按及滚动取消。分别在宽屏、390 px 与 320 px 检查边界和底部面板；合成检查与真实 Android WebView 验收分别记录。
+세션 메뉴 확인: 제작물만 로드 중 `session-menu.js`、`session-menu.css` 기본 스타일을 사용한 격리된 페이지 로딩 `session-menu.browser.js`，전화해서 기다려 `runSessionMenuBrowserChecks()`。상단의 합성 콜백 유효성 검사, 이름 이스케이프, 세부 정보 복사, 기본 프로젝트 및 파티션 선택, 현재 소유권 태그, 읽기 오류 및 지연 응답 격리, 아카이브 확인 및 취소, 복구, 인증 변경 차단, 길게 누르기 및 롤링 취소 기능이 있습니다. 와이드스크린에서、390 px 및 320 px 경계와 하단 패널을 확인하세요. 합성 수표 대 실제 수표 Android WebView 합격을 별도로 기록。
 
-这些脚本不会由 `npm run test:desktop` 执行。该命令只发现 `tests/` 和 `mobile/tests/` 下的 `*.test.js`、`*.test.cjs`、`*.test.mjs`；浏览器检查应单独记录实际执行与未执行情况。
+이 스크립트는 다음에 의해 실행되지 않습니다. `npm run test:desktop` 구현하다. 이 명령은 다음을 찾습니다. `tests/` 및 `mobile/tests/` 아래에 `*.test.js`、`*.test.cjs`、`*.test.mjs`；브라우저 검사는 실제 실행과 비실행을 별도로 기록해야 합니다.。
 
-`npm run test:browser` 自动启动隔离服务，在 Chromium/WebKit 的 1280 px 与 390 px 视口执行 `critical.spec.cjs` 指定的检查。它调用并等待实际检查函数，不把页面加载计作通过。准备方式及失败证据见 [验证入口](../README.md#node-与浏览器)。其他专项夹具仍按下面各节单独执行；这套通过不代表所有浏览器功能均已覆盖。
+`npm run test:browser` 다음에서 격리 서비스를 자동으로 시작합니다. Chromium/WebKit 의 1280 px 및 390 px 뷰포트 실행 `critical.spec.cjs` 지정된 수표. 실제 확인 기능을 호출하고 대기하며 페이지 로드를 통과한 것으로 간주하지 않습니다. 준비 방법 및 실패 증거는 다음을 참조하세요. [검증입력](../README.md#node-브라우저로)。다른 특수 고정 장치는 다음 섹션에 따라 별도로 구현됩니다. 이 승인이 모든 브라우저 기능이 포함되었음을 의미하지는 않습니다.。
 
-Markdown 与公式检查也由此入口执行：先加载生产聊天与公式资源，再运行 `markdown.browser.js` 的 15 项检查和 `math.browser.js` 的 13 项检查，覆盖无空行块公式、TeX 原文、代码、链接安全、流式片段及窄屏滚动。可用 `npm run test:browser -- --grep 'Markdown, literal code and math rendering'` 单独运行这四组浏览器与视口组合；不代表手机 WebView 真机验收。
+Markdown 공식 확인도 이 입구에서 수행됩니다. 생산 채팅 및 공식 리소스를 먼저 로드한 다음 실행합니다. `markdown.browser.js` 의 15 아이템 체크섬 `math.browser.js` 의 13 빈 줄 없이 수식을 덮는 항목 확인、TeX 원본 텍스트, 코드, 링크 보안, 스트리밍 조각 및 좁은 화면 스크롤. 사용 가능 `npm run test:browser -- --grep 'Markdown, literal code and math rendering'` 이 네 가지 브라우저 및 뷰포트 조합을 개별적으로 실행하십시오. 휴대전화를 대표하지 않음 WebView 실제 기계 수용。
 
-## 启动恢复检查
+## 복구 확인 시작
 
-运行 `python3 -B tests/browser/bootstrap-fixture.py`，在一个测试标签页访问它打印的 loopback 地址。用 `?case=success` 等参数选择场景，完整清单见夹具文件头。夹具提供生产 Web 资源与合成认证，不连接真实网关；每次导航重置故障计数，不能多页同时操作。
+달리다 `python3 -B tests/browser/bootstrap-fixture.py`，인쇄하려면 테스트 탭에서 액세스하세요. loopback 주소. 사용 `?case=success` 등. 매개변수 선택 시나리오에 대한 전체 목록은 고정 파일 헤더를 참조하세요. 생산을 위해 제공되는 설비 Web 실제 게이트웨이에 연결되지 않은 리소스 및 합성 인증; 탐색할 때마다 오류 카운트가 재설정되며 동시에 여러 페이지를 작동할 수 없습니다.。
 
-等待当前页面的 `window.__startupTest.scenario` 与所选场景一致，并等待启动区域隐藏或进入 `data-state="failed"`。把 `/__checks.js` 作为外部脚本加载后，调用并等待 `runBootstrapBrowserChecks()`；仅加载该脚本不会执行断言。`bootstrap-missing` 场景需等待兜底提示可见；`pair-unknown` 使用 `#pair=synthetic-test-token`，约 30 秒后检查只提交了一次合成配对。正常场景还检查执行顺序、脚本不重复执行和原生 load 时刻的剪贴板定义，`fast` 与 `slow` 分别检查遮罩不闪现及延迟显示。
+현재 페이지를 기다리는 중 `window.__startupTest.scenario` 선택한 장면에 맞게 시작 영역이 숨겨지거나 들어갈 때까지 기다립니다. `data-state="failed"`。묶음 `/__checks.js` 외부 스크립트로 로드한 후 호출하고 기다립니다. `runBootstrapBrowserChecks()`；단순히 스크립트를 로드하면 어설션이 수행되지 않습니다.。`bootstrap-missing` 장면은 하단 프롬프트가 표시될 때까지 기다려야 합니다.；`pair-unknown` 사용 `#pair=synthetic-test-token`，～에 대한 30 단 하나의 합성 페어링만 제출되었는지 몇 초 후에 확인하세요. 일반 시나리오에서는 실행 순서, 스크립트의 반복되지 않는 실행 및 기본도 확인합니다. load 순간의 클립보드 정의，`fast` 및 `slow` 마스크 비 플래시 및 지연 표시를 각각 확인하십시오.。
 
-基础样式回归使用 `shell-once`、`shell-twice` 与 `shell-fatal`：分别让 `/style.css` 首次、前两次、始终返回 503，核验自动恢复与包含初始 link 在内最多三次加载的限制。失败样式可能没有 `sheet`，也可能保留一个读取 `cssRules` 时抛出 `SecurityError` 的对象；Node 用例覆盖后者，浏览器用例验证实际请求链。Chromium 可能对初始 link 发起额外 HTTP 请求，次数上限按实际插入的 link 计数，同时保留服务端请求数；缺少基础 CSS 时的无样式 HTML 兜底不计作样式遮罩闪现。
+기본 스타일 복귀 사용 `shell-once`、`shell-twice` 및 `shell-fatal`：각각 보자 `/style.css` 처음, 처음 두 번, 항상 반환 503，자동 복구 확인 및 초기화 포함 link 최대 3개까지 로드할 수 있습니다. 실패 스타일에는 다음이 없을 수 있습니다. `sheet`，열람 예약도 가능합니다 `cssRules` 언제 던져졌는가 `SecurityError` 물체；Node 사용 사례는 후자를 다루고, 브라우저 사용 사례는 실제 요청 체인을 확인합니다.。Chromium 아마도 초기에는 link 추가 시작 HTTP 요청의 상한은 실제 삽입된 요청 수를 기준으로 합니다. link 서버 요청 수를 유지하면서 계산합니다. 기초가 부족하다 CSS 스타일이 없는 HTML 포켓 하단은 스타일 마스크 플래싱용으로 사용되지 않습니다.。
 
-在浏览器中模拟 `prefers-reduced-motion: reduce`，分别打开 `?case=fast&motion=reduce`、`?case=slow&motion=reduce` 和 `?case=bootstrap-missing&motion=reduce`，运行同一检查函数；查询参数只验证浏览器设置已生效，不代替模拟设置。慢启动与脚本缺失时等待至少 650 ms 再检查，避免只因提示尚未到显示时间而失败。宽屏与 390 px 窄屏均应检查。启动提示只延迟改变可见性，不产生位移、缩放或渐变；减少动态效果不应使提示永久隐藏。
+브라우저에서 시뮬레이션 `prefers-reduced-motion: reduce`，별도로 열기 `?case=fast&motion=reduce`、`?case=slow&motion=reduce` 및 `?case=bootstrap-missing&motion=reduce`，동일한 검사 기능을 실행합니다. 쿼리 매개변수는 브라우저 설정이 적용되었는지 확인하기만 하며 시뮬레이션된 설정을 바꾸지는 않습니다. 누락된 스크립트로 인해 느린 시작이 발생함 650 ms 프롬프트가 아직 표시 시간에 도달하지 않았기 때문에 실패하지 않도록 다시 확인하십시오. 와이드스크린 vs. 390 px 좁은 화면을 검사해야 합니다. 힌트를 활성화하면 가시성 변경만 지연되고 변위, 크기 조정 또는 그라데이션이 발생하지 않습니다. 동적 효과를 줄이면 힌트가 영구적으로 숨겨져서는 안 됩니다.。
 
-`external-script` 场景模拟 Cloudflare 注入的外部统计脚本，断言 CSP 确实阻止它且工作台仍成功加载。资源下载与执行分开后仍须验证脚本顺序、运行时错误和依赖失败屏障。
+`external-script` 시나리오 시뮬레이션 Cloudflare 외부 통계 스크립트, 어설션 삽입 CSP 이를 차단하고 워크벤치는 여전히 성공적으로 로드됩니다. 리소스 다운로드와 실행이 분리된 후에도 스크립트 순서, 런타임 오류 및 종속성 실패 장벽을 계속 확인해야 합니다.。
 
-`opaque-error` 在 DOMContentLoaded 前注入没有来源的全局错误，覆盖 Safari 截图中 `loading / 0s` 的误中止路径；`external-runtime` 与 `external-rejection` 分别覆盖非启动依赖脚本的异常和未处理 Promise 拒绝。三者都应继续显示登录，不提前进入失败页。它们是合成故障，不证明真实手机上的错误由扩展引起；`runtime` 与 `js-fatal` 仍须中止依赖链，Node 用例还验证来源不明的错误不会延长启动超时，也不会在诊断中暴露异常正文或 URL 参数。
+`opaque-error` 에서 DOMContentLoaded 소스 없이 전역 오류를 주입하기 전에 재정의하세요. Safari 스크린샷 진행 중 `loading / 0s` 거짓 중단 경로；`external-runtime` 및 `external-rejection` 비시작 종속 스크립트의 예외 및 처리되지 않은 예외를 각각 다룹니다. Promise 거부하다. 세 가지 모두 미리 실패 페이지에 진입하지 않고 로그인을 계속 표시해야 합니다. 이는 합성 결함이며 실제 전화의 버그가 확장 프로그램으로 인해 발생했음을 증명하지 않습니다.；`runtime` 및 `js-fatal` 종속성 체인은 계속 종료되어야 합니다.，Node 또한 사용 사례에서는 원인을 알 수 없는 오류가 시작 시간 제한을 연장하지 않거나 진단 또는 예외 본문을 노출하지 않는지 확인합니다. URL 매개변수。
 
-`app-cached-failure` 为原始 `/app.js` 版本 URL 返回可缓存、被 nosniff 拒绝的非脚本响应，模拟失败预加载被后续 script 复用。恢复必须产生带新缓存标识的同路径请求，且真正的 `/app.js` 只能执行一次；仅重复插入相同 URL 时仍失败。此场景验证缓存恢复机制，不代表已经定位或验证真实 Safari 的内容拦截、隐私设置或网络请求。
+`app-cached-failure` 원본용 `/app.js` 버전 URL 캐시 가능 반환 nosniff 비스크립트 응답이 거부되었으며 시뮬레이션된 사전 로드 실패가 이어졌습니다. script 재사용. 복구는 새로운 캐시 식별자를 사용하여 동일한 경로 요청을 생성해야 하며 실제 `/app.js` 한 번만 실행할 수 있습니다. 같은 내용만 반복해서 삽입하세요. URL 여전히 실패했습니다. 이 시나리오는 캐시 복구 메커니즘을 확인하지만 진위 여부가 확인되었거나 확인되었음을 의미하지는 않습니다. Safari 콘텐츠 차단, 개인 정보 보호 설정 또는 네트워크 요청。
 
-除 `app-cached-failure` 的故障响应外，夹具资源响应使用 `no-store`；这些故障测试不证明生产缓存命中或真实 BFCache 冻结恢复。需要分别记录浏览器模拟弱网、手机 WebView 实机和生产缓存的验证范围。
+제거하다 `app-cached-failure` 오류 응답 외에도 고정 장치 리소스 응답이 사용됩니다. `no-store`；이러한 실패 테스트는 프로덕션 캐시 적중이나 실제 캐시 적중을 입증하지 않습니다. BFCache 동결 복구. 약한 네트워크와 휴대폰의 브라우저 시뮬레이션을 별도로 기록해야 합니다. WebView 실제 머신과 프로덕션 캐시의 검증 범위。
 
-[PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88) 作者记录的 2026-10-27 验证：1213 项 Node 测试、8 项 Web 资源测试及 17 个 Chromium 启动场景通过；修复同步至正在运行的 Windows 网关后，用户确认 iPhone Safari 已恢复。此实机反馈确认访问恢复，不据此断言最初故障来自某个扩展或缓存来源。本地集成时的独立复验见[决策记录](../../.agents/notes/implemented/bug-fix/2026-10-27-startup-error-attribution-and-cache-retry.md)，不把作者的实机反馈当作本轮重复完成的验收。
+[PR #88](https://github.com/try2love/codex-mobile-bridge/pull/88) 작가가 녹음한 2026-10-27 검증：1213 개 Node 시험、8 개 Web 리소스 테스트 및 17 개인 Chromium 출시 시나리오가 통과되었습니다. 실행 중인 동기화 수정 Windows 게이트웨이 후 사용자가 확인합니다. iPhone Safari 복원되었습니다. 이 실제 시스템 피드백은 액세스가 복원되었음을 확인하며 원래 오류가 확장 또는 캐시 소스에서 발생했음을 의미하지 않습니다. 로컬 통합에 대한 독립적인 재테스트를 참조하세요.[결정기록](../../.agents/notes/implemented/bug-fix/2026-10-27-startup-error-attribution-and-cache-retry.md)，작성자의 실제 기계 피드백을 이 라운드의 반복 완료를 수락하는 것으로 간주하지 마십시오.。
 
 <a id="mermaid-checks"></a>
 
-## Mermaid 定向检查
+## Mermaid 감독검사
 
-- `mermaid.browser.js` 在加载 Markdown 与图表卡片模块的页面中直接运行，使用替代渲染器核验围栏识别、原文复制、流式更新、源码选择、缓存复用与清理；通过这些断言不等于真实 Mermaid 图像已生成。
-- `mermaid-viewer.browser.js` 需调用并等待 `runMermaidViewerTests()`，以合成 SVG 检查全屏、缩放、拖动、源码切换与关闭。它不能替代真实渲染器或手机输入事件验收。
-- 打包验收应从实际安装的网关加载生产资源，确认中文 SVG 的 `naturalWidth > 0`，再检查源码、全屏、流式及缓存。保留完整页面 DOM，避免破坏 App 异步初始化；CDP 驱动需等待主框架导航完成并选用其默认执行上下文。iOS 必须使用带生产导航策略的完整 App，并验证失败基线与修复后的实际图像。
-- `tests/test_mermaid_renderer_security.py` 覆盖固定资源、鉴权、CSP 与中继路径；`python3 scripts/test-ios-mermaid-navigation.py` 在有 Xcode/Swift 的 macOS 上编译真实 URL 判断，验证直连及中继精确路径与导航限制。后者只验证导航规则，不代替完整 App 的显示检查。
+- `mermaid.browser.js` 로드 중 Markdown 차트 카드 모듈의 페이지에서 직접 실행하고 대체 렌더러를 사용하여 펜스 식별, 원본 텍스트 복사, 스트리밍 업데이트, 소스 코드 선택, 캐시 재사용 및 정리를 확인합니다. 이러한 주장을 통과시키는 것은 진실과 같지 않습니다 Mermaid 이미지가 생성되었습니다.。
+- `mermaid-viewer.browser.js` 전화해서 기다려야함 `runMermaidViewerTests()`，합성하다 SVG 전체 화면, 확대/축소, 드래그, 소스 전환 및 닫기를 확인하세요. 실제 렌더러 또는 모바일 입력 이벤트 수용을 대체하지 않습니다.。
+- 패키지 승인은 실제로 설치된 게이트웨이에서 프로덕션 리소스를 로드해야 하며 중국어를 확인해야 합니다. SVG 의 `naturalWidth > 0`，그런 다음 소스 코드, 전체 화면, 스트리밍 및 캐시를 확인하십시오. 전체 페이지 유지 DOM，파괴를 피하다 App 비동기 초기화；CDP 드라이버는 메인 프레임 탐색이 완료될 때까지 기다려야 하며 기본 실행 컨텍스트를 사용해야 합니다.。iOS 프로덕션 탐색 전략과 함께 전체를 사용해야 합니다. App，복구 후 실제 이미지로 실패한 기준선을 확인합니다.。
+- `tests/test_mermaid_renderer_security.py` 고정 리소스 및 인증 다루기、CSP 중계 경로 있음；`python3 scripts/test-ios-mermaid-navigation.py` 있다 Xcode/Swift 의 macOS true로 컴파일 URL 직접 및 중계 정확한 경로와 탐색 제한 사항을 결정하고 확인합니다. 후자는 탐색 규칙만 확인하고 전체를 대체하지는 않습니다. App 디스플레이 확인。
 
-已完成的本轮检查见 [Mermaid 跨平台验收](../../VERIFICATION.md#mermaid-preview-acceptance)。
+이번 라운드의 완료된 검사는 다음을 참조하세요. [Mermaid 크로스 플랫폼 수용](../../VERIFICATION.md#mermaid-preview-acceptance)。
 
-## 历史分页
+## 기록 페이징
 
-在 `bootstrap-fixture.py` 的 `?case=success` 页面启动完成后，加载
-`desktop-history.browser.js` 并调用、等待 `runDesktopHistoryBrowserChecks()`。
-它创建独立界面，所有历史与 workspace 请求均为合成只读结果；不访问真实会话。
-分别在宽屏与 390 px 下验证首屏、旧页追加、滚动位置、文件引用、当前状态及草稿保留。
-断言使用当前消息节点，因为文件引用更新可能合法地替换旧 DOM 节点。
+에서 `bootstrap-fixture.py` 의 `?case=success` 페이지가 시작된 후 로드
+`desktop-history.browser.js` 그리고 전화해서 기다려 `runDesktopHistoryBrowserChecks()`。
+독립적인 인터페이스, 모든 이력 및 workspace 요청은 모두 합성 읽기 전용 결과입니다. 실제 세션에 액세스할 수 없습니다.。
+각각 와이드스크린과 390 px 첫 번째 화면, 이전 페이지 추가, 스크롤 위치, 파일 참조, 현재 상태 및 초안 보존 확인。
+파일 참조 업데이트가 이전 메시지 노드를 합법적으로 대체할 수 있으므로 현재 메시지 노드를 사용하도록 어설션합니다. DOM 마디。
 
 
-## 新建聊天与项目目录
+## 새 채팅 및 프로젝트 디렉토리 생성
 
-`project-creation.browser.js` 在已加载生产 Web 脚本的隔离 loopback 页面中运行。
-通过浏览器驱动读取并注入脚本后，调用并等待
+`project-creation.browser.js` 프로덕션에 로드됨 Web 스크립트 격리 loopback 페이지에서 실행。
+브라우저 드라이버를 통해 스크립트를 읽고 주입한 후 호출하고 기다립니다.
 `runProjectCreationBrowserChecks({language:'zh',provider:'claude',keepOpen:true})`。
-`language` 支持 `zh` / `en`，`provider` 支持 `claude` / `deepseek`；
-`folder:true` 会在检查结束时停留于共享目录弹窗，便于视觉验收。
-`keepOpen:true` 保留预览，结束时调用 `window.__projectCreationPreview.cleanup()`；默认自动清理。
-分别在 320 px、390 px 和宽屏下运行中英检查，核验短路径、环境身份、首条消息要求、折叠新建文件夹和横向溢出。
-该脚本创建独立 `DesktopSessionsView`，所有请求由闭包合成；新建文件夹仅改变内存中的路径，拒绝项目登记和聊天创建，不访问实际客户端。
+`language` 지원하다 `zh` / `en`，`provider` 지원하다 `claude` / `deepseek`；
+`folder:true` 공유 디렉터리 팝업 창은 검사가 끝난 후에도 시각적으로 쉽게 확인할 수 있도록 유지됩니다.。
+`keepOpen:true` 미리보기를 유지하고 완료되면 전화하세요. `window.__projectCreationPreview.cleanup()`；기본적으로 자동 청소。
+각각 320 px、390 px 와이드스크린 모드에서 중국어 및 영어 검사를 실행하여 짧은 경로, 환경 ID, 첫 번째 메시지 요구 사항, 새 폴더 접기 및 수평 오버플로를 확인합니다.。
+이 스크립트는 독립형을 생성합니다. `DesktopSessionsView`，모든 요청은 클로저로 합성됩니다. 새 폴더를 생성하면 메모리의 경로만 변경되고 프로젝트 등록 및 채팅 생성이 거부되며 실제 클라이언트에 액세스할 수 없습니다.。
 
-Codex 的环境路由、目录登记和创建回执由 `codex-entries.browser.js` 检查，配套服务为
-`scripts/smoke-wsl-app-ui.cjs`。运行 `CMB_FIXTURE_ONLY=1 node scripts/smoke-wsl-app-ui.cjs`
-只启动合成 API 服务，随后由现有浏览器打开打印的 loopback 地址；不要对真实网关调用这些检查。
-页面启动后注入 `codex-entries.browser.js`，调用并等待 `checkCodexEntries()`，使用中文界面和全新的夹具状态。
-它覆盖单一 Codex 入口、WSL 扫描启停、列表过滤分页、WSL 新目录、本机及 SSH CLI 无既有项目时的新目录流程、模型标签和草稿隔离。
-`checkCodexProjectCreation()` 可在原生 Codex 接入已启用时单独检查本机与 SSH CLI 项目流程。
-合成服务核验 `environments`、目录 `host`、WSL `entry`、`kind:'cli'`、目录身份和创建请求；
-这些聊天创建只返回内存中的合成会话，不发送消息、不调用模型。修改服务端夹具后应重启服务，重新加载页面不能更新旧进程的路由。
+Codex 환경 라우팅, 디렉터리 등록, 생성 확인 등은 다음에서 제공됩니다. `codex-entries.browser.js` 검사 및 지원 서비스는
+`scripts/smoke-wsl-app-ui.cjs`。달리다 `CMB_FIXTURE_ONLY=1 node scripts/smoke-wsl-app-ui.cjs`
+합성만 시작 API 이 서비스는 인쇄를 위해 기존 브라우저에서 열립니다. loopback 주소; 실제 게이트웨이에 대해 이러한 검사를 호출하지 마세요.。
+페이지 시작 후 삽입됨 `codex-entries.browser.js`，전화해서 기다려 `checkCodexEntries()`，중국어 인터페이스 및 새로운 설비 상태 사용。
+그것은 하나를 덮는다 Codex 입구、WSL 스캔 시작 및 중지, 목록 필터링 및 페이징、WSL 새 디렉토리, 로컬 및 SSH CLI 기존 프로젝트가 없는 경우 새 카탈로그 흐름, 모델 태그 및 초안 격리。
+`checkCodexProjectCreation()` 네이티브로 사용 가능 Codex 액세스가 개별적으로 활성화되면 장치를 확인하고 SSH CLI 프로젝트 프로세스。
+합성 서비스 검증 `environments`、폴더 `host`、WSL `entry`、`kind:'cli'`、디렉터리 ID 및 생성 요청；
+이러한 채팅 생성은 메모리 내 합성 세션만 반환하고 메시지는 전송되지 않으며 모델은 호출되지 않습니다. 서버측 픽스처를 수정한 후 서비스를 다시 시작해야 합니다. 페이지를 다시 로드하면 이전 프로세스의 경로가 업데이트될 수 없습니다.。
 
 
-## 图片添加到当前对话
+## 현재 대화에 이미지 추가
 
-`image-composer.browser.js` 配合 `scripts/smoke-image-composer.cjs`，使用已安装的 Electron 执行隔离检查。
-它加载生产 Workbench、ComposerQuotes、ChatAttachments、图片预览器、样式和 `app.js` 中的实际回调，
-以合成图片验证 Codex、Claude、DSH 在 390 px 和宽屏下的文件标签、图片预览、“添加到对话”、返回聊天、可见附件和草稿保留。
-同一个文件标签在账号身份改变后仍可查看原图片，但不能将旧图片加入新的草稿。
-附件上传由内存夹具接收，HTTP 服务拒绝所有非 GET 请求，不调用真实网关或模型。
-检查结果和截图保存在 `.tmp/v215-chat-feedback/image-workbench-check/`。
+`image-composer.browser.js` 맞잡다 `scripts/smoke-image-composer.cjs`，설치된 것을 사용하세요 Electron 검역 점검 수행。
+그것은 생산을 부하한다 Workbench、ComposerQuotes、ChatAttachments、이미지 미리보기, 스타일 및 `app.js` 실제 콜백，
+합성 이미지로 확인 Codex、Claude、DSH 에서 390 px 와이드스크린에서 파일 태그와 이미지 미리보기、“대화에 추가”、채팅으로 돌아가기, 첨부 파일 표시, 임시 보관。
+동일한 파일 태그의 경우 계정 ID가 변경된 후에도 원본 이미지를 계속 볼 수 있지만 이전 이미지를 새 초안에 추가할 수는 없습니다.。
+첨부 파일 업로드는 메모리 고정 장치에 의해 수신됩니다.，HTTP 서비스는 모든 비- GET 요청은 실제 게이트웨이나 모델을 호출하지 않습니다.。
+확인 결과와 스크린샷은 다음 위치에 저장됩니다. `.tmp/v215-chat-feedback/image-workbench-check/`。
 
-## 输入区引用布局
+## 입력 영역 참조 레이아웃
 
-`composer-quotes.browser.js` 在 `bootstrap-fixture.py` 完整启动生产页面后运行。
-调用并等待 `runComposerQuoteLayoutChecks()`，分别在实际 390、844、1440 px 视口执行；调整窗口后先等待 `innerWidth` 匹配目标宽度。
-它复制已初始化的完整 Codex / Claude 输入区（包括提醒、权限、上下文和收起按钮），不再手工简化工具栏。核验宽屏选区按钮紧邻上下文用量、窄屏独立紧凑行且原工具栏不换行、引用预览单行省略与展开完整文本，以及选区点击和已有草稿保留；不发送消息。布局依据实际输入区宽度，不能用全窗口宽度代替分屏宽度。
+`composer-quotes.browser.js` 에서 `bootstrap-fixture.py` 프로덕션 페이지를 완전히 시작한 후 실행。
+전화해서 기다려 `runComposerQuoteLayoutChecks()`，현실의 차이 390、844、1440 px 뷰포트 실행; 창 크기를 조정한 후 대기 `innerWidth` 목표 너비 일치。
+초기화된 전체 내용을 복사합니다. Codex / Claude 입력 영역（알림, 권한, 컨텍스트 및 축소 버튼 포함）은 더 이상 도구 모음을 수동으로 단순화하지 않습니다. 와이드스크린 선택 버튼이 컨텍스트에 인접해 있는지, 좁은 화면에 독립적인 컴팩트 행이 있고 원래 도구 모음이 줄바꿈되지 않았는지, 참조 미리보기 한 줄이 생략되고 전체 텍스트가 확장되었는지, 선택 클릭과 기존 초안이 유지되는지 확인하세요. 메시지가 전송되지 않습니다. 레이아웃은 실제 입력 영역 너비를 기준으로 합니다. 분할 화면 너비 대신 전체 창 너비를 사용할 수 없습니다.。
 
-## Codex 多标签页发送协调
+## Codex 멀티탭 전송 조정
 
-在隔离 `bootstrap-fixture.py?case=success` 页面加载 `composer-send.browser.js` 后，调用并等待 `runComposerSendCoordinationChecks()`。它使用两个独立同源文档、实际 IndexedDB 事务与专属合成 localStorage 键，验证同 ID 并发登记、拒绝顺序、未知结果保留和全部明确拒绝后允许改为排队；不请求发送 API。顶层标签页的同源共享行为需由浏览器驱动另行核验。
+격리 상태 `bootstrap-fixture.py?case=success` 페이지 로딩 `composer-send.browser.js` 그 후 전화해서 기다리세요 `runComposerSendCoordinationChecks()`。두 개의 독립적인 소스 문서를 사용합니다. IndexedDB 거래 및 전속구성 localStorage 키, 동일하게 확인 ID 동시 등록, 거부 순서, 알 수 없는 결과 보유 및 모든 명시적 거부를 대기열로 변경할 수 있습니다. 요청이 전송되지 않았습니다 API。최상위 탭의 동일 출처 공유 동작은 브라우저 드라이버에서 별도로 확인해야 합니다.。
 
-`persistent-drafts.browser.js` 的 `runPersistentDraftTests()` 使用真实提交处理器和合成网络结果，补充账号切换、页面导航及等待回执期间的新草稿保护。两类检查不得在真实会话页面执行。
+`persistent-drafts.browser.js` 의 `runPersistentDraftTests()` 승인을 기다리는 동안 실제 제출 프로세서와 합성 네트워크 결과를 사용하여 계정 전환, 페이지 탐색 및 새로운 초안 보호를 보완합니다. 실제 세션 페이지에서는 두 가지 유형의 확인을 모두 수행하면 안 됩니다.。
 
-## 聊天列表优先启动
+## 채팅 목록이 먼저 시작됩니다.
 
-`python3 -B tests/browser/list-first-fixture.py` 启动隔离 loopback 服务，使用生产页面、版本化资源和合成账号／列表，拒绝聊天写入。
-`?case=first` 获取列表后，打开 `?case=cached`：同一身份缓存应先显示，5 秒后刷新为新标题；`?case=identity` 使用另一缓存身份，旧列表不能提前出现。
-`?case=blocked` 对公式、终端和文件预览资源返回 503，列表仍应正常显示且不请求这些组件；实际渲染公式后应保留源码和重试按钮，不进入全屏启动错误。
-`?case=slow` 为脚本响应额外增加 300 ms；结合浏览器单页网络限速验证冷启动。`window.__listProbe` 记录首个列表／缓存更新时刻和运行时异常。仅在夹具中使用，禁止对真实网关注入测试数据。
+`python3 -B tests/browser/list-first-fixture.py` 격리 시작 loopback 프로덕션 페이지, 버전이 지정된 리소스 및 합성 계정/목록을 사용하는 서비스는 채팅 쓰기를 거부합니다.。
+`?case=first` 목록을 얻은 후 엽니다. `?case=cached`：동일한 ID 캐시가 먼저 표시되어야 합니다.，5 몇 초 후에 새 제목으로 새로고침；`?case=identity` 캐시된 다른 ID를 사용하면 이전 목록이 더 일찍 나타날 수 없습니다.。
+`?case=blocked` 수식, 터미널 및 파일 미리보기 리소스에 대한 반환 503，목록은 여전히 ​​정상적으로 표시되어야 하며 이러한 구성 요소는 요청되어서는 안 됩니다. 수식이 실제로 렌더링된 후에도 소스 코드와 재시도 버튼이 유지되어야 하며 전체 화면 시작 오류를 입력해서는 안 됩니다.。
+`?case=slow` 스크립트 응답을 위해 추가됨 300 ms；브라우저 단일 페이지 네트워크 속도 제한 확인 콜드 스타트와 결합。`window.__listProbe` 첫 번째 목록/캐시 업데이트 시간 및 런타임 예외를 기록합니다. 설비에만 사용되며 실제 게이트웨이에 테스트 데이터를 주입하는 것은 금지되어 있습니다.。
 
-## WSL 弹窗宽度
+## WSL 팝업 창 너비
 
-在隔离生产页面夹具中加载 `wsl-dialog-width.browser.js`，调用并等待 `runWslDialogWidthChecks({kind:"accounts"})` 或 `{kind:"new-chat"}`。使用合成长发行版名称、账号名、地址与导入选项；不调用真实账号接口或发送聊天。分别在 320/393/430/1280 宽度及中英文下检查元素边界、`scrollWidth === clientWidth`、横向滚动位置为零，窄屏原生选择框字号至少 16px。完成后调用 `window.__wslLayoutCleanup()`。
+격리 생산 페이지 고정 장치에 로드 `wsl-dialog-width.browser.js`，전화해서 기다려 `runWslDialogWidthChecks({kind:"accounts"})` 또는 `{kind:"new-chat"}`。합성 긴 배포판 이름, 계정 이름, 주소 및 가져오기 옵션을 사용합니다. 실제 계정 인터페이스를 호출하거나 채팅을 보내지 않습니다. 각각 320/393/430/1280 중국어, 영어로 요소의 너비와 경계를 확인하세요.、`scrollWidth === clientWidth`、가로 스크롤 위치는 0이고 좁은 화면의 기본 선택 상자 글꼴 크기는 최소 16px。완료 후 호출됨 `window.__wslLayoutCleanup()`。
 
-选择框内部的长选项在 WebKit 中可能扩大祖先滚动区域，即使元素边界正常；需要在 WebKit 实际执行以上滚动断言，不能只检查 Chromium 或元素宽度。macOS WKWebView 的通过结果不能代替 iPhone 真机输入与选择验收。
+선택 상자 안의 긴 옵션은 WebKit 요소 경계가 정상인 경우에도 조상 스크롤 영역을 확장할 수 있습니다. 필요하다 WebKit 위의 롤링 어설션을 실제로 실행하려면 다음을 확인하는 것만으로는 충분하지 않습니다. Chromium 또는 요소 너비。macOS WKWebView 합격 결과는 대체할 수 없습니다. iPhone 실제 기계 입력 및 선택 승인。
 
-## 共享客户端会话控件
+## 클라이언트 세션 제어 공유
 
-在隔离 `bootstrap-fixture.py` 的成功页面中注入 `desktop-parity.browser.js`，调用并等待 `runDesktopParityChecks({language:'zh'})`。检查三客户端底栏同排、原生上下文占比、共享引用入口，以及长文件名图片预览按钮不换行；所有数据和请求均为合成，不发送模型消息。覆盖 320/390 像素中英文、横屏和宽屏。`keepOpen:true` 保留图片预览供截图；会话菜单 ID 复制另由 `session-menu.browser.js` 验证。
+격리 상태 `bootstrap-fixture.py` 성공 페이지에 삽입 `desktop-parity.browser.js`，전화해서 기다려 `runDesktopParityChecks({language:'zh'})`。세 클라이언트의 아래쪽 열이 동일한 행에 있는지, 기본 컨텍스트 비율, 공유 참조 항목 및 긴 파일 이름 이미지 미리 보기 버튼이 줄 바꿈되지 않는지 확인하세요. 모든 데이터와 요청이 합성되며 모델 메시지가 전송되지 않습니다. 씌우다 320/390 픽셀 중국어 및 영어, 가로 및 와이드스크린。`keepOpen:true` 스크린샷을 위한 이미지 미리보기를 유지합니다. 세션 메뉴 ID 다른 사람이 복사 `session-menu.browser.js` 검증。
 
-## visualize 回归
+## visualize 반품
 
-`npx playwright test -c tests/browser/playwright.config.cjs visualize.spec.cjs` 在 Chromium 与 WebKit 的宽窄视口运行生产 Markdown、预览壳和运行时。覆盖交互、状态恢复、主题、保持脚本内存的全屏、提问草稿、失败重试及隔离边界。合成 API 与外网拦截保证这些用例只操作夹具。
+`npx playwright test -c tests/browser/playwright.config.cjs visualize.spec.cjs` 에서 Chromium 및 WebKit 넓고 좁은 뷰포트로 생산 실행 Markdown、셸 및 런타임을 미리 봅니다. 상호 작용, 상태 복원, 테마, 스크립트 메모리 전체 화면 유지, 질문 초안, 실패 재시도 및 격리 경계를 다룹니다. 합성 API 외부 네트워크를 가로채면 이러한 사용 사례가 설비만 작동하도록 보장합니다.。

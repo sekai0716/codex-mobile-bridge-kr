@@ -19,12 +19,12 @@ app.on('browser-window-created',(_,win)=>{
       assert.equal(await evaluate('snapshot.preferences.connections[0].sshPort'),2222);
       await win.setSize(1100,900);
       await evaluate("document.querySelector('.connection-card').scrollIntoView({block:'start',behavior:'instant'})");
-      fs.writeFileSync(path.join(process.env.CMB_DATA_DIR,'server-setup-zh.png'),(await win.webContents.capturePage()).toPNG());
+      fs.writeFileSync(path.join(process.env.CMB_DATA_DIR,'server-setup-ko.png'),(await win.webContents.capturePage()).toPNG());
       await evaluate("$('connection-kind').value='cloudflare';addConnection();Object.assign(connectionDraft[1],{enabled:false,publicUrl:'https://phone.example.com'});renderConnections();updateDirty();$('settings').requestSubmit()");
       await until('!dirty');
       await evaluate("document.querySelectorAll('.connection-card')[1].scrollIntoView({block:'start',behavior:'instant'})");
       assert.match(await evaluate("document.querySelector('[data-panel=network]').innerText"),/localhost:/);
-      fs.writeFileSync(path.join(process.env.CMB_DATA_DIR,'cloudflare-domain-zh.png'),(await win.webContents.capturePage()).toPNG());
+      fs.writeFileSync(path.join(process.env.CMB_DATA_DIR,'cloudflare-domain-ko.png'),(await win.webContents.capturePage()).toPNG());
       const secret='only-a-local-test-token';
       await evaluate(`api.connectionCredentials({id:connectionDraft[1].id,remember:false,secrets:{tunnelToken:${JSON.stringify(secret)}}})`);
       assert.ok(!fs.readFileSync(path.join(process.env.CMB_DATA_DIR,'desktop.json'),'utf8').includes(secret));

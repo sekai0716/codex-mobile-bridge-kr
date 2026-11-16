@@ -366,7 +366,7 @@ class RecoveryTests(unittest.TestCase):
         session = self.bridge.session(THREAD)
         self.bridge._disconnected()
         with patch.object(self.bridge, '_attach'), patch('bridge.app.service.open_in_desktop', side_effect=OSError('unavailable')):
-            with self.assertRaisesRegex(IPCError, '应用管理'):
+            with self.assertRaisesRegex(IPCError, "게이트웨이\\ 연결이\\ 다시\\ 설정되었지만\\ 원래\\ 데스크톱\\ 세션은\\ 복원되지\\ 않았습니다\\.\\ 애플리케이션\\ 관리에서\\ 작업을\\ 확인한\\ 후\\ 다시\\ 시작할\\ 수\\ 있습니다\\.\\ Codex；작업이\\ 전송되지\\ 않았습니다\\.。"):
                 self.bridge.rebuild_connection(THREAD)
         self.assertTrue(session.view()['desktopRestartRecommended'])
         self.assertTrue(self.bridge.desktop_restart_recommended())
@@ -380,7 +380,7 @@ class RecoveryTests(unittest.TestCase):
         session.rebuild_recommended = False
         with patch.object(self.bridge, '_refresh_async'), patch.object(
                 self.bridge.ipc, 'reconnect', side_effect=IPCError('interrupted')):
-            with self.assertRaisesRegex(IPCError, '再次重建'):
+            with self.assertRaisesRegex(IPCError, "원래\\ 데스크톱\\ 세션의\\ 연결이\\ 여전히\\ 끊어졌습니다\\.\\ 다시\\ 재구축해\\ 보세요\\.\\ 실패하면\\ Codex를\\ 다시\\ 시작하기\\ 전에\\ 앱\\ 관리에서\\ 작업을\\ 검토하세요\\."):
                 self.bridge.rebuild_connection(THREAD)
         self.assertTrue(session.view()['desktopRestartRecommended'])
         self.assertTrue(session.view()['rebuildRecommended'])

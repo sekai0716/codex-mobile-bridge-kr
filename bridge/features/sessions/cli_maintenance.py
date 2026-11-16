@@ -30,18 +30,18 @@ class CliMaintenance:
         result = record.get('maintenanceResult') or {}
         if waiting:
             state = 'waiting'
-            message = record['message'] if active else '等待已暂停；重新确认后继续检查此配置的任务。'
+            message = record['message'] if active else '대기가 일시 중지되었습니다. 이 구성된 작업을 계속 확인하려면 다시 확인하세요.。'
         elif phase == 'cancelled':
-            state, message = 'cancelled', '已取消等待，未退出服务。'
+            state, message = 'cancelled', '대기가 취소되었으며 서비스가 종료되지 않았습니다.。'
         elif phase == 'failed' or record.get('providerPhase') == 'failed':
-            state, message = 'failed', record.get('maintenanceError') or 'CLI 恢复未完成，请重新检查。'
+            state, message = 'failed', record.get('maintenanceError') or 'CLI 복원이 완료되지 않았습니다. 다시 확인하세요.。'
         elif result:
-            state, message = 'complete', 'CLI 恢复已完成。'
+            state, message = 'complete', 'CLI 복구 완료。'
         elif active:
-            state, message = 'recovering', '正在恢复此配置的 CLI 服务。'
+            state, message = 'recovering', '이 구성 복원 CLI 제공하다。'
         else:
             state = 'unknown'
-            message = record.get('maintenanceError') or 'CLI 恢复结果待核对；不会重复执行。'
+            message = record.get('maintenanceError') or 'CLI 복구 결과를 확인해야 합니다. 그것은 반복되지 않을 것입니다.。'
         return {'operationId': operation_id, 'threadId': record['threadId'], 'state': state,
                 'maintenancePending': waiting, 'requiresConfirmation': waiting, 'canCancel': waiting,
                 'canRecover': waiting and not active, 'generation': record['confirmation']['generation'],

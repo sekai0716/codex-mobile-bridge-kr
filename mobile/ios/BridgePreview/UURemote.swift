@@ -68,9 +68,9 @@ import AVKit
     }
     func open(_ mode: String, notice: @escaping (String) -> Void) {
         guard enabled, ["pip", "full"].contains(mode), mode != "pip" || pipSupported() else { return }
-        guard pending.isEmpty else { notice("UU 请求正在处理中"); return }
+        guard pending.isEmpty else { notice("UU Remote 요청을 처리 중입니다."); return }
         guard installed() else {
-            notice("请安装或更新 UU 远程至 4.42.0 及以上版本"); return
+            notice("UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요."); return
         }
         let nonce = UUID().uuidString, callback = scheme + "://result"
         let id = defaults.string(forKey: "uu.binding:" + scope)
@@ -83,14 +83,14 @@ import AVKit
         } else {
             target = url("authorize", [("callback", callback), ("nonce", nonce)])
         }
-        guard let target else { notice("无法打开 UU 远程"); return }
+        guard let target else { notice("UU Remote를 열 수 없습니다."); return }
         if kind != "full" {
             defaults.set(["kind":kind, "scope":scope, "nonce":nonce, "until":Date().addingTimeInterval(600)], forKey:pendingKey)
         }
         launch(target) { opened in
             if !opened {
                 if self.pending["nonce"] as? String == nonce { self.defaults.removeObject(forKey:self.pendingKey) }
-                notice("无法打开 UU 远程")
+                notice("UU Remote를 열 수 없습니다.")
             }
         }
     }
@@ -111,18 +111,18 @@ import AVKit
             if let id = one("anonymous_device_id"), !id.isEmpty, id.utf8.count <= 4096,
                !(parts.queryItems ?? []).contains(where:{ $0.name == "error" }) {
                 defaults.set(id, forKey:"uu.binding:" + device)
-                return "UU 设备已绑定，请再次选择小窗或远控"
+                return "기기가 연결되었습니다. 작은 화면 또는 원격 제어를 다시 선택하세요."
             }
-            return one("error") == "user_cancel" ? "" : "UU 绑定未完成，请在 UU 中确认账号和设备"
+            return one("error") == "user_cancel" ? "" : "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요."
         }
-        if one("status") == "success", !(parts.queryItems ?? []).contains(where:{ $0.name == "reason" }) { return "UU 小窗已开启" }
-        guard one("status") == "failure" else { return "UU 小窗未能开启，请检查设备或重试" }
+        if one("status") == "success", !(parts.queryItems ?? []).contains(where:{ $0.name == "reason" }) { return "UU Remote 작은 화면이 열렸습니다." }
+        guard one("status") == "failure" else { return "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요." }
         switch one("reason") {
-        case "device_not_found": unlink(device); return "UU 设备已失效，请重新绑定"
-        case "device_offline": return "UU 设备离线"
-        case "pip_unsupported": return "当前设备不支持 UU 小窗，请使用全屏远控"
+        case "device_not_found": unlink(device); return "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요."
+        case "device_offline": return "UU Remote 기기가 오프라인 상태입니다."
+        case "pip_unsupported": return "작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요."
         case "user_cancel": return ""
-        default: return "UU 小窗未能开启，请检查设备或重试"
+        default: return "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요."
         }
     }
 }

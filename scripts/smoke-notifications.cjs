@@ -11,7 +11,7 @@ async function main(){
     `${process.arch==='x64'?'mac':'mac-'+process.arch}/Codex Mobile Bridge.app/Contents/Resources/gateway/codex-mobile-gateway`:
     'win-unpacked/resources/gateway/codex-mobile-gateway.exe');
   await fs.mkdir(path.join(root,'.tmp'),{recursive:true});
-  const dataDir=await fs.mkdtemp(path.join(root,'.tmp','notifications-中文 '));
+  const dataDir=await fs.mkdtemp(path.join(root,'.tmp','notifications-중국어 '));
   const requests=[];let rejectBark=false;
   const server=http.createServer(async(request,response)=>{
     try{
@@ -34,7 +34,7 @@ async function main(){
     assert.ok((await worker('test-notification',{channel:'bark'})).message.startsWith('Bark'));
     assert.equal(requests.length,1);assert.equal(requests[0].url,'/bark/push');
     assert.equal(requests[0].payload.device_key,'synthetic-bark-key');
-    assert.equal(requests[0].payload.title,'Codex 手机通知测试');
+    assert.equal(requests[0].payload.title,'Codex 모바일 알림 테스트');
     assert.equal(requests[0].payload.group,'Codex Mobile Bridge');
     Object.assign(state.notifications,{enabled:true,server:base+'/ntfy',topic:'synthetic-topic',token:'synthetic-ntfy-token'});
     state=await worker('save',state); // Blank Bark key must preserve the saved secret.

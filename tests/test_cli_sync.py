@@ -59,7 +59,7 @@ class LocalCliSyncTests(unittest.TestCase):
         self.bridge.cli_sessions.daemon_may_be_running.return_value = True
         with patch('bridge.features.accounts.cli_sync.DesktopApp') as desktop:
             desktop.return_value.processes.return_value = []
-            with self.assertRaisesRegex(ValueError, '后台服务'):
+            with self.assertRaisesRegex(ValueError, '백그라운드 서비스'):
                 self.sync.preflight('codex')
         self.bridge.cli_sessions.daemon_may_be_running.assert_called_once_with()
 
@@ -80,7 +80,7 @@ class LocalCliSyncTests(unittest.TestCase):
                     if supported:
                         self.assertEqual(self.sync._api_runtime(), (client, [42, 123]))
                     else:
-                        with self.assertRaisesRegex(ValueError, '协议无法核验'):
+                        with self.assertRaisesRegex(ValueError, "기본\\ 서비스의\\ 구성\\ 디렉터리\\ 또는\\ 계정\\ 동기화\\ 프로토콜을\\ 확인할\\ 수\\ 없습니다\\."):
                             self.sync._api_runtime()
 
     def test_native_idle_check_rejects_active_background_and_unknown_states(self):
@@ -115,7 +115,7 @@ class LocalCliSyncTests(unittest.TestCase):
             rpc.return_value.__enter__.return_value.request.side_effect = response
             self.assertEqual(self.sync.verify('codex', row)['status'], 'verified')
             config['openai_base_url'] = 'https://other.invalid/v1'
-            with self.assertRaisesRegex(ValueError, 'API 接入未生效'):
+            with self.assertRaisesRegex(ValueError, 'API 액세스가 효과적이지 않습니다.'):
                 self.sync.verify('codex', row)
 
     def test_claude_auth_requires_selected_native_config_directory(self):
@@ -127,11 +127,11 @@ class LocalCliSyncTests(unittest.TestCase):
         with patch('bridge.clients.claude.cli_session._profile', return_value={'binary': '/fixture/claude'}), \
              patch('bridge.clients.claude.cli_session.managed_api_env', return_value={}, create=True), \
              patch('bridge.features.accounts.cli_sync.subprocess.run', return_value=result) as run:
-            with self.assertRaisesRegex(ValueError, '配置目录无法核验'):
+            with self.assertRaisesRegex(ValueError, '구성 디렉터리를 확인할 수 없습니다.'):
                 self.sync._claude_auth(directory, 'api_key')
             status['configDirectory'] = None
             result.stdout = json.dumps(status)
-            with self.assertRaisesRegex(ValueError, '配置目录无法核验'):
+            with self.assertRaisesRegex(ValueError, '구성 디렉터리를 확인할 수 없습니다.'):
                 self.sync._claude_auth(directory, 'api_key')
             status['configDirectory'] = str(directory)
             result.stdout = json.dumps(status)
@@ -158,7 +158,7 @@ class LocalCliSyncTests(unittest.TestCase):
              patch('bridge.features.accounts.cli_sync.subprocess.run', side_effect=native_status):
             self.assertEqual(self.sync._claude_auth(directory, 'api_key')['authMethod'], 'api_key')
             control_logged_in[0] = True
-            with self.assertRaisesRegex(ValueError, '配置目录无法核验'):
+            with self.assertRaisesRegex(ValueError, '구성 디렉터리를 확인할 수 없습니다.'):
                 self.sync._claude_auth(directory, 'api_key')
         self.assertEqual(len(control_dirs), 2)
         self.assertTrue(all(not Path(path).exists() for path in control_dirs))
@@ -177,7 +177,7 @@ class LocalCliSyncTests(unittest.TestCase):
                      patch('bridge.features.accounts.cli_sync.subprocess.run', side_effect=[
                          selected, failure if isinstance(failure, Exception) else
                          SimpleNamespace(returncode=1, stdout=failure)]):
-                    with self.assertRaisesRegex(ValueError, '认证状态无法核验'):
+                    with self.assertRaisesRegex(ValueError, '인증 상태를 확인할 수 없습니다.'):
                         self.sync._claude_auth(directory, 'api_key')
 
     def test_claude_auth_negative_control_rejects_error_exit_with_logged_out_json(self):
@@ -190,7 +190,7 @@ class LocalCliSyncTests(unittest.TestCase):
         with patch('bridge.clients.claude.cli_session._profile', return_value={'binary': '/fixture/claude'}), \
              patch('bridge.clients.claude.cli_session.managed_api_env', return_value={}, create=True), \
              patch('bridge.features.accounts.cli_sync.subprocess.run', side_effect=[selected, failed_control]):
-            with self.assertRaisesRegex(ValueError, '配置目录无法核验'):
+            with self.assertRaisesRegex(ValueError, '구성 디렉터리를 확인할 수 없습니다.'):
                 self.sync._claude_auth(directory, 'api_key')
 
     def test_claude_auth_rejects_wrong_selected_method_before_control(self):
@@ -201,7 +201,7 @@ class LocalCliSyncTests(unittest.TestCase):
         with patch('bridge.clients.claude.cli_session._profile', return_value={'binary': '/fixture/claude'}), \
              patch('bridge.clients.claude.cli_session.managed_api_env', return_value={}, create=True), \
              patch('bridge.features.accounts.cli_sync.subprocess.run', return_value=wrong) as run:
-            with self.assertRaisesRegex(ValueError, '未识别'):
+            with self.assertRaisesRegex(ValueError, "Claude\\ Code\\ CLI가\\ 선택한\\ 인증\\ 방법을\\ 인식하지\\ 못했습니다\\."):
                 self.sync._claude_auth(directory, 'api_key')
         run.assert_called_once()
 
@@ -243,9 +243,9 @@ class LocalCliSyncTests(unittest.TestCase):
         active.pending = {}
         cli = SimpleNamespace(lock=threading.RLock(), owned={'idle': idle, 'active': active}, auth_cache='cached')
         self.bridge.desktop_sessions = SimpleNamespace(adapters={'claude': SimpleNamespace(cli=cli)})
-        with self.assertRaisesRegex(ValueError, '先结束'):
+        with self.assertRaisesRegex(ValueError, "액세스를\\ 전환하기\\ 전에\\ 지속적인\\ 로컬\\ Claude\\ Code\\ 채팅을\\ 종료하세요\\."):
             self.sync.preflight('claude')
-        with self.assertRaisesRegex(ValueError, '先结束'):
+        with self.assertRaisesRegex(ValueError, "액세스를\\ 전환하기\\ 전에\\ 지속적인\\ 로컬\\ Claude\\ Code\\ 채팅을\\ 종료하세요\\."):
             self.sync._close_claude_idle()
         idle.close.assert_not_called()
         active.close.assert_not_called()
@@ -275,7 +275,7 @@ class LocalCliSyncTests(unittest.TestCase):
             self.sync.restore('claude', {})
         self.assertFalse(directory.exists())
         row['directory'] = str(self.root/'different-missing')
-        with self.assertRaisesRegex(ValueError, '配置目录不可用'):
+        with self.assertRaisesRegex(ValueError, '구성 디렉터리를 사용할 수 없습니다.'):
             self.sync.apply('claude', row)
 
     def test_desktop_claude_import_requires_active_verified_api_snapshot(self):
@@ -297,7 +297,7 @@ class LocalCliSyncTests(unittest.TestCase):
         self.assertEqual(imported['authScheme'], 'x-api-key')
         self.assertEqual(imported['model'], 'fixture-model')
         store.public.return_value = {'activeId': 'other', 'current': {'kind': 'official'}}
-        with self.assertRaisesRegex(ValueError, '官方登录不能复制'):
+        with self.assertRaisesRegex(ValueError, '공식 로그인은 복사할 수 없습니다.'):
             self.sync.import_desktop_claude('desktop-api', store)
 
 
@@ -368,7 +368,7 @@ class ManagedApiSwitchTests(unittest.TestCase):
         from bridge.clients.codex.app_server import AppServerUnknownResult
         self.failure = AppServerUnknownResult('lost response')
         value = self.value()
-        with self.assertRaisesRegex(ValueError, '尚未核验'):
+        with self.assertRaisesRegex(ValueError, "계정\\ 동기화가\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 동일한\\ 요청을\\ 사용하여\\ 확인하고\\ 반복적으로\\ 제출하지\\ 마십시오\\."):
             self.accounts.switch(value)
         self.assertEqual(self.accounts.state['phase'], 'authUnknown')
         self.assertIsNone(self.accounts.public()['activeId'])
@@ -397,11 +397,11 @@ class ManagedApiSwitchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.accounts.switch(value)
         self.native_key = 'fixture-A'
-        with self.assertRaisesRegex(ValueError, '尚未使用'):
+        with self.assertRaisesRegex(ValueError, "선택한\\ 계정은\\ 기본\\ 서비스에서\\ 사용되지\\ 않았습니다\\.\\ 계속하기\\ 전에\\ 동기화\\ 또는\\ 유지\\ 관리를\\ 명확하게\\ 확인하십시오\\."):
             self.accounts.switch(value)
         self.assertEqual(self.writes, ['fixture-B'])
         self.assertEqual(self.accounts.state['phase'], 'authUnknown')
-        with self.assertRaisesRegex(ValueError, '同一次'):
+        with self.assertRaisesRegex(ValueError, "마지막\\ 계정\\ 동기화\\ 결과를\\ 확인해야\\ 합니다\\.\\ 동일한\\ 스위치를\\ 확인하고\\ 다시\\ 제출하지\\ 마십시오\\."):
             self.accounts.switch(self.value())
         self.assertEqual(self.writes, ['fixture-B'])
 
@@ -414,7 +414,7 @@ class ManagedApiSwitchTests(unittest.TestCase):
         restarted = Accounts(self.bridge)
         self.assertEqual(restarted.state['phase'], 'authUnknown')
         self.generation = [422, 1235, [12346, 1]]
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "기본\\ 서비스\\ 또는\\ 구성이\\ 변경되었으며\\ 계정\\ 작성\\ 결과는\\ 아직\\ 확인\\ 중입니다\\.\\ 반복적으로\\ 전환하지\\ 마십시오\\."):
             self.accounts.switch(value)
         self.assertEqual(self.writes, ['fixture-B'])
 
@@ -429,7 +429,7 @@ class ManagedApiSwitchTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.accounts.switch(value)
         self.assertEqual(self.accounts.state['phase'], 'authUnknown')
-        with self.assertRaisesRegex(ValueError, '尚未使用'):
+        with self.assertRaisesRegex(ValueError, "선택한\\ 계정은\\ 기본\\ 서비스에서\\ 사용되지\\ 않았습니다\\.\\ 계속하기\\ 전에\\ 동기화\\ 또는\\ 유지\\ 관리를\\ 명확하게\\ 확인하십시오\\."):
             self.accounts.switch(value)
         methods = [call.args[0] for call in self.client.request.call_args_list]
         self.assertEqual(methods.count('account/login/start'), 1)
@@ -461,16 +461,16 @@ class ManagedApiSwitchTests(unittest.TestCase):
             self.accounts.switch(value)
         private_json(self.accounts.directory(self.target['id'])/'api.json', {'key': 'replacement'})
         self.native_key = 'replacement'
-        with self.assertRaisesRegex(ValueError, '已变化'):
+        with self.assertRaisesRegex(ValueError, "기본\\ 서비스\\ 또는\\ 구성이\\ 변경되었으며\\ 계정\\ 작성\\ 결과는\\ 아직\\ 확인\\ 중입니다\\.\\ 반복적으로\\ 전환하지\\ 마십시오\\."):
             self.accounts.switch(value)
         self.assertEqual(self.writes, ['fixture-B'])
         self.assertNotIn('keyHash', json.dumps(self.accounts.public()))
 
     def test_hot_switch_requires_task_confirmation_and_blocks_unknown_work(self):
-        with self.assertRaisesRegex(ValueError, '确认'):
+        with self.assertRaisesRegex(ValueError, '확인'):
             self.accounts.switch(self.value(tasksConfirmed=False))
         self.accounts.blockers = Mock(return_value=[{'title': 'Unknown', 'reason': 'unknown'}])
-        with self.assertRaisesRegex(ValueError, '待发送'):
+        with self.assertRaisesRegex(ValueError, "작업을\\ 종료하거나\\ 보류\\ 중인\\ 메시지를\\ 먼저\\ 처리하세요\\.："):
             self.accounts.switch(self.value())
         self.assertEqual(self.writes, [])
 
@@ -485,13 +485,13 @@ class ManagedApiSwitchTests(unittest.TestCase):
 
     def test_unsettled_cli_request_still_blocks_hot_sync(self):
         self.bridge.cli_sessions.requests = {'idle-thread': {'approval': {'id': 'approval'}}}
-        with self.assertRaisesRegex(ValueError, '待处理请求'):
+        with self.assertRaisesRegex(ValueError, "먼저\\ 이\\ 단원을\\ 완료하세요\\.\\ CLI\\ 요청을\\ 연결하거나\\ 대기\\ 중인\\ 후\\ 계정을\\ 동기화하세요\\."):
             self.accounts.switch(self.value())
         self.assertEqual(self.writes, [])
 
     def test_native_active_or_background_work_blocks_even_an_idle_joined_view(self):
         self.bridge.cli_sessions.joined = {'idle-thread': {'status': 'idle'}}
-        for reason in ('运行中的任务', '有后台任务或状态未知', '状态未知'):
+        for reason in ('작업 실행', '백그라운드 작업이 있거나 상태를 알 수 없습니다.', "알 수 없는 상태"):
             with self.subTest(reason=reason), patch.object(LocalCliSync, 'check_idle_daemon', side_effect=ValueError(reason)):
                 with self.assertRaisesRegex(ValueError, reason):
                     self.accounts.switch(self.value())
@@ -514,7 +514,7 @@ class ManagedApiSwitchTests(unittest.TestCase):
         self.config['model_providers']['openai'] = {'base_url': 'https://other.invalid/v1'}
         self.assertEqual(self.sync.recovery_target(self.config)['aliases'], ['bridge_api'])
         self.config['model_providers']['bridge_api']['env_http_headers'] = {'Authorization': 'NEW_TOKEN'}
-        with self.assertRaisesRegex(ValueError, '注入来源'):
+        with self.assertRaisesRegex(ValueError, "현재\\ CLI\\ 인증\\ 주입\\ 소스가\\ 선택한\\ 접근권한과\\ 다릅니다\\.\\ 접근권한을\\ 재확인해주세요\\."):
             self.sync.recovery_target(self.config)
 
     def test_recovery_target_rejects_unselected_or_changed_managed_files(self):
@@ -528,7 +528,7 @@ class ManagedApiSwitchTests(unittest.TestCase):
         target = self.sync.recovery_target(self.config)
         self.assertTrue(self.sync.verify_runtime_auth(self.client, target))
         self.native_key = 'other-cached-key'
-        with self.assertRaisesRegex(ValueError, '尚未使用'):
+        with self.assertRaisesRegex(ValueError, "선택한\\ 계정은\\ 기본\\ 서비스에서\\ 사용되지\\ 않았습니다\\.\\ 계속하기\\ 전에\\ 동기화\\ 또는\\ 유지\\ 관리를\\ 명확하게\\ 확인하십시오\\."):
             self.sync.verify_runtime_auth(self.client, target)
 
 

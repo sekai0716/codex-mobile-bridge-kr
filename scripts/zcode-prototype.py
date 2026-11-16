@@ -23,7 +23,7 @@ def main():
     if args.action == 'attach':
         app = installation(config['application'])
         if not app:
-            raise ValueError('无法核验 ZCode 安装')
+            raise ValueError('확인할 수 없습니다 ZCode 설치하다')
         config['process'] = listener_identity(config['port'], app['executable'])
     adapter = ZCodePrototype(args.state, config)
     body = json.load(sys.stdin) if args.action in ('send', 'stop', 'respond', 'receipt') else {}

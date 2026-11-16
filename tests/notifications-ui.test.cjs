@@ -80,7 +80,7 @@ async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=
 test('homepage retains the v1.3 archive checkbox and complete mode labels',async()=>{
   const ui=await fixture();
   assert.match(ui.html, /id="archived" type="checkbox"/);
-  for(const text of ['最近交互','按项目','发送新消息','完成后发送','补充当前任务','普通模式','计划模式','目标模式'])assert.ok(ui.html.includes(text));
+  for(const text of ['최근의','프로젝트','메시지 보내기','완료되면 보내기','현재 작업 조종','기본 모드','계획 모드','목표 모드'])assert.ok(ui.html.includes(text));
 });
 
 test('request and completion choices are independent and persist',async()=>{
@@ -154,7 +154,7 @@ test('third-party notification channels save independently, mask secrets and tes
   await ui.nodes.get('pushplus-form').onsubmit({preventDefault(){}});
   assert.deepEqual(ui.writes[0].body,{pushplusEnabled:true,pushplusToken:'secret',clearPushplusToken:false});
   assert.equal(ui.nodes.get('pushplus-token').value,'');
-  assert.equal(ui.nodes.get('pushplus-token').placeholder,'已保存，留空保留');
+  assert.equal(ui.nodes.get('pushplus-token').placeholder,'저장되어 있습니다. 유지하려면 비워 두세요.');
   await ui.nodes.get('pushplus-test').onclick();assert.equal(ui.writes[1].url,'/api/notifications/channels/pushplus/test');
   ui.nodes.get('notification-channel-back').onclick();await ui.channelButtons[0].onclick();
   assert.equal(ui.nodes.get('notification-server').value,'https://api.day.app');
@@ -207,7 +207,7 @@ test('Feishu preset and signing secret require save before a Webhook test',async
   ui.nodes.get('webhook-sign-secret').value='sample-secret';
   ui.nodes.get('webhook-use-template').onclick();
   await ui.nodes.get('webhook-test').onclick();
-  assert.equal(ui.writes.length,0);assert.match(ui.nodes.get('webhook-error').textContent,/保存/);
+  assert.equal(ui.writes.length,0);assert.match(ui.nodes.get('webhook-error').textContent,/저장/);
   ui.setPost(()=>ui.response({error:'Save failed'},400));
   await ui.nodes.get('webhook-form').onsubmit({preventDefault(){}});
   assert.equal(ui.nodes.get('webhook-sign-secret').value,'sample-secret');
@@ -279,7 +279,7 @@ test('named Webhooks save, switch, test and delete by stable ID without exposing
   await ui.nodes.get('pushplus-settings').onclick();await ui.channelButtons[3].onclick();
   const buttons=ui.nodes.get('webhook-endpoint-list').children;
   assert.equal(buttons.length,2);assert.equal(buttons[0].textContent.includes('token'),false);
-  ui.nodes.get('webhook-name').value='Draft';buttons[1].onclick();assert.match(ui.nodes.get('webhook-error').textContent,/保存/);
+  ui.nodes.get('webhook-name').value='Draft';buttons[1].onclick();assert.match(ui.nodes.get('webhook-error').textContent,/저장/);
   ui.nodes.get('webhook-cancel').onclick();buttons[1].onclick();assert.equal(ui.nodes.get('webhook-name').value,'Ops');
   ui.nodes.get('webhook-name').value='Ops alerts';await ui.nodes.get('webhook-form').onsubmit({preventDefault(){}});
   assert.equal(ui.writes[0].body.webhookId,'named-2');assert.equal(ui.writes[0].body.webhookName,'Ops alerts');
@@ -297,10 +297,10 @@ test('Webhook form has English labels and narrow-screen scroll styling',async()=
   assert.match(css,/#webhook-dialog textarea\{[^}]*width:100%/);
   assert.match(dialog,/maxlength="4096"/);
   assert.match(dialog,/\{\{title\}\}/);
-  for(const error of ['Webhook 地址格式不正确','Webhook 请求头格式不正确','Webhook JSON 模板格式不正确','Webhook 模板包含未知占位符','开启 Webhook 前请填写地址','Webhook 测试失败，请检查服务地址、认证和网络'])assert.notEqual(ui.run(`BridgeI18n.t(${JSON.stringify(error)})`),error);
-  assert.equal(ui.run("BridgeI18n.t('飞书未接受通知（19022：签名或时间无效）')"),'Feishu did not accept the notification (19022: Invalid signature or timestamp).');
-  assert.equal(ui.run("BridgeI18n.t('钉钉未接受通知（400101：访问令牌无效）')"),'DingTalk did not accept the notification (400101: Invalid access token).');
-  assert.equal(ui.run("BridgeI18n.t('Discord 未接受通知（HTTP 404）')"),'Discord did not accept the notification (HTTP 404).');
+  for(const error of ['잘못된 웹훅 엔드포인트 URL.','웹훅 요청 헤더가 잘못되었습니다.','웹훅 JSON 본문 템플릿이 잘못되었습니다.','웹훅 템플릿에 알 수 없는 자리 표시자가 포함되어 있습니다.','Webhook을 활성화하기 전에 엔드포인트 URL를 입력하세요.','웹훅 테스트에 실패했습니다. 엔드포인트, 인증, 네트워크를 확인하세요.'])assert.notEqual(ui.run(`BridgeI18n.t(${JSON.stringify(error)})`),error);
+  assert.equal(ui.run("BridgeI18n.t('Feishu는 알림을 수락하지 않았습니다.（19022：잘못된 서명 또는 시간）')"),'Feishu did not accept the notification (19022: Invalid signature or timestamp).');
+  assert.equal(ui.run("BridgeI18n.t('DingTalk가 알림을 수락하지 않았습니다.（400101：액세스 토큰이 잘못되었습니다.）')"),'DingTalk did not accept the notification (400101: Invalid access token).');
+  assert.equal(ui.run("BridgeI18n.t('Discord 알림이 수락되지 않음（HTTP 404）')"),'Discord did not accept the notification (HTTP 404).');
 });
 
 test('common notification controls save once outside provider detail',async()=>{
@@ -321,10 +321,10 @@ test('provider list reports configured and enabled states',async()=>{
   ui.saved.set('/api/notifications/channels/ntfy',{enabled:false,topic:'saved-topic'});
   ui.saved.set('/api/notifications/channels/webhook',{webhookEndpoints:[{webhookId:'named-1',webhookName:'Ops',hasWebhookUrl:true,webhookEnabled:true}]});
   await ui.nodes.get('pushplus-settings').onclick();
-  assert.equal(ui.nodes.get('notification-status-bark').textContent,'已开启');
-  assert.equal(ui.nodes.get('notification-status-ntfy').textContent,'已关闭');
-  assert.equal(ui.nodes.get('notification-status-pushplus').textContent,'未配置');
-  assert.equal(ui.nodes.get('notification-status-webhook').textContent,'已开启');
+  assert.equal(ui.nodes.get('notification-status-bark').textContent,'켜짐');
+  assert.equal(ui.nodes.get('notification-status-ntfy').textContent,'꺼짐');
+  assert.equal(ui.nodes.get('notification-status-pushplus').textContent,'구성되지 않음');
+  assert.equal(ui.nodes.get('notification-status-webhook').textContent,'켜짐');
 });
 
 test('common settings wait for a valid read and ignore late responses after close',async()=>{
@@ -515,8 +515,8 @@ test('cold local empty result remains loading until the remote result is known',
     ?ui.response({sessions:[],remoteHosts:['remote-slow'],availableSources:[],unavailableHosts:[],complete:true})
     :new Promise(resolve=>{release=()=>resolve(ui.response({sessions:[],availableSources:[],unavailableHosts:[],complete:true}));}));
   const pending=ui.run('loadList(true)');await new Promise(setImmediate);
-  assert.equal(root.children[0].textContent,ui.run("t('正在读取…')"));assert.equal(ui.run('listComplete'),false);
-  release();await pending;assert.equal(root.children[0].textContent,ui.run("t('没有找到聊天。')"));
+  assert.equal(root.children[0].textContent,ui.run("t('로드 중…')"));assert.equal(ui.run('listComplete'),false);
+  release();await pending;assert.equal(root.children[0].textContent,ui.run("t('채팅을 찾을 수 없습니다.')"));
 });
 
 test('refresh preserves all loaded pages and their scroll position',async()=>{

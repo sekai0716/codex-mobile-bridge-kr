@@ -19,9 +19,9 @@ async function main(){
  const assets=JSON.parse(fs.readFileSync(path.join(root,'web/assets.json'))),requests=[],unexpected=[];let scanned=navigationFixture,enabled=navigationFixture,nativeEnabled=true,cdp;
  for(const match of fs.readFileSync(path.join(root,'bridge/api/assets.py'),'utf8').matchAll(/"(\/vendor\/[^"]+)": \("([^"]+)"/g))assets[match[1]]=match[2];
  const native=()=>({id:'desktop',name:'Codex',kind:'desktop',enabled:nativeEnabled,installed:true,configured:true,selectable:true,connected:nativeEnabled,running:true,canQuitDesktop:true});
- const entry=()=>({id:wsl,name:'WSL · Ubuntu · fixture',kind:'wsl-cli',icon:'codex',enabled,installed:true,configured:true,selectable:true,connected:enabled,running:enabled,canQuitDesktop:false,canForceQuit:false,reason:'账号与模型接入由 WSL 中的原工具管理。'});
+ const entry=()=>({id:wsl,name:'WSL · Ubuntu · fixture',kind:'wsl-cli',icon:'codex',enabled,installed:true,configured:true,selectable:true,connected:enabled,running:enabled,canQuitDesktop:false,canForceQuit:false,reason:'계정 및 모델 액세스 권한은 다음에서 제공됩니다. WSL 원본 도구 관리。'});
  const clients=()=>({wslSupported:true,gatewayRunning:true,computer:'Synthetic Windows fixture',clients:[{...native(),id:'codex',name:'Codex',enabled:nativeEnabled||enabled,desktopEnabled:nativeEnabled,nativeConfigured:true,nativeSelectable:true,entries:[native(),...(scanned?[entry()]:[])]},...['claude','deepseek'].map(id=>({id,name:id==='claude'?'Claude':'DSH',enabled:navigationFixture,installed:navigationFixture,configured:navigationFixture,connected:navigationFixture,running:navigationFixture,selectable:navigationFixture}))]});
- const models=[{id:'group/auto-gpt-6-1-sol',name:'Magpie 分组模型',efforts:['low','medium','high'],defaultEffort:'high'},{id:'group/id-only',name:'group/id-only',efforts:['medium'],defaultEffort:'medium'},{id:'group/another',name:'另一分组',efforts:['high'],defaultEffort:'high'}];
+ const models=[{id:'group/auto-gpt-6-1-sol',name:'Magpie 그룹화 모델',efforts:['low','medium','high'],defaultEffort:'high'},{id:'group/id-only',name:'group/id-only',efforts:['medium'],defaultEffort:'medium'},{id:'group/another',name:'다른 그룹',efforts:['high'],defaultEffort:'high'}];
  const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://fixture'),pathname=url.pathname;let body='';for await(const chunk of req)body+=chunk;body=body?JSON.parse(body):undefined;
   const json=value=>{res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
@@ -36,7 +36,7 @@ async function main(){
     if(action==='accounts')return json({accounts:[],activeIds:[]});
     if(action==='account')return json({visible:false});
    }
-   if(pathname==='/api/auth')return json({authenticated:true,...(navigationFixture?{draftIdentity:'navigation-fixture-gateway',listCacheIdentity:'a'.repeat(64)}:{}),csrf:'fixture',uiLanguage:'zh',computer:{name:'Synthetic Windows fixture',platform:'win32'}});
+   if(pathname==='/api/auth')return json({authenticated:true,...(navigationFixture?{draftIdentity:'navigation-fixture-gateway',listCacheIdentity:'a'.repeat(64)}:{}),csrf:'fixture',uiLanguage:'ko',computer:{name:'Synthetic Windows fixture',platform:'win32'}});
    if(pathname==='/api/clients'){if(body?.action==='scan-wsl')scanned=true;else if(body){assert.ok([wsl,'codex'].includes(body.provider));assert.equal(body.quitDesktop||false,false);if(body.provider===wsl)enabled=body.enabled;else nativeEnabled=body.enabled;}return json(clients());}
    if(pathname==='/api/accounts')return json({accounts:[],current:{status:'ready',kind:'external',name:url.searchParams.has('entry')?'WSL Magpie':'Native fixture'},scope:url.searchParams.has('entry')?'wsl':'desktop',scopeLabel:'WSL fixture',management:{external:true},canSwitch:false,canManageDesktop:false,blockers:[]});
    if(pathname==='/api/cli-access')return json({codex:{accounts:[],activeId:null}});
@@ -61,18 +61,18 @@ async function main(){
      const remote=body.host===sshHost;assert.deepEqual(body,{host:remote?sshHost:'local',path:remote?'/srv/fixture/projects/ssh-cli-project':'/Users/fixture/projects/local-cli-project',createDirectory:false,kind:'cli'});
      return json({project:{key:'cli|'+body.host+'|directory:fixture',host:body.host,type:'cli',environment:'cli|'+body.host,cwd:body.path,name:remote?'ssh-cli-project':'local-cli-project'}});
     }
-    return json({projects:[],environments:['local',sshHost].flatMap(host=>['desktop','cli'].map(type=>({key:type+'|'+host,type,surface:type,host,hostLabel:host==='local'?'此电脑':'Research server',name:(host==='local'?'此电脑':'Research server')+' · '+(type==='cli'?'Codex CLI':'Codex App')})))});
+    return json({projects:[],environments:['local',sshHost].flatMap(host=>['desktop','cli'].map(type=>({key:type+'|'+host,type,surface:type,host,hostLabel:host==='local'?'이 컴퓨터':'Research server',name:(host==='local'?'이 컴퓨터':'Research server')+' · '+(type==='cli'?'Codex CLI':'Codex App')})))});
    }
    if(pathname==='/api/sessions'&&body){
     assert.deepEqual(Object.keys(body).sort(),url.searchParams.has('entry')?['id','project','title']:['id','kind','project','title']);
-    if(url.searchParams.has('entry')){assert.equal(url.searchParams.get('entry'),wsl);assert.ok([wsl+'|independent',wsl+'|directory:fixture'].includes(body.project));return json({id:sid,host:wsl,opened:true,message:'聊天已创建，可以直接发送消息'});}
+    if(url.searchParams.has('entry')){assert.equal(url.searchParams.get('entry'),wsl);assert.ok([wsl+'|independent',wsl+'|directory:fixture'].includes(body.project));return json({id:sid,host:wsl,opened:true,message:'채팅이 생성되었으며 직접 메시지를 보낼 수 있습니다'});}
     assert.equal(body.kind,'cli');const remote=body.project==='cli|'+sshHost+'|directory:fixture';assert.ok(remote||body.project==='cli|local|directory:fixture');
-    return json({id:remote?sshSid:cliSid,host:remote?sshHost:'local',opened:false,message:'聊天已创建，可以直接发送消息'});
+    return json({id:remote?sshSid:cliSid,host:remote?sshHost:'local',opened:false,message:'채팅이 생성되었으며 직접 메시지를 보낼 수 있습니다'});
    }
    if(pathname==='/api/sessions'){
     const host=url.searchParams.get('host')||'local',isWsl=host===wsl,source=url.searchParams.get('source')||'all',q=url.searchParams.get('q')||'',offset=Number(url.searchParams.get('offset')||0);
     const access=kind=>({source:kind==='desktop'?'desktop':'cli',runtime:isWsl?'wsl':kind,canSend:true,canReconnect:true,canChangeModel:true,canSelectSkills:true,canUseModes:true,canUseGoal:true});
-    const row=(id,kind,title,recency)=>({id,host,hostLabel:isWsl?'WSL · Ubuntu · fixture':'此电脑',title,projectName:'fixture',projectKey:host+'|fixture',cwd:'/fixture',recency,access:access(kind)});
+    const row=(id,kind,title,recency)=>({id,host,hostLabel:isWsl?'WSL · Ubuntu · fixture':'이 컴퓨터',title,projectName:'fixture',projectKey:host+'|fixture',cwd:'/fixture',recency,access:access(kind)});
     let rows=isWsl?(enabled?[row(sid,'cli','WSL fixture conversation',300)]:[]):nativeEnabled?[row(sid,'desktop','APP fixture conversation',200),row(navigationFixture?cliSid:'12345678-1234-4234-9234-123456789013','cli','CLI fixture conversation',100)]:[];
     if(q==='paging-fixture')rows=isWsl&&enabled?Array.from({length:101},(_,i)=>row('12345678-1234-4234-9234-'+String(i).padStart(12,'0'),'cli','Paging fixture '+i,101-i)):[];
     else if(q)rows=rows.filter(row=>row.title.includes(q));

@@ -27,8 +27,8 @@ class InsightsTests(unittest.TestCase):
         reminders = events({'subscription':{'periodEndsAt':now+86400,'source':'login'}}, {}, now,
                            {**DEFAULTS, 'subscriptionExpiry':True})
         self.assertEqual(len(reminders), 1)
-        self.assertIn('并非实时账单信息', reminders[0][3])
-        self.assertNotIn('当前订阅周期', reminders[0][3])
+        self.assertIn("실시간 결제 정보가 아니므로 ChatGPT 구독 페이지에서 확인하세요.", reminders[0][3])
+        self.assertNotIn('현재 구독 기간', reminders[0][3])
         self.assertEqual(events({'subscription':{'periodEndsAt':now-1,'source':'login'}}, {}, now,
                                 {**DEFAULTS, 'subscriptionExpiry':True}), [])
 
@@ -40,7 +40,7 @@ class InsightsTests(unittest.TestCase):
                 self.manager.updates, 'status', return_value={'state': 'available', 'targetBuild': '101'}), patch.object(
                 monitor, 'deliver') as deliver:
             monitor.scan()
-        self.assertIn('客户端管理的 Codex 版本与更新', deliver.call_args.args[1][3])
+        self.assertIn("클라이언트 관리에서 Codex 버전과 업데이트를 확인하세요.", deliver.call_args.args[1][3])
 
     def test_reminders_do_not_guess_recovery_from_a_passed_timestamp(self):
         now=2000000000
@@ -89,7 +89,7 @@ class InsightsTests(unittest.TestCase):
                 recovered = {'updatedAt': now+61, 'limits': [{'id': 'codex', 'windows': [
                     {'kind': 'primary', 'remainingPercent': 100, 'resetsAt': now+3600}]}]}
                 monitor.observe('account', recovered)
-            self.assertEqual(send.call_args.args[1], 'Codex 额度已恢复')
+            self.assertEqual(send.call_args.args[1], 'Codex 사용량 한도 갱신')
             self.assertEqual(send.call_count, 2)
 
     def test_reminder_identity_uses_workspace_ownership_and_keeps_keyring_fallback(self):

@@ -8,7 +8,7 @@
   const config = __BRIDGE_CONFIG__;
   const api = window['claude.web'];
   if (!api?.LocalSessions?.getAll || (config.transport !== 'cdp' && (!api.LocalSessions.readFileAtCwd || !api.LocalSessions.writeSessionFile))) {
-    throw new Error('当前 Claude Desktop 不提供所需的本地文件接口');
+    throw new Error('현재 Claude Desktop 필요한 로컬 파일 인터페이스를 제공하지 않습니다.');
   }
   const normalizedWorkspace = cwd => {
     const value = cwd.replaceAll('\\', '/').replace(/\/$/, '');
@@ -50,8 +50,8 @@
         sameOwner && !safeLegacyStatus ||
         !sameOwner && state.suspended !== true && !canHandoff) {
       const message = state?.busy && !state.handoffPending || state?.writing ?
-        'Claude 桥接仍有请求进行中，请稍后重试连接' :
-        '旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）';
+        'Claude 아직 브릿지 요청이 진행 중입니다. 나중에 다시 연결해 보세요.' :
+        '이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）';
       ownerError(state?.busy && !state.handoffPending || state?.writing ? 'BUSY' : 'LEGACY', message);
     }
   }
@@ -59,22 +59,22 @@
     if (!existing) return;
     let state;
     try { state = existing.status(); } catch {
-      ownerError('UNCONFIRMED', 'Claude 桥接状态已变化，请刷新后重试连接');
+      ownerError('UNCONFIRMED', 'Claude 브리지 상태가 변경되었습니다. 새로고침한 후 다시 연결해 보세요.');
     }
     if (!sameOwner && state?.suspended !== true) {
       let released = false;
       try { released = canHandoff && await existing.handoff(config.cwd); } catch {}
       if (!released)
-        ownerError('UNCONFIRMED', '旧网关仍有未确认请求或未完成接替，请在旧网关检查结果后重试');
+        ownerError('UNCONFIRMED', '이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요.');
     }
     try { state = existing.status(); } catch {
-      ownerError('UNCONFIRMED', 'Claude 桥接状态已变化，请刷新后重试连接');
+      ownerError('UNCONFIRMED', 'Claude 브리지 상태가 변경되었습니다. 새로고침한 후 다시 연결해 보세요.');
     }
     if (!state || window.__claudeMobileBridge !== existing || state.busy || state.writing ||
         !sameOwner && state.suspended !== true)
-      ownerError('UNCONFIRMED', 'Claude 桥接状态已变化，请刷新后重试连接');
+      ownerError('UNCONFIRMED', 'Claude 브리지 상태가 변경되었습니다. 새로고침한 후 다시 연결해 보세요.');
     try { existing.stop(); } catch {
-      ownerError('UNCONFIRMED', 'Claude 桥接状态已变化，请刷新后重试连接');
+      ownerError('UNCONFIRMED', 'Claude 브리지 상태가 변경되었습니다. 새로고침한 후 다시 연결해 보세요.');
     }
   }
   const encoder = new TextEncoder();
@@ -87,7 +87,7 @@
   }
   async function read(name = config.request) {
     const file = await api.LocalSessions.readFileAtCwd(config.cwd, name);
-    if (!file) throw new Error('无法读取桥接请求文件');
+    if (!file) throw new Error('브리지 요청 파일을 읽을 수 없습니다.');
     const envelope = JSON.parse(file.contents);
     if (typeof envelope.signature !== 'string' || !/^[a-f0-9]{64}$/.test(envelope.signature)) return null;
     const signature = new Uint8Array(envelope.signature.match(/../g).map(v => parseInt(v, 16)));
@@ -138,7 +138,7 @@
     await replaceExisting();
     // A second injector may have completed the same asynchronous handoff.
     if (window.__claudeMobileBridge !== existing)
-      ownerError('UNCONFIRMED', 'Claude 桥接状态已变化，请刷新后重试连接');
+      ownerError('UNCONFIRMED', 'Claude 브리지 상태가 변경되었습니다. 새로고침한 후 다시 연결해 보세요.');
     try {
       installObservers();
       window.__claudeMobileBridge = bridge;
@@ -152,14 +152,14 @@
     let choices, source='session-history';
     const store=window['claude.settings']?.Custom3pSetup?.bootstrapStateStore;
     if(typeof store?.getState==='function'){
-      const state=await bounded(store.getState(),2500,'模型读取超时').catch(()=>null);
+      const state=await bounded(store.getState(),2500,'모델 읽기 시간 초과').catch(()=>null);
       const catalog=state?.modelSelectorCatalog;
       const selected=Array.isArray(catalog)?catalog.find(row=>row.id===kind):null;
       if(Array.isArray(selected?.models)){choices=selected.models;source='desktop-catalog';}
     }
     if(!choices&&offeredModels.has(target)){choices=offeredModels.get(target);source='desktop-observed';}
     if(!choices){
-      const result=await bounded(target.getAll(),2500,'模型读取超时').catch(()=>knownSessions.get(target)||[]);
+      const result=await bounded(target.getAll(),2500,'모델 읽기 시간 초과').catch(()=>knownSessions.get(target)||[]);
       const rows=Array.isArray(result)?result:Array.isArray(result?.sessions)?result.sessions:knownSessions.get(target)||[];
       knownSessions.set(target,rows);choices=rows.map(row=>row.model).filter(Boolean);
     }
@@ -180,18 +180,18 @@
       attachments:typeof target.sendMessage==='function',permissions:typeof target.setPermissionMode==='function',
       skills:typeof target.getSupportedCommands==='function',queue:kind==='code',steer:kind==='code'}};
     if(includeSkills&&typeof target.getSupportedCommands==='function'){
-      const commands=await bounded(target.getSupportedCommands(sessionId?{sessionId}:{}),2500,'技能读取超时').catch(()=>[]);
+      const commands=await bounded(target.getSupportedCommands(sessionId?{sessionId}:{}),2500,'스킬 읽기 시간 초과').catch(()=>[]);
       result.skills=(Array.isArray(commands)?commands:[]).filter(row=>typeof row.name==='string').map(row=>({
         id:row.name,name:row.name,description:typeof row.description==='string'?row.description:'',kind:'skill',selectable:row.userInvocable!==false}));
     }
-    if(source==='session-history')result.notice='客户端尚未提供当前可选模型，历史模型仅供查看';
+    if(source==='session-history')result.notice='클라이언트는 아직 현재 옵션 모델을 제공하지 않았습니다. 과거 모델은 보기 전용입니다.';
     return result;
   }
   async function mobileAccount(){
     const settings=window['claude.settings']?.Custom3pSetup;
     const result={provider:'claude',readOnly:true,canManage:false,status:'unknown',current:null};
     if(typeof settings?.getLoginDesktop3pStatus==='function'){
-      const value=await bounded(settings.getLoginDesktop3pStatus(),2500,'接入信息读取超时');
+      const value=await bounded(settings.getLoginDesktop3pStatus(),2500,'접속 정보 읽기 시간 초과');
       if(value?.enabled){
         result.status=value.thirdPartyConfigured&&!value.needsInteractiveAuth?'ready':'needs-login';
         result.current={kind:'api',label:typeof value.hybridOrganizationName==='string'&&value.hybridOrganizationName||
@@ -287,25 +287,25 @@
   }
   async function mobileRename(target,id,options={}){
     const title=typeof options.title==='string'?options.title.trim():'';
-    if(!title||[...title].length>120||/[\u0000-\u001f\u007f]/u.test(options.title))throw Error('标题为 1–120 字，不能包含控制字符');
+    if(!title||[...title].length>120||/[\u0000-\u001f\u007f]/u.test(options.title))throw Error('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.');
     const before=await target.getSession(id);
-    if(before?.sessionId!==id)throw Error('改名目标无法确认，尚未发送修改');
+    if(before?.sessionId!==id)throw Error('이름 변경 대상을 확인할 수 없으며 아직 수정 사항이 전송되지 않았습니다.');
     const cwd=before.cwd,folders=JSON.stringify(before.userSelectedFolders);
     // Desktop 3.6556.2 owns title persistence for both Code and Cowork.
     // updateSession changes metadata without starting or resuming a session.
     await target.updateSession(id,{title,titleSource:'user'});
     const after=await target.getSession(id);
     if(after?.sessionId!==id||after.title!==title||after.cwd!==cwd||
-      JSON.stringify(after.userSelectedFolders)!==folders)throw Error('改名结果待核对，请检查原客户端；不会重复提交');
+      JSON.stringify(after.userSelectedFolders)!==folders)throw Error('이름 변경 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요. 중복 제출은 되지 않습니다');
     return {status:'confirmed',scope:'native',result:{id,title}};
   }
   async function mobileFork(target,id,options={}){
-    if(target!==api.LocalSessions||!capabilities.code.includes('mobileFork'))throw Error('当前 Claude 接入未提供原生分支接口');
-    if(typeof options.id!=='string'||!/^[0-9a-f-]{36}$/i.test(options.id)||typeof options.messageId!=='string'||!options.messageId)throw Error('分支标识无效');
+    if(target!==api.LocalSessions||!capabilities.code.includes('mobileFork'))throw Error('현재 Claude 액세스를 위해 기본 분기 인터페이스가 제공되지 않습니다.');
+    if(typeof options.id!=='string'||!/^[0-9a-f-]{36}$/i.test(options.id)||typeof options.messageId!=='string'||!options.messageId)throw Error('지점 ID가 잘못되었습니다.');
     const transcript=await target.getTranscript(id);
     const anchor=Array.isArray(transcript)&&transcript.find(row=>row.uuid===options.messageId&&row.type==='assistant'&&
       !['isSynthetic','isMeta','isSidechain','parent_tool_use_id','isCompactSummary'].some(key=>row[key]));
-    if(!anchor)throw Error('原消息已不可用，请刷新聊天后重试');
+    if(!anchor)throw Error('원본 메시지를 더 이상 사용할 수 없습니다. 채팅을 새로 고치고 다시 시도해 주세요.');
     // Use Desktop's own inclusive UUID cut and preserve the parent workspace.
     // The gateway receipt fences retries; a lost response must never fork again.
     return target.forkSession(id,'local_'+options.id,options.messageId);
@@ -320,9 +320,9 @@
     return Object.fromEntries(rows);
   }
   async function mobileArchiveState(target,id){
-    if(target!==api.LocalSessions||!capabilities.code.includes('mobileArchive'))throw Error('当前接入尚未确认原生归档和恢复能力');
+    if(target!==api.LocalSessions||!capabilities.code.includes('mobileArchive'))throw Error('현재 액세스에서는 아직 기본 보관 및 복구 기능이 확인되지 않았습니다.');
     const [root,all]=await Promise.all([target.getSession(id),target.getAll()]);
-    if(root?.sessionId!==id||!Array.isArray(all))throw Error('归档目标或子会话状态无法确认');
+    if(root?.sessionId!==id||!Array.isArray(all))throw Error('보관 대상 또는 구독 상태를 확인할 수 없습니다.');
     const scope=new Set([id]);let expanded=true;
     while(expanded){expanded=false;for(const row of all){if(scope.has(row.spawnedFrom?.sessionId)&&!scope.has(row.sessionId)){scope.add(row.sessionId);expanded=true;}}}
     const rows=[root,...all.filter(row=>row.sessionId!==id&&scope.has(row.sessionId))];
@@ -335,57 +335,57 @@
       runningIds:rows.filter(row=>row.isRunning||row.turnRunning).map(row=>row.sessionId)};
   }
   async function mobileArchive(target,id,options={}){
-    if(typeof options.archived!=='boolean'||(options.disconnect!=null&&typeof options.disconnect!=='boolean')||options.disconnect&&!options.archived)throw Error('归档设置无效');
+    if(typeof options.archived!=='boolean'||(options.disconnect!=null&&typeof options.disconnect!=='boolean')||options.disconnect&&!options.archived)throw Error('잘못된 보관 설정');
     let state=await mobileArchiveState(target,id);
     if(options.disconnect){
-      if(!state.runtimeKnown||state.runningIds.length&&typeof target.interrupt!=='function')return {archiveNotSent:true,message:'无法确认可停止的原生任务，未停止或归档'};
+      if(!state.runtimeKnown||state.runningIds.length&&typeof target.interrupt!=='function')return {archiveNotSent:true,message:'중지되거나 보관되지 않았으며 중지 가능한 기본 작업을 확인할 수 없습니다.'};
       const scope=Object.keys(state.archiveFlags).sort().join(',');
       for(const child of [...state.runningIds].reverse())await target.interrupt(child);
       const deadline=Date.now()+15000;
       do{
         state=await mobileArchiveState(target,id);
-        if(Object.keys(state.archiveFlags).sort().join(',')!==scope)throw Error('子会话范围已变化，尚未发送归档请求');
+        if(Object.keys(state.archiveFlags).sort().join(',')!==scope)throw Error('하위 세션 범위가 변경되었으며 아카이브 요청이 아직 전송되지 않았습니다.');
         if(state.archiveSafe)break;
-        if(Date.now()>=deadline)throw Error('停止结果待核对，尚未发送归档请求');
+        if(Date.now()>=deadline)throw Error('확인 대기 중인 결과 중지, 보관 요청이 아직 전송되지 않음');
         await new Promise(resolve=>setTimeout(resolve,100));
       }while(true);
     }
-    if(!state.archiveSafe)return {archiveNotSent:true,message:'聊天或子会话有运行、排队、审批或未知状态，请先在原客户端处理'};
+    if(!state.archiveSafe)return {archiveNotSent:true,message:'채팅 또는 하위 세션이 실행 중, 대기 중, 승인됨 또는 알 수 없음 상태입니다. 먼저 원본 클라이언트에서 처리해 주세요.'};
     if(options.archived)await target.archive(id,{cleanupWorktree:false});else await target.unarchive(id);
     return {status:'accepted'};
   }
   async function mobileProjectTrust(target,path,confirmed){
-    if(typeof path!=='string'||!path||path.length>4096||/[\0\r\n]/.test(path)||typeof confirmed!=='boolean')throw Error('工作区确认格式无效');
+    if(typeof path!=='string'||!path||path.length>4096||/[\0\r\n]/.test(path)||typeof confirmed!=='boolean')throw Error('작업공간 확인 형식이 잘못되었습니다.');
     const before=await target.checkTrust(path);
-    if(typeof before?.trusted!=='boolean')throw Error('无法核验原生工作区信任状态');
+    if(typeof before?.trusted!=='boolean')throw Error('기본 작업 공간 신뢰 상태를 확인할 수 없습니다.');
     if(!before.trusted&&confirmed)await target.saveTrust(path);
     const state=confirmed?await target.checkTrust(path):before;
-    if(typeof state?.trusted!=='boolean'||confirmed&&!state.trusted)throw Error('工作区信任结果待核对，请在原客户端检查');
+    if(typeof state?.trusted!=='boolean'||confirmed&&!state.trusted)throw Error('워크스페이스 신뢰 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요.');
     return {trusted:state.trusted,path};
   }
   async function mobileImage(target,id,source){
-    if(!source||typeof source.event!=='string'||!Number.isInteger(source.part)||source.part<0||source.part>=4096)throw Error('图片引用无效');
-    const session=await target.getSession(id);if(session?.sessionId!==id)throw Error('会话标识已变化');
+    if(!source||typeof source.event!=='string'||!Number.isInteger(source.part)||source.part<0||source.part>=4096)throw Error('잘못된 이미지 참조');
+    const session=await target.getSession(id);if(session?.sessionId!==id)throw Error('세션 ID가 변경됨');
     const raw=await target.getTranscript(id),rows=Array.isArray(raw)?raw:raw?.messages||raw?.transcript||[];
     const event=rows.find(row=>(row.uuid||row.message?.id)===source.event),block=event?.message?.content?.[source.part]||event?.content?.[source.part];
-    if(!block||!['image','input_image'].includes(block.type))throw Error('原生历史中未找到可预览图片');
+    if(!block||!['image','input_image'].includes(block.type))throw Error('기본 역사에서 미리보기 이미지를 찾을 수 없습니다.');
     if(block.source?.type==='base64')return {mediaType:block.source.media_type,data:block.source.data};
     const url=typeof block.image_url==='object'?block.image_url?.url:block.image_url||block.url;
     const match=typeof url==='string'&&/^data:(image\/(?:png|jpeg|gif|webp));base64,(.*)$/.exec(url);
-    if(!match)throw Error('原生图片格式不支持预览');
+    if(!match)throw Error('기본 이미지 형식은 미리보기를 지원하지 않습니다.');
     return {mediaType:match[1],data:match[2]};
   }
   async function mobileDetail(target,id,options={}){
     const paged=target===api.LocalSessions&&capabilities.code.includes('mobileHistory');
     const limit=Number.isInteger(options.historyLimit)&&options.historyLimit>=1&&options.historyLimit<=100?options.historyLimit:40;
     const before=options.historyBefore;
-    if(before!=null&&(typeof before!=='string'||!before||!paged))throw Error('历史游标无效');
+    if(before!=null&&(typeof before!=='string'||!before||!paged))throw Error('기록 커서가 잘못되었습니다.');
     const transcriptPromise=paged?(before?target.getTranscriptPage(id,before,limit):target.getTranscriptTail(id,limit)):target.getTranscript(id);
     const [session,page,context]=await Promise.all([target.getSession(id),transcriptPromise,mobileContextUsage(target,id)]);
-    if(paged&&(!Array.isArray(page?.messages)||typeof page.hasMore!=='boolean'||before&&page.found!==true))throw Error('历史分页响应无效');
+    if(paged&&(!Array.isArray(page?.messages)||typeof page.hasMore!=='boolean'||before&&page.found!==true))throw Error('기록 페이지 매기기 응답이 잘못되었습니다.');
     const rows=paged?page.messages:page;
     const boundary=rows?.[0]?.uuid;
-    if(paged&&page.hasMore&&(typeof boundary!=='string'||!boundary||boundary===before))throw Error('历史游标未前进');
+    if(paged&&page.hasMore&&(typeof boundary!=='string'||!boundary||boundary===before))throw Error('기록 커서가 진행되지 않았습니다.');
     return {session:sanitize('getSession',session),transcript:sanitize('getTranscript',rows),
       history:{before:paged&&page.hasMore?boundary:null,hasMore:paged?page.hasMore:false},...context};
   }
@@ -413,26 +413,26 @@
       status() { return {transport:'cdp', stopped, busy:inFlight > 0, connectorRevision:config.connectorRevision, surfaces:capabilities}; },
       async invoke(msg) {
         if (stopped || msg?.token !== config.token || msg.generation !== config.generation)
-          return {error:'连接已过期'};
-        if (!Number.isSafeInteger(msg.seq) || msg.seq <= highWater) return {error:'请求已处理，不会重复执行'};
+          return {error:'연결이 만료되었습니다'};
+        if (!Number.isSafeInteger(msg.seq) || msg.seq <= highWater) return {error:'요청이 처리되었으며 반복되지 않습니다.'};
         highWater = msg.seq;
-        if (typeof msg.expires !== 'number' || msg.expires < Date.now()/1000) return {error:'请求已过期'};
+        if (typeof msg.expires !== 'number' || msg.expires < Date.now()/1000) return {error:'요청이 만료되었습니다.'};
         inFlight++;
         try {
           const target = api[surfaces[msg.surface]];
-          if (!target || !Array.isArray(msg.args)) throw new Error('不支持的桌面操作');
+          if (!target || !Array.isArray(msg.args)) throw new Error('지원되지 않는 데스크톱 작업');
           if (msg.method === 'mobileCatalog') return {result:await mobileCatalog(target,msg.surface,msg.args[0])};
           if (msg.method === 'mobileAccount') return {result:await mobileAccount()};
           if (msg.method === 'mobileProjectTrust' && capabilities[msg.surface].includes('mobileProjectTrust')) return {result:await mobileProjectTrust(target,msg.args[0],msg.args[1])};
           if (msg.method === 'mobileImage' && capabilities[msg.surface].includes('mobileImage')) return {result:await mobileImage(target,msg.args[0],msg.args[1])};
           if (msg.method === 'mobileArchiveState' && capabilities[msg.surface].includes('mobileArchiveState')) return {result:await mobileArchiveState(target,msg.args[0])};
           if (msg.method === 'mobileArchive' && capabilities[msg.surface].includes('mobileArchive')) return {result:await mobileArchive(target,msg.args[0],msg.args[1])};
-          if (msg.method === 'mobileList') return {result:await bounded(mobileList(),30000,'读取会话超时')};
-          if (msg.method === 'mobileDetail' && capabilities[msg.surface].includes('mobileDetail')) return {result:await bounded(mobileDetail(target,msg.args[0],msg.args[1]),30000,'读取会话超时')};
+          if (msg.method === 'mobileList') return {result:await bounded(mobileList(),30000,'읽기 세션 시간 초과')};
+          if (msg.method === 'mobileDetail' && capabilities[msg.surface].includes('mobileDetail')) return {result:await bounded(mobileDetail(target,msg.args[0],msg.args[1]),30000,'읽기 세션 시간 초과')};
           if (msg.method === 'mobileFork' && capabilities[msg.surface].includes('mobileFork')) return {result:await mobileFork(target,msg.args[0],msg.args[1])};
           if (msg.method === 'mobileRename' && capabilities[msg.surface].includes('mobileRename')) return {result:await mobileRename(target,msg.args[0],msg.args[1])};
           if (msg.method === 'mobileProgress') { const page=msg.surface==='code'&&capabilities.code.includes('mobileHistory')?await target.getTranscriptTail(msg.args[0],24):await target.getTranscript(msg.args[0]); const rows=Array.isArray(page)?page:page?.messages; return {result:sanitize('getTranscript',Array.isArray(rows)?rows.slice(-24):[])}; }
-          if (!allowed.has(msg.method) || typeof target[msg.method] !== 'function') throw new Error('不支持的桌面操作');
+          if (!allowed.has(msg.method) || typeof target[msg.method] !== 'function') throw new Error('지원되지 않는 데스크톱 작업');
           return {result:sanitize(msg.method, await target[msg.method](...callArgs(msg.method,msg.args)))};
         } catch (error) { return {error:String(error.message || error)}; }
         finally { inFlight--; }
@@ -442,7 +442,7 @@
   }
   const initial = await read();
   if (!initial || (initial.generation !== config.generation && (initial.type !== 'idle' || initial.seq !== 0)))
-    throw new Error('连接脚本已过期，请通过手机 Claude 标题选择启动以重新连接');
+    throw new Error('연결 스크립트가 만료되었습니다. 휴대폰을 사용하세요. Claude 제목 다시 연결하려면 시작을 선택하세요.');
   const sessions = await api.LocalSessions.getAll();
   knownSessions.set(api.LocalSessions,Array.isArray(sessions)?sessions:[]);
   const matching = sessions.filter(row => !row.isArchived && sameWorkspace(row.cwd));
@@ -451,9 +451,9 @@
   if (!sessionId) {
     const trust = await api.LocalSessions.checkTrust?.(config.cwd);
     if (trust?.trusted !== true)
-      throw new Error('Claude 尚未信任目录：' + config.cwd + '。请在 Claude Code 页面选择此目录并确认信任，再初始化连接。');
+      throw new Error('Claude 아직 신뢰할 수 없는 디렉터리：' + config.cwd + '。제발 Claude Code 페이지에서 이 디렉터리를 선택하고 신뢰를 확인한 다음 연결을 초기화합니다.。');
     if (typeof api.FileSystem?.savePastedFile !== 'function')
-      throw new Error('当前 Claude Desktop 不支持无消息初始化，请更新 Claude Desktop 后重试');
+      throw new Error('현재 Claude Desktop 메시지 없는 초기화는 지원되지 않습니다. 업데이트하세요. Claude Desktop 나중에 다시 시도해 보세요');
     const digest = prefix => crypto.subtle.digest('SHA-256',encoder.encode(prefix + config.token));
     staging = {name:'cmb-' + hex(await digest('cmb-reply-name:')).slice(0,32) + '.bin',
       key:await crypto.subtle.importKey('raw',await digest('cmb-reply-key:'),{name:'AES-GCM'},false,['encrypt']),
@@ -517,7 +517,7 @@
       let text = await pack(value);
       if (stopped) return;
       if (encoder.encode(text).length > 32 * 1024 * 1024) {
-        state = {seq: state.seq, done: true, error: '会话内容超过 32 MiB，请在桌面查看'};
+        state = {seq: state.seq, done: true, error: '대화 내용이 초과되었습니다. 32 MiB，데스크탑에서 보시기 바랍니다'};
         text = await pack({...value, ...state, result: undefined});
       }
       if (stopped) return;
@@ -532,7 +532,7 @@
         const pending=staging.pending={generation,receipt:value.receipt};
         try {
           const saved=await api.FileSystem.savePastedFile(chunks.join(''),'application/octet-stream',staging.name);
-          if (!saved?.path) throw new Error('Claude 未能暂存连接回执，请重新初始化连接');
+          if (!saved?.path) throw new Error('Claude 연결 영수증을 임시 저장하지 못했습니다. 연결을 다시 초기화하세요.');
         } catch (error) {
           // The outer publish deadline does not settle this native write. Only
           // its actual failure permits retry; a late failure cannot clear a new receipt.
@@ -541,16 +541,16 @@
         }
       } else {
         const result = await api.LocalSessions.writeSessionFile(sessionId, config.response, text);
-        if (!result?.hash) throw new Error('Claude 拒绝写入桥接文件，请检查目录信任和文件权限');
+        if (!result?.hash) throw new Error('Claude 브리지 파일 쓰기가 거부되었습니다. 디렉터리 신뢰 및 파일 권한을 확인하세요.');
       }
       lastWrite = Date.now();
     } finally { writing--; }
   }
-  console.info('Claude 文件桥接启动中；状态：window.__claudeMobileBridge.status()');
+  console.info('Claude 파일 브릿지 시작; 상태：window.__claudeMobileBridge.status()');
   try {
     while (!stopped) {
       let msg;
-      try { msg = await bounded(read(),4000,'读取桥接文件超时'); }
+      try { msg = await bounded(read(),4000,'브리지 파일 읽기 시간이 초과되었습니다.'); }
       catch (error) {
         if (!config.reconnect) throw error;
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -584,7 +584,7 @@
         state = {seq: msg.seq, done: false};
         dirty = true;
         if (typeof msg.expires !== 'number' || msg.expires < Date.now() / 1000) {
-          state = {seq: msg.seq, done: true, error: '请求已过期，未执行'};
+          state = {seq: msg.seq, done: true, error: '요청이 만료되어 실행되지 않았습니다.'};
         } else {
           busy = true;
           const dispatchedGeneration = generation;
@@ -602,7 +602,7 @@
             if (target && msg.method === 'mobileImage' && capabilities[msg.surface].includes('mobileImage')) return mobileImage(target,msg.args[0],msg.args[1]);
             if (target && msg.method === 'mobileProgress') { const page=msg.surface==='code'&&capabilities.code.includes('mobileHistory')?await target.getTranscriptTail(msg.args[0],24):await target.getTranscript(msg.args[0]); const rows=Array.isArray(page)?page:page?.messages; return sanitize('getTranscript',Array.isArray(rows)?rows.slice(-24):[]); }
             if (!target || !allowed.has(msg.method) || typeof target[msg.method] !== 'function' || !Array.isArray(msg.args)) {
-              throw new Error('不支持的桌面操作');
+              throw new Error('지원되지 않는 데스크톱 작업');
             }
             return sanitize(msg.method, await target[msg.method](...callArgs(msg.method,msg.args)));
           });
@@ -610,19 +610,19 @@
           // Retain ownership until the underlying call itself settles.
           inFlight++;
           operation.then(() => { inFlight--; }, () => { inFlight--; });
-          bounded(operation,Math.max(100,Math.min(90000,(msg.expires-Date.now()/1000)*1000)),'桌面操作超时，结果待核对；不会重复执行').then(result => { if (generation === dispatchedGeneration) state = {seq: msg.seq, done: true, result}; },
+          bounded(operation,Math.max(100,Math.min(90000,(msg.expires-Date.now()/1000)*1000)),'데스크톱 작업 시간이 초과되었으며 결과를 확인해야 합니다. 반복적으로 실행되지는 않습니다.').then(result => { if (generation === dispatchedGeneration) state = {seq: msg.seq, done: true, result}; },
             error => { if (generation === dispatchedGeneration) state = {seq: msg.seq, done: true, error: String(error.message || error)}; })
             .finally(() => { if (generation === dispatchedGeneration) { busy = false; dirty = true;wakePoll(); } });
         }
       }
       if (dirty || Date.now() - lastWrite > 5000) {
         dirty=false;
-        try { await bounded(publish(),4000,'写入桥接文件超时'); }
+        try { await bounded(publish(),4000,'브리지 파일 쓰기 시간 초과'); }
         catch(error) { dirty = true;window.__codingRemoteInjectionError=String(error.message||error); }
       }
       await pause();
     }
-  } catch (error) { window.__codingRemoteInjectionError = String(error.message || error); console.error('Claude 文件桥接停止：', error); }
+  } catch (error) { window.__codingRemoteInjectionError = String(error.message || error); console.error('Claude 파일 브리징이 중지되었습니다.：', error); }
   finally { stopped = true; for (const undo of restore) undo(); await publish().catch(() => {});
     if (handoff) { handoff.resolve(false); handoff = null; }
     completedHandoff?.resolve(true); }

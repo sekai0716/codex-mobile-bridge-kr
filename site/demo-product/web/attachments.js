@@ -18,9 +18,9 @@ class ChatAttachments {
   save(key,rows){try{sessionStorage.setItem('attachments:'+key,JSON.stringify(rows.filter(r=>r.status==='ready').map(({id,name,size,image,thumb,thumbWidth,thumbHeight})=>({id,name,size,image,thumb,thumbWidth,thumbHeight}))));}catch{}}
   add(files){
     if(!this.key||this.locked)return;
-    if(this.rows.length+files.length>10){this.error='每条消息最多添加 10 个不同附件';this.render();return;}
-    if(files.some(f=>!f.size||f.size>20*1024*1024)){this.error='每个附件需为 1 字节至 20 MB';this.render();return;}
-    if([...this.rows,...files].reduce((n,f)=>n+f.size,0)>100*1024*1024){this.error='每条消息的附件总计不能超过 100 MB';this.render();return;}
+    if(this.rows.length+files.length>10){this.error="메시지당 최대 10개의 파일 첨부";this.render();return;}
+    if(files.some(f=>!f.size||f.size>20*1024*1024)){this.error="각 첨부 파일은 1바이트에서 20MB 사이여야 합니다.";this.render();return;}
+    if([...this.rows,...files].reduce((n,f)=>n+f.size,0)>100*1024*1024){this.error="첨부 파일의 총 개수는 메시지당 MB 100개 이하여야 합니다.";this.render();return;}
     this.error='';const key=this.key,rows=this.rows;
     for(const file of files){
       const row={id:uuid(),name:file.name,size:file.size,file,status:'pending'};
@@ -73,16 +73,16 @@ class ChatAttachments {
     if(typeof createImageBitmap==='function'){
       source=await createImageBitmap(file);width=source.width;height=source.height;
     }else if(typeof Image==='function'&&typeof URL?.createObjectURL==='function'){
-      source=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('无法解码图片'));image.src=URL.createObjectURL(file);});
+      source=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('사진을 디코딩할 수 없습니다.'));image.src=URL.createObjectURL(file);});
       width=source.naturalWidth;height=source.naturalHeight;
-    }else throw Error('无法生成缩略图');
+    }else throw Error("미리보기 이미지를 만들 수 없습니다.");
     const scale=Math.min(1,640/Math.max(width,height)),canvas=document.createElement('canvas');
     canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
     const context=canvas.getContext('2d');context.drawImage(source,0,0,canvas.width,canvas.height);
     const close=()=>{if('close' in source&&typeof source.close==='function')source.close();};
     const encode=type=>canvas.convertToBlob
       ?canvas.convertToBlob({type,quality:.8})
-      :new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('无法生成缩略图')),type,.8));
+      :new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error("미리보기 이미지를 만들 수 없습니다.")),type,.8));
     let blob=await encode('image/webp');
     if(blob.type!=='image/webp')blob=await encode('image/jpeg');
     close();return {data:blob,width:canvas.width,height:canvas.height,mime:blob.type||'image/jpeg'};
@@ -96,17 +96,17 @@ class ChatAttachments {
       if(row.image){
         const image=node('img',null,'attachment-thumb');image.alt='';image.decoding='async';
         image.src=(row.status==='ready'&&row.thumb&&this.preview&&this.key)?this.preview(this.key,row.id):(row.objectUrl||'');
-        if(row.status==='ready'&&this.preview&&this.key){image.src=this.preview(this.key,row.id);image.dataset.imagePreview=image.src+(image.src.includes('?')?'&':'?')+'variant=original';image.dataset.imageName=row.name;image.tabIndex=0;image.setAttribute('role','button');image.setAttribute('aria-label',t('图片附件')+' '+row.name);}
+        if(row.status==='ready'&&this.preview&&this.key){image.src=this.preview(this.key,row.id);image.dataset.imagePreview=image.src+(image.src.includes('?')?'&':'?')+'variant=original';image.dataset.imageName=row.name;image.tabIndex=0;image.setAttribute('role','button');image.setAttribute('aria-label',t("이미지 첨부")+' '+row.name);}
         image.onerror=()=>image.remove();card.append(image);
       }
       info.append(node('strong',row.name));
-      const status=row.status==='ready'?t('已上传'):row.status==='failed'?t(row.error):t('正在上传…');
+      const status=row.status==='ready'?t('업로드됨'):row.status==='failed'?t(row.error):t('업로드 중…');
       info.append(node('small',(row.size/1024/1024>=1?(row.size/1024/1024).toFixed(1)+' MB':Math.ceil(row.size/1024)+' KB')+' · '+status,row.status==='failed'?'error':''));card.append(info);
       if(row.status==='failed'){
-        const retry=node('button',t('重试'),'plain');retry.type='button';retry.disabled=this.locked;
+        const retry=node('button',t("다시 시도"),'plain');retry.type='button';retry.disabled=this.locked;
         retry.onclick=()=>{row.status='pending';this.uploadPending(this.key,this.rows);};card.append(retry);
       }
-      const remove=node('button','×','attachment-remove');remove.type='button';remove.disabled=this.locked;remove.setAttribute('aria-label',t('移除附件')+' '+row.name);
+      const remove=node('button','×','attachment-remove');remove.type='button';remove.disabled=this.locked;remove.setAttribute('aria-label',t('첨부파일 삭제')+' '+row.name);
       remove.onclick=()=>{this.rows.splice(this.rows.indexOf(row),1);this.error='';this.save(this.key,this.rows);this.render();};card.append(remove);this.root.append(card);
     }
     this.root.hidden=!this.rows.length&&!this.error;this.onChange?.();

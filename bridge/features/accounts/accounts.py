@@ -39,7 +39,7 @@ from bridge.features.notifications.channels import read_json
 def private_bytes(path, content):
     path = Path(path)
     if path.is_symlink():
-        raise ValueError('账号文件不能是符号链接')
+        raise ValueError('계정 파일은 심볼릭 링크일 수 없습니다.')
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd, name = tempfile.mkstemp(prefix='.account-', dir=path.parent)
     try:
@@ -89,7 +89,7 @@ def operation(method=None, *, host=None, project=None, entry_only=False):
         if entry_gate is not None:
             with entry_gate.host(self.host):
                 if self.closed.is_set():
-                    raise ValueError('Codex 入口已关闭，请重新打开接入')
+                    raise ValueError('Codex 입구가 닫혀 있으니 다시 열어주세요')
                 manager = None if entry_only else getattr(self, 'accounts', None)
                 if manager is None:
                     return method(self, *args, **kwargs)
@@ -108,7 +108,7 @@ def operation(method=None, *, host=None, project=None, entry_only=False):
             else:
                 host_id = self.project_host(values.arguments[project])
         if not isinstance(host_id, str):
-            raise ValueError('运行主机无效')
+            raise ValueError('실행 중인 호스트가 잘못되었습니다.')
         gate = manager.gate
         with gate.host(host_id) if isinstance(gate, OperationGate) else gate:
             guard = getattr(manager, 'require_client_enabled', None)
@@ -128,7 +128,7 @@ class ManagedRPC(AccountRPC):
 
     def request(self, method, params=None):
         if method not in self.METHODS:
-            raise ValueError('不支持的账号操作')
+            raise ValueError("지원되지 않는 계정 작업입니다.")
         self.counter += 1
         self.process.stdin.write(json.dumps({'id': self.counter, 'method': method, 'params': params})+'\n')
         self.process.stdin.flush()
@@ -142,10 +142,10 @@ class ManagedRPC(AccountRPC):
                 break
             if value.get('id') == self.counter:
                 if 'error' in value:
-                    raise AccountError('运行时拒绝账号或配置操作，请检查登录及工作区限制')
+                    raise AccountError("런타임이 계정 또는 구성 작업을 거부했습니다. 로그인 및 작업 공간 제한 사항을 확인하세요.")
                 return value.get('result', {})
             self.notifications.append(value)
-        raise AccountError('账号服务超时或已断开')
+        raise AccountError('계정 서비스 시간이 초과되었거나 연결이 끊어졌습니다.')
 
     def login_finished(self, cancel):
         end = time.monotonic() + 600
@@ -170,7 +170,7 @@ class Accounts:
         self.home = bridge.codex_home
         self.root = bridge.data_dir/'accounts'
         if self.root.is_symlink():
-            raise ValueError('账号目录不能是符号链接')
+            raise ValueError('계정 디렉터리는 심볼릭 링크일 수 없습니다.')
         self.lock = threading.RLock()
         self.gate = OperationGate()
         self.api_models_locks = {}
@@ -182,9 +182,9 @@ class Accounts:
         self.index = read_json(self.root/'index.json', {'accounts': [], 'activeId': None, 'desktopExecutable': ''})
         self.state = read_json(self.root/'switch.json', {'phase': 'idle'})
         if self.state.get('phase') in ('preparing', 'stopping', 'applying', 'migrating', 'starting', 'verifying', 'restoring'):
-            self.state.update(phase='interrupted', error='上次切换中断，请在桌面端恢复原接入')
+            self.state.update(phase='interrupted', error="이전 스위치가 중단되었습니다. 데스크톱 앱에서 이전 계정을 복원하세요.")
             if self.state.get('operation') == 'desktopRuntime':
-                self.state.update(phase='failed', error='上次连接初始化中断，请重新初始化连接')
+                self.state.update(phase='failed', error="이전 초기화가 중단되었습니다. 연결을 다시 초기화하십시오.")
         self.enrollment = None
         self.discovery = None
         self.candidates = {}
@@ -209,7 +209,7 @@ class Accounts:
 
     def directory(self, identifier):
         if not isinstance(identifier, str) or not re.fullmatch(r'[0-9a-f]{32}', identifier):
-            raise ValueError('账号标识无效')
+            raise ValueError("잘못된 계정 ID.")
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.root.chmod(0o700)
         return self.root/identifier
@@ -228,7 +228,7 @@ class Accounts:
         self.directory(identifier)
         row = next((r for r in self.index['accounts'] if r['id'] == identifier), None)
         if row is None:
-            raise ValueError('账号不存在，请刷新列表')
+            raise ValueError("계정이 더 이상 존재하지 않습니다. 목록을 새로 고칩니다.")
         return row
 
     def save(self):
@@ -242,9 +242,9 @@ class Accounts:
 
     def check_ready(self):
         if self.updates.status()['state'] == 'requesting':
-            raise ValueError('正在交接桌面更新，请稍后再操作')
+            raise ValueError("데스크톱 업데이트를 전달하는 중입니다. 잠시 후 다시 시도하세요.")
         if self.state.get('phase') not in ('idle', 'complete', 'failed', 'restored'):
-            raise ValueError('账号正在切换或等待恢复，请稍后再操作聊天')
+            raise ValueError("계정 전환 또는 복구가 보류 중입니다. 채팅 작업이 일시적으로 일시 중지되었습니다.")
 
     def active_matches(self):
         stamp = self.index.get('activeStamp')
@@ -278,12 +278,12 @@ class Accounts:
         with self.lock:
             management = self.management()
             if management['external']:
-                current = {'status': 'ready', 'kind': 'external', 'id': None, 'name': 'Magpie / 外部管理'}
+                current = {'status': 'ready', 'kind': 'external', 'id': None, 'name': 'Magpie / 외부 관리'}
             else:
                 current = self.info.current()
             if self.state.get('operation') == 'cliAuth' and self.state.get('phase') == 'authUnknown':
                 current = {'status': 'error', 'kind': 'api', 'id': None,
-                           'name': '原生账号同步结果待核验'}
+                           'name': '기본 계정 동기화 결과를 확인해야 합니다.'}
             verified = bool(current.get('id'))
             return {'accounts': [{**{k: row[k] for k in ('id', 'name', 'kind', 'email', 'planType', 'baseUrl', 'model') if k in row},
                                   'details': copy.deepcopy(self.info.public_details(row['id']))}
@@ -291,7 +291,7 @@ class Accounts:
                     'activeId': current.get('id'), 'activeVerified': verified, 'current': current, 'blockers': self.blockers(),
                     'externalChange': bool(self.index.get('activeId')) and not verified,
                     'sharedWithLocalCli': True, 'scope': 'profile' if self.independent else 'desktop',
-                    'scopeLabel': getattr(self.bridge, 'host_label', '此电脑'), 'codexHome': str(self.home),
+                    'scopeLabel': getattr(self.bridge, 'host_label', '이 컴퓨터'), 'codexHome': str(self.home),
                     'canManageDesktop': not self.independent, 'switch': dict(self.state),
                     'desktopRuntime': self.desktop_runtime_status(),
                     'loginAccount': copy.deepcopy(self.info.current_login()),
@@ -304,7 +304,7 @@ class Accounts:
 
     def set_reset_dynamic(self, enabled):
         if type(enabled) is not bool:
-            raise ValueError('重置动态设置无效')
+            raise ValueError('동적 설정을 재설정해도 효과가 없습니다.')
         with self.lock:
             if enabled and not self.reset_dynamic_enabled:
                 self.monitor.reset_global_watch()
@@ -317,16 +317,16 @@ class Accounts:
         except FileNotFoundError:
             text = ''
         except (OSError, UnicodeError):
-            return {'mode': 'external', 'external': True, 'reason': '无法确认接入配置，已暂停覆盖配置'}
+            return {'mode': 'external', 'external': True, 'reason': '액세스 구성을 확인할 수 없어 오버레이 구성이 일시중지되었습니다.'}
         configured = self.index.get('accessManagement', 'auto')
         detected = magpie_managed(text=text)
         return {'mode': configured, 'external': configured == 'external' or detected,
                 'detected': 'magpie' if detected else None,
-                'reason': '此入口由 Magpie 或外部工具管理；请在原工具中切换接入' if configured == 'external' or detected else None}
+                'reason': "이 항목은 외부에서 관리됩니다. Magpie 또는 원래 도구에서 연결을 전환합니다." if configured == 'external' or detected else None}
 
     def require_managed_writes(self):
         if self.management()['external']:
-            raise ValueError('此入口由 Magpie 或外部工具管理，Bridge 不会覆盖其认证、提供商和模型目录')
+            raise ValueError('이 입구는 다음에서 제공됩니다. Magpie 또는 외부 도구 관리，Bridge 인증, 공급자 및 모델 카탈로그는 포함되지 않습니다.')
 
     def desktop_status(self):
         result = self.public()
@@ -343,34 +343,34 @@ class Accounts:
             try:
                 result['configured'] = settings(self.home) is not None
             except (OSError, ValueError, TypeError, KeyError):
-                result['error'] = '共享接入配置无法读取，请重新初始化连接'
+                result['error'] = "공유 연결 설정을 읽을 수 없습니다. 연결을 다시 초기화하십시오."
         return result
 
     @staticmethod
     def name(value):
         name = value.get('name')
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
-            raise ValueError('请填写 1–80 字的账号名称')
+            raise ValueError("계정 이름을 1~80자 사이로 입력하세요.")
         return name.strip()
 
     def assert_editable(self):
         self.check_ready()
         if self.enrollment and self.enrollment.get('phase') in ('starting', 'waiting'):
-            raise ValueError('请先完成或取消正在进行的登录')
+            raise ValueError("먼저 대기 중인 로그인을 완료하거나 취소하세요.")
 
     @staticmethod
     def api_url(url):
         if not isinstance(url, str):
-            raise ValueError('请填写有效 API 地址')
+            raise ValueError("유효한 API URL를 입력하세요.")
         try:
             parsed = urlsplit(url)
             parsed.port
         except ValueError:
-            raise ValueError('请填写有效 API 地址') from None
+            raise ValueError("유효한 API URL를 입력하세요.") from None
         if (parsed.scheme not in ('https', 'http') or not parsed.hostname or parsed.username or parsed.password
                 or parsed.query or parsed.fragment or len(url) > 2000 or any(c.isspace() for c in url)
                 or (parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1', '::1'))):
-            raise ValueError('API 地址须为 HTTPS，只有本机服务可使用 HTTP')
+            raise ValueError("API URL은 HTTPS를 사용해야 합니다. HTTP는 로컬 서비스에만 허용됩니다.")
         return url.rstrip('/')
 
     def api_credentials(self, value):
@@ -380,7 +380,7 @@ class Accounts:
             if old['kind'] == 'api':
                 key = read_json(self.directory(old['id'])/'api.json', {}).get('key', '')
         if not isinstance(key, str) or not 1 <= len(key) <= 8192 or any(c in key for c in '\r\n\x00'):
-            raise ValueError('请填写有效 API Key')
+            raise ValueError("유효한 API 키를 입력하세요.")
         return url, key
 
     @staticmethod
@@ -393,16 +393,16 @@ class Accounts:
             self.assert_editable()
             path = value.get('source') or str(self.home)
             if not isinstance(path, str) or not Path(path).expanduser().is_absolute():
-                raise ValueError('请填写 Codex 配置目录的完整路径')
+                raise ValueError("Codex 구성 디렉터리의 전체 경로를 입력합니다.")
             source = Path(path).expanduser().resolve()
             if not source.is_dir() or not any((source/name).is_file() for name in ('config.toml', 'auth.json')):
-                raise ValueError('目录中没有找到 config.toml 或 auth.json')
+                raise ValueError("이 디렉터리에는 config.toml 또는 auth.json이 없습니다.")
             stamp = self.source_stamp(source)
             with ManagedRPC(source, self.runtime) as rpc:
                 config = rpc.request('config/read', {'includeLayers': False}).get('config', {})
             auth = read_json(source/'auth.json', {})
             if stamp != self.source_stamp(source):
-                raise ValueError('本机配置已变化，请重新扫描')
+                raise ValueError("로컬 구성이 변경되었습니다. 다시 스캔하세요.")
             candidates = []
             tokens, owner = auth.get('tokens') or {}, token_owner(auth)
             if owner and owner[1] and owner[2] and all(tokens.get(k) for k in ('access_token', 'refresh_token', 'account_id')):
@@ -426,14 +426,14 @@ class Accounts:
                     key = auth.get('OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY', '')
                 reason = None
                 if any(definition.get(k) for k in ('http_headers', 'env_http_headers', 'auth', 'aws', 'query_params', 'gateway_oauth')):
-                    reason = '暂不支持导入含额外请求配置的提供商'
+                    reason = "추가 요청 설정이 있는 공급자 가져오기는 지원되지 않습니다."
                 elif definition.get('wire_api', 'responses') != 'responses':
-                    reason = '此提供商不是 Responses API，暂不支持导入'
+                    reason = "이 공급자는 API 응답을 사용하지 않으며 가져올 수 없습니다."
                 else:
                     try:
                         self.api_credentials({'baseUrl': url, 'apiKey': key})
                     except ValueError:
-                        reason = '未找到可用 API Key 或地址，请检查环境变量或手动添加'
+                        reason = "사용 가능한 API 키 또는 URL를 찾을 수 없습니다. 환경 변수를 확인하거나 수동으로 추가하세요."
                 variants = [(provider, config.get('model') or '')]
                 variants += [(provider+' / '+name, profile.get('model') or config.get('model') or '')
                              for name, profile in (config.get('profiles') or {}).items()
@@ -446,7 +446,7 @@ class Accounts:
                 candidate.update(id=uuid.uuid4().hex, source=source, stamp=stamp)
                 self.candidates[candidate['id']] = candidate
             self.discovery = {'source': str(source), 'candidates': [],
-                              'notice': ('系统凭据库中的官方登录不能直接复制，请使用官方登录添加'
+                              'notice': ("시스템 자격 증명 저장소 로그인은 여기에 복사할 수 없습니다. 공식 로그인을 통해 추가하세요."
                                          if not owner and config.get('cli_auth_credentials_store') in ('keyring', 'auto') else None)}
             self.update_discovery()
             return self.desktop_status()
@@ -471,9 +471,9 @@ class Accounts:
     def candidate(self, identifier):
         row = self.candidates.get(identifier)
         if not row or row.get('reason'):
-            raise ValueError('请重新扫描并选择可导入的配置')
+            raise ValueError("다시 스캔하고 가져올 수 있는 구성을 선택하십시오.")
         if row['stamp'] != self.source_stamp(row['source']):
-            raise ValueError('本机配置已变化，请重新扫描')
+            raise ValueError("로컬 구성이 변경되었습니다. 다시 스캔하세요.")
         return row
 
     def import_account(self, value):
@@ -501,7 +501,7 @@ class Accounts:
     def api_model_identity(self, row):
         with self.lock:
             if self.row(row['id']).get('baseUrl') != row['baseUrl']:
-                raise ValueError('当前接入已变化，请重新读取模型列表')
+                raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
             key = read_json(self.directory(row['id'])/'api.json', {})['key']
             return ModelStore.key('saved-api', str(self.home), row['id'], row['baseUrl'], key)
 
@@ -515,7 +515,7 @@ class Accounts:
                 self.check_ready()
                 stored = dict(self.row(row['id']))
                 if any(stored.get(key) != row.get(key) for key in ('kind', 'baseUrl', 'model')):
-                    raise ValueError('当前接入已变化，请重新读取模型列表')
+                    raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
                 key = read_json(self.directory(row['id'])/'api.json', {})['key']
                 identity = ModelStore.key('saved-api', str(self.home), row['id'], row['baseUrl'], key)
                 def result(models, updated_at, error=None):
@@ -523,7 +523,7 @@ class Accounts:
                         self.check_ready()
                         if (self.row(row['id']) != stored or
                                 read_json(self.directory(row['id'])/'api.json', {}).get('key') != key):
-                            raise ValueError('当前接入已变化，请重新读取模型列表')
+                            raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
                     copied = copy.deepcopy(models)
                     return (copied, updated_at, error) if with_timestamp else copied
                 try:
@@ -551,13 +551,13 @@ class Accounts:
                 models = model_catalog(row['baseUrl'], key)
             except ValueError:
                 if persisted:
-                    return result(persisted[1], persisted[0], '模型目录刷新失败，已保留上次结果')
+                    return result(persisted[1], persisted[0], '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.')
                 raise
             with self.lock:
                 self.check_ready()
                 if (self.row(row['id']) != stored or
                         read_json(self.directory(row['id'])/'api.json', {}).get('key') != key):
-                    raise ValueError('当前接入已变化，请重新读取模型列表')
+                    raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
             try:
                 updated_at = self.api_model_store.write(identity, models)
                 self._schedule_api_model_refresh(row, identity, updated_at, replace=True)
@@ -635,7 +635,7 @@ class Accounts:
             self.check_ready()
             if (self.index.get('activeId') != row['id'] or self.index.get('activeStamp') != stamp or
                     not self.active_matches() or self.row(row['id']) != row):
-                raise ValueError('当前接入已变化，请重新读取模型列表')
+                raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
             return {**result, 'modelAccessName':row['name'], 'modelAccountId':row['id']}
 
     def models(self, value):
@@ -644,7 +644,7 @@ class Accounts:
             if value.get('candidateId'):
                 candidate = self.candidate(value['candidateId'])
                 if candidate['kind'] != 'api':
-                    raise ValueError('请选择 API 接入')
+                    raise ValueError("API 연결을 선택합니다.")
                 url, key = self.api_credentials({'baseUrl': candidate['baseUrl'], 'apiKey': candidate['key']})
             else:
                 url, key = self.api_credentials(value)
@@ -659,10 +659,10 @@ class Accounts:
             url, key, model = value.get('baseUrl', ''), value.get('apiKey', ''), value.get('model', '')
             url, key = self.api_credentials(value)
             if not valid_model_id(model):
-                raise ValueError('请填写有效模型 ID')
+                raise ValueError("유효한 모델 ID를 입력하세요.")
             existing = self.row(value['id']) if value.get('id') else None
             if existing and (existing['kind'] != 'api' or existing['id'] == self.info.current().get('id')):
-                raise ValueError('请先切换到其他接入，再修改此 API')
+                raise ValueError("이 API를 편집하기 전에 다른 계정으로 전환하세요.")
             identifier = existing['id'] if existing else uuid.uuid4().hex
             row = {'id': identifier, 'kind': 'api', 'name': name, 'baseUrl': url.rstrip('/'), 'model': model}
             private_json(self.directory(identifier)/'api.json', {'key': key})
@@ -680,7 +680,7 @@ class Accounts:
             name = self.name(value)
             replacing = self.row(value['replaceId']) if value.get('replaceId') else None
             if replacing and (replacing['kind'] != 'chatgpt' or replacing['id'] == self.info.current().get('id')):
-                raise ValueError('请先切换到其他接入，再重新登录此账号')
+                raise ValueError("다시 로그인하기 전에 다른 계정으로 전환하세요.")
             identifier = uuid.uuid4().hex
             folder = self.directory(identifier)
             folder.mkdir(parents=True, mode=0o700)
@@ -695,26 +695,26 @@ class Accounts:
                         url = flow.get('authUrl', '')
                         parsed = urlsplit(url)
                         if parsed.scheme != 'https' or parsed.hostname not in ('auth.openai.com', 'chatgpt.com', 'auth0.openai.com'):
-                            raise ValueError('登录地址未通过验证')
+                            raise ValueError("로그인 URL 유효성 검사에 실패했습니다.")
                         with self.lock:
                             self.enrollment.update(phase='waiting', authUrl=url)
                         if not rpc.login_finished(self.login_cancel):
                             if flow.get('loginId'):
                                 rpc.request('account/login/cancel', {'loginId': flow['loginId']})
-                            raise ValueError('登录已取消或过期，请重新登录')
+                            raise ValueError("로그인이 취소되었거나 만료되었습니다. 다시 로그인하세요.")
                         auth = rpc.request('account/read', {'refreshToken': False}).get('account') or {}
                         if auth.get('type') != 'chatgpt' or not (folder/'auth.json').is_file():
-                            raise ValueError('尚未取得官方账号凭据')
+                            raise ValueError("공식 계정 자격 증명은 아직 사용할 수 없습니다.")
                         saved_auth = read_json(folder/'auth.json', {})
                         tokens = saved_auth.get('tokens') or {}
                         owner = token_owner(saved_auth)
                         if not tokens.get('account_id') or not owner or not owner[1]:
-                            raise ValueError('尚未取得账号身份，请重新登录')
+                            raise ValueError("계정 ID를 사용할 수 없습니다. 다시 로그인하세요.")
                         with self.lock:
                             if self.login_cancel.is_set():
-                                raise ValueError('登录已取消')
+                                raise ValueError('로그인이 취소되었습니다.')
                             if any(r is not replacing and r.get('accountId') == tokens['account_id'] and r.get('email') == auth.get('email') for r in self.index['accounts']):
-                                raise ValueError('此账号已添加，请先删除旧档案再重新授权')
+                                raise ValueError("이 계정은 이미 저장되어 있습니다. 다시 인증하기 전에 이전 항목을 제거하세요.")
                             self.index['accounts'].append({'id': identifier, 'name': name, 'kind': 'chatgpt',
                                                           'accountId': tokens['account_id'], 'tokenOwner': owner, 'email': auth.get('email'),
                                                           'planType': auth.get('planType')})
@@ -730,7 +730,7 @@ class Accounts:
                             self.enrollment = {'phase': 'complete', 'name': name}
                 except Exception:
                     with self.lock:
-                        self.enrollment = {'phase': 'failed', 'error': '登录未完成、已取消或账号已存在，请重新添加'}
+                        self.enrollment = {'phase': 'failed', 'error': '로그인이 완료되지 않았거나 취소되었거나 계정이 이미 존재합니다. 다시 추가하세요.'}
                 finally:
                     if not accepted:
                         shutil.rmtree(folder, ignore_errors=True)
@@ -740,7 +740,7 @@ class Accounts:
     def current_login_account(self):
         row = self.info.current_login()
         if not row or not row.get('transient'):
-            raise ValueError('账号身份已变化，请刷新列表')
+            raise ValueError('계정 ID가 변경되었습니다. 목록을 새로고침하세요.')
         target = Account(self.home, self.bridge.data_dir, executable=self.runtime)
         target.usage_cache = self.bridge.account.usage_cache
         target.subscription_cache = self.bridge.account.subscription_cache
@@ -751,14 +751,14 @@ class Accounts:
             if (not context or context['accountKey'] != row['accountKey'] or
                     context.get('_routeCacheKey') != expected_route or
                     token_owner(read_json(self.home/'auth.json', {})) != expected_owner):
-                raise ValueError('账号身份已变化，请刷新列表')
+                raise ValueError('계정 ID가 변경되었습니다. 목록을 새로고침하세요.')
             return context
         target.context = checked_login
         return target, expected_owner
 
     def saved_account(self, row):
         if row['kind'] != 'chatgpt':
-            raise ValueError('仅官方 ChatGPT 账号可使用重置卡')
+            raise ValueError("사용량을 재설정하려면 네이티브 ChatGPT 로그인이 필요합니다.")
         identity = self.info.read_identity()
         with self.lock:
             active = self.info.match(identity)
@@ -766,7 +766,7 @@ class Accounts:
         native_login = bool(login and login.get('owner') and login['owner'] == row.get('tokenOwner'))
         home = self.home if native_login or active and active['id'] == row['id'] else self.directory(row['id'])
         if token_owner(read_json(home/'auth.json', {})) != row.get('tokenOwner'):
-            raise ValueError('账号身份不匹配')
+            raise ValueError('계정 ID가 일치하지 않습니다.')
         if home != self.home:
             private_bytes(home/'config.toml', b'cli_auth_credentials_store = "file"\nmodel_provider = "openai"\n')
         target = Account(home, self.bridge.data_dir, executable=self.runtime)
@@ -778,7 +778,7 @@ class Accounts:
                     native_login and (context['accountKey'] != login['context']['accountKey'] or
                                       context.get('_routeCacheKey') != login['context'].get('_routeCacheKey')) or
                     token_owner(read_json(home/'auth.json', {})) != row.get('tokenOwner')):
-                raise ValueError('账号身份已变化')
+                raise ValueError('계정 ID가 변경되었습니다.')
             return context
         target.context = checked_context
         return target
@@ -799,14 +799,14 @@ class Accounts:
                 self.check_ready()
                 if ((row is not None and self.row(row['id']).get('tokenOwner') != owner) or
                         token_owner(read_json(target.home/'auth.json', {})) != owner):
-                    raise ValueError('账号身份已变化，请刷新列表')
+                    raise ValueError('계정 ID가 변경되었습니다. 목록을 새로고침하세요.')
             return result
 
     def account(self, value):
         """Operate one login without changing the desktop's active connection."""
         action = value.get('operation', 'read')
         if action not in ('read', 'consume') or set(value) - {'action', 'id', 'operation', 'refresh', 'confirmed', 'requestId', 'accountKey', 'creditId'}:
-            raise ValueError('账号重置请求包含不支持的字段')
+            raise ValueError('계정 재설정 요청에 지원되지 않는 필드가 포함되어 있습니다.')
         if action == 'read':
             return self.read_account(value)
         from bridge.features.accounts.info import CURRENT_LOGIN_ID
@@ -823,17 +823,17 @@ class Accounts:
     def control(self, value):
         action = value.get('action', 'list')
         if self.independent and action in ('retrySsh', 'checkDesktopUpdate', 'requestDesktopUpdate', 'scanDesktop', 'configure', 'recover', 'initializeDesktopRuntime'):
-            raise ValueError('独立配置不管理默认 Codex Desktop')
+            raise ValueError('독립 실행형 구성은 기본값을 관리하지 않습니다. Codex Desktop')
         if action == 'initializeDesktopRuntime':
             return self.initialize_desktop_runtime(value)
         if action == 'retrySsh':
             if set(value) != {'action', 'host'}:
-                raise ValueError('SSH 重试请求包含不支持的字段')
+                raise ValueError('SSH 재시도 요청에 지원되지 않는 필드가 포함되어 있습니다.')
             self.bridge.retry_ssh(value['host'])
             return self.desktop_status()
         if action == 'management':
             if set(value) != {'action', 'mode'} or value['mode'] not in ('auto', 'external'):
-                raise ValueError('接入管理模式无效')
+                raise ValueError('액세스 관리 모드가 잘못되었습니다.')
             with self.gate, self.lock:
                 self.assert_editable()
                 self.index['accessManagement'] = value['mode']
@@ -879,7 +879,7 @@ class Accounts:
             elif action == 'configure':
                 executable = value.get('desktopExecutable')
                 if not isinstance(executable, str) or not Path(executable).is_absolute():
-                    raise ValueError('请填写桌面程序的完整路径')
+                    raise ValueError("데스크톱 앱의 전체 경로를 입력하세요.")
                 app = DesktopApp(executable, self.home)
                 app.validate(self.runtime)
                 self.index['desktopExecutable'] = str(app.executable)
@@ -889,7 +889,7 @@ class Accounts:
                     row['name'] = self.name(value)
                 else:
                     if row['id'] == self.info.current().get('id'):
-                        raise ValueError('请先切换到其他接入，再删除此账号')
+                        raise ValueError("이 계정을 삭제하기 전에 다른 계정으로 전환하세요.")
                     self.index['accounts'].remove(row)
                     self.api_models_locks.pop(row['id'], None)
                     catalog = self.saved_model_catalogs.pop(row['id'], None)
@@ -898,7 +898,7 @@ class Accounts:
                     self.save()
                     shutil.rmtree(self.directory(row['id']), ignore_errors=True)
             else:
-                raise ValueError('不支持的账号管理操作')
+                raise ValueError("지원되지 않는 계정 관리 작업입니다.")
             self.save()
             return self.desktop_status()
 
@@ -956,7 +956,7 @@ class Accounts:
             blocked = [row for row in blocked if row['reason'] in ('queued', 'unknown')]
         if blocked:
             names = '、'.join(row['title'] for row in blocked[:3])
-            raise ValueError('请先结束任务或处理待发送消息：'+names)
+            raise ValueError('작업을 종료하거나 보류 중인 메시지를 먼저 처리하세요.：'+names)
 
     def desktop_runtime_lifecycle(self):
         # Lock even before initialization has saved settings: another gateway
@@ -969,13 +969,13 @@ class Accounts:
     def switch(self, value):
         self.require_managed_writes()
         if value.get('confirmed') is not True or value.get('tasksConfirmed') is not True:
-            raise ValueError('请确认所有桌面任务已结束，并同意重启 Codex 桌面应用')
+            raise ValueError("모든 데스크톱 작업이 완료되었는지 확인하고 Codex 데스크톱 앱을 다시 시작하도록 허용합니다.")
         request_id = value.get('requestId')
         if not isinstance(request_id, str) or str(uuid.UUID(request_id)) != request_id:
-            raise ValueError('切换请求标识无效')
+            raise ValueError("잘못된 계정 전환 요청 ID.")
         with getattr(self.bridge, 'entry_gate', None) or nullcontext(), self.gate, self.bridge.account.lock, self.desktop_runtime_lifecycle(), self.lock:
             if self.independent and self.bridge.closed.is_set():
-                raise ValueError('Codex 入口已关闭，请重新打开管理页面')
+                raise ValueError('Codex 입구가 닫혀있습니다. 관리페이지를 다시 열어주세요')
             row = dict(self.row(value.get('id')))
             sync_cli = True
             ledger = read_json(self.root/'requests.json', {})
@@ -983,12 +983,12 @@ class Accounts:
             sync = LocalCliSync(self.bridge)
             if self.state.get('operation') == 'cliAuth' and self.state.get('phase') == 'authUnknown':
                 if self.state.get('requestId') != request_id or self.state.get('targetId') != row['id']:
-                    raise ValueError('上次账号同步结果待核验，请检查同一次切换，勿重复提交')
+                    raise ValueError('마지막 계정 동기화 결과를 확인해야 합니다. 동일한 스위치를 확인하고 다시 제출하지 마십시오.')
                 sync.switch_live_api(row, request_id, reconcile=True)
                 return self.public()
             if request_id in ledger:
                 if ledger[request_id] != row['id']:
-                    raise ValueError('同一请求不能切换到不同账号')
+                    raise ValueError('동일한 요청을 다른 계정으로 전환할 수 없습니다.')
                 return self.public()
             # One local account home always verifies CLI effectiveness.
             self.assert_editable()
@@ -1018,7 +1018,7 @@ class Accounts:
                 return self.public()
             executable = self.index.get('desktopExecutable') or DesktopApp.discover(self.runtime)
             if not executable:
-                raise ValueError('请先在桌面端指定 Codex 桌面程序路径')
+                raise ValueError("먼저 데스크톱 앱에서 Codex 데스크톱 실행 파일을 선택하세요.")
             app = DesktopApp(executable, self.home)
             app.validate(self.runtime)
             ledger[request_id] = row['id']
@@ -1032,19 +1032,19 @@ class Accounts:
 
     def initialize_desktop_runtime(self, value):
         if sys.platform not in ('darwin', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
-            raise ValueError('此入口不支持 Codex 原生连接初始化')
+            raise ValueError("이 항목은 Codex 네이티브 연결 초기화를 지원하지 않습니다.")
         required = {'action', 'confirmed', 'tasksConfirmed', 'requestId'}
         if (set(value) - {'acknowledgeUnavailable'} != required or value.get('confirmed') is not True
                 or value.get('tasksConfirmed') is not True
                 or 'acknowledgeUnavailable' in value and value['acknowledgeUnavailable'] is not True):
-            raise ValueError('请确认所有桌面任务已结束，并同意重启 Codex 桌面应用')
+            raise ValueError("모든 데스크톱 작업이 완료되었는지 확인하고 Codex 데스크톱 앱을 다시 시작하도록 허용합니다.")
         request_id = value.get('requestId')
         try:
             valid_id = isinstance(request_id, str) and str(uuid.UUID(request_id)) == request_id
         except ValueError:
             valid_id = False
         if not valid_id:
-            raise ValueError('初始化请求标识无效')
+            raise ValueError("잘못된 초기화 요청 ID")
         with self.gate, self.bridge.account.lock, self.lock:
             self.require_managed_writes()
             if self.state.get('operation') == 'desktopRuntime' and self.state.get('requestId') == request_id:
@@ -1056,7 +1056,7 @@ class Accounts:
                                      and self.state.get('taskStateUnavailable') is True
                                      or self.desktop_preparation.get('state') == 'waiting'
                                      and self.desktop_preparation.get('taskStateUnavailable') is True):
-                raise ValueError('请先核验原生连接初始化的任务状态，再确认是否继续')
+                raise ValueError("계속 진행할지 결정하기 전에 네이티브 연결 초기화에 영향을 받는 작업 상태를 확인하세요.")
             self.idle(pending_only=True)
             executable = self.index.get('desktopExecutable') or DesktopApp.discover(self.runtime)
             if not executable:
@@ -1081,7 +1081,7 @@ class Accounts:
         if sys.platform not in ('darwin', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
             return False
         if not self.gate.acquire(timeout=0):
-            self.desktop_preparation = {'state': 'waiting', 'reason': '等待当前操作结束后自动准备原生侧聊'}
+            self.desktop_preparation = {'state': 'waiting', 'reason': '현재 작업이 끝날 때까지 기다린 후 기본 사이드 채팅을 자동으로 준비합니다.'}
             return True
         try:
             if self.bridge.closed.is_set() or cancelled():
@@ -1111,10 +1111,10 @@ class Accounts:
             state = inspect_client(descriptor)
             main = state.get('mainPids', [])
             if state.get('unknown') or len(main) > 1 or state.get('running') and not main:
-                raise ValueError('无法确认唯一的 Codex 桌面进程，请在电脑端检查后重试')
+                raise ValueError("단일 Codex 데스크톱 프로세스를 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도하세요.")
             identities = {pid: process_identity(pid) for pid in main}
             if any(identity['image'] != os.path.normcase(str(app.executable)) for identity in identities.values()):
-                raise ValueError('Codex 桌面进程身份已变化，请重新初始化连接')
+                raise ValueError("Codex 데스크탑 프로세스 ID가 변경되었습니다. 연결을 다시 초기화하십시오.")
             launch_commands = commands(main) if main else {}
             for pid, identity in identities.items():
                 record = ({'processStartTime': str(identity['created'])} if sys.platform == 'win32' else
@@ -1128,9 +1128,9 @@ class Accounts:
                 command = launch_commands.get(pid)
                 if (home != self.home.resolve() or sqlite_home != home or environment.get('CODEX_ELECTRON_USER_DATA_PATH')
                         or not command or re.search(r'''(?:^|[\s"'])--user-data-dir(?:[=\s"']|$)''', command)):
-                    raise ValueError('运行中的 Codex 使用其他配置目录，不能初始化此接入')
+                    raise ValueError("실행 중인 Codex는 다른 구성 디렉터리를 사용합니다. 이 연결을 초기화할 수 없습니다.")
                 if process_identity(pid) != identity:
-                    raise ValueError('Codex 桌面进程身份已变化，请重新初始化连接')
+                    raise ValueError("Codex 데스크탑 프로세스 ID가 변경되었습니다. 연결을 다시 초기화하십시오.")
             return state, identities
 
         try:
@@ -1153,7 +1153,7 @@ class Accounts:
                         return False
                     prior = preparation(self.home)
                     if prior and prior['state'] == 'pending':
-                        self.desktop_preparation = {'state': 'failed', 'reason': '上次原生连接准备结果待核对，请在账号管理中重新准备；不会自动重复重启'}
+                        self.desktop_preparation = {'state': 'failed', 'reason': '마지막 기본 연결 준비 결과를 확인해야 합니다. 계정관리에서 다시 준비해주세요. 자동으로 다시 시작되지 않습니다.'}
                         return False
                     app.validate(self.runtime)
                     from bridge.clients.codex.desktop_runtime import validate_runtime, launcher_settings
@@ -1192,7 +1192,7 @@ class Accounts:
                     return True
                 current, current_identities = observed()
                 if identities != current_identities or set(state['pids']) != set(current['pids']):
-                    raise ValueError('Codex 桌面进程已变化，请重新初始化连接')
+                    raise ValueError("Codex 데스크탑 프로세스가 변경되었습니다. 연결을 다시 초기화하십시오.")
                 if automatic:
                     if self.bridge.closed.is_set() or cancelled():
                         return False
@@ -1209,14 +1209,14 @@ class Accounts:
                     self.wait_stopped()
                 self.invalidate()
                 if observed()[0]['running']:
-                    raise ValueError('Codex 桌面已被重新启动，请重新初始化连接')
+                    raise ValueError("Codex 데스크탑이 다시 시작되었습니다. 연결을 다시 초기화하십시오.")
                 if automatic and (self.bridge.closed.is_set() or cancelled()):
-                    raise ValueError('网关已停止准备，原生连接尚未完成；请在账号管理中重新准备')
+                    raise ValueError('게이트웨이 준비가 중지되었으며 기본 연결이 완료되지 않았습니다. 계정관리에서 다시 준비해주세요.')
                 if not preparation_error:
                     self.phase('applying')
                     configure(self.home, app.executable, self.runtime)
                 if automatic and (self.bridge.closed.is_set() or cancelled()):
-                    raise ValueError('网关已停止准备，尚未启动 Codex；请在账号管理中重新准备')
+                    raise ValueError('게이트웨이 준비가 중지되었으며 아직 시작되지 않았습니다. Codex；계정관리에서 다시 준비해주세요')
                 self.phase('starting')
                 app.start()
                 self.phase('verifying')
@@ -1242,14 +1242,14 @@ class Accounts:
         for name in ('config.toml', 'auth.json'):
             file = self.home/name
             if file.is_symlink():
-                raise ValueError('切换不支持符号链接形式的认证或配置文件')
+                raise ValueError("계정 전환은 심볼릭 링크된 인증 또는 구성 파일을 지원하지 않습니다.")
             result[name] = base64.b64encode(file.read_bytes()).decode() if file.exists() else None
         return result
 
     def restore_files(self, snapshot):
         for name, data in snapshot.items():
             if name not in ('config.toml', 'auth.json'):
-                raise ValueError('恢复文件无效')
+                raise ValueError('복구 파일이 잘못되었습니다.')
             if data is None:
                 (self.home/name).unlink(missing_ok=True)
             else:
@@ -1287,19 +1287,19 @@ class Accounts:
             if config.get('forced_login_method'):
                 changes['forced_login_method'] = 'chatgpt' if row['kind'] == 'chatgpt' else 'api'
             if config.get('profile'):
-                raise ValueError('当前配置启用了 profile，请先在桌面切回默认配置')
+                raise ValueError("구성 프로필이 활성화되었습니다. 먼저 데스크탑에서 기본 구성으로 전환하십시오.")
             if row['kind'] == 'chatgpt':
                 # Let the official runtime select its default model.
                 changes['model'] = None
             result = rpc.request('config/batchWrite', {'edits': [{'keyPath': key, 'value': val, 'mergeStrategy': 'replace'}
                                                                 for key, val in changes.items()]})
             if result.get('status') != 'ok':
-                raise ValueError('接入配置被其他配置层覆盖，无法安全切换')
+                raise ValueError("다른 구성 레이어는 이 연결을 재정의합니다. 안전하게 전환할 수 없습니다.")
         if row['kind'] == 'chatgpt':
             with ManagedRPC(folder, self.runtime) as rpc:
                 auth = rpc.request('account/read', {'refreshToken': False}).get('account') or {}
                 if auth.get('type') != 'chatgpt' or auth.get('email') != row.get('email'):
-                    raise ValueError('保存的账号需要重新登录')
+                    raise ValueError("저장된 계정에 다시 로그인하세요.")
         return folder
 
     def wait_stopped(self):
@@ -1314,7 +1314,7 @@ class Accounts:
                 return
             stream.close()
             time.sleep(.25)
-        raise ValueError('仍有桌面实例占用连接，请在电脑端关闭后重试')
+        raise ValueError("데스크톱 인스턴스가 아직 연결을 사용하고 있습니다. 컴퓨터를 닫고 다시 시도하세요.")
 
     def wait_ready(self, app, row=None, *, native_runtime=False):
         end = time.monotonic()+35
@@ -1329,30 +1329,30 @@ class Accounts:
                     from bridge.clients.codex.desktop_runtime import connect
                     client = connect(self.home, self.runtime)
                     if client is None:
-                        raise ValueError('未能确认 Codex 原生共享连接')
+                        raise ValueError('확인할 수 없습니다 Codex 기본 공유 연결')
                     client.close()
                 if row:
                     with ManagedRPC(self.home, self.runtime) as rpc:
                         config = rpc.request('config/read', {'includeLayers': False}).get('config', {})
                         provider = config.get('model_provider') or 'openai'
                         if provider != ('openai' if row['kind'] == 'chatgpt' else 'bridge_api'):
-                            raise ValueError('模型提供商未生效')
+                            raise ValueError("모델 제공자 설정이 적용되지 않았습니다.")
                         if row['kind'] == 'chatgpt':
                             auth = rpc.request('account/read', {'refreshToken': False}).get('account') or {}
                             tokens = read_json(self.home/'auth.json', {}).get('tokens') or {}
                             if auth.get('email') != row.get('email') or token_owner({'tokens': tokens}) != row.get('tokenOwner'):
-                                raise ValueError('账号身份未生效')
+                                raise ValueError("계정 ID가 적용되지 않았습니다.")
                         else:
                             provider_config = (config.get('model_providers') or {}).get('bridge_api') or {}
                             auth = rpc.request('account/read', {'refreshToken': False}).get('account') or {}
                             if (auth.get('type') != 'apiKey' or provider_config.get('base_url') != row['baseUrl']
                                     or config.get('openai_base_url') != row['baseUrl']
                                     or config.get('model') != row['model']):
-                                raise ValueError('API 接入配置未生效')
+                                raise ValueError("API 연결 설정이 적용되지 않았습니다.")
                 return
             except Exception:
                 time.sleep(.5)
-        raise ValueError('未能确认桌面连接和目标账号，请检查电脑端')
+        raise ValueError('데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
 
     def invalidate(self):
         for bridge in [self.bridge, *self.bridge.remote_bridges.values()]:
@@ -1410,13 +1410,13 @@ class Accounts:
             self.phase('applying')
             self.require_managed_writes()
             if self.snapshot_files() != before:
-                raise ValueError('接入配置被外部工具修改，已停止覆盖')
+                raise ValueError('액세스 구성이 외부 도구에 의해 수정되어 덮어쓰기가 중지되었습니다.')
             private_bytes(self.home/'config.toml', (folder/'config.toml').read_bytes())
             backup['writtenConfig'] = base64.b64encode((folder/'config.toml').read_bytes()).decode('ascii')
             private_json(self.root/'rollback.json', backup)
             self.require_managed_writes()
             if self.snapshot_files() != {'config.toml': backup['writtenConfig'], 'auth.json': before['auth.json']}:
-                raise ValueError('接入配置或认证被其他工具修改，已停止覆盖')
+                raise ValueError('액세스 구성 또는 인증이 다른 도구에 의해 수정되어 덮어쓰기가 중지되었습니다.')
             if (folder/'auth.json').is_file():
                 private_bytes(self.home/'auth.json', (folder/'auth.json').read_bytes())
             else:
@@ -1445,13 +1445,13 @@ class Accounts:
                     self.require_managed_writes()
                     expected = backup.get('writtenConfig', before['config.toml'])
                     if self.snapshot_files()['config.toml'] != expected:
-                        raise ValueError('配置已被其他工具修改，禁止覆盖恢复')
+                        raise ValueError('다른 도구에 의해 구성이 수정되었으므로 덮어쓰기 및 복구가 금지됩니다.')
                     self.phase('restoring')
                     app.stop(provider='codex')
                     self.wait_stopped()
                     self.require_managed_writes()
                     if self.snapshot_files()['config.toml'] != expected:
-                        raise ValueError('配置已被其他工具修改，禁止覆盖恢复')
+                        raise ValueError('다른 도구에 의해 구성이 수정되었으므로 덮어쓰기 및 복구가 금지됩니다.')
                     self.restore_files(before)
                     self.invalidate()
                     app.start()
@@ -1460,15 +1460,15 @@ class Accounts:
                         self.mark_active(backup['activeId'])
                     if self.state.get('cliSync', {}).get('status') == 'pending':
                         self.state['cliSync'] = {'status': 'not-applied', 'desktopStatus': 'restored'}
-                    self.phase('restored', error='切换未完成，已恢复原接入；请检查桌面程序或重新登录')
+                    self.phase('restored', error="전환에 실패했습니다. 이전 계정이 복원되었습니다. 데스크톱 앱을 확인하거나 다시 로그인하세요.")
                     (self.root/'rollback.json').unlink(missing_ok=True)
                 except Exception:
                     if self.state.get('cliSync', {}).get('status') == 'pending':
                         self.state['cliSync'] = {'status': 'unknown', 'desktopStatus': 'unknown'}
-                    self.phase('interrupted', error='自动恢复未完成，请在桌面端恢复原接入')
+                    self.phase('interrupted', error="자동 복구에 실패했습니다. 데스크톱 앱에서 이전 계정을 복원하세요.")
             else:
-                message = ('桌面程序未正常退出，请检查系统权限或手动关闭后重试' if self.state.get('phase') == 'stopping'
-                           else '切换未执行，请检查账号登录、配置限制和桌面程序路径')
+                message = ("데스크톱 앱이 닫히지 않았습니다. 시스템 권한을 확인하거나 수동으로 닫은 후 다시 시도하세요." if self.state.get('phase') == 'stopping'
+                           else "전환이 수행되지 않았습니다. 로그인, 구성 제한 및 데스크톱 실행 파일을 확인하세요.")
                 if self.state.get('cliSync', {}).get('status') == 'pending':
                     self.state['cliSync'] = {'status': 'not-applied', 'desktopStatus': 'failed'}
                 self.phase('failed', error=message)
@@ -1478,13 +1478,13 @@ class Accounts:
     def recover(self, value):
         self.require_managed_writes()
         if value.get('confirmed') is not True:
-            raise ValueError('请确认恢复原接入并重启桌面应用')
+            raise ValueError("이전 연결 복원을 확인하고 데스크톱 앱을 다시 시작하세요.")
         with self.gate, self.lock:
             if self.state.get('phase') != 'interrupted':
-                raise ValueError('当前不需要恢复')
+                raise ValueError("복구가 필요하지 않습니다.")
             backup = read_json(self.root/'rollback.json', None)
             if not backup:
-                self.phase('failed', error='未修改接入，请重新发起切换')
+                self.phase('failed', error='액세스가 수정되지 않았습니다. 스위치를 다시 시작하십시오.')
                 return self.desktop_status()
             self.phase('restoring')
             def run():
@@ -1496,7 +1496,7 @@ class Accounts:
                         self.wait_stopped()
                         self.require_managed_writes()
                         if 'writtenConfig' in backup and self.snapshot_files()['config.toml'] not in (backup['writtenConfig'], backup['files']['config.toml']):
-                            raise ValueError('配置已被其他工具修改，禁止覆盖恢复')
+                            raise ValueError('다른 도구에 의해 구성이 수정되었으므로 덮어쓰기 및 복구가 금지됩니다.')
                         self.restore_files(backup['files'])
                         if backup.get('threadsApplying'):
                             # Only older previews wrote thread migrations to this
@@ -1511,7 +1511,7 @@ class Accounts:
                             self.phase('restored', error=None)
                         (self.root/'rollback.json').unlink(missing_ok=True)
                 except Exception:
-                    self.phase('interrupted', error='恢复未完成，请检查桌面程序路径和运行状态')
+                    self.phase('interrupted', error='복구가 완료되지 않았습니다. 데스크톱 프로그램 경로와 실행상태를 확인해주세요.')
             self.thread = threading.Thread(target=run, daemon=True)
             self.thread.start()
             return self.desktop_status()

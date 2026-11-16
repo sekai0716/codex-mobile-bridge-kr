@@ -16,7 +16,7 @@ test('QR clocks exist only for visible live grants and rotated addresses revoke 
   document.hidden=false;listeners.visibilitychange();assert.equal(timers.size,2);
   assert.equal(calls.filter(v=>v.action==='create').length,1);
   const tick=[...timers.values()].find(x=>x.ms===1000);now+=5500;tick.fn();
-  assert.equal(timers.size,0);assert.match(run('entry.status.textContent'),/过期/);
+  assert.equal(timers.size,0);assert.match(run('entry.status.textContent'),/(?:만료됨|QR 코드가 만료되었습니다\. 새로고침하세요\.)/);
   await run('refreshPairing(entry)');assert.equal(timers.size,2);
   run("prunePairing(['https://next.test']);");
   assert.equal(timers.size,0);assert.equal(run('qrEntries.size'),0);

@@ -97,15 +97,15 @@ def status():
         except (OSError, ValueError, AttributeError):
             pass
     if state == 'locked':
-        reason = 'Windows 已锁定；请解锁电脑后重试初始化连接'
+        reason = "Windows가 잠겨 있습니다. 컴퓨터를 잠금 해제한 다음 연결 초기화를 다시 시도하십시오."
     elif state == 'unknown':
-        reason = '无法确认 Windows 桌面状态；请回到电脑桌面后重试初始化连接'
+        reason = "Windows 데스크탑 상태를 확인할 수 없습니다. 컴퓨터 바탕 화면으로 돌아가서 연결 초기화를 다시 시도하십시오."
     elif not active:
-        reason = 'Windows 桌面会话未连接；请恢复电脑桌面后重试初始化连接'
+        reason = "Windows 데스크톱 세션의 연결이 끊어졌습니다. 복원한 다음 연결 초기화를 다시 시도하세요."
     elif interactive is not True:
-        reason = 'Windows 输入桌面不可用；请关闭系统安全提示或恢复桌面后重试初始化连接'
+        reason = "Windows 입력 데스크탑을 사용할 수 없습니다. 시스템 보안 프롬프트를 닫거나 데스크탑을 복원한 후 연결 초기화를 다시 시도하십시오."
     else:
-        reason = 'Windows 桌面已解锁'
+        reason = "Windows 데스크탑 잠금 해제됨"
     return {'state': state, 'interactive': interactive, 'reason': reason}
 
 

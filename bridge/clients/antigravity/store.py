@@ -86,7 +86,7 @@ def _cap_large_fields(step):
     for key in ('content', 'thinking'):
         val = copied.get(key)
         if isinstance(val, str) and len(val) > _MAX_FULL_FIELD_CHARS:
-            copied[key] = val[:_MAX_FULL_FIELD_CHARS] + '\n…（内容过长，已在手机端截断预览）'
+            copied[key] = val[:_MAX_FULL_FIELD_CHARS] + '\n…（내용이 너무 길어서 휴대폰에서 미리보기가 잘렸습니다.）'
     return copied
 
 
@@ -151,7 +151,7 @@ class AntigravityStore:
         title = str(row.get('title') or '').strip()
         if not title:
             preview = extract_user_text(str(row.get('preview') or '')).splitlines()
-            title = (preview[0][:80] if preview and preview[0].strip() else '') or f'聊天 {cid[:8]}'
+            title = (preview[0][:80] if preview and preview[0].strip() else '') or f'채팅 {cid[:8]}'
         updated_at = parse_timestamp(row.get('last_modified_time'))
         active = bool(row.get('not_fully_idle')) or str(row.get('status') or '').endswith('_RUNNING')
         backend = self._backend_for(dir_key, str(row.get('source') or ''))
@@ -225,7 +225,7 @@ class AntigravityStore:
                         'provider': 'antigravity',
                         'host': 'local',
                         'backend': surface['key'],
-                        'title': f'聊天 {cid[:8]}',
+                        'title': f'채팅 {cid[:8]}',
                         'cwd': '',
                         'projectId': f'{surface["key"]}:unassigned',
                         'projectName': surface['name'],
@@ -247,13 +247,13 @@ class AntigravityStore:
             (conversation_id,), strict=True,
         )
         if not rows or rows[0].get('not_fully_idle') is None:
-            raise ValueError('无法核验原生会话是否空闲，请在电脑检查会话')
+            raise ValueError('기본 세션이 유휴 상태인지 확인할 수 없습니다. 컴퓨터에서 세션을 확인하십시오.')
         row = rows[0]
         if row['not_fully_idle'] or str(row.get('status') or '').endswith('_RUNNING'):
             return True
         if str(row.get('status') or '').endswith('_IDLE'):
             return False
-        raise ValueError('无法核验原生会话是否空闲，请在电脑检查会话')
+        raise ValueError('기본 세션이 유휴 상태인지 확인할 수 없습니다. 컴퓨터에서 세션을 확인하십시오.')
 
     def list_tasks(self, surface_root, conversation_id):
         """Return subagent child conversations for AgentsPanel."""
@@ -279,7 +279,7 @@ class AntigravityStore:
                 status = 'failed'
             else:
                 status = 'completed'
-            title = str(row.get('title') or row.get('agent_name') or f'子代理 {cid[:8]}').strip()
+            title = str(row.get('title') or row.get('agent_name') or f'하위 에이전트 {cid[:8]}').strip()
             tasks.append({
                 'id': cid,
                 'title': title,
@@ -292,7 +292,7 @@ class AntigravityStore:
         """Read a reverse-paginated slice of transcript.jsonl with targeted full-line hydration."""
         logs_dir = Path(surface_root) / 'brain' / conversation_id / '.system_generated' / 'logs'
         if not re.fullmatch(r'[0-9a-fA-F-]{36}', conversation_id) or (Path(surface_root)/'brain'/conversation_id).is_symlink():
-            raise ValueError('原生会话路径无效')
+            raise ValueError('잘못된 기본 세션 경로')
         compact_path = logs_dir / 'transcript.jsonl'
         full_path = logs_dir / 'transcript_full.jsonl'
         if not compact_path.is_file():
@@ -308,7 +308,7 @@ class AntigravityStore:
             try:
                 before_index = int(str(before).strip())
             except ValueError as exc:
-                raise ValueError('历史游标格式无效') from exc
+                raise ValueError('기록 커서 형식이 잘못되었습니다.') from exc
 
         steps = []
         with compact_path.open('r', encoding='utf-8', errors='replace') as stream:
@@ -420,34 +420,34 @@ class AntigravityStore:
     def read_image(self, surface_root, conversation_id, source):
         """Re-verify image membership in transcript.jsonl and return base64 bytes + MIME."""
         if not isinstance(source, dict):
-            raise ValueError('图片引用格式无效')
+            raise ValueError('잘못된 이미지 참조 형식')
         target_step = source.get('stepIndex')
         target_media = source.get('mediaIndex')
         if type(target_step) is not int or type(target_media) is not int or target_step < 0 or target_media < 0:
-            raise ValueError('图片索引无效')
+            raise ValueError('잘못된 이미지 인덱스')
         if not re.fullmatch(r'[0-9a-fA-F-]{36}', str(conversation_id or '')):
-            raise ValueError('原生会话路径无效')
+            raise ValueError('잘못된 기본 세션 경로')
         raw_session_dir = Path(surface_root) / 'brain' / conversation_id
         if raw_session_dir.is_symlink():
-            raise ValueError('原生会话路径无效')
+            raise ValueError('잘못된 기본 세션 경로')
         logs_dir = raw_session_dir / '.system_generated' / 'logs'
         compact_path = logs_dir / 'transcript.jsonl'
         full_path = logs_dir / 'transcript_full.jsonl'
         if not compact_path.is_file() and not full_path.is_file():
-            raise ValueError('找不到原始会话记录')
+            raise ValueError('원래 세션 기록을 찾을 수 없습니다.')
 
         uri = self._extract_image_uri(compact_path, target_step, target_media) if compact_path.is_file() else None
         if not uri and full_path.is_file():
             uri = self._extract_image_uri(full_path, target_step, target_media)
 
         if not uri:
-            raise ValueError('图片不在该会话历史记录中')
+            raise ValueError('이미지가 이 세션 기록에 없습니다.')
         raw_path = local_file_path(uri) if uri.startswith('file://') else uri
         raw_candidate = Path(raw_path)
         if not raw_candidate.is_absolute() or '..' in raw_candidate.parts:
-            raise ValueError('原始图片不在当前会话或项目目录中')
+            raise ValueError('원본 이미지가 현재 세션이나 프로젝트 디렉터리에 없습니다.')
         if raw_candidate.is_symlink():
-            raise ValueError('不允许预览符号链接图片')
+            raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
         image_path = raw_candidate.resolve()
         session_dir = raw_session_dir.resolve()
         surface_key = next((r['key'] for r in self.surfaces() if r['root'] == Path(surface_root)), 'app')
@@ -459,7 +459,7 @@ class AntigravityStore:
         matched = [(raw_root, resolved_root) for raw_root, resolved_root in allowed_pairs
                    if resolved_root == image_path or resolved_root in image_path.parents]
         if not matched:
-            raise ValueError('原始图片不在当前会话或项目目录中')
+            raise ValueError('원본 이미지가 현재 세션이나 프로젝트 디렉터리에 없습니다.')
         verified_lexical = False
         for raw_root, resolved_root in matched:
             for base in (raw_root, resolved_root):
@@ -471,22 +471,22 @@ class AntigravityStore:
                 for part in rel.parts:
                     cur = cur / part
                     if cur.is_symlink():
-                        raise ValueError('不允许预览符号链接图片')
+                        raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
                 verified_lexical = True
                 break
             if verified_lexical:
                 break
         if not verified_lexical:
-            raise ValueError('不允许预览符号链接图片')
+            raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
         if not image_path.is_file():
-            raise ValueError('原始图片文件已移除或不可读')
+            raise ValueError('원본 이미지 파일이 제거되었거나 읽을 수 없습니다.')
         size = image_path.stat().st_size
         if not 0 < size <= MAX_FILE:
-            raise ValueError('图片大小超出预览限制')
+            raise ValueError('이미지 크기가 미리보기 제한을 초과합니다.')
         raw = image_path.read_bytes()
         mime = image_type(raw)
         if not mime:
-            raise ValueError('不支持的图片格式')
+            raise ValueError('지원되지 않는 이미지 형식')
         return {
             'data': base64.b64encode(raw).decode('ascii'),
             'mediaType': mime,

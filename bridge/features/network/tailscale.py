@@ -32,16 +32,16 @@ def command_json(binary, arguments):
                                 encoding='utf-8', errors='replace', timeout=8,
                                 **({'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}))
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise ValueError('无法连接 Tailscale，请打开客户端并检查系统网络权限。') from exc
+        raise ValueError("Tailscale에 연결할 수 없습니다. 클라이언트를 열고 시스템 네트워크 권한을 확인하십시오.") from exc
     try:
         value = json.loads(result.stdout)
         if not isinstance(value, dict):
             raise ValueError()
     except (ValueError, TypeError) as exc:
         # CLI output can contain account details and login URLs; do not relay it.
-        raise ValueError('无法读取 Tailscale 状态，请更新官方客户端并完成登录。') from exc
+        raise ValueError("Tailscale 상태를 읽을 수 없습니다. 공식 클라이언트를 업데이트하고 로그인하세요.") from exc
     if result.returncode and not value.get('BackendState'):
-        raise ValueError('无法读取 Tailscale 状态，请更新官方客户端并完成登录。')
+        raise ValueError("Tailscale 상태를 읽을 수 없습니다. 공식 클라이언트를 업데이트하고 로그인하세요.")
     return value
 
 
@@ -61,7 +61,7 @@ def authorization_url(value):
 def device_url(status, port):
     host = status.get('Self', {}).get('DNSName', '').rstrip('.').lower()
     if not re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net', host):
-        raise ValueError('Tailscale 尚未提供固定域名，请启用 MagicDNS 并完成登录。')
+        raise ValueError("Tailscale가 호스트 이름을 제공하지 않았습니다. MagicDNS를 활성화하고 로그인하세요.")
     return 'https://' + host + (':' + str(port) if port != 443 else '')
 
 
@@ -107,7 +107,7 @@ def desired_route(entry, backend_port):
     host = (public.hostname or '').rstrip('.').lower()
     port = entry.get('tailscalePort')
     if not host or type(port) is not int:
-        raise ValueError('Tailscale 固定地址无效，请重新检测并保存连接配置。')
+        raise ValueError('Tailscale 고정 주소가 잘못되었습니다. 연결 구성을 다시 확인하고 저장하세요.。')
     return ((host, port), f'http://127.0.0.1:{backend_port}',
             entry.get('tailscaleMode') == 'funnel')
 
@@ -142,25 +142,25 @@ def inspect(entry):
     binary = executable()
     if not binary:
         return {'state': 'missing', 'available': False,
-                'message': '未找到 Tailscale，请先安装官方客户端并完成登录。'}
+                'message': "Tailscale를 찾을 수 없습니다. 공식 클라이언트를 설치하고 먼저 로그인하세요."}
     status = command_json(binary, ['status', '--json'])
     version = str(status.get('Version', ''))
     match = re.match(r'(\d+)\.(\d+)', version)
     if not match or tuple(map(int, match.groups())) < (1, 52):
-        raise ValueError('请更新 Tailscale 至 1.52 或更高版本。')
+        raise ValueError("Tailscale를 버전 1.52 이상으로 업데이트하세요.")
     if status.get('BackendState') != 'Running':
         return {'state': 'login', 'available': True, 'version': version,
                 'authUrl': authorization_url(status.get('AuthURL', '')),
-                'message': '请在 Tailscale 客户端完成登录并开启连接，然后重新检测。'}
+                'message': "Tailscale에 로그인하고 연결한 후 다시 검색하세요."}
     node = status.get('Self') or {}
     if node.get('KeyExpired'):
-        raise ValueError('Tailscale 设备授权已过期，请重新登录。')
+        raise ValueError("Tailscale 장치 인증이 만료되었습니다. 다시 로그인하세요.")
     node_id = node.get('ID', '')
     if not isinstance(node_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', node_id):
-        raise ValueError('无法读取 Tailscale 设备身份，请更新官方客户端并完成登录。')
+        raise ValueError("Tailscale 장치 ID를 읽을 수 없습니다. 공식 클라이언트를 업데이트하고 로그인하세요.")
     return {'state': 'ready', 'available': True, 'version': version,
             'url': device_url(status, entry.get('tailscalePort', 443)), 'nodeId': node_id,
-            'message': '已读取 Tailscale 固定地址。保存配置后启动网关，再检测固定入口。'}
+            'message': "Tailscale URL가 감지되었습니다. 저장하고 게이트웨이를 시작한 다음 고정된 항목을 확인하십시오."}
 
 
 def require_identity(entry):
@@ -168,7 +168,7 @@ def require_identity(entry):
     if state['state'] != 'ready':
         raise ValueError(state['message'])
     if state['url'] != entry.get('publicUrl') or state['nodeId'] != entry.get('tailscaleNodeId'):
-        raise ValueError('Tailscale 账号或设备地址已变化，请重新检测并保存连接配置。')
+        raise ValueError("Tailscale 계정 또는 장치 주소가 변경되었습니다. 연결을 다시 감지하고 저장하십시오.")
     return state
 
 
@@ -243,7 +243,7 @@ class TailscaleTunnel:
                 conflicts = 0
                 failures += 1
                 interval = self.ROUTE_RECHECK_INTERVAL
-                self.status('retrying', 'Tailscale 入口暂时不可用，正在重新检查…')
+                self.status('retrying', 'Tailscale 일시적으로 입구를 폐쇄하여 재점검 중입니다.…')
                 if failures >= self.ROUTE_FAILURE_LIMIT:
                     return 'retry'
                 continue
@@ -251,17 +251,17 @@ class TailscaleTunnel:
             if state == 'same':
                 conflicts = 0
                 interval = self.ROUTE_CHECK_INTERVAL
-                self.status('connected', 'Tailscale 固定入口已启动并保持连接。')
+                self.status('connected', 'Tailscale 고정 포털이 시작되어 연결 상태를 유지함。')
             elif state == 'none':
-                self.status('retrying', 'Tailscale 固定入口已丢失，正在重新建立…')
+                self.status('retrying', 'Tailscale 고정 항목이 손실되어 다시 설정되는 중입니다.…')
                 return 'retry'
             else:
                 conflicts += 1
                 interval = self.ROUTE_RECHECK_INTERVAL
                 if conflicts >= self.ROUTE_FAILURE_LIMIT:
-                    self.status('blocked', '此 Tailscale 端口已被其他服务使用，请选择其他端口；不会覆盖已有配置。')
+                    self.status('blocked', "다른 서비스에서는 이 Tailscale 포트를 사용합니다. 다른 포트를 선택하십시오. 기존 설정은 덮어쓰이지 않습니다.")
                     return 'blocked'
-                self.status('retrying', 'Tailscale 入口状态有变化，正在重新核对…')
+                self.status('retrying', 'Tailscale 입력상태가 변경되어 재확인 중입니다.…')
         return 'stopped' if self.stopped.is_set() else 'retry'
 
     def _read(self, process):
@@ -272,9 +272,9 @@ class TailscaleTunnel:
                 urls = re.findall(r'https://[^\s<>"\x1b]+', line)
                 auth_url = next((authorization_url(url) for url in urls if authorization_url(url)), '')
                 if auth_url:
-                    self.status('authorization', '请完成 Tailscale HTTPS 或 Funnel 授权，完成后会继续连接。', auth_url)
+                    self.status('authorization', "계속 연결하려면 Tailscale HTTPS 또는 유입경로 인증을 완료하세요.", auth_url)
                 elif 'Available on the internet' in line or 'Available within your tailnet' in line:
-                    self.status('connected', 'Tailscale 入口已启动，请检测固定入口并用手机验证。')
+                    self.status('connected', "Tailscale 항목이 시작되었습니다. 고정된 항목을 확인하고 휴대폰에서 인증하세요.")
                     self.ready.set()
                     self.wake.set()
         finally:
@@ -287,7 +287,7 @@ class TailscaleTunnel:
     def _run(self):
         delay = 3
         while not self.stopped.is_set():
-            self.status('connecting', '正在建立 Tailscale 固定入口…')
+            self.status('connecting', "Tailscale 고정 항목을 시작하는 중…")
             process = None
             reader = None
             result = 'retry'
@@ -300,11 +300,11 @@ class TailscaleTunnel:
                 config = command_json(binary, ['serve', 'status', '--json'])
                 state = route_state(config, self.entry, self.port, self.target_validator)
                 if state == 'other':
-                    self.status('blocked', '此 Tailscale 端口已被其他服务使用，请选择其他端口；不会覆盖已有配置。')
+                    self.status('blocked', "다른 서비스에서는 이 Tailscale 포트를 사용합니다. 다른 포트를 선택하십시오. 기존 설정은 덮어쓰이지 않습니다.")
                     return
                 if state == 'same':
                     delay = 3
-                    self.status('connected', 'Tailscale 固定入口已接管并保持连接。')
+                    self.status('connected', '기존 Tailscale 고정 접속 경로를 사용하며 연결 상태를 확인합니다.')
                     result = self._monitor_adopted(binary)
                 else:
                     # Foreground sessions are removed by tailscaled when this CLI
@@ -324,7 +324,7 @@ class TailscaleTunnel:
                     result = self._monitor_process(process, binary)
             except (OSError, ValueError) as exc:
                 if not self.stopped.is_set():
-                    self.status('retrying', str(exc) if isinstance(exc, ValueError) else 'Tailscale 入口已断开，正在重试。')
+                    self.status('retrying', str(exc) if isinstance(exc, ValueError) else "Tailscale 항목의 연결이 끊어졌습니다. 재시도 중입니다.")
             finally:
                 if process:
                     self._terminate(process)
@@ -341,7 +341,7 @@ class TailscaleTunnel:
             if self.stopped.is_set():
                 break
             if self.last_status and self.last_status['state'] in ('connected', 'connecting', 'authorization'):
-                self.status('retrying', 'Tailscale 入口未保持连接，请检查客户端、网络及 Funnel 授权。')
+                self.status('retrying', "Tailscale 항목이 연결을 유지하지 못했습니다. 클라이언트, 네트워크 및 유입경로 인증을 확인하세요.")
             if self.connected.is_set():
                 delay = 3
             self.retry_wake.wait(delay)
@@ -370,4 +370,4 @@ class TailscaleTunnel:
             self.thread.join(timeout=20)
         if self.reader and self.reader is not threading.current_thread():
             self.reader.join(timeout=3)
-        self.status('stopped', 'Tailscale 固定入口已停止')
+        self.status('stopped', "Tailscale 고정 항목이 중지되었습니다.")

@@ -9,7 +9,7 @@ final class EventClient {
  static final String USER_AGENT="BridgeMobile/0.1-Android";
  static final int POLL_SECONDS=60;
  static final class AuthenticationRequired extends IOException {
-  AuthenticationRequired(){super("登录已失效，请重新连接电脑");}
+  AuthenticationRequired(){super("로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.");}
  }
  static final class HttpFailure extends IOException {
   final int status;
@@ -48,7 +48,7 @@ final class EventClient {
   return read(origin,after,pending,null,null);
  }
  static JSONObject read(String origin,Long after,Read pending,String stream,String revision)throws Exception {
-  if(!GatewayURL.origin(origin).equals(origin))throw new IOException("连接地址无效");
+  if(!GatewayURL.origin(origin).equals(origin))throw new IOException("잘못된 연결 주소");
   String cookie=CookieManager.getInstance().getCookie(origin+"/"),binding=sessionCookie(cookie,origin);if(binding.isEmpty())throw new AuthenticationRequired();
   boolean waiting=after!=null&&stream!=null&&revision!=null;
   String query=after==null?"":"?after="+Math.max(0,after);
@@ -58,8 +58,8 @@ final class EventClient {
   try{if(pending!=null)pending.attach(c);int code=c.getResponseCode();if(code==401)throw new AuthenticationRequired();if(code!=200)throw new HttpFailure(code);
    if(pending!=null)pending.check();
    renew(c,origin,cookie);
-   ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(pending!=null)pending.check();if(out.size()+n>512000)throw new IOException("通知数据过大");out.write(b,0,n);}}
-   if(pending!=null){pending.check();if(!tokenValue(binding).equals(tokenValue(sessionCookie(CookieManager.getInstance().getCookie(origin+"/"),origin))))throw new IOException("登录已失效，请重新连接电脑");}
+   ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(pending!=null)pending.check();if(out.size()+n>512000)throw new IOException("알림 데이터가 너무 큽니다.");out.write(b,0,n);}}
+   if(pending!=null){pending.check();if(!tokenValue(binding).equals(tokenValue(sessionCookie(CookieManager.getInstance().getCookie(origin+"/"),origin))))throw new IOException("로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.");}
    return new JSONObject(out.toString("UTF-8"));
   }finally{if(pending!=null)pending.detach();c.disconnect();}
  }
@@ -73,13 +73,13 @@ final class EventClient {
   prefs.edit().putBoolean("pushRegistered:"+origin,true).apply();
  }
  static JSONObject request(String origin,String path,JSONObject body,String csrf)throws Exception {
-  if(!GatewayURL.origin(origin).equals(origin))throw new IOException("连接地址无效");
+  if(!GatewayURL.origin(origin).equals(origin))throw new IOException("잘못된 연결 주소");
   HttpURLConnection c=(HttpURLConnection)new URL(origin+path).openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(7000);c.setReadTimeout(10000);
   String cookie=CookieManager.getInstance().getCookie(origin+"/");if(cookie!=null)c.setRequestProperty("Cookie",cookie);c.setRequestProperty("Origin",GatewayURL.httpOrigin(origin));c.setRequestProperty("User-Agent",USER_AGENT);
   try{if(body!=null){c.setRequestMethod("POST");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json");c.setRequestProperty("X-CSRF-Token",csrf);try(OutputStream out=c.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}}
-   if(c.getResponseCode()!=200)throw new IOException("电脑未配置系统推送，或登录已失效");
+   if(c.getResponseCode()!=200)throw new IOException("컴퓨터가 시스템 푸시용으로 구성되지 않았거나 로그인이 만료되었습니다.");
    renew(c,origin,cookie);
-   ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1){if(out.size()+n>65536)throw new IOException("响应过大");out.write(b,0,n);}}JSONObject result=new JSONObject(out.toString("UTF-8"));if("/api/auth".equals(path))setName(origin,result.optString("cookieName",null));return result;
+   ByteArrayOutputStream out=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1){if(out.size()+n>65536)throw new IOException("응답이 너무 큼");out.write(b,0,n);}}JSONObject result=new JSONObject(out.toString("UTF-8"));if("/api/auth".equals(path))setName(origin,result.optString("cookieName",null));return result;
   }finally{c.disconnect();}
  }
 

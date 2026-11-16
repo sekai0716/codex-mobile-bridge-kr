@@ -10,7 +10,7 @@ async function runNativeControlsChecks(){
  usage.update({...state,connected:false});check(button.disabled,'stale context cannot compact');
  usage.update(state);button.click();await Promise.resolve();await Promise.resolve();check(compactCalls===1,'single compaction dispatch');usage.dispose();
  const tab={id:'agents',body:document.createElement('div')};document.body.append(tab.body);
- let stops=[],reads=0;const tasks=[{id:'one',title:'后台任务的较长标题用于检查窄屏显示',status:'running',cancellable:true},{id:'done',title:'Completed task',status:'resultPending',cancellable:false}];
+ let stops=[],reads=0;const tasks=[{id:'one',title:'좁은 화면 표시를 확인하기 위한 백그라운드 작업의 제목이 길어졌습니다.',status:'running',cancellable:true},{id:'done',title:'Completed task',status:'resultPending',cancellable:false}];
  const workbench={node:(tag,cls='',text='')=>{const n=document.createElement(tag);n.className=cls;n.textContent=text;return n;},button:(text,fn)=>{const n=document.createElement('button');n.textContent=text;n.onclick=fn;return n;},request:async url=>{reads++;check(url.includes('/zcode/tasks?sessionId=fixture'),'shared panel uses scoped native task route');return {tasks};},isVisible:()=>false,notify(){},stopTask:async(session,id)=>{stops.push([session.id,id]);tasks[0].cancellable=false;return {status:'accepted'};}};
  const panel=new AgentsPanel(workbench,{provider:'zcode',id:'fixture'},tab);await Promise.resolve();await Promise.resolve();
  check(panel.list.querySelectorAll('button').length===1,'only cancellable task has stop');

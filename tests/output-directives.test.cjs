@@ -21,7 +21,7 @@ test('complete directives consume escaped quotes and multiline source exactly',(
   assert.equal(directives.read('::code-comment{title="T" body="'+'x'.repeat(65536)+'" file="/a"}'),null);
   assert.equal(directives.read(String.raw`::code-comment{title="T" body="B" file="C:\foo\bar.py"}`).attributes.file,String.raw`C:\foo\bar.py`);
   assert.equal(result.end,source.length);
-  assert.equal(directives.read(':codex-followup[继续]{prompt="保留草稿"}').attributes.prompt,'保留草稿');
+  assert.equal(directives.read(':codex-followup[계속하다]{prompt="초안을 유지하다"}').attributes.prompt,'초안을 유지하다');
 });
 test('partial streams and malformed attributes stay inert',()=>{
   const complete='::code-comment{title="T" body="B" file="/a" start=1}';
@@ -62,7 +62,7 @@ test('cards use authorized file URLs and followups dispatch prompt without sendi
   assert.equal(api.create({...item,attributes:{...item.attributes,title:'[P2] Keep draft'}},()=>null).children[0].textContent,'[P2] Keep draft');
   assert.equal(api.create({...item,attributes:{...item.attributes,title:'[P1] Keep draft'}},()=>null).children[0].textContent,'[P2] [P1] Keep draft');
   assert.equal(unknown.children[2].tag,'span');
-  assert.equal(unknown.children[3].textContent,'EN 复制批注源码');
+  assert.equal(unknown.children[3].textContent,'EN 리뷰 소스 복사');
   assert.equal(unknown.children[1].textContent,'<script>literal</script>');
   const known=api.create(item,()=>({url:'/api/authorized/file'}));
   assert.equal(known.children[2].href,'/api/authorized/file');

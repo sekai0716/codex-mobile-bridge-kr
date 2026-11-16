@@ -8,7 +8,7 @@ for(const paired of [false,true])test('optional official service starts after th
     constructor(){this.serviceAvailable=false;}
     start(){calls.push('official');return new Promise((_resolve,reject)=>{rejectStart=reject;});}
   }
-  const app={requestSingleInstanceLock:()=>true,whenReady:()=>({then(fn){ready=fn;}}),on(){},getLocale:()=> 'zh-CN',getPath:()=>'/fixture',isPackaged:false};
+  const app={requestSingleInstanceLock:()=>true,whenReady:()=>({then(fn){ready=fn;}}),on(){},getLocale:()=> 'ko-KR',getPath:()=>'/fixture',isPackaged:false};
   const context=vm.createContext({__dirname:path.dirname(main),process:{env:{},platform:'linux'},calls,
     require(name){
       if(name==='electron')return {app};

@@ -15,24 +15,24 @@ const row=(id,kind='account',usage)=>({id,name:id,kind,usage});
 const snapshot=(accounts,activeIds=['current'])=>({accounts,activeId:activeIds[0],activeIds,current:{name:'Current desktop access'},canSwitch:true});
 test('native read-only accounts keep login guidance visible and do not imply saved copies',()=>{
   const ui=fixture({desktop:true,provider:'antigravity'});
-  ui.panel.accept({...snapshot([{id:'app',name:'APP · Fixture',kind:'official',saved:false}],['app']),readOnly:true,canSwitch:false,canImport:false,capabilities:{quota:false,addApi:false},enrollmentHint:'在对应原客户端登录后刷新。'});
-  assert.equal(ui.panel.heading.textContent,'当前接入');assert.equal(ui.panel.hint.parentNode,ui.root);
+  ui.panel.accept({...snapshot([{id:'app',name:'APP · Fixture',kind:'official',saved:false}],['app']),readOnly:true,canSwitch:false,canImport:false,capabilities:{quota:false,addApi:false},enrollmentHint:'원래 클라이언트에 로그인한 뒤 새로고침하세요.'});
+  assert.equal(ui.panel.heading.textContent,'현재 계정');assert.equal(ui.panel.hint.parentNode,ui.root);
   assert.equal(ui.panel.scanDetails.hidden,true);assert.equal(ui.panel.apiDetails.hidden,true);
   const all=node=>[node,...node.children.flatMap(all)];
-  assert.equal(all(ui.panel.rows).some(node=>node.textContent==='尚未保存'),false);
-  assert.equal(all(ui.panel.rows).filter(node=>node.tag==='button').some(node=>!node.disabled&&node.textContent==='切换到此接入'),false);
-  assert.match(ui.panel.hint.textContent,/原客户端/);
+  assert.equal(all(ui.panel.rows).some(node=>node.textContent==='저장 안 됨'),false);
+  assert.equal(all(ui.panel.rows).filter(node=>node.tag==='button').some(node=>!node.disabled&&node.textContent==='이 계정으로 전환'),false);
+  assert.match(ui.panel.hint.textContent,/원래 클라이언트/);
 });
 test('account model groups retain unavailable source labels beside working models',async()=>{
   const ui=fixture({provider:'antigravity'});ui.panel.accept(snapshot([]));
-  ui.setHandler(async()=>({models:[],modelError:'APP 暂不可用',groups:[{label:'APP',models:[],notice:'原客户端模型暂不可用'},{label:'CLI',models:[{id:'cli-model'}]}]}));
+  ui.setHandler(async()=>({models:[],modelError:'APP 아직 사용할 수 없음',groups:[{label:'APP',models:[],notice:'원래 클라이언트 모델을 일시적으로 사용할 수 없습니다.'},{label:'CLI',models:[{id:'cli-model'}]}]}));
   await ui.panel.toggleModels();
-  assert.match(ui.text(),/APP · 可用模型/);assert.match(ui.text(),/原客户端模型暂不可用/);assert.match(ui.text(),/cli-model/);
+  assert.match(ui.text(),/APP · 사용 가능한 모델/);assert.match(ui.text(),/원래 클라이언트 모델을 일시적으로 사용할 수 없습니다./);assert.match(ui.text(),/cli-model/);
 });
 test('shared account switching explains native scope and cannot select unsaved identities',async()=>{
   const ui=fixture({provider:'antigravity',desktop:true});
   const saved={...row('saved'),saved:true},native={...row('native'),saved:false,canSwitch:false};
-  const value={...snapshot([saved,native],[]),capabilities:{addApi:false,quota:false,switchRequiresStopped:true},switchConfirmation:'正常退出 APP、CLI、IDE 后应用共同登录。'};
+  const value={...snapshot([saved,native],[]),capabilities:{addApi:false,quota:false,switchRequiresStopped:true},switchConfirmation:'정상적으로 종료 APP、CLI、IDE 앱 후 공동 로그인。'};
   ui.panel.accept(value);ui.setHandler(async()=>value);
   await ui.panel.choose(native);assert.equal(ui.calls.length,0);assert.equal(ui.prompts.length,0);
   await ui.panel.choose(saved);assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].action,'switch');
@@ -43,7 +43,7 @@ test('official account names remain editable when API enrollment is unsupported'
   ui.panel.accept({...snapshot([saved],[]),capabilities:{addApi:false,quota:false}});
   ui.setHandler(async()=>({id:'saved',name:'Saved account'}));await ui.panel.editAccount(saved);
   assert.equal(ui.panel.apiDetails.hidden,false);assert.equal(ui.panel.editor.hidden,false);
-  assert.equal(ui.panel.addApiButton.textContent,'编辑');assert.equal(ui.panel.editKey.wrap.hidden,true);
+  assert.equal(ui.panel.addApiButton.textContent,'편집');assert.equal(ui.panel.editKey.wrap.hidden,true);
   ui.panel.closeEditor();assert.equal(ui.panel.apiDetails.hidden,true);
 });
 test('native API editors share Codex fold placement and fetch models before saving',async()=>{
@@ -77,13 +77,13 @@ test('draft model responses cannot refill canceled or replaced native API editor
 });
 test('account management action uses one reusable slot without moving the saved account cards',()=>{
   const ui=fixture({provider:'zcode'});ui.panel.accept(snapshot([row('current')]));const cards=ui.panel.rows,button=ui.panel.managementButton;let clicked=0;
-  ui.panel.setManagementAction({label:'连接方式',description:'当前：官方远控',onClick:()=>clicked++});assert.equal(ui.panel.rows,cards);assert.equal(ui.panel.managementSlot.hidden,false);button.onclick();assert.equal(clicked,1);
-  ui.panel.setManagementAction({label:'连接方式',disabled:true});assert.equal(ui.panel.managementButton,button);assert.equal(button.disabled,true);ui.panel.setManagementAction(null);assert.equal(ui.panel.managementSlot.hidden,true);
+  ui.panel.setManagementAction({label:'사이',description:'현재: 공식 원격 제어',onClick:()=>clicked++});assert.equal(ui.panel.rows,cards);assert.equal(ui.panel.managementSlot.hidden,false);button.onclick();assert.equal(clicked,1);
+  ui.panel.setManagementAction({label:'사이',disabled:true});assert.equal(ui.panel.managementButton,button);assert.equal(button.disabled,true);ui.panel.setManagementAction(null);assert.equal(ui.panel.managementSlot.hidden,true);
 });
 test('ZCode API editor reuses shared form and sends native protocol plus URL and models without applying',async()=>{
   const ui=fixture({provider:'zcode',desktop:true});
   const value={...snapshot([]),capabilities:{addApi:true,quota:false,apiFormats:[{value:'anthropic-messages',label:'Anthropic Messages'},{value:'openai-chat-completions',label:'OpenAI Chat Completions'},{value:'openai-responses',label:'OpenAI Responses'}],switchRequiresStopped:true}};
-  ui.panel.accept(value);assert.equal(ui.panel.addApiButton.textContent,'添加 API 接入');ui.panel.addApiButton.onclick();
+  ui.panel.accept(value);assert.equal(ui.panel.addApiButton.textContent,'API 연결 추가');ui.panel.addApiButton.onclick();
   assert.equal(ui.panel.editUrl.wrap.hidden,false);assert.equal(ui.panel.editModels.wrap.hidden,false);assert.equal(ui.panel.apiFormatWrap.hidden,false);assert.equal(ui.panel.authWrap.hidden,true);
   assert.equal(ui.panel.editApiFormat.children.length,3);assert.equal(ui.panel.editApiFormat.value,'anthropic-messages');
   ui.panel.editName.input.value='Local API';ui.panel.editUrl.input.value='http://127.0.0.1:9999/v1';ui.panel.editApiFormat.value='openai-responses';ui.panel.editKey.input.value='fixture-key';ui.panel.editModels.input.value='first\nsecond';
@@ -96,22 +96,22 @@ test('ZCode API editor reuses shared form and sends native protocol plus URL and
 test('ZCode API applied state is distinct from official login and selecting a model',async()=>{
   const ui=fixture({provider:'zcode',desktop:true});
   const value={...snapshot([{...row('official','official'),saved:true},{...row('draft','api'),saved:true},{...row('applied','api'),saved:true}],['official','applied']),capabilities:{apiFormats:[{value:'openai-responses',label:'OpenAI Responses'}],switchRequiresStopped:true,quota:false}};
-  ui.panel.accept(value);assert.match(ui.text(),/已配置/);assert.match(ui.text(),/待应用/);assert.match(ui.text(),/应用配置/);
-  const applied=ui.panel.rows.children.find(card=>card.accountRowId==='applied');assert.equal(applied.children[0].children[0].children[0].children[1].textContent,'已配置');
+  ui.panel.accept(value);assert.match(ui.text(),/구성됨/);assert.match(ui.text(),/적용되지 않음/);assert.match(ui.text(),/구성 적용/);
+  const applied=ui.panel.rows.children.find(card=>card.accountRowId==='applied');assert.equal(applied.children[0].children[0].children[0].children[1].textContent,'구성됨');
   ui.setHandler(async()=>value);await ui.panel.choose(row('draft','api'));
-  assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].action,'switch');assert.match(ui.prompts[0],/正常退出原 App/);assert.match(ui.prompts[0],/选择对应模型/);assert.doesNotMatch(ui.prompts[0],/切换会重启/);
+  assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].action,'switch');assert.match(ui.prompts[0],/이 저장된 구성을 적용하기 전에 전화 액세스를 비활성화하고 원래 앱을 정상적으로 종료하십시오\. API 구성은 공식 로그인을 유지합니다\. 다시 시작한 후 채팅에서 해당 모델을 선택하십시오\. 구성을 적용하시겠습니까\?/);assert.match(ui.prompts[0],/이 저장된 구성을 적용하기 전에 전화 액세스를 비활성화하고 원래 앱을 정상적으로 종료하십시오\. API 구성은 공식 로그인을 유지합니다\. 다시 시작한 후 채팅에서 해당 모델을 선택하십시오\. 구성을 적용하시겠습니까\?/);assert.doesNotMatch(ui.prompts[0],/스위치가 다시 시작됩니다/);
 });
 test('manual DSH account state hides editing and restores official controls after unbinding',()=>{
  const ui=fixture({desktop:true});ui.panel.openEditor({api:{}});
  ui.panel.accept({...snapshot([]),readOnly:true,canImport:false,canSwitch:false});
  assert.equal(ui.panel.editor.hidden,true);assert.equal(ui.panel.apiDetails.hidden,true);assert.equal(ui.panel.scanDetails.hidden,true);
- assert.match(ui.panel.hint.textContent,/第三方客户端/);assert.equal(ui.panel.modelsButton.hidden,false);
+ assert.match(ui.panel.hint.textContent,/바인딩된 타사 클라이언트에서 계정 및 API를 관리합니다\./);assert.equal(ui.panel.modelsButton.hidden,false);
  ui.panel.accept(snapshot([]));assert.equal(ui.panel.apiDetails.hidden,false);assert.equal(ui.panel.scanDetails.hidden,false);
 });
 test('multiple native active connections are first and cannot be switched again',()=>{
   const ui=fixture();ui.panel.accept(snapshot([row('other'),row('api','api'),row('current')],['current','api']));
   assert.deepEqual(ui.panel.rows.children.map(card=>card.children[0].children[0].children[0].children[0].textContent),['api','current','other']);
-  const buttons=ui.all().filter(node=>node.tag==='button'&&['当前接入','切换到此接入'].includes(node.textContent));assert.deepEqual(buttons.map(button=>button.disabled),[true,true,false]);
+  const buttons=ui.all().filter(node=>node.tag==='button'&&['현재 계정','이 계정으로 전환'].includes(node.textContent));assert.deepEqual(buttons.map(button=>button.disabled),[true,true,false]);
   ui.panel.choose(row('api'));assert.equal(ui.prompts.length,0);ui.panel.value.canSwitch=false;ui.panel.choose(row('other'));assert.equal(ui.prompts.length,0);
 });
 test('first visible visit queries automatically; manual quota query resets the five minute clock',async()=>{
@@ -133,23 +133,23 @@ test('Claude list, timer, and return visits only read saved quota snapshots',asy
   const ui=fixture({provider:'claude'});ui.setValue(snapshot([row('current'),row('saved')]));
   await ui.panel.resume();await ui.advance(300000);ui.setVisible(false);await ui.advance(300000);ui.setVisible(true);await ui.panel.resume();
   assert.deepEqual(ui.calls.map(call=>call.action),['list','list','list']);
-  assert.match(ui.text(),/尚未查询/);
+  assert.match(ui.text(),/아직 쿼리되지 않음/);
   ui.english();assert.match(ui.text(),/Not queried yet/);
 });
 test('Claude explicit quota query is single-flight and failed refresh keeps the last success time',async()=>{
   const ui=fixture({provider:'claude'}),saved={status:'ready',checkedAt:1000,limits:[{name:'5h',windows:[{remainingPercent:70}]}]};
-  ui.panel.accept(snapshot([row('current','account',saved)]));assert.match(ui.text(),/查询时间：/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
+  ui.panel.accept(snapshot([row('current','account',saved)]));assert.match(ui.text(),/쿼리 위치:/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
   const card=ui.panel.rows.children[0],controls=card.children.find(n=>n.className==='accounts-card-footer').children.at(-1);
-  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'查看剩余额度');
-  assert.match(controls.children[0].textContent,/查询时间：/);assert.equal(card.children[1].children[1].children.some(node=>node.className==='account-updated'),false);
+  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'남은 할당량 보기');
+  assert.match(controls.children[0].textContent,/쿼리 위치:/);assert.equal(card.children[1].children[1].children.some(node=>node.className==='account-updated'),false);
   let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));
-  const button=ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='查看剩余额度');const pending=button.onclick();
+  const button=ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 할당량 보기');const pending=button.onclick();
   assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].refresh,true);
-  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='查询中…').disabled,true);
+  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='확인 중…').disabled,true);
   await ui.panel.perform({action:'details',id:'current',refresh:true});assert.equal(ui.calls.length,1);
-  finish(snapshot([row('current','account',{...saved,status:'error',error:'无法查询 Claude 剩余额度，请确认客户端登录有效并解锁系统凭据存储后重试'})]));await pending;
-  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='查看剩余额度').disabled,false);
-  assert.match(ui.text(),/70%/);assert.match(ui.text(),/无法查询 Claude 剩余额度/);assert.match(ui.text(),/保留上次结果/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
+  finish(snapshot([row('current','account',{...saved,status:'error',error:'Claude 남은 사용량을 확인할 수 없습니다. 클라이언트가 로그인되어 있는지 확인하고 시스템 자격 증명 저장소를 잠금 해제한 후 다시 시도하십시오.'})]));await pending;
+  assert.equal(ui.all().find(node=>node.tag==='button'&&node.attributes['aria-label']==='남은 할당량 보기').disabled,false);
+  assert.match(ui.text(),/70%/);assert.match(ui.text(),/Claude 남은 사용량을 확인할 수 없습니다\. 클라이언트가 로그인되어 있는지 확인하고 시스템 자격 증명 저장소를 잠금 해제한 후 다시 시도하십시오\./);assert.match(ui.text(),/마지막 결과를 표시합니다\. 데이터가 업데이트되지 않았습니다/);assert.match(ui.text(),/1970-01-01 \d\d:16/);
   ui.english();assert.match(ui.text(),/Queried at: /);assert.match(ui.text(),/Showing the last result/);assert.match(ui.text(),/Cannot check Claude remaining usage/);
 });
 test('Claude quota button shows an English pending state',async()=>{
@@ -167,20 +167,20 @@ test('DSH wallet amounts stay separate from percent quota and never invent missi
   const ui=fixture();ui.panel.accept(snapshot([row('current','account',{status:'ready',limits:[],balance:{wallets:[{currency:'CNY',remaining:'12.30',toppedUp:'10.00',granted:'2.30'},{currency:'USD',remaining:'4.00'}]}})]));
   assert.match(ui.text(),/CNY 12.30/);assert.match(ui.text(),/USD 4.00/);assert.match(ui.text(),/10.00/);assert.equal(ui.all().filter(node=>node.tag==='progress').length,0);
   const card=ui.panel.rows.children[0];assert.match(card.className,/accounts-client-card is-current/);assert.match(card.children[1].className,/accounts-client-usage/);
-  assert.equal(card.children[1].children[0].children[0].textContent,'账户余额');assert.equal(card.children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'刷新余额');
-  ui.panel.accept(snapshot([row('current','account',{status:'unsupported',limits:[]})]));assert.match(ui.text(),/余额信息暂不可用/);assert.doesNotMatch(ui.text(),/0%|12.30|USD/);
+  assert.equal(card.children[1].children[0].children[0].textContent,'계좌잔고');assert.equal(card.children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'잔액 새로고침');
+  ui.panel.accept(snapshot([row('current','account',{status:'unsupported',limits:[]})]));assert.match(ui.text(),/잔액 정보를 확인할 수 없습니다\./);assert.doesNotMatch(ui.text(),/0%|12.30|USD/);
 });
 test('DeepSeek balance time stays beside its refresh control',()=>{
   const ui=fixture(),checkedAt=1000;
   ui.panel.accept(snapshot([row('current','account',{status:'ready',checkedAt,balance:{wallets:[{currency:'CNY',remaining:'12.30'}]}})]));
   const controls=ui.panel.rows.children[0].children.find(n=>n.className==='accounts-card-footer').children.at(-1);
-  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'刷新余额');
-  assert.match(controls.children[0].textContent,/更新于：/);
+  assert.equal(controls.className,'accounts-usage-controls');assert.equal(controls.children.at(-1).attributes['aria-label'],'잔액 새로고침');
+  assert.match(controls.children[0].textContent,/업데이트 날짜:/);
 });
 test('client cards keep provider usage and API actions distinct',async()=>{
   const claude=fixture({provider:'claude'});claude.panel.accept(snapshot([row('current'),row('api','api')]));
   assert.match(claude.panel.rows.children[0].children[1].className,/accounts-client-usage/);
-  assert.equal(claude.panel.rows.children[0].children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'查看剩余额度');
+  assert.equal(claude.panel.rows.children[0].children.find(n=>n.className==='accounts-card-footer').children.at(-1).children[0].attributes['aria-label'],'남은 할당량 보기');
   assert.equal(claude.panel.rows.children[1].children.length,2,'API card has identity and actions, no invented quota');
   const dsh=fixture();dsh.panel.accept(snapshot([row('current'),row('api','api')]));
   assert.equal(dsh.panel.rows.children[1].children.length,2);
@@ -192,26 +192,26 @@ test('DSH API wallet appears only when the backend supplies a balance',()=>{
   const ui=fixture();ui.panel.accept(snapshot([row('api','api',{status:'ready',balance:{wallets:[{currency:'CNY',remaining:'9.50'}]}})],['api']));
   assert.match(ui.text(),/CNY 9.50/);assert.equal(ui.panel.rows.children[0].children.length,5);
   ui.panel.accept(snapshot([row('api','api',{status:'unsupported'})],['api']));
-  assert.equal(ui.panel.rows.children[0].children.length,4);assert.doesNotMatch(ui.text(),/CNY 9.50|余额信息暂不可用/);
+  assert.equal(ui.panel.rows.children[0].children.length,4);assert.doesNotMatch(ui.text(),/CNY 9.50|잔액 정보를 확인할 수 없습니다\./);
 });
 test('current account models share footer with quota time and refresh',async()=>{
   const ui=fixture({toolbar:true});ui.setValue(snapshot([row('current')]));ui.panel.accept(snapshot([row('current')]));
-  assert.equal(ui.outerToolbar.children.length,1);assert.equal(ui.outerToolbar.children[0].textContent,'刷新');
+  assert.equal(ui.outerToolbar.children.length,1);assert.equal(ui.outerToolbar.children[0].textContent,'새로고침');
   assert.equal(ui.root.children.some(node=>node.className==='accounts-toolbar'),false);
   assert.equal(ui.panel.modelsButton.parent.className,'accounts-card-footer');assert.equal(ui.panel.modelsButton.parent.children[0],ui.panel.modelsButton);assert.equal(ui.panel.modelsBox.parent,ui.panel.rows.children[0]);
   await ui.outerToolbar.children[0].onclick();assert.deepEqual(ui.calls.map(call=>call.action),['list','details']);
 });
 test('Claude enrollment confirms restart while DSH API import remains a read-only native snapshot',async()=>{
   const ui=fixture({desktop:true,provider:'claude'});ui.setValue(snapshot([row('current')]));ui.panel.accept(snapshot([row('current')]));ui.confirm(false);await ui.panel.importCurrent();assert.equal(ui.calls.length,0);
-  assert.match(ui.prompts[0],/解锁状态/);ui.confirm(true);ui.panel.nameInput.value='Work account';await ui.panel.importCurrent();assert.equal(ui.calls[0].action,'import-current');assert.equal(ui.calls[0].name,'Work account');assert.equal(ui.panel.nameInput.value,'');assert.ok(ui.prompts[0].includes('短暂重启'));
+  assert.match(ui.prompts[0],/Claude Desktop을 다시 시작한 후 연결을 초기화하려면 컴퓨터 잠금을 해제해야 합니다\. 정말 그만두시겠어요\?/);ui.confirm(true);ui.panel.nameInput.value='Work account';await ui.panel.importCurrent();assert.equal(ui.calls[0].action,'import-current');assert.equal(ui.calls[0].name,'Work account');assert.equal(ui.panel.nameInput.value,'');assert.ok(ui.prompts[0].includes('잠시 다시 시작'));
   const dsh=fixture({desktop:true});dsh.setValue(snapshot([]));await dsh.panel.importCurrent('api');assert.equal(dsh.calls[0].kind,'api');assert.equal(dsh.prompts.length,0);
   const web=fixture();await web.panel.importCurrent();assert.equal(web.calls.length,0);assert.equal(web.panel.importButton,undefined);
 });
 test('Claude account switch explains unlock requirement in the same confirmation and cancel submits nothing',async()=>{
- const ui=fixture({provider:'claude'});ui.panel.accept(snapshot([row('current'),row('other')]));ui.confirm(false);await ui.panel.choose(row('other'));assert.equal(ui.calls.length,0);assert.equal(ui.prompts.length,1);assert.match(ui.prompts[0],/切换会重启/);assert.match(ui.prompts[0],/解锁状态/);
+ const ui=fixture({provider:'claude'});ui.panel.accept(snapshot([row('current'),row('other')]));ui.confirm(false);await ui.panel.choose(row('other'));assert.equal(ui.calls.length,0);assert.equal(ui.prompts.length,1);assert.match(ui.prompts[0],/전환하면 이 데스크톱 앱이 다시 시작됩니다\. 보내지 않은 초안은 계정에 남아 있습니다\. 보류 중인 첨부 파일을 다시 추가해야 합니다\. 전환하기 전에 작업을 완료하고 작업 내용을 저장하세요\. 계속하다\?/);assert.match(ui.prompts[0],/Claude Desktop을 다시 시작한 후 연결을 초기화하려면 컴퓨터 잠금을 해제해야 합니다\. 정말 그만두시겠어요\?/);
  ui.english();await ui.panel.choose(row('other'));assert.equal(ui.calls.length,0);assert.match(ui.prompts[1],/unlocked/);assert.doesNotMatch(ui.prompts[1],/[\u4e00-\u9fff]/);
  ui.confirm(true);await ui.panel.choose(row('other'));assert.equal(ui.calls.length,1);assert.equal(ui.calls[0].action,'switch');assert.equal(ui.prompts.length,3,'each attempt has only one confirmation');
- const dsh=fixture();dsh.panel.accept(snapshot([row('current'),row('other')]));dsh.confirm(false);await dsh.panel.choose(row('other'));assert.doesNotMatch(dsh.prompts[0],/解锁|Claude/);assert.equal(dsh.calls.length,0);
+ const dsh=fixture();dsh.panel.accept(snapshot([row('current'),row('other')]));dsh.confirm(false);await dsh.panel.choose(row('other'));assert.doesNotMatch(dsh.prompts[0],/터놓다|Claude/);assert.equal(dsh.calls.length,0);
 });
 test('Claude API switch sends local CLI choice only after checkbox selection',async()=>{
  const ui=fixture({provider:'claude'});ui.panel.accept(snapshot([row('current'),row('other','api')]));
@@ -243,7 +243,7 @@ test('leaving during quota refresh stops further upstream account queries',async
 });
 
 test('account model catalog renders native provider groups and reasoning options without a chat',async()=>{
- const ui=fixture();ui.english();ui.panel.accept(snapshot([]));ui.setHandler(async()=>({groups:[{id:'deepseek-account',name:'Official access',models:[{id:'deepseek-account/deepseek-v4-pro',name:'DeepSeek Pro',efforts:['low','high']}]},{id:'custom',name:'Configured API',models:[{id:'custom/model-x',name:'Custom model'}]}]}));await ui.panel.toggleModels();assert.match(ui.text(),/Official access/);assert.match(ui.text(),/DeepSeek Pro/);assert.match(ui.text(),/low.*high/);assert.match(ui.text(),/Custom model/);assert.doesNotMatch(ui.text(),/进入会话|可用模型/);
+ const ui=fixture();ui.english();ui.panel.accept(snapshot([]));ui.setHandler(async()=>({groups:[{id:'deepseek-account',name:'Official access',models:[{id:'deepseek-account/deepseek-v4-pro',name:'DeepSeek Pro',efforts:['low','high']}]},{id:'custom',name:'Configured API',models:[{id:'custom/model-x',name:'Custom model'}]}]}));await ui.panel.toggleModels();assert.match(ui.text(),/Official access/);assert.match(ui.text(),/DeepSeek Pro/);assert.match(ui.text(),/low.*high/);assert.match(ui.text(),/Custom model/);assert.doesNotMatch(ui.text(),/세션 시작|사용 가능한 모델/);
 });
 test('flat model responses are preserved when the backend has no groups',async()=>{
  const ui=fixture();ui.setHandler(async()=>({groups:[],models:[{id:'flat/model',name:'Flat model'}]}));await ui.panel.toggleModels();assert.match(ui.text(),/Flat model/);
@@ -251,14 +251,14 @@ test('flat model responses are preserved when the backend has no groups',async()
 test('Claude configured and unavailable account catalogs keep source labels and identity',async()=>{
  const ui=fixture({provider:'claude'}),identity='a'.repeat(64);
  ui.panel.accept({...snapshot([row('current')]),modelCatalogIdentity:identity});
- ui.setHandler(async()=>({cache:{identity,state:'unavailable',updatedAt:null},models:[],groups:[],notice:'Claude 官方账号未提供可离线读取的模型目录；连接 Desktop 后已有的缓存仍可查看'}));
- await ui.panel.toggleModels();assert.match(ui.text(),/未提供可离线读取/);assert.doesNotMatch(ui.text(),/账号已切换/);
+ ui.setHandler(async()=>({cache:{identity,state:'unavailable',updatedAt:null},models:[],groups:[],notice:'Claude의 공식 계정에는 로컬에서 읽을 수 있는 모델 카탈로그가 없습니다. 이전에 캐시된 모델은 Desktop이 연결된 후에도 계속 사용할 수 있습니다.'}));
+ await ui.panel.toggleModels();assert.match(ui.text(),/Claude의 공식 계정에는 로컬에서 읽을 수 있는 모델 카탈로그가 없습니다\. 이전에 캐시된 모델은 Desktop이 연결된 후에도 계속 사용할 수 있습니다\./);assert.doesNotMatch(ui.text(),/계정이 전환되었습니다/);
  ui.setHandler(async()=>({cache:{identity,state:'unavailable',updatedAt:null},models:[{id:'configured-model'}],groups:[{name:'Provider',source:'desktop-config',models:[{id:'configured-model'}]}]}));
- await ui.panel.loadModels(true);assert.match(ui.text(),/配置模型/);assert.match(ui.text(),/configured-model/);
+ await ui.panel.loadModels(true);assert.match(ui.text(),/구성된 모델/);assert.match(ui.text(),/configured-model/);
  ui.english();assert.match(ui.text(),/Configured models/);
 });
 test('model read errors are retryable and are not presented as a successful empty catalog',async()=>{
- const ui=fixture();ui.setHandler(async()=>{throw Error('model catalog unavailable');});await ui.panel.toggleModels();assert.match(ui.text(),/model catalog unavailable/);assert.doesNotMatch(ui.text(),/未返回可用模型|进入会话/);ui.setHandler(async()=>({models:[{id:'recovered-model'}]}));await ui.all().find(node=>node.tag==='button'&&node.textContent==='刷新模型').onclick();assert.match(ui.text(),/recovered-model/);assert.doesNotMatch(ui.text(),/model catalog unavailable/);
+ const ui=fixture();ui.setHandler(async()=>{throw Error('model catalog unavailable');});await ui.panel.toggleModels();assert.match(ui.text(),/model catalog unavailable/);assert.doesNotMatch(ui.text(),/사용 가능한 모델이 반환되지 않았습니다.|세션 시작/);ui.setHandler(async()=>({models:[{id:'recovered-model'}]}));await ui.all().find(node=>node.tag==='button'&&node.textContent==='모델 새로 고침').onclick();assert.match(ui.text(),/recovered-model/);assert.doesNotMatch(ui.text(),/model catalog unavailable/);
 });
 
 test('API editor exists only in desktop and sends a native gateway draft without applying it',async()=>{
@@ -272,7 +272,7 @@ test('API edits keep the existing key blank and DSH does not expose unsupported 
 });
 test('official account edit is a name-only operation and deletion requires confirmation',async()=>{
  const ui=fixture({desktop:true});ui.panel.accept(snapshot([row('saved')]));ui.setHandler(async value=>value.action==='edit'?{id:'saved',name:'Saved',kind:'official'}:snapshot([]));await ui.panel.editAccount(row('saved'));assert.equal(ui.panel.editKey.wrap.hidden,true);ui.panel.editName.input.value='Renamed';await ui.panel.saveEditor();assert.deepEqual(JSON.parse(JSON.stringify(ui.calls[1])),{action:'rename',id:'saved',name:'Renamed'});
- ui.confirm(false);await ui.panel.removeAccount(row('saved'));assert.equal(ui.calls.length,2);ui.confirm(true);await ui.panel.removeAccount(row('saved'));assert.equal(ui.calls[2].action,'remove');assert.match(ui.prompts.at(-1),/不会退出电脑上的账号/);
+ ui.confirm(false);await ui.panel.removeAccount(row('saved'));assert.equal(ui.calls.length,2);ui.confirm(true);await ui.panel.removeAccount(row('saved'));assert.equal(ui.calls[2].action,'remove');assert.match(ui.prompts.at(-1),/저장된 연결을 삭제하시겠습니까\? 이렇게 하면 게이트웨이 복사본만 제거되고 데스크톱 앱은 로그아웃되지 않습니다\./);
 });
 test('closing account panel discards a late edit response and erases typed key',async()=>{
  const ui=fixture({desktop:true});ui.panel.openEditor({kind:'api',api:{}});ui.panel.editKey.input.value='private-key';ui.panel.closeEditor();assert.equal(ui.panel.editKey.input.value,'');let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));const pending=ui.panel.editAccount(row('saved'));ui.panel.dispose();finish({id:'saved',name:'Saved',kind:'api',api:{hasKey:true}});await pending;assert.equal(ui.panel.editor.hidden,true);assert.equal(ui.panel.editing,null);
@@ -281,8 +281,8 @@ test('closing account panel discards a late edit response and erases typed key',
 test('model catalog reopens from cache; only explicit refresh forces upstream and preserves old rows',async()=>{
  const ui=fixture({provider:'claude'}),calls=[],identity='a'.repeat(64);
  ui.panel.accept({...snapshot([row('current')]),modelCatalogIdentity:identity});ui.setHandler(async body=>{calls.push(body);return {cache:{identity,updatedAt:1000},models:[{id:'concrete-model',efforts:['low','high']}]};});
- await ui.panel.toggleModels();await ui.panel.toggleModels();await ui.panel.toggleModels();assert.equal(calls.length,2);assert.equal(calls[0].refresh,false);assert.equal(calls[1].refresh,false);assert.match(ui.text(),/concrete-model/);assert.match(ui.text(),/更新于：/);
- ui.setHandler(async body=>{calls.push(body);throw Error('upstream temporarily unavailable');});await ui.all().find(n=>n.tag==='button'&&n.textContent==='刷新模型').onclick();assert.equal(calls.at(-1).refresh,true);assert.match(ui.text(),/concrete-model/);assert.match(ui.text(),/upstream temporarily unavailable/);assert.equal(ui.calls.some(c=>c.action==='details'),false);
+ await ui.panel.toggleModels();await ui.panel.toggleModels();await ui.panel.toggleModels();assert.equal(calls.length,2);assert.equal(calls[0].refresh,false);assert.equal(calls[1].refresh,false);assert.match(ui.text(),/concrete-model/);assert.match(ui.text(),/업데이트 날짜:/);
+ ui.setHandler(async body=>{calls.push(body);throw Error('upstream temporarily unavailable');});await ui.all().find(n=>n.tag==='button'&&n.textContent==='모델 새로 고침').onclick();assert.equal(calls.at(-1).refresh,true);assert.match(ui.text(),/concrete-model/);assert.match(ui.text(),/upstream temporarily unavailable/);assert.equal(ui.calls.some(c=>c.action==='details'),false);
  ui.english();assert.match(ui.text(),/Refresh models/);
 });
 test('same saved account ID with changed model identity clears rows and rejects old reads',async()=>{
@@ -300,7 +300,7 @@ for(const provider of ['claude','deepseek'])test(`${provider} model scroller sur
  await ui.panel.toggleModels();const box=ui.panel.modelsBox,card=box.parent;box.scrollTop=83;
  await ui.panel.refresh(false);assert.equal(ui.panel.modelsBox,box);assert.equal(box.parent,card);assert.equal(box.scrollTop,83);
  ui.setHandler(async()=>({cache:{identity,updatedAt:2000},models:[{id:'model-c'},{id:'model-d'}]}));
- await ui.all().find(n=>n.tag==='button'&&n.textContent==='刷新模型').onclick();assert.equal(box.scrollTop,83);assert.match(ui.text(),/model-d/);
+ await ui.all().find(n=>n.tag==='button'&&n.textContent==='모델 새로 고침').onclick();assert.equal(box.scrollTop,83);assert.match(ui.text(),/model-d/);
  let finish;ui.setHandler(()=>new Promise(resolve=>finish=resolve));ui.focus(ui.panel.modelsRefreshButton);const pending=ui.panel.modelsRefreshButton.onclick();ui.blur();finish({cache:{identity,updatedAt:3000},models:[{id:'model-e'}]});await pending;assert.equal(ui.active(),ui.panel.modelsRefreshButton);assert.equal(box.scrollTop,83);
 });
 
@@ -310,6 +310,6 @@ test('current ZCode daily model quota shows exact native token quantities and ch
    {name:'GLM-5.3-Flash',windows:[{unit:'tokens',remaining:9,total:20,remainingPercent:45}]}]};
  ui.setValue(snapshot([{...row('current','official',usage),canReadQuota:true},{...row('other','official'),canReadQuota:false}]));
  await ui.panel.resume();assert.deepEqual(ui.calls.map(c=>c.action),['list','details']);assert.equal(ui.calls[1].id,'current');
- assert.match(ui.text(),/今日剩余额度/);assert.match(ui.text(),/GLM-5.3/);assert.match(ui.text(),/GLM-5.3-Flash/);
- assert.match(ui.text(),/0 \/ 10 tokens/);assert.match(ui.text(),/9 \/ 20 tokens/);assert.match(ui.text(),/原 App 查询时间/);
+ assert.match(ui.text(),/오늘 남은 할당량/);assert.match(ui.text(),/GLM-5.3/);assert.match(ui.text(),/GLM-5.3-Flash/);
+ assert.match(ui.text(),/0 \/ 10 tokens/);assert.match(ui.text(),/9 \/ 20 tokens/);assert.match(ui.text(),/앱에서 마지막으로 확인한 날짜:/);
 });

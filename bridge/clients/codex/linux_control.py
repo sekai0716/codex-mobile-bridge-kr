@@ -28,10 +28,10 @@ def shared_cli_probe(stream):
             except IPCError as error:
                 rpc = getattr(error, 'rpc_error', None)
                 if rpc:
-                    failure = (AppServerUnsupported if rpc.get('code') == -32601 else AppServerError)('目标 CLI 拒绝此只读检查')
+                    failure = (AppServerUnsupported if rpc.get('code') == -32601 else AppServerError)('목표 CLI 이 읽기 전용 확인을 거부합니다.')
                     failure.rpc_error = rpc
                     raise failure from error
-                raise AppServerUnavailable('目标 CLI 只读检查暂不可用') from error
+                raise AppServerUnavailable('목표 CLI 현재 읽기 전용 검사를 사용할 수 없습니다.') from error
     try:
         server.start()
         yield Probe()
@@ -123,18 +123,18 @@ class LinuxCliControl:
         try:
             reply = self.reader(worker_source(request, inspect=inspect), timeout=18)
         except (OSError, RuntimeError, IPCError) as error:
-            raise ValueError('目标生命周期传输结果尚未核验；不会重发操作') from error
+            raise ValueError('목표 생애주기 이전 결과는 아직 검증되지 않았습니다. 작업이 재발행되지 않습니다.') from error
         if not isinstance(reply, dict) or reply.get('ok') is not True:
-            raise ValueError('目标 Linux 原生进程或生命周期回执尚未核验')
+            raise ValueError('목표 Linux 기본 프로세스 또는 수명 주기 영수증이 아직 확인되지 않았습니다.')
         return reply['result']
 
     def inspect(self):
         home = self.home()
         if home is not None and (not isinstance(home, str) or not home.startswith('/')):
-            raise ReleaseNotSent('目标 CLI home 尚未通过原生连接核验')
+            raise ReleaseNotSent('목표 CLI home 아직 기본 연결 확인을 통과하지 못했습니다.')
         result = self._read({'home': home}, inspect=True)
         if result.get('platform') != 'linux':
-            raise ReleaseNotSent('目标不是已核验的 Linux 生命周期运行时')
+            raise ReleaseNotSent('대상이 확인되지 않았습니다. Linux 수명 주기 런타임')
         info = result.get('initialize') or {}
         known_version = isinstance(info.get('userAgent'), str)
         result['generation']['nativeVersion'] = daemon_version(info) if known_version else None

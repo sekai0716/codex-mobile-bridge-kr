@@ -27,30 +27,30 @@ class ContextUsageControl {
     const known=usage?.measurement!=='lastPrompt'&&Number.isFinite(usage?.usedTokens)&&usage.usedTokens>=0&&Number.isFinite(usage.contextWindow)&&usage.contextWindow>0;
     const percent=known?Math.round(usage.usedTokens/usage.contextWindow*100):null;
     this.ring.style.setProperty('--context-percent',known?Math.min(percent,100)+'%':'0%');this.ring.classList.toggle('unknown',!known);
-    this.button.title=BridgeI18n.t('上下文使用量')+' · '+(known?percent+'%':BridgeI18n.t('暂未提供'));this.button.setAttribute('aria-label',this.button.title);
+    this.button.title=BridgeI18n.t('컨텍스트 사용법')+' · '+(known?percent+'%':BridgeI18n.t('사용할 수 없음'));this.button.setAttribute('aria-label',this.button.title);
   }
   open(){
     if(!this.state)return;this.dialog?.remove();const dialog=this.dialog=document.createElement('dialog');dialog.className='picker';
-    const title=document.createElement('h2');title.textContent=BridgeI18n.t('上下文使用量');
-    const close=document.createElement('button');close.type='button';close.className='icon-button';close.textContent='×';close.setAttribute('aria-label',BridgeI18n.t('关闭'));close.onclick=()=>dialog.close();const head=document.createElement('div');head.className='picker-head';head.append(title,close);dialog.append(head);
+    const title=document.createElement('h2');title.textContent=BridgeI18n.t('컨텍스트 사용법');
+    const close=document.createElement('button');close.type='button';close.className='icon-button';close.textContent='×';close.setAttribute('aria-label',BridgeI18n.t('닫기'));close.onclick=()=>dialog.close();const head=document.createElement('div');head.className='picker-head';head.append(title,close);dialog.append(head);
     const line=(label,value)=>{const p=document.createElement('p');p.textContent=BridgeI18n.t(label)+(value===undefined?'':' · '+value);dialog.append(p);};
-    const usage=this.state.contextUsage,previous=this.state.lastPromptContextUsage,number=value=>Number.isFinite(value)&&value>=0?value.toLocaleString(BridgeI18n.locale()):BridgeI18n.t('暂未提供');
-    if(!usage)line(this.state.contextUsageStatus==='unsupported'?'当前客户端或会话模式未提供上下文用量接口。':this.state.contextUsageStatus==='unavailable'?'当前会话尚未提供上下文用量；有可用数据时会自动更新。':'当前客户端尚未提供此会话的上下文用量。');
+    const usage=this.state.contextUsage,previous=this.state.lastPromptContextUsage,number=value=>Number.isFinite(value)&&value>=0?value.toLocaleString(BridgeI18n.locale()):BridgeI18n.t('사용할 수 없음');
+    if(!usage)line(this.state.contextUsageStatus==='unsupported'?'이 클라이언트 또는 세션 모드는 컨텍스트 사용법을 노출하지 않습니다.':this.state.contextUsageStatus==='unavailable'?'이 세션에서는 아직 컨텍스트 사용을 사용할 수 없습니다. 사용 가능한 경우 자동으로 업데이트됩니다.':'이 클라이언트는 이 세션에 대한 컨텍스트 사용을 제공하지 않았습니다.');
     else {
-      line(usage.measurement==='lastPrompt'?'最近一次模型输入':'已用 Token',number(usage.usedTokens));line('上下文容量',number(usage.contextWindow));
-      if(usage.measurement!=='lastPrompt'&&usage.contextWindow>0&&Number.isFinite(usage.usedTokens)&&usage.usedTokens>=0)line('使用占比',(usage.usedTokens/usage.contextWindow*100).toFixed(1)+'%');
-      if(usage.model)line('模型',usage.model);
-      if(Number.isFinite(usage.autoCompactThresholdTokens))line('自动压缩阈值',number(usage.autoCompactThresholdTokens));
-      if(Number.isFinite(usage.pressureTokens)&&usage.pressureTokens!==usage.usedTokens)line('已确认上下文 Token',number(usage.pressureTokens));
-      for(const [key,label] of [['inputTokens','最近输入 Token'],['cacheReadTokens','缓存读取 Token'],['cacheWriteTokens','缓存写入 Token']])if(Number.isFinite(usage.cache?.[key]))line(label,number(usage.cache[key]));
-      if(usage.compacted)line('最近一次压缩后统计。');
-      if(usage.measurement==='lastPrompt')line('统计最近一次请求的输入与缓存 Token；不包含尚未发送的内容。');
-      if(usage.estimated)line('包含客户端对尚未发送内容的估算。');
-      if(usage.cached||!this.state.connected)line('当前为缓存数据，连接恢复后更新。');
+      line(usage.measurement==='lastPrompt'?'최신 모델 입력':'사용된 토큰',number(usage.usedTokens));line('컨텍스트 용량',number(usage.contextWindow));
+      if(usage.measurement!=='lastPrompt'&&usage.contextWindow>0&&Number.isFinite(usage.usedTokens)&&usage.usedTokens>=0)line('사용된 컨텍스트',(usage.usedTokens/usage.contextWindow*100).toFixed(1)+'%');
+      if(usage.model)line('모델',usage.model);
+      if(Number.isFinite(usage.autoCompactThresholdTokens))line('자동 압축 임계값',number(usage.autoCompactThresholdTokens));
+      if(Number.isFinite(usage.pressureTokens)&&usage.pressureTokens!==usage.usedTokens)line('확인된 컨텍스트 토큰',number(usage.pressureTokens));
+      for(const [key,label] of [['inputTokens','최근 입력 토큰'],['cacheReadTokens','캐시 읽기 토큰'],['cacheWriteTokens','캐시 쓰기 토큰']])if(Number.isFinite(usage.cache?.[key]))line(label,number(usage.cache[key]));
+      if(usage.compacted)line('최근 압축 후 측정되었습니다.');
+      if(usage.measurement==='lastPrompt')line('최신 요청 입력 및 캐시된 토큰 보내지 않은 콘텐츠는 포함되지 않습니다.');
+      if(usage.estimated)line('아직 전송되지 않은 콘텐츠에 대한 클라이언트 추정치를 포함합니다.');
+      if(usage.cached||!this.state.connected)line('캐시된 데이터. 연결이 재개되면 업데이트됩니다.');
     }
-    if(previous&&!usage){line('最近一次模型输入',number(previous.usedTokens));line('统计最近一次请求的输入与缓存 Token；不包含尚未发送的内容。');}
+    if(previous&&!usage){line('최신 모델 입력',number(previous.usedTokens));line('최신 요청 입력 및 캐시된 토큰 보내지 않은 콘텐츠는 포함되지 않습니다.');}
     if(this.onCompact&&this.state.capabilities?.compact===true){
-      const stateId=this.state.id,button=this.compactButton=document.createElement('button');button.type='button';button.textContent=BridgeI18n.t('压缩上下文');button.disabled=!this.state.connected||!!this.state.busy;
+      const stateId=this.state.id,button=this.compactButton=document.createElement('button');button.type='button';button.textContent=BridgeI18n.t('컴팩트한 컨텍스트');button.disabled=!this.state.connected||!!this.state.busy;
       button.onclick=async()=>{if(button.disabled||stateId!==this.state?.id)return;button.disabled=true;try{if(await this.onCompact())dialog.close();}finally{if(dialog.open&&stateId===this.state?.id)button.disabled=!this.state.connected||this.state.capabilities?.compact!==true||!!this.state.busy;}};
       dialog.append(button);
     }
@@ -62,16 +62,16 @@ class ContextUsageControl {
 // Linux Desktop and native CLI capability picker; other sessions keep their existing flow.
 async function permissionPicker(dialog,{load,save,isCurrent,onSaved,nativeCli=false}){
   const t=BridgeI18n.t,options=document.createElement('div'),status=document.createElement('p'),refresh=document.createElement('button');
-  status.className='muted';status.setAttribute('role','status');refresh.type='button';refresh.textContent=t('刷新');
+  status.className='muted';status.setAttribute('role','status');refresh.type='button';refresh.textContent=t('새로고침');
   dialog.append(options,status,refresh);
   let busy=false,revision=0,buttons=[];
   const valid=()=>dialog.open&&isCurrent();
   const setBusy=value=>{busy=value;refresh.disabled=value;for(const [button,available] of buttons)button.disabled=value||!available;};
-  const labels={ask:['请求批准','需要额外权限时询问你。'],'auto-review':['帮我批准','由 Codex 审核需要额外权限的操作。'],'full-access':['完全访问权限','允许访问工作区外的文件和网络，无需逐次批准。']};
-  const unknown=nativeCli?'无法确认当前 CLI 的权限能力，请检查 CLI 运行时与策略后刷新。':'无法确认当前权限能力，请在桌面检查设置后重新打开此面板。';
+  const labels={ask:['승인 요청','추가 권한이 필요할 때 물어보세요.'],'auto-review':['승인해 주세요','Codex는 추가 권한이 필요한 작업을 검토합니다.'],'full-access':['전체 액세스','개별 승인 없이 작업 공간 및 네트워크 외부의 파일에 대한 액세스를 허용합니다.']};
+  const unknown=nativeCli?'CLI 권한 기능을 확인할 수 없습니다. CLI 런타임 및 정책을 확인한 후 새로 고치세요.':'권한 기능을 확인할 수 없습니다. 데스크탑 설정을 확인한 후 이 패널을 다시 여십시오.';
   const reload=async()=>{
     if(busy||!valid())return;
-    const version=++revision;options.replaceChildren();buttons=[];setBusy(true);status.textContent=t('正在读取权限选项…');
+    const version=++revision;options.replaceChildren();buttons=[];setBusy(true);status.textContent=t('읽기 권한 옵션…');
     try{
       const result=await load();if(version!==revision||!valid())return;
       options.replaceChildren();buttons=[];
@@ -82,12 +82,12 @@ async function permissionPicker(dialog,{load,save,isCurrent,onSaved,nativeCli=fa
         buttons.push([button,available]);button.disabled=!available;
         button.onclick=async()=>{
           if(busy||!available||!valid())return;
-          if(preset==='full-access'&&!confirm(t('允许此会话完全访问电脑文件和网络？请仅在信任任务内容时开启。')))return;
+          if(preset==='full-access'&&!confirm(t('이 채팅에 컴퓨터 파일 및 네트워크에 대한 전체 액세스를 허용하시겠습니까? 신뢰하는 작업에 대해서만 활성화하세요.')))return;
           setBusy(true);status.textContent='';
           try{
             const response=await save(preset);if(!valid())return;
             if(response.confirmed===true){onSaved(response);dialog.close();}
-            else status.textContent=t(nativeCli?'已提交权限设置，等待 CLI 运行时确认。':'已提交权限设置，等待桌面确认。');
+            else status.textContent=t(nativeCli?'권한이 제출되었습니다. CLI 런타임 확인을 기다리는 중입니다.':'권한이 제출되었습니다. 데스크톱 확인을 기다리는 중입니다.');
           }catch(e){if(valid())status.textContent=t(e.message);}
           finally{setBusy(false);}
         };options.append(button);

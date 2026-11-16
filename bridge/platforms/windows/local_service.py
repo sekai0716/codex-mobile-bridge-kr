@@ -74,7 +74,7 @@ def _check(handle, *, directory):
     if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
         raise ctypes.WinError(ctypes.get_last_error())
     if info.attributes & 0x400 or bool(info.attributes & 0x10) != directory or not directory and info.links != 1:
-        raise PermissionError('本机服务记录不能使用链接或重解析路径')
+        raise PermissionError('기본 서비스 레코드는 링크 또는 재분석 경로를 사용할 수 없습니다.')
     with _user_sid() as (api, sid):
         api.GetSecurityInfo.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
         api.GetSecurityInfo.restype = wintypes.DWORD
@@ -84,19 +84,19 @@ def _check(handle, *, directory):
         owner, acl, descriptor = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
         try:
             if api.GetSecurityInfo(handle, 1, 5, ctypes.byref(owner), None, ctypes.byref(acl), None, ctypes.byref(descriptor)):
-                raise PermissionError('无法核验本机服务记录权限')
+                raise PermissionError('로컬 서비스 레코드 권한을 확인할 수 없습니다.')
             if not owner or not api.EqualSid(owner, sid) or not acl:
-                raise PermissionError('本机服务记录不属于当前用户')
+                raise PermissionError('로컬 서비스 기록은 현재 사용자의 것이 아닙니다.')
             control, revision = wintypes.WORD(), wintypes.DWORD()
             if not api.GetSecurityDescriptorControl(descriptor, ctypes.byref(control), ctypes.byref(revision)) or not control.value & 0x1000:
-                raise PermissionError('本机服务记录不能继承其他用户的访问权限')
+                raise PermissionError('기본 서비스 레코드는 다른 사용자로부터 액세스 권한을 상속받을 수 없습니다.')
             count = ctypes.c_ushort.from_address(acl.value + 4).value
             if not 1 <= count <= 16:
-                raise PermissionError('本机服务记录权限无效')
+                raise PermissionError('잘못된 로컬 서비스 레코드 권한')
             for index in range(count):
                 ace = ctypes.c_void_p()
                 if not api.GetAce(acl, index, ctypes.byref(ace)) or ctypes.c_ubyte.from_address(ace.value).value != 0 or not api.EqualSid(ace.value + 8, sid):
-                    raise PermissionError('本机服务记录必须仅允许当前用户访问')
+                    raise PermissionError('기본 서비스 레코드는 현재 사용자만 액세스할 수 있어야 합니다.')
         finally:
             if descriptor:kernel.LocalFree(descriptor)
 
@@ -138,7 +138,7 @@ def read_record(path):
         with os.fdopen(fd, 'rb') as stream:raw = stream.read(4097)
     finally:
         if handle is not None:_native().close(handle)
-    if len(raw) > 4096:raise ValueError('本机服务记录无效')
+    if len(raw) > 4096:raise ValueError('로컬 서비스 기록이 잘못되었습니다.')
     return json.loads(raw)
 
 
@@ -161,13 +161,13 @@ def write_record(path, value):
 def require_peer(conn, *, server, expected=None):
     peer = identity(peer_pid(conn, server=server))
     if peer['image'] != identity(os.getpid())['image'] or expected is not None and any(peer.get(key) != expected.get(key) for key in ('pid', 'created', 'session', 'image')):
-        raise PermissionError('本机服务与当前网关进程不匹配')
+        raise PermissionError('기본 서비스가 현재 게이트웨이 프로세스와 일치하지 않습니다.')
     return peer
 
 
 def require_parent(pid):
     owner = _identity(os.getpid(), parent=True)
-    if owner['parent'] != pid:raise PermissionError('本机服务父进程不匹配')
+    if owner['parent'] != pid:raise PermissionError('기본 서비스 상위 프로세스가 일치하지 않습니다.')
     identity(pid)  # The original helper enforces the same user and interactive session.
     return {key: owner[key] for key in ('pid', 'created', 'session', 'image')}
 

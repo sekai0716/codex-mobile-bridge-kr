@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT/'tests/fixtures/tls'
-TLS_ERROR = 'HTTPS 证书或 TLS 握手失败；请检查域名、证书和反代配置'
+TLS_ERROR = 'HTTPS 인증서 또는 TLS 핸드셰이크가 실패했습니다. 도메인 이름, 인증서 및 역방향 프록시 구성을 확인하세요.'
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

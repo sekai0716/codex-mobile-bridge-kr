@@ -6,8 +6,8 @@ import time
 
 from bridge.platforms import desktop
 
-CHANGED = '客户端进程已变化或无法核对，已停止强制结束；请重新扫描后重试'
-PROTECTED = '所选应用与网关或其启动进程重叠，不能强制结束'
+CHANGED = "앱 프로세스가 변경되었거나 확인할 수 없어 강제 종료가 중지되었습니다. 다시 시도하기 전에 다시 스캔하세요."
+PROTECTED = "선택한 앱이 게이트웨이 또는 해당 앱을 실행한 프로세스와 겹치므로 강제 종료할 수 없습니다."
 
 
 def force_stop(executable, commands):
@@ -16,7 +16,7 @@ def force_stop(executable, commands):
     elif sys.platform == 'linux':
         from bridge.platforms.linux.force_exit import Native
     else:
-        raise ValueError('此系统不支持客户端强制结束')
+        raise ValueError("이 시스템은 데스크톱 클라이언트 강제 종료를 지원하지 않습니다.")
     executable = str(Path(executable).resolve())
     native, held = Native(), {}
     deadline = time.monotonic() + 20
@@ -86,10 +86,10 @@ def force_stop(executable, commands):
                 pass
         while current():
             if time.monotonic() >= deadline:
-                raise ValueError('等待客户端强制结束超时，请重新扫描并检查电脑端状态')
+                raise ValueError("앱이 강제 종료되기를 기다리는 중 시간이 초과되었습니다. 다시 스캔하고 컴퓨터에서 앱을 확인하세요.")
             time.sleep(.1)
     except OSError:
-        raise ValueError('未能结束全部客户端进程，请检查权限或在电脑端处理后重试') from None
+        raise ValueError("모든 앱 프로세스를 종료할 수 있는 것은 아닙니다. 다시 시도하기 전에 컴퓨터에서 권한을 확인하거나 문제를 해결하세요.") from None
     finally:
         for handle, _ in held.values():
             native.close(handle)

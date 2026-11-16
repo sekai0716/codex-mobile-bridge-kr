@@ -42,7 +42,7 @@ class MobilePush:
         identifier = str(uuid.UUID(body.get('deviceId', '')))
         kind = body.get('kind')
         if kind not in ('apns', 'fcm', 'activity'):
-            raise ValueError('不支持的推送类型')
+            raise ValueError('지원되지 않는 푸시 유형')
         key = hashlib.sha256((owner + identifier + kind).encode()).hexdigest()
         with self.lock:
             if body.get('enabled') is False:
@@ -52,18 +52,18 @@ class MobilePush:
             token = body.get('token', '')
             pattern = r'[0-9a-fA-F]{32,512}' if kind != 'fcm' else r'[A-Za-z0-9_:.-]{20,4096}'
             if not isinstance(token, str) or not re.fullmatch(pattern, token):
-                raise ValueError('推送设备标识格式不正确')
+                raise ValueError('푸시 장치 ID 형식이 잘못되었습니다.')
             provider = 'fcm' if kind == 'fcm' else 'apns'
             if not self.status()[provider]:
-                raise ValueError('电脑尚未配置系统推送服务')
+                raise ValueError('컴퓨터가 시스템 푸시 서비스로 구성되지 않았습니다.')
             thread = host = ''
             if kind == 'activity':
                 thread = str(uuid.UUID(body.get('thread', '')))
                 host = body.get('host', 'local')
                 if not isinstance(host, str) or len(host) > 256:
-                    raise ValueError('主机标识无效')
+                    raise ValueError('잘못된 호스트 ID')
             if key not in self.devices and len(self.devices) >= 100:
-                raise ValueError('推送设备数量已达上限')
+                raise ValueError('푸시 장치 수가 상한에 도달했습니다.')
             # A token belongs to one login. Re-registration replaces a revoked/old session.
             for old in list(self.devices):
                 if old != key and self.devices[old]['token'] == token:
@@ -112,7 +112,7 @@ class MobilePush:
                         remove = changed = True; break
                     except Exception:
                         attempts = device.get('attempts', 0) + 1
-                        device.update(attempts=attempts, next=time.time()+min(300, 5*2**min(attempts, 6)), error='推送失败，等待重试')
+                        device.update(attempts=attempts, next=time.time()+min(300, 5*2**min(attempts, 6)), error='푸시에 실패했습니다. 다시 시도하는 중입니다.')
                         changed = True; break
                     device.update(cursor=event['sequence'], attempts=0, next=0, error='', lastAccepted=time.time())
                     changed = True
@@ -130,7 +130,7 @@ class MobilePush:
                         except InvalidPushToken:
                             remove = True
                         except Exception:
-                            device.update(next=time.time()+60, error='实时活动更新失败，等待重试')
+                            device.update(next=time.time()+60, error='실시간 활동 업데이트에 실패했습니다. 다시 시도하는 중입니다.')
                         changed = True
             if changed:
                 with self.lock:
@@ -147,8 +147,8 @@ def payload(device, event):
              'provider': provider,
              'sequence': str(event['sequence']), 'streamId': event.get('streamId', '')}
     # Push carries generic state only. Full inbox content stays behind gateway authentication.
-    title = ('运行遇到问题，需要你处理' if event['kind'] == 'attention' else
-             '本轮已结束' if event['kind'] == 'completion' else '有任务等待你确认')
+    title = ('실행에 문제가 있으며 이를 처리해야 합니다.' if event['kind'] == 'attention' else
+             '이번 라운드는 종료되었습니다' if event['kind'] == 'completion' else '확인을 기다리는 작업이 있습니다.')
     client = {'claude': 'Claude', 'deepseek': 'DeepSeek Harness', 'codex': 'Codex', 'zcode': 'ZCode', 'antigravity': 'Antigravity'}[provider]
     heading = client + ' · Codex Bridge'
     if device['kind'] == 'fcm':
@@ -183,7 +183,7 @@ def send_provider(config, device, event):
         if not credentials.valid:
             credentials.refresh(Request())
         if not re.fullmatch(r'[a-z0-9-]+', cfg['projectId']):
-            raise ValueError('Firebase project ID 无效')
+            raise ValueError('Firebase project ID 유효하지 않은')
         url = 'https://fcm.googleapis.com/v1/projects/'+cfg['projectId']+'/messages:send'
         headers = {'Authorization': 'Bearer '+credentials.token}
     else:
@@ -212,4 +212,4 @@ def send_provider(config, device, event):
         if error.get('reason') in ('BadDeviceToken', 'Unregistered') or any(item.get('errorCode') == 'UNREGISTERED' for item in error.get('error', {}).get('details', [])):
             raise InvalidPushToken()
     if not 200 <= response.status_code < 300:
-        raise RuntimeError('系统推送服务拒绝请求')
+        raise RuntimeError('시스템 푸시 서비스가 요청을 거부합니다.')

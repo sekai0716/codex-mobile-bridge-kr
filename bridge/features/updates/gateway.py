@@ -126,7 +126,7 @@ def reject_pending_transaction(target):
         # A dead helper or an old timestamp does not prove a swap was recovered.
         # Keep the backup and copied helper after crashes or interrupted writes.
         if any((transaction / name).exists() for name in ('ready.json', 'previous', 'failed')):
-            raise ValueError('上一次更新的恢复状态尚未确认，已保留备份；请检查更新日志并恢复后再试。')
+            raise ValueError('마지막 업데이트의 복구 상태가 확인되지 않았으며 백업이 유지되었습니다. 업데이트 로그를 확인하시고 복구 후 다시 시도해주세요。')
         try:
             age = time.time() - transaction.stat().st_mtime
         except OSError:
@@ -137,10 +137,10 @@ def reject_pending_transaction(target):
         helper = read_record(transaction / 'helper.json')
         if helper and isinstance(helper.get('pid'), int):
             if process_exists(helper['pid']):
-                raise ValueError('上一次更新事务尚未完成；请等待几分钟后再试。')
+                raise ValueError('마지막 업데이트 트랜잭션이 완료되지 않았습니다. 몇 분 정도 기다렸다가 다시 시도해 주세요.。')
             shutil.rmtree(transaction, ignore_errors=True)
             continue
-        raise ValueError('上一次更新事务尚未完成；请等待几分钟或重启电脑后再试。')
+        raise ValueError('마지막 업데이트 트랜잭션이 완료되지 않았습니다. 몇 분 정도 기다리거나 컴퓨터를 다시 시작한 후 다시 시도해 보세요.。')
 
 
 def extract(archive, destination):
@@ -148,42 +148,42 @@ def extract(archive, destination):
     with zipfile.ZipFile(archive) as source:
         entries = source.infolist()
         if len(entries) > 50000 or sum(e.file_size for e in entries) > 4*1024**3:
-            raise ValueError('更新包解压大小超出限制。')
+            raise ValueError("추출된 업데이트가 크기 제한을 초과합니다.")
         seen, links = set(), {}
         for entry in entries:
             # ZipInfo normalizes Windows separators and truncates NULs. Validate
             # the wire name as well, before that normalization can hide it.
             if entry.orig_filename != entry.filename:
-                raise ValueError('更新包包含无效路径。')
+                raise ValueError("업데이트에 잘못된 경로가 포함되어 있습니다.")
             name = entry.filename.rstrip('/')
             parts = PurePosixPath(name).parts
             if (not name or '\\' in name or ':' in name or name.startswith('/')
                     or any(p in ('.', '..') for p in name.split('/'))):
-                raise ValueError('更新包包含无效路径。')
+                raise ValueError("업데이트에 잘못된 경로가 포함되어 있습니다.")
             # Both supported filesystems commonly compare names case-insensitively.
             key = name.casefold()
             if key in seen:
-                raise ValueError('更新包包含重复路径。')
+                raise ValueError("업데이트에 중복된 경로가 포함되어 있습니다.")
             seen.add(key)
             mode = entry.external_attr >> 16
             kind = stat.S_IFMT(mode)
             if kind not in (0, stat.S_IFREG, stat.S_IFDIR, stat.S_IFLNK):
-                raise ValueError('更新包包含不支持的文件。')
+                raise ValueError("업데이트에 지원되지 않는 파일이 포함되어 있습니다.")
             if stat.S_ISLNK(mode):
                 if sys.platform == 'win32' or entry.file_size > 4096:
-                    raise ValueError('更新包包含无效链接。')
+                    raise ValueError("업데이트에 잘못된 링크가 포함되어 있습니다.")
                 target = source.read(entry).decode('utf-8')
                 if not target or '\\' in target or Path(target).is_absolute():
-                    raise ValueError('更新包链接指向安装目录外。')
+                    raise ValueError("업데이트 링크는 설치 외부를 가리킵니다.")
                 resolved = (destination / name).parent.joinpath(target).resolve()
                 if destination.resolve() not in resolved.parents:
-                    raise ValueError('更新包链接指向安装目录外。')
+                    raise ValueError("업데이트 링크는 설치 외부를 가리킵니다.")
                 links[name] = target
         link_keys = {name.casefold() for name in links}
         for entry in entries:
             name = entry.filename.rstrip('/')
             if any(str(parent).casefold() in link_keys for parent in PurePosixPath(name).parents):
-                raise ValueError('更新包通过链接写入文件。')
+                raise ValueError("업데이트는 링크를 통해 쓰기를 시도합니다.")
         for entry in entries:
             name = entry.filename.rstrip('/')
             if name in links:
@@ -204,7 +204,7 @@ def extract(archive, destination):
         # Detect chained links escaping the bundle as well.
         for name in links:
             if destination.resolve() not in (destination / name).resolve().parents:
-                raise ValueError('更新包链接指向安装目录外。')
+                raise ValueError("업데이트 링크는 설치 외부를 가리킵니다.")
 
 
 def locations(target):
@@ -227,21 +227,21 @@ def prepare(data_dir, payload):
     target = Path(payload['target']).absolute()
     data = Path(data_dir).resolve()
     if sys.platform not in ('darwin', 'win32'):
-        raise ValueError('此系统暂无应用内更新包。')
+        raise ValueError("이 시스템에는 인앱 업데이트 패키지가 없습니다.")
     if not target.is_dir() or target.is_symlink() or target.resolve() != target:
-        raise ValueError('请将应用安装到可写目录后再更新。')
+        raise ValueError("업데이트하기 전에 쓰기 가능한 폴더에 앱을 설치하세요.")
     if target == data or target in data.parents:
-        raise ValueError('请先将网关数据目录移到应用安装目录之外。')
+        raise ValueError("업데이트하기 전에 게이트웨이 데이터 폴더를 앱 설치 외부로 이동하세요.")
     old_app, old_worker, _ = locations(target)
     if not old_app.is_file() or not old_worker.is_file():
-        raise ValueError('未找到完整的应用安装目录。')
+        raise ValueError("전체 앱 설치를 찾을 수 없습니다.")
     preflight(target)
     digest = hashlib.sha256()
     with open(payload['archive'], 'rb') as stream:
         for chunk in iter(lambda: stream.read(1024*1024), b''):
             digest.update(chunk)
     if digest.hexdigest() != payload['sha256']:
-        raise ValueError('更新包校验失败，已取消安装。')
+        raise ValueError("업데이트 확인에 실패했습니다. 설치가 취소되었습니다.")
     reject_pending_transaction(target)
     clean_transactions(target)
     transaction = Path(tempfile.mkdtemp(prefix='.cmb-update-', dir=target.parent))
@@ -256,14 +256,14 @@ def prepare(data_dir, payload):
         new_app, new_worker, resources = locations(staged)
         metadata = json.loads((resources / 'update-version.json').read_text(encoding='utf-8'))
         if metadata != {'version': payload['version'], 'platform': payload['platform'], 'arch': payload['arch']}:
-            raise ValueError('更新包版本或平台不匹配。')
+            raise ValueError("업데이트 버전이나 플랫폼이 일치하지 않습니다.")
         if not new_app.is_file() or not new_worker.is_file():
-            raise ValueError('更新包缺少应用程序。')
+            raise ValueError("업데이트 패키지에 앱이 없습니다.")
         if sys.platform == 'darwin':
             with open(staged / 'Contents/Info.plist', 'rb') as stream:
                 info = plistlib.load(stream)
             if info.get('CFBundleIdentifier') != APP_ID or info.get('CFBundleShortVersionString') != payload['version']:
-                raise ValueError('更新包的应用标识或版本不匹配。')
+                raise ValueError("업데이트 앱 ID 또는 버전이 일치하지 않습니다.")
             subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(staged)], check=True, capture_output=True, timeout=60)
         else:
             # The ZIP is also used by NSIS installations. Preserve the registered
@@ -277,7 +277,7 @@ def prepare(data_dir, payload):
         shutil.copytree(old_worker.parent, helper, symlinks=True)
         runtime = Desktop(data_dir).status()
         if runtime['portOccupied']:
-            raise ValueError('端口被其他网关占用，请先检查运行配置。')
+            raise ValueError("다른 게이트웨이가 해당 포트를 사용하고 있습니다. 먼저 런타임 설정을 확인하세요.")
         plan = {'target': str(target), 'staged': str(staged), 'backup': str(transaction / 'previous'),
                 'dataDir': str(data), 'version': payload['version'], 'parentPid': payload['parentPid'],
                 'token': payload['token'], 'runtime': runtime}
@@ -302,7 +302,7 @@ def wait_parent(pid, timeout=45):
             return
         try:
             if kernel.WaitForSingleObject(handle, int(timeout*1000)) != 0:
-                raise TimeoutError('应用尚未退出，更新已取消。')
+                raise TimeoutError("앱이 종료되지 않았습니다. 업데이트가 취소되었습니다.")
         finally:
             kernel.CloseHandle(handle)
     else:
@@ -311,7 +311,7 @@ def wait_parent(pid, timeout=45):
             if not process_exists(pid):
                 return
             time.sleep(.2)
-        raise TimeoutError('应用尚未退出，更新已取消。')
+        raise TimeoutError("앱이 종료되지 않았습니다. 업데이트가 취소되었습니다.")
 
 
 def launch_app(target, transaction, plan, acknowledge=True):
@@ -336,7 +336,7 @@ def start_gateway(target, data_dir, desktop):
                                  timeout=35, env={**os.environ, 'PYINSTALLER_RESET_ENVIRONMENT': '1'})
     except subprocess.TimeoutExpired as error:
         detail = (error.stderr or b'').decode('utf-8', errors='replace').strip() or 'control process timed out'
-        raise RuntimeError('更新后的网关启动失败：' + detail) from error
+        raise RuntimeError('업데이트된 게이트웨이가 시작되지 않습니다.：' + detail) from error
     try:
         response = json.loads(command.stdout.decode('utf-8'))
     except (UnicodeDecodeError, ValueError):
@@ -344,13 +344,13 @@ def start_gateway(target, data_dir, desktop):
     if command.returncode or not response.get('ok'):
         detail = response.get('error') or command.stderr.decode('utf-8', errors='replace').strip() or (
             command.stdout.decode('utf-8', errors='replace').strip() or f'exit {command.returncode}')
-        raise RuntimeError('更新后的网关启动失败：' + detail)
+        raise RuntimeError('업데이트된 게이트웨이가 시작되지 않습니다.：' + detail)
     end = time.monotonic() + 40
     while time.monotonic() < end:
         if desktop.status()['running']:
             return
         time.sleep(.3)
-    raise TimeoutError('更新后的网关未就绪。')
+    raise TimeoutError("업데이트된 게이트웨이가 준비되지 않았습니다.")
 
 
 def check_app(child, transaction, plan):
@@ -358,7 +358,7 @@ def check_app(child, transaction, plan):
     while time.monotonic() < end:
         if child.poll() is not None:
             logs = child_log(transaction)
-            raise RuntimeError(f'更新后的应用未能启动（exit {child.poll()}）：' + (logs or '没有应用输出'))
+            raise RuntimeError(f'업데이트된 앱을 실행하지 못했습니다.（exit {child.poll()}）：' + (logs or '애플리케이션 출력 없음'))
         try:
             ack = json.loads((transaction / 'ack.json').read_text(encoding='utf-8'))
             if ack == {'token': plan['token'], 'version': plan['version'], 'dataDir': plan['dataDir']}:
@@ -367,7 +367,7 @@ def check_app(child, transaction, plan):
             pass
         time.sleep(.2)
     logs = child_log(transaction)
-    raise TimeoutError('更新后的应用未就绪：' + (logs or '没有应用输出，也未写入确认'))
+    raise TimeoutError('업데이트된 앱이 준비되지 않았습니다.：' + (logs or '신청서 출력 및 확인서 작성 없음'))
 
 
 def registry_version(target, version):
@@ -426,16 +426,16 @@ def apply(plan_file, *, desktop=None, wait=wait_parent, launch=launch_app, healt
         while True:
             state = desktop.status()
             if state.get('portOccupied'):
-                raise RuntimeError('网关状态发生变化，更新已取消。')
+                raise RuntimeError("게이트웨이 상태가 변경되었습니다. 업데이트가 취소되었습니다.")
             expected_id = plan['runtime'].get('instanceId')
             actual_id = state.get('instanceId')
             if expected_id and actual_id and actual_id != expected_id:
-                raise RuntimeError('网关状态发生变化，更新已取消。')
+                raise RuntimeError("게이트웨이 상태가 변경되었습니다. 업데이트가 취소되었습니다.")
             if state.get('running') == plan['runtime'].get('running'):
                 if not plan['runtime']['running'] or actual_id == expected_id:
                     break
             if time.monotonic() >= deadline:
-                raise RuntimeError('网关状态发生变化，更新已取消。')
+                raise RuntimeError("게이트웨이 상태가 변경되었습니다. 업데이트가 취소되었습니다.")
             time.sleep(.2)
         if plan['runtime']['running']:
             # Stop can return while the listener is finishing its final socket
@@ -453,7 +453,7 @@ def apply(plan_file, *, desktop=None, wait=wait_parent, launch=launch_app, healt
                     stop_error = error
                 state = desktop.status()
                 if state.get('portOccupied') or (state.get('instanceId') and state['instanceId'] != expected_id):
-                    raise RuntimeError('网关状态发生变化，更新已取消。')
+                    raise RuntimeError("게이트웨이 상태가 변경되었습니다. 업데이트가 취소되었습니다.")
                 if acknowledged or time.monotonic() >= stop_deadline:
                     break
                 time.sleep(.2)
@@ -461,13 +461,13 @@ def apply(plan_file, *, desktop=None, wait=wait_parent, launch=launch_app, healt
             while time.monotonic() < deadline:
                 state = desktop.status()
                 if state.get('portOccupied') or (state.get('instanceId') and state['instanceId'] != expected_id):
-                    raise RuntimeError('网关状态发生变化，更新已取消。')
+                    raise RuntimeError("게이트웨이 상태가 변경되었습니다. 업데이트가 취소되었습니다.")
                 if acknowledged and not state.get('running') and (not verified_pid or not process_exists(verified_pid)):
                     break
                 time.sleep(.2)
             else:
-                detail = str(stop_error) if stop_error else '实例仍在运行'
-                raise RuntimeError('网关尚未停止，更新已取消：' + detail)
+                detail = str(stop_error) if stop_error else '인스턴스가 아직 실행 중입니다.'
+                raise RuntimeError('게이트웨이가 중지되지 않았으며 업데이트가 취소되었습니다.：' + detail)
             stopped = True
             if os.name == 'nt' and verified_pid:
                 wait_parent(verified_pid, timeout=20)

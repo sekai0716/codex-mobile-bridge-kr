@@ -43,5 +43,5 @@ enum GatewayURL {
         let identifier = desktop ? thread.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._"))! : thread
         return URL(string: origin + "/#" + identifier + "~" + (host.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "local"))!
     }
-    struct InvalidURL: LocalizedError { var errorDescription: String? { "请填写完整的 HTTPS 网关地址，或局域网 HTTP 地址，不含路径、账号和参数。" } }
+    struct InvalidURL: LocalizedError { var errorDescription: String? { "컴퓨터 게이트웨이에서 제공한 전체 HTTPS 주소 또는 LAN HTTP 주소를 입력하세요. 사용자 정보나 쿼리 매개변수는 사용할 수 없습니다." } }
 }

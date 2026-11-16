@@ -21,5 +21,5 @@ class ThreadAccessTests(unittest.TestCase):
         rpc=Mock();rpc.request.return_value={'modelProvider':'wrong','model':'new'}
         with patch('bridge.features.sessions.access.ThreadAccessRPC') as factory:
             factory.return_value.__enter__.return_value=rpc
-            with self.assertRaisesRegex(ValueError,'接入未能更新'):
+            with self.assertRaisesRegex(ValueError,"기존\\ 채팅에\\ 대한\\ 액세스를\\ 업데이트할\\ 수\\ 없습니다\\.\\ 데스크톱\\ 앱을\\ 확인하세요\\."):
                 ThreadAccess(self.bridge()).restore([{'id':'old','provider':'old','model':'new'}])

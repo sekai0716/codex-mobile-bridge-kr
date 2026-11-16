@@ -36,7 +36,7 @@ test('management commands remain distinct, serialized, and use one persistent ow
 test('a UI timeout never replays a command or advances to another owner before completion',async()=>{
   const {children,worker}=fixture(20);
   const first=worker.call(options,'accounts',{action:'switch',id:'a'});
-  const rejected=assert.rejects(first,/超时/);
+  const rejected=assert.rejects(first,/시간이 초과/);
   const second=worker.call(options,'accounts',{action:'list'});
   // Attach a handler immediately so the failing implementation reports a test
   // assertion instead of an unhandled rejection while this test inspects it.
@@ -55,7 +55,7 @@ test('explicit close cancels queued commands and waits for old owner before a ne
   const {children,worker}=fixture();
   const first=worker.call(options,'accounts',{action:'login'});
   const second=worker.call(options,'accounts',{action:'delete',id:'must-not-run'});
-  const firstRejected=assert.rejects(first,/关闭/),secondRejected=assert.rejects(second,/关闭/);
+  const firstRejected=assert.rejects(first,/관리가 종료되었습니다/),secondRejected=assert.rejects(second,/관리가 종료되었습니다/);
   await tick();const old=children[0];worker.close();
   const next=worker.call({...options,dataDir:'new-profile'},'accounts',{action:'list'});
   await tick();assert.equal(children.length,1);assert.ok(old.ended);
@@ -69,7 +69,7 @@ test('explicit close cancels queued commands and waits for old owner before a ne
 test('a worker exit rejects the active command without retrying it',async()=>{
   const {children,worker}=fixture();
   const first=worker.call(options,'accounts',{action:'addApi'});
-  const rejected=assert.rejects(first,/退出/);
+  const rejected=assert.rejects(first,/종료/);
   await tick();children[0].emit('close',1);await rejected;await tick();
   assert.equal(children.length,1);assert.equal(children[0].writes.length,1);
   worker.close();

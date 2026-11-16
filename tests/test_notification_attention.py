@@ -48,7 +48,7 @@ class AttentionNotifications(unittest.TestCase):
         self.fail()
         events, send = self.scan()
         self.assertEqual([e['kind'] for e in events], ['attention'])
-        self.assertEqual(events[0]['title'], 'Codex 需要你处理')
+        self.assertEqual(events[0]['title'], 'Codex 당신이 처리해야')
         self.assertEqual(send.call_args.kwargs['event'], 'task.attention')
         self.assertNotIn(CAPACITY, str(events))
         self.assertNotIn('private title', str(events))
@@ -163,7 +163,7 @@ class AttentionNotifications(unittest.TestCase):
         event = {'kind': 'attention', 'threadId': 'fixture', 'host': 'desktop:claude', 'sequence': 4}
         for kind in ('fcm', 'apns'):
             body = payload({'kind': kind, 'origin': 'https://test.invalid', 'token': 'fixture', 'sourceIcon': True}, event)
-            self.assertIn('运行遇到问题，需要你处理', str(body))
+            self.assertIn('실행에 문제가 있으며 이를 처리해야 합니다.', str(body))
             self.assertIn('desktop:claude', str(body))
 
 

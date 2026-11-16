@@ -72,7 +72,7 @@ public class ArtifactRangeTests {
     ArtifactDownload.Task task=new ArtifactDownload.Task(base+ATTACHMENT,base,directory.toFile());AtomicBoolean stop=new AtomicBoolean();task.run(cookies,t->{if(t.downloaded>=ArtifactDownload.CHUNK&&stop.compareAndSet(false,true))t.pause();});long partial=task.downloaded;
     conflict.set(code);task.run(cookies,null);boolean changedFile=code.equals("download_changed");
     check(task.state==ArtifactDownload.State.FAILED&&task.restartRequired==changedFile&&task.resumable()!=changedFile,"409 "+code+" classified");check(task.downloaded==partial,"409 error body never appended");
-    if(changedFile)check(task.error.equals("文件已发生变化，请重新下载"),"409 changed message");
+    if(changedFile)check(task.error.equals("파일이 변경되었습니다. 다운로드를 다시 시작하세요."),"409 changed message");
     conflict.set(null);if(!changedFile){task.run(cookies,null);check(task.state==ArtifactDownload.State.COMPLETE&&Arrays.equals(Files.readAllBytes(task.result().file.toPath()),payload),"temporary 409 resumes existing partial");}
     task.cancel();clean(directory);
    }

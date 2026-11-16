@@ -3,15 +3,15 @@ const {spawn}=require('node:child_process');
 const path=require('node:path');
 function runWorker({executable,prefix=[],dataDir},action,payload){
   const allowed=new Set(['tailscale-setup','read-credentials','server-setup','connection-credentials','snapshot','save','start','stop','logs','test-notification','webhook-endpoint','network-adaptation','deployment','export-deployment','check-entry','devices','pairing','account', 'accounts', 'cli-access', 'harness', 'desktop-sessions','notification-watches','transfer-settings','update-preflight','update-prepare']);
-  if(!allowed.has(action))return Promise.reject(Error('未知操作'));
+  if(!allowed.has(action))return Promise.reject(Error('알 수 없는 작업입니다.'));
   return new Promise((resolve,reject)=>{
     const child=spawn(executable,[...prefix,action,'--data-dir',dataDir],{stdio:['pipe','pipe','pipe'],windowsHide:true});
     let output='',error='';
-    const timer=setTimeout(()=>{child.kill();reject(Error('本地操作超时，请检查运行日志'));},action==='server-setup'?300000:action==='connection-credentials'?60000:action==='update-prepare'?180000:['account','accounts','cli-access','harness','desktop-sessions'].includes(action)?150000:action==='notification-watches'?45000:25000);
+    const timer=setTimeout(()=>{child.kill();reject(Error('로컬 작업 시간이 초과되었습니다. 실행 로그를 확인하세요.'));},action==='server-setup'?300000:action==='connection-credentials'?60000:action==='update-prepare'?180000:['account','accounts','cli-access','harness','desktop-sessions'].includes(action)?150000:action==='notification-watches'?45000:25000);
     child.stdout.setEncoding('utf8');child.stdout.on('data',data=>{output+=data;});
     child.stderr.setEncoding('utf8');child.stderr.on('data',data=>{error+=data;});
-    child.on('error',err=>{clearTimeout(timer);reject(Error('无法启动网关运行时：'+err.message));});
-    child.on('close',()=>{clearTimeout(timer);try{const value=JSON.parse(output.trim());if(!value.ok)throw Object.assign(Error(value.error),{validation:value.validation});resolve(value.result);}catch(e){reject(output.trim()?e:Error('网关运行时未返回结果，请检查日志或重新安装应用'));}});
+    child.on('error',err=>{clearTimeout(timer);reject(Error('게이트웨이 런타임을 시작할 수 없습니다.：'+err.message));});
+    child.on('close',()=>{clearTimeout(timer);try{const value=JSON.parse(output.trim());if(!value.ok)throw Object.assign(Error(value.error),{validation:value.validation});resolve(value.result);}catch(e){reject(output.trim()?e:Error('게이트웨이가 실행 중일 때 결과가 반환되지 않았습니다. 로그를 확인하거나 앱을 다시 설치하세요.'));}});
     child.stdin.on('error',()=>{});child.stdin.end(payload===undefined?'':JSON.stringify(payload));
   });
 }
@@ -22,7 +22,7 @@ function workerFor({packaged,resources,root,dataDir}){
 // One private read-only worker per controller. Writes remain one-shot commands.
 function createSnapshotWorker({launch=spawn,timeout=25000}={}){
   let child,key,pending,buffer='';
-  function close(error=Error('状态查询已关闭')){
+  function close(error=Error('현황조회가 마감되었습니다')){
     const old=child;child=null;key=null;buffer='';
     if(pending){clearTimeout(pending.timer);pending.reject(error);pending=null;}
     old?.kill();
@@ -35,7 +35,7 @@ function createSnapshotWorker({launch=spawn,timeout=25000}={}){
       child=launch(options.executable,[...(options.prefix||[]),'snapshot-stream','--data-dir',options.dataDir],{stdio:['pipe','pipe','pipe'],windowsHide:true});
       key=next;const current=child;
       const failed=error=>{if(child===current)close(error);};
-      current.on('error',failed);current.on('close',()=>failed(Error('状态查询进程已退出')));
+      current.on('error',failed);current.on('close',()=>failed(Error('상태 쿼리 프로세스가 종료되었습니다.')));
       current.stdin.on('error',failed);current.stderr.on('data',()=>{});
       current.stdout.setEncoding('utf8');
       current.stdout.on('data',data=>{
@@ -51,7 +51,7 @@ function createSnapshotWorker({launch=spawn,timeout=25000}={}){
       });
     }
     let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});
-    pending={promise,resolve,reject,timer:setTimeout(()=>close(Error('状态查询超时')),timeout)};
+    pending={promise,resolve,reject,timer:setTimeout(()=>close(Error('상태 쿼리 시간 초과')),timeout)};
     child.stdin.write(JSON.stringify({action:'snapshot'})+'\n');
     return promise;
   }
@@ -75,7 +75,7 @@ function createManagementWorker({launch=spawn,timeout=150000}={}){
     // services. Its process exit, not the UI timeout, releases ownership.
     current.child.stdin.end();
   }
-  function close(error=Error('本机管理已关闭')){
+  function close(error=Error('현지 관리가 종료되었습니다.')){
     generation++;
     if(pending){clearTimeout(pending.timer);pending.reject(error);}
     retire(owner);
@@ -85,7 +85,7 @@ function createManagementWorker({launch=spawn,timeout=150000}={}){
     if(owner&&(owner.key!==key||owner.retiring)){
       const old=owner;retire(old);await old.exited;
     }
-    if(epoch!==generation)throw Error('本机管理已关闭');
+    if(epoch!==generation)throw Error('현지 관리가 종료되었습니다.');
     if(!owner){
       const child=launch(options.executable,[...(options.prefix||[]),'management-stream','--data-dir',options.dataDir],{stdio:['pipe','pipe','pipe'],windowsHide:true});
       let release;const exited=new Promise(resolve=>{release=resolve;});
@@ -97,7 +97,7 @@ function createManagementWorker({launch=spawn,timeout=150000}={}){
       };
       child.on('error',failed);
       child.on('close',()=>{
-        if(owner===current){finish(Error('本机管理进程已退出'));owner=null;}
+        if(owner===current){finish(Error('로컬 관리 프로세스가 종료되었습니다.'));owner=null;}
         release();
       });
       child.stdin.on('error',failed);child.stderr.on('data',()=>{});child.stdout.setEncoding('utf8');
@@ -119,12 +119,12 @@ function createManagementWorker({launch=spawn,timeout=150000}={}){
     let resolve,reject;const result=new Promise((yes,no)=>{resolve=yes;reject=no;});
     const dispatch=queue.then(async()=>{
       const current=await ensure(options,epoch);
-      if(epoch!==generation)throw Error('本机管理已关闭');
+      if(epoch!==generation)throw Error('현지 관리가 종료되었습니다.');
       await new Promise(done=>{
         pending={resolve,reject,done,timer:setTimeout(()=>{
           // Tell the caller its outcome is unknown, but keep the internal queue
           // occupied until the original response or worker exit. Never replay.
-          reject(Error('本机操作超时，请刷新状态确认结果'));
+          reject(Error('로컬 작업 시간이 초과되었습니다. 결과를 확인하려면 상태를 새로고침하세요.'));
         },timeout)};
         try{current.child.stdin.write(JSON.stringify({action,payload})+'\n');}
         catch(error){clearTimeout(pending.timer);reject(error);retire(current);}

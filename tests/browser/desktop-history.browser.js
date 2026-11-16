@@ -21,7 +21,7 @@ async function runDesktopHistoryBrowserChecks(){
     request:async(url,body)=>{
       calls.push({url,body});if(body)throw Error('Unexpected control request');
       if(url.includes('historyBefore='))return new Promise(resolve=>finishOlder=resolve);
-      if(url.includes('/detail')){if(failDetail)throw Error('找不到此本机 ZCode 聊天');return {...recent,session:{...recent.session,id:new URL(url,location.href).searchParams.get('sessionId')}};}
+      if(url.includes('/detail')){if(failDetail)throw Error('이 기계를 찾을 수 없습니다 ZCode 채팅');return {...recent,session:{...recent.session,id:new URL(url,location.href).searchParams.get('sessionId')}};}
       if(url.includes('/workspace'))return {entries:[],total:0,project:'/fixture'};
       return {sessions:[{id:'fixture',title:'History fixture',backend:'code'}]};
     }});
@@ -67,10 +67,10 @@ async function runDesktopHistoryBrowserChecks(){
     await expandImage('40',260);
     check(Math.abs(view.messageNodes.get('77').node.getBoundingClientRect().top-beforeResize)<3,'An image loading above the reader preserves the visible message');
     view.backToList();failDetail=true;await view.open('unavailable');
-    check(!view.messages.textContent.includes('正在读取聊天')&&!view.title.textContent.includes('正在读取聊天'),'A failed read clears the loading placeholder');
-    check(view.notice.textContent.includes('找不到此本机 ZCode 聊天')&&view.send.disabled,'Read failure is shown at the top, with writes disabled');
+    check(!view.messages.textContent.includes('채팅 읽기')&&!view.title.textContent.includes('채팅 읽기'),'A failed read clears the loading placeholder');
+    check(view.notice.textContent.includes('이 기계를 찾을 수 없습니다 ZCode 채팅')&&view.send.disabled,'Read failure is shown at the top, with writes disabled');
     failDetail=false;view.notice.querySelector('button').click();await until(()=>view.freshDetail);
-    check(!view.notice.textContent.includes('找不到此本机 ZCode 聊天'),'Successful retry clears the read error');
+    check(!view.notice.textContent.includes('이 기계를 찾을 수 없습니다 ZCode 채팅'),'Successful retry clears the read error');
     return {width:innerWidth,passed:checks.length,checks};
   }finally{view.clear();root.remove();}
 }

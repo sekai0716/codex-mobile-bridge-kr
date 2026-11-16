@@ -1,16 +1,8 @@
 'use strict';
 const {test, expect} = require('@playwright/test');
-const fragment = `<section id="viz-test" class="viz-grid"><label class="form-label">数量<input id="amount" class="form-range" type="range" min="1" max="10" value="2"></label><output id="result" class="tabular-nums">4</output><button id="follow" class="btn">继续分析</button><button id="volatile" class="btn">0</button><div class="nav nav-pills" role="tablist" aria-label="图表模式"><button id="tab-a" class="nav-link active" role="tab" aria-selected="true" aria-controls="panel-a">数值</button><button id="tab-b" class="nav-link" role="tab" aria-selected="false" aria-controls="panel-b">图形</button></div><div id="panel-a" role="tabpanel">数值面板</div><div id="panel-b" role="tabpanel" hidden>图形面板</div></section>
-<script>
-const input=document.getElementById('amount'), result=document.getElementById('result');
-const saved=window.openai.widgetState?.privateContent?.amount;if(saved)input.value=saved;
-function paint(){result.textContent=String(Number(input.value)*2)}paint();
-document.getElementById('volatile').onclick=event=>event.target.textContent=String(Number(event.target.textContent)+1);
-input.oninput=async()=>{paint();await window.openai.setWidgetState({privateContent:{amount:Number(input.value)}});result.dataset.saved='yes'};
-document.getElementById('follow').onclick=()=>window.openai.sendFollowUpMessage({prompt:'分析数量 '+input.value,title:'分析'});
-</script>`;
+const fragment = `<section id="viz-test" class="viz-grid"><label class="form-label">세다<input id="amount" class="form-range" type="range" min="1" max="10" value="2"></label><output id="result" class="tabular-nums">4</output><button id="follow" class="btn">계속 분석</button><button id="volatile" class="btn">0</button><div class="nav nav-pills" role="tablist" aria-label="차트 패턴"><button id="tab-a" class="nav-link active" role="tab" aria-selected="true" aria-controls="panel-a">수치</button><button id="tab-b" class="nav-link" role="tab" aria-selected="false" aria-controls="panel-b">제도법</button></div><div id="panel-a" role="tabpanel">값 패널</div><div id="panel-b" role="tabpanel" hidden>그래픽 패널</div></section>\n<script>\nconst input=document.getElementById('amount'), result=document.getElementById('result');\nconst saved=window.openai.widgetState?.privateContent?.amount;if(saved)input.value=saved;\nfunction paint(){result.textContent=String(Number(input.value)*2)}paint();\ndocument.getElementById('volatile').onclick=event=>event.target.textContent=String(Number(event.target.textContent)+1);\ninput.oninput=async()=>{paint();await window.openai.setWidgetState({privateContent:{amount:Number(input.value)}});result.dataset.saved='yes'};\ndocument.getElementById('follow').onclick=()=>window.openai.sendFollowUpMessage({prompt:'수량 분석 '+input.value,title:'분석하다'});\n</script>`;
 const file = {id:'a'.repeat(64), name:'slider.html', reference:'/fixture/slider.html', references:['/fixture/slider.html'], image:false, visualization:true};
-const marker = '\ue200visualize\ue202' + JSON.stringify({path:file.reference, mode:'wide', title:'交互测试'}) + '\ue201';
+const marker = '\ue200visualize\ue202' + JSON.stringify({path:file.reference, mode:'wide', title:'대화형 테스트'}) + '\ue201';
 
 async function setup(page, context, baseURL, {source=fragment, text=marker, failed=false}={}) {
   const requests = {writes:[], reads:0, blocked:[]};
@@ -57,9 +49,9 @@ test('visualize restores saved parameters after reopening the page', async ({pag
 });
 
 test('visualize is interactive, themed, persistent, fullscreen and isolated', async ({page,context,baseURL}) => {
-  const requests=await setup(page,context,baseURL,{text:'说明\n'+marker});
+  const requests=await setup(page,context,baseURL,{text:'설명하다\n'+marker});
   await expect(frame(page).locator('#result')).toHaveText('4');
-  await expect(page.getByRole('button',{name:'全屏查看'})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'전체 화면'})).toBeEnabled();
   await expect(page.locator('.visualize-surface[open]')).toHaveCount(0);
   await frame(page).locator('#amount').fill('7');
   await frame(page).locator('#amount').dispatchEvent('input');
@@ -75,15 +67,15 @@ test('visualize is interactive, themed, persistent, fullscreen and isolated', as
   await frame(page).locator('#follow').click();
   await expect(page.locator('.visualize-followup')).toBeVisible();
   expect(await page.evaluate(()=>visualizePrompt)).toEqual([]);
-  await page.getByRole('button',{name:'放入输入框'}).click();
-  expect(await page.evaluate(()=>visualizePrompt)).toEqual(['分析数量 7']);
+  await page.getByRole('button',{name:'메시지에 추가'}).click();
+  expect(await page.evaluate(()=>visualizePrompt)).toEqual(['수량 분석 7']);
   expect(requests.writes).toEqual([]);
   await frame(page).locator('#volatile').click();
-  await page.getByRole('button',{name:'全屏查看'}).click();
+  await page.getByRole('button',{name:'전체 화면'}).click();
   await expect(page.locator('.visualize-dialog')).toBeVisible();
   await expect(frame(page).locator('#volatile')).toHaveText('1');
   await expect(frame(page).locator('#result')).toHaveText('14');
-  await page.locator('.visualize-dialog').getByRole('button',{name:'关闭',exact:true}).click();
+  await page.locator('.visualize-dialog').getByRole('button',{name:'닫기',exact:true}).click();
   await expect(page.locator('.visualize-dialog')).toHaveCount(0);
   await expect(page.locator('.visualize-surface[open]')).toHaveCount(0);
   await expect(frame(page).locator('#volatile')).toHaveText('1');
@@ -94,8 +86,8 @@ test('visualize is interactive, themed, persistent, fullscreen and isolated', as
 
 test('visualize retries source failures and keeps user text and fenced references inert',async({page,context,baseURL})=>{
   const requests=await setup(page,context,baseURL,{failed:true});
-  await expect(page.getByRole('button',{name:'重试',exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'重试',exact:true}).click();
+  await expect(page.getByRole('button',{name:'다시 시도',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'다시 시도',exact:true}).click();
   await expect(frame(page).locator('#result')).toHaveText('4');
   const count=requests.reads;
   await page.evaluate(()=>paintVisualize('```\n'+String.fromCharCode(0xe200)+'visualize'+String.fromCharCode(0xe202)+'{"path":"/fixture/slider.html"}'+String.fromCharCode(0xe201)+'\n```'));
@@ -136,13 +128,13 @@ test('the production timeline keeps live frames stable and restores widget state
   await frame(page).locator('#volatile').click();
   await page.evaluate(()=>visualizeTimeline.apply({...visualizePage,sequence:2},false));
   await expect(frame(page).locator('#volatile')).toHaveText('1');
-  await page.evaluate(()=>visualizeTimeline.apply({...visualizePage,sequence:3,rows:[{...visualizePage.rows[0],version:'v2',text:'追加说明\n\n'+visualizePage.rows[0].text}]},false));
+  await page.evaluate(()=>visualizeTimeline.apply({...visualizePage,sequence:3,rows:[{...visualizePage.rows[0],version:'v2',text:'추가 설명\n\n'+visualizePage.rows[0].text}]},false));
   await expect(frame(page).locator('#result')).toHaveText('16');
   await page.evaluate(()=>visualizeTimeline.apply({...visualizePage,sequence:4,rows:[{...visualizePage.rows[0],key:'another-message'}]},true));
   await expect(frame(page).locator('#result')).toHaveText('4');
   await page.evaluate(()=>visualizeTimeline.apply({...visualizePage,sequence:5},true));
   await expect(frame(page).locator('#result')).toHaveText('16');
-  await page.getByRole('button',{name:'全屏查看'}).click();
+  await page.getByRole('button',{name:'전체 화면'}).click();
   await expect(page.locator('.visualize-dialog')).toBeVisible();
   await page.evaluate(()=>visualizeTimeline.dispose());
   await expect(page.locator('.visualize-stage iframe')).toHaveCount(0);

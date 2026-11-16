@@ -8,7 +8,7 @@ window.checkCodexEntries = async function checkCodexEntries() {
   await until(()=>clientNavigation.clients.length===3);
   assert(!document.getElementById('codex-entries'),'old entry controls removed');
   clientNavigation.openManager();
-  const scan=[...clientNavigation.manager.dialog.querySelectorAll('button')].find(button=>button.textContent==='扫描 WSL 应用');
+  const scan=[...clientNavigation.manager.dialog.querySelectorAll('button')].find(button=>button.textContent==='스캐닝 WSL 애플리케이션');
   assert(scan,'WSL scan belongs to Codex management');await scan.onclick();
   let row=clientNavigation.manager.list.querySelector('[data-client-id="'+wsl+'"]');
   assert(row?.parentElement.classList.contains('client-management-group'),'WSL is nested inside Codex management');
@@ -17,11 +17,11 @@ window.checkCodexEntries = async function checkCodexEntries() {
   await row.querySelector('[role=switch]').onclick();
   row=clientNavigation.manager.list.querySelector('[data-client-id="'+wsl+'"]');
   assert(row.querySelector('[role=switch]').getAttribute('aria-checked')==='true','WSL has its own enable switch');
-  [...row.querySelectorAll('button')].find(button=>button.textContent==='查看聊天').click();
+  [...row.querySelectorAll('button')].find(button=>button.textContent==='채팅 보기').click();
   await until(()=>!listLoading&&listSource==='wsl'&&rows().length===1);
   assert(clientNavigation.provider==='codex','WSL uses the single Codex application');
   assert(rows()[0].dataset.host===wsl&&rows()[0].querySelector('.session-source').textContent==='WSL','WSL retains its environment and source badge');
-  assert([...document.getElementById('source-filter').options].map(option=>option.textContent).join('|')==='全部会话|CLI|APP|WSL','all four filter choices are available');
+  assert([...document.getElementById('source-filter').options].map(option=>option.textContent).join('|')==='모든 세션|CLI|APP|WSL','all four filter choices are available');
   await filter('all');assert(rows().length===3,'all sessions combines APP, CLI and WSL');
   assert(rows().map(row=>row.dataset.host+'|'+row.dataset.id).length===new Set(rows().map(row=>row.dataset.host+'|'+row.dataset.id)).size,'same thread UUID in different environments stays distinct');
   assert(rows().map(row=>row.querySelector('.session-source').textContent).join('|')==='WSL|APP|CLI','mixed sessions share recency ordering');
@@ -77,7 +77,7 @@ window.checkCodexEntries = async function checkCodexEntries() {
   assert(document.getElementById('message').value!=='WSL draft fixture','APP does not inherit the WSL draft with the same UUID');
   document.getElementById('message').value='APP draft fixture';await openChat(sid,wsl);
   assert(document.getElementById('message').value==='WSL draft fixture','WSL draft survives APP switching');
-  const disabling=clientNavigation.toggle('codex',false);await until(()=>document.querySelector('.client-disable-dialog'));[...document.querySelectorAll('.client-disable-dialog button')].find(button=>button.textContent.startsWith('仅停用手机接入')).click();await disabling;assert(clientNavigation.provider==='codex','WSL-only state keeps Codex accessible');
+  const disabling=clientNavigation.toggle('codex',false);await until(()=>document.querySelector('.client-disable-dialog'));[...document.querySelectorAll('.client-disable-dialog button')].find(button=>button.textContent.startsWith('모바일 액세스만 비활성화')).click();await disabling;assert(clientNavigation.provider==='codex','WSL-only state keeps Codex accessible');
   await document.getElementById('new-chat').onclick();assert(document.getElementById('new-chat-type').value==='wsl','WSL-only creation does not require a native App');document.getElementById('new-chat-dialog').close();
   await clientNavigation.toggle('codex',true);await clientNavigation.toggle(wsl,false);await loadList(true);
   assert(clientNavigation.provider==='codex','disabling WSL keeps the native Codex page');assert(currentId===null,'disabling the current environment closes its live chat view');
@@ -106,7 +106,7 @@ window.checkCodexProjectCreation=async function({assert:report}={}){
     assert(document.getElementById('new-chat-submit').disabled,'a CLI chat cannot be created until its directory is selected');
     await document.getElementById('new-chat-directory-browse').onclick();
     assert(document.getElementById('folder-picker').open&&folderPickerData.path===target.home,'shared directory picker opens in the selected native environment');
-    assert(document.getElementById('folder-picker-environment').textContent.includes(target.host==='local'?'此电脑':'Research server'),'directory picker displays the native environment identity');
+    assert(document.getElementById('folder-picker-environment').textContent.includes(target.host==='local'?'이 컴퓨터':'Research server'),'directory picker displays the native environment identity');
     assert(!document.getElementById('folder-picker-new-folder').open,'native directory creation begins collapsed');
     document.getElementById('folder-picker-new-folder').open=true;document.getElementById('folder-picker-name').value=target.name;await document.getElementById('folder-picker-create').onclick();
     assert(folderPickerData.path===target.home+'/'+target.name,'native directory creation keeps the selected environment and parent');

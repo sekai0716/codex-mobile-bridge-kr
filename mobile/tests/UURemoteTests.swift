@@ -22,12 +22,12 @@ import Foundation
         open("pip"); precondition(urls.count == 1)
         let nonce = value(bind,"nonce")!
         precondition(reply("nonce=wrong&anonymous_device_id=no") == "")
-        precondition(reply("nonce=" + nonce + "&anonymous_device_id=A%2BB%2F%3D")?.contains("已绑定") == true)
+        precondition(reply("nonce=" + nonce + "&anonymous_device_id=A%2BB%2F%3D")?.contains("경계") == true)
         precondition(reply("nonce=" + nonce + "&anonymous_device_id=replay") == "")
         open("pip"); let target = urls.last!
         precondition(value(target,"anonymous_device_id") == "A+B/=" && value(target,"window_type") == "1")
         let callback = URL(string:value(target,"callback")!)!
-        precondition(uu.callback(URL(string:callback.absoluteString + "&status=success")!) == "UU 小窗已开启")
+        precondition(uu.callback(URL(string:callback.absoluteString + "&status=success")!) == "UU Remote 작은 화면이 열렸습니다.")
         open("full"); precondition(value(urls.last!,"window_type") == "0" && value(urls.last!,"callback") == nil)
         pip = false; let count = urls.count; open("pip"); precondition(urls.count == count)
         uu.scope = "computer-b"; _ = uu.settings("enable")
@@ -38,7 +38,7 @@ import Foundation
         open("full"); precondition(value(urls.last!,"anonymous_device_id") == "A+B/=")
         pip = true; open("pip")
         let expired = URL(string:value(urls.last!,"callback")! + "&status=failure&reason=device_not_found")!
-        precondition(uu.callback(expired)?.contains("失效") == true)
+        precondition(uu.callback(expired)?.contains("유효하지 않은") == true)
         open("full"); precondition(urls.last!.path == "/device/authorize")
         let removed = value(urls.last!,"nonce")!; uu.remove("computer-a")
         precondition(reply("nonce=" + removed + "&anonymous_device_id=stale") == "")

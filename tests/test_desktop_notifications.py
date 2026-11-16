@@ -43,7 +43,7 @@ class DesktopNotificationTests(unittest.TestCase):
         events = self.scan()
         self.assertEqual(len(events), 2)
         self.assertEqual({e['host'] for e in events}, {'desktop:claude', 'desktop:deepseek'})
-        self.assertEqual({e['title'] for e in events}, {'Claude 需要你的确认', 'DSH 需要你的确认'})
+        self.assertEqual({e['title'] for e in events}, {'Claude 당신의 확인이 필요합니다', 'DSH 당신의 확인이 필요합니다'})
         self.assertTrue(all(e['kind'] == 'request' for e in events))
         self.assertEqual(len(self.scan()), 2)
         self.assertNotIn('private title', str(events))
@@ -54,7 +54,7 @@ class DesktopNotificationTests(unittest.TestCase):
         self.turns['claude'].append({'turnId': 'new-result-uuid', 'status': 'completed'})
         events = self.scan()
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0]['title'], 'Claude 运行已完成')
+        self.assertEqual(events[0]['title'], 'Claude 실행 완료')
         self.assertEqual(events[0]['kind'], 'completion')
         self.assertEqual(len(self.scan()), 1)
 
@@ -64,7 +64,7 @@ class DesktopNotificationTests(unittest.TestCase):
         self.scan()
         self.rows[1]['status'] = 'idle'
         self.turns['deepseek'][-1]['status'] = 'completed'
-        self.assertEqual(self.scan()[0]['title'], 'DSH 运行已完成')
+        self.assertEqual(self.scan()[0]['title'], 'DSH 실행 완료')
 
     def test_failed_turn_requires_attention_but_idle_without_native_end_does_not(self):
         self.scan()
@@ -111,7 +111,7 @@ class DesktopNotificationTests(unittest.TestCase):
         with patch('bridge.features.notifications.channels.publish') as publish:
             self.scan()
             self.assertEqual(publish.call_count, 1)
-            self.assertEqual(publish.call_args.args[1], 'DSH 运行已完成')
+            self.assertEqual(publish.call_args.args[1], 'DSH 실행 완료')
 
     def test_notice_links_encode_native_ids_and_preserve_provider(self):
         sid = 'native/~ id'

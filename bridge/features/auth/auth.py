@@ -14,6 +14,16 @@ from pathlib import Path
 from bridge.features.accounts.draft_identity import draft_identity
 
 
+INITIAL_CREDENTIAL_NAMES = ('첫 로그인.txt', '\u9996\u6b21\u767b\u5f55.txt')
+
+
+def initial_credentials_path(directory):
+    """한국어 파일을 우선하되 기존 데이터 디렉터리의 로그인 정보도 읽을 수 있게 한다."""
+    directory = Path(directory)
+    return next((directory / name for name in INITIAL_CREDENTIAL_NAMES if (directory / name).is_file()),
+                directory / INITIAL_CREDENTIAL_NAMES[0])
+
+
 @contextmanager
 def session_file_lock(path):
     """Serialize session-file replacements across gateway and desktop processes."""
@@ -48,7 +58,7 @@ def replace_session_file(path, contents):
 
 def session_hours(value):
     if type(value) is not int or not 0 <= value <= 87600:
-        raise ValueError('登录有效期必须为 0–87600 的整数小时')
+        raise ValueError("로그인 유효 기간은 0~87600시간 사이의 정수여야 합니다.")
     return value
 
 
@@ -61,20 +71,20 @@ def canonical_ip(value):
 
 def access_policy(value):
     if not isinstance(value, dict) or type(value.get('allowlistEnabled', False)) is not bool:
-        raise ValueError('IP 访问规则格式不正确')
+        raise ValueError("잘못된 IP 액세스 규칙")
     result = {'allowlistEnabled': value.get('allowlistEnabled', False)}
     for key in ('allowlist', 'blocklist', 'trustedProxies'):
         entries = value.get(key, [])
         if not isinstance(entries, list) or len(entries) > 256:
-            raise ValueError('IP 列表最多允许 256 个地址')
+            raise ValueError("각 IP 목록은 최대 256개의 주소를 지원합니다.")
         try:
             if any(not isinstance(item, str) or '%' in item for item in entries):
                 raise ValueError()
             result[key] = list(dict.fromkeys(canonical_ip(item.strip()) for item in entries))
         except ValueError:
-            raise ValueError('请填写有效的 IPv4 或 IPv6 地址，每行一个') from None
+            raise ValueError("유효한 IPv4 또는 IPv6 주소를 한 줄에 하나씩 입력하세요.") from None
     if result['allowlistEnabled'] and not result['allowlist']:
-        raise ValueError('启用白名单前，请至少添加一个允许访问的 IP')
+        raise ValueError("허용 목록을 활성화하기 전에 허용된 IP를 하나 이상 추가하세요.")
     return result
 
 
@@ -161,7 +171,7 @@ class Auth:
         with session_file_lock(self.path):
             current = self.path.read_bytes() if self.path.exists() else None
             if current != self._loaded:
-                raise ValueError('设备授权已变化，请刷新后重试')
+                raise ValueError('기기 인증이 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
             contents = json.dumps({'identity': self.identity, 'cookieName': self.cookie_name, 'policy': self.policy, 'sessions': self.sessions, 'failures': self.failures, 'autoBlocks': self.auto_blocks}).encode('utf-8')
             replace_session_file(self.path, contents)
             self._loaded = contents
@@ -183,7 +193,7 @@ class Auth:
                 return
             saved = json.loads(before)
             if saved['identity'] != old_identity:
-                raise ValueError('设备授权已变化，请刷新后重试')
+                raise ValueError('기기 인증이 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
             migrated = {**saved, 'identity': new_identity,
                         'sessions': {key: session for key, session in saved['sessions'].items()
                                      if cls.valid(session) and session.get('trustedDevice') is True
@@ -233,13 +243,13 @@ class Auth:
 
     def login(self, username, password, address, user_agent='', client=None, remember=None):
         if remember is not None and type(remember) is not bool:
-            raise ValueError('记住密码选项格式不正确')
+            raise ValueError("잘못된 기억 옵션")
         address = canonical_ip(address)
         # Serialize validation and durable accounting: simultaneous requests must
         # not create extra password attempts or clear a newly applied block.
         with self.lock:
             if not self.permitted(address):
-                raise LoginRejected('此 IP 已被封禁，请在电脑网关 App 的“登录设备”中解除。', self.login_status(address))
+                raise LoginRejected("이 IP는 차단되었습니다. 데스크톱 게이트웨이 앱의 로그인 장치에서 차단을 해제하세요.", self.login_status(address))
             if self.config.get('mode', 'password') != 'none':
                 digest = hashlib.pbkdf2_hmac('sha256', password.encode(), bytes.fromhex(self.config['salt']), self.config['iterations'], dklen=32)
                 valid = hmac.compare_digest(digest.hex(), self.config['hash']) and hmac.compare_digest(username.encode(), self.config['username'].encode())
@@ -251,8 +261,8 @@ class Auth:
                                                      'blockedAt': time.time(), 'attempts': count}
                         self.sessions = {k: v for k, v in self.sessions.items() if v['ip'] != address}
                     self.persist()
-                    message = ('此 IP 已被封禁，请在电脑网关 App 的“登录设备”中解除。'
-                               if address in self.auto_blocks else '账号或密码不正确')
+                    message = ("이 IP는 차단되었습니다. 데스크톱 게이트웨이 앱의 로그인 장치에서 차단을 해제하세요."
+                               if address in self.auto_blocks else '계정이나 비밀번호가 올바르지 않습니다.')
                     raise LoginRejected(message, self.login_status(address))
             self.failures.pop(address, None)
             return self.new_session(address, user_agent, client, remember)
@@ -260,7 +270,7 @@ class Auth:
     def new_session(self, address='', user_agent='', client=None, remember=None):
         with self.lock:
             if address and not self.permitted(address):
-                raise PermissionError('此 IP 已被访问规则禁止')
+                raise PermissionError("이 IP는 액세스 규칙에 의해 차단되었습니다.")
             now = time.time()
             trusted = self.mobile_client(user_agent)
             hours = 0 if trusted else self.REMEMBER_HOURS if remember is True else self.hours
@@ -340,7 +350,7 @@ class Auth:
                     self.sessions.pop(value.get('id'), None)
                 self.persist()
             elif action != 'list':
-                raise ValueError('未知设备管理操作')
+                raise ValueError('알 수 없는 장치 관리 작업')
             return {'policy': {k: list(v) if isinstance(v, list) else v for k, v in self.policy.items()},
                     'autoBlocks': sorted(self.auto_blocks.values(), key=lambda row: row['blockedAt'], reverse=True),
                     'sessions': sorted([{'id': k, **{field: val for field, val in v.items() if field not in ('csrf', 'routeBindings', 'routeRenewal', 'routeLegacyRenewal')}}

@@ -272,7 +272,7 @@ class CurrentLoginTests(unittest.TestCase):
             rpc.limits['rateLimits']['primary'].update(usedPercent=0, resetsAt=now+18000)
             clock.return_value = now+301
             self.manager.monitor.scan()
-            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 额度不足', 'Codex 额度已恢复'])
+            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 사용량 한도 부족', 'Codex 사용량 한도 갱신'])
             AccountMonitor(self.manager).scan()
             self.assertEqual(send.call_count, 2)
 

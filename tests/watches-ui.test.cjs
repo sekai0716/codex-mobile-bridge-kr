@@ -44,16 +44,16 @@ test('in-flight mutation blocks duplicate clicks and stale snapshots cannot resu
   ui.panel.render(ui.value,revision);assert.doesNotMatch(ui.text(),/Local chat/);
 });
 test('failed saves restore the checked value and surface translated error',async()=>{
-  const ui=fixture();ui.setChange(()=>{throw Error("Error invoking remote method 'bridge:notification-watches': Error: 请重新启动网关以管理会话通知");});
+  const ui=fixture();ui.setChange(()=>{throw Error("Error invoking remote method 'bridge:notification-watches': Error: 채팅 알림을 관리하려면 게이트웨이를 다시 시작하세요.");});
   const input=ui.all().find(n=>n.tag==='input');input.checked=true;input.onchange({stopPropagation(){}});await new Promise(setImmediate);
-  assert.equal(ui.all().find(n=>n.tag==='input').checked,false);assert.match(ui.text(),/重新启动/);
+  assert.equal(ui.all().find(n=>n.tag==='input').checked,false);assert.match(ui.text(),/다시 시작/);
   ui.language();assert.match(ui.text(),/Restart the gateway/);
 });
 test('changing data directory ignores an old response; offline and disabled channels remain manageable',async()=>{
   const ui=fixture();let finish;ui.setChange(()=>new Promise(resolve=>finish=resolve));
   const pending=ui.all().find(n=>n.tag==='button').onclick();ui.panel.clear();
   ui.panel.render({...ui.value,runtime:{running:false},watches:[ui.value.watches[1]]});
-  finish({watches:[]});await pending;assert.match(ui.text(),/Remote chat/);assert.match(ui.text(),/网关未运行/);
-  ui.panel.render({...ui.value,notifications:{}});assert.match(ui.text(),/通知通道未开启/);
+  finish({watches:[]});await pending;assert.match(ui.text(),/Remote chat/);assert.match(ui.text(),/게이트웨이가 중지되었습니다\. 모니터링이 시작되면 재개됩니다\./);
+  ui.panel.render({...ui.value,notifications:{}});assert.match(ui.text(),/알림 채널이 비활성화되었습니다\. 저장된 시계에서는 알림이 전송되지 않습니다\./);
   assert.ok(ui.all().filter(n=>['input','button'].includes(n.tag)).every(n=>!n.disabled));
 });

@@ -31,5 +31,5 @@ class ClaudeHistoryPage(unittest.IsolatedAsyncioTestCase):
             await adapter.dispatch('detail', sid, {'historyBefore': first['history']['before'], 'historyLimit': 20})
             self.assertEqual(calls[1][2][1], {'historyLimit': 20, 'historyBefore': 'u1'})
             adapter.index[gateway_id('code', 'native-other')] = {'backend': 'code', 'nativeId': 'native-other'}
-            with self.assertRaisesRegex(ValueError, '历史游标无效'):
+            with self.assertRaisesRegex(ValueError, '기록 커서가 잘못되었습니다.'):
                 await adapter.dispatch('detail', gateway_id('code', 'native-other'), {'historyBefore': first['history']['before']})

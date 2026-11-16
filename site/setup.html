@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="ko-KR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Codex Mobile Bridge 连接配置指南：局域网、已有穿透或反向代理、Cloudflare、Tailscale、自有服务器 SSH、NAS 的图解步骤与排查。">
-<title>连接配置指南 · Codex Mobile Bridge</title>
+<meta name="description" content="Codex Mobile Bridge 연결 구성 가이드: LAN, 기존 순회 또는 역방향 프록시、Cloudflare、Tailscale、자체 서버 SSH、NAS 예시된 단계 및 문제 해결。">
+<title>연결 구성 가이드 · Codex Mobile Bridge</title>
 <link rel="icon" href="./assets/icon.png">
 <link rel="stylesheet" href="./site.css?v=20261006-setup">
 <link rel="stylesheet" href="./setup.css?v=20261010-tailscale">
@@ -19,249 +19,249 @@
 <span>CODEX MOBILE BRIDGE<small>CONNECTION GUIDE</small>
 </span>
 </a>
-<a data-en="Back to overview" href="./#connect">返回产品介绍</a>
+<a data-en="Back to overview" href="./#connect">개요로 돌아가기</a>
 <div class="languages" aria-label="Language">
-<button type="button" data-language="zh" aria-pressed="true">中文</button>
+<button type="button" data-language="ko" aria-pressed="true">한국어</button>
 <button type="button" data-language="en" aria-pressed="false">EN</button>
 </div>
 </div>
 </header>
 <main>
 <div class="setup-intro">
-<p data-en="SETUP / CONNECTIONS" class="eyebrow">SETUP / 连接配置</p>
-<h1 data-en="Connect every step." >把每一步，连起来。</h1>
-<p data-en="Choose how to connect, then follow the diagrams and steps. Each step explains where to work, the permissions needed and how to check success." class="lead">选好访问方式，照着图示和步骤配置。每一步都说明在哪操作、需要什么权限，以及看到什么才算成功。</p>
-<p class="example-note" data-en="Public downloads are v2.1.3 (stable) and include the Existing tunnel / reverse proxy option below. Install and sign in to your desktop clients before setting up remote access.">当前公开下载为 v2.1.3 正式版，包含下方“已有穿透 / 反向代理”连接方式。配置外网前先安装并登录所需桌面客户端。</p>
+<p data-en="SETUP / CONNECTIONS" class="eyebrow">SETUP / CONNECTIONS</p>
+<h1 data-en="Connect every step." >모든 단계를 연결하세요.</h1>
+<p data-en="Choose how to connect, then follow the diagrams and steps. Each step explains where to work, the permissions needed and how to check success." class="lead">연결 방법을 선택한 후 다이어그램과 단계를 따르세요. 각 단계에서는 작업할 위치, 필요한 권한 및 성공을 확인하는 방법을 설명합니다.</p>
+<p class="example-note" data-en="Public downloads are v2.1.3 (stable) and include the Existing tunnel / reverse proxy option below. Install and sign in to your desktop clients before setting up remote access.">공개 다운로드는 v2.1.3(안정적)이며 아래의 기존 터널/역방향 프록시 옵션을 포함합니다. 원격 액세스를 설정하기 전에 데스크톱 클라이언트를 설치하고 로그인하세요.</p>
 </div>
-<nav class="method-picker" aria-label="连接方式 / Connection methods">
+<nav class="method-picker" aria-label="연결 방법 / Connection methods">
 <a href="#lan" data-method="lan">
-<strong data-en="LAN" >局域网</strong>
-<span data-en="On the same network" >只在同一网络使用</span>
+<strong data-en="LAN" >LAN</strong>
+<span data-en="On the same network" >동일한 네트워크에서</span>
 </a>
 <a href="#quick" data-method="quick">
-<strong data-en="Temporary HTTPS · Recommended" >临时 HTTPS · 推荐</strong>
-<span data-en="No server or domain" >没有服务器，也没有域名</span>
+<strong data-en="Temporary HTTPS · Recommended" >임시 HTTPS · 권장</strong>
+<span data-en="No server or domain" >서버 또는 도메인 없음</span>
 </a>
 <a href="#external" data-method="external">
-<strong data-en="Existing tunnel / reverse proxy" >已有穿透 / 反向代理</strong>
-<span data-en="Already have a trusted HTTPS URL" >已有受信任的 HTTPS 地址</span>
+<strong data-en="Existing tunnel / reverse proxy" >기존 터널/역방향 프록시</strong>
+<span data-en="Already have a trusted HTTPS URL" >이미 신뢰할 수 있는 HTTPS URL가 있습니다.</span>
 </a>
-<a href="#tailscale" data-method="tailscale"><strong data-en="Tailscale · Fixed HTTPS">Tailscale · 固定 HTTPS</strong><span data-en="Fixed HTTPS, no server">固定 HTTPS，无需服务器</span></a>
+<a href="#tailscale" data-method="tailscale"><strong data-en="Tailscale · Fixed HTTPS">Tailscale · 고정 HTTPS</strong><span data-en="Fixed HTTPS, no server">HTTPS 수정, 서버 없음</span></a>
 <a href="#cloudflare" data-method="cloudflare">
-<strong data-en="Named Cloudflare Tunnel · Advanced" >Cloudflare 固定域名 · 进阶</strong>
-<span data-en="Domain, without server maintenance" >有域名，希望少管服务器</span>
+<strong data-en="Named Cloudflare Tunnel · Advanced" >Cloudflare 터널로 명명됨 · 고급</strong>
+<span data-en="Domain, without server maintenance" >도메인, 서버 유지보수 불필요</span>
 </a>
 <a href="#server" data-method="server">
-<strong data-en="Own server + SSH · Advanced" >自有服务器 + SSH · 进阶</strong>
-<span data-en="Public server with an HTTPS entry" >有公网服务器与 HTTPS 入口</span>
+<strong data-en="Own server + SSH · Advanced" >자체 서버 + SSH · 고급</strong>
+<span data-en="Public server with an HTTPS entry" >HTTPS 항목이 있는 공용 서버</span>
 </a>
 <a href="#nas" data-method="nas">
-<strong data-en="NAS / Docker · Advanced" >NAS / Docker · 进阶</strong>
-<span data-en="Existing NAS / HTTPS proxy" >已有 NAS / HTTPS 反代</span>
+<strong data-en="NAS / Docker · Advanced" >NAS / 도커 · 고급</strong>
+<span data-en="Existing NAS / HTTPS proxy" >기존 NAS / HTTPS 프록시</span>
 </a>
 </nav>
-<p data-en="You or your administrator manually install server software and configure SSH and firewalls. The app does not accept sudo passwords. Copy buttons only copy text; they never execute commands." class="boundary-note">安装软件、调整 SSH 和防火墙等管理员操作由你或管理员在服务器手动执行。App 不接收 sudo 密码；网页上的“复制”只复制文本，不会执行命令。</p>
+<p data-en="You or your administrator manually install server software and configure SSH and firewalls. The app does not accept sudo passwords. Copy buttons only copy text; they never execute commands." class="boundary-note">귀하 또는 귀하의 관리자는 수동으로 서버 소프트웨어를 설치하고 SSH 및 방화벽을 구성합니다. 앱은 sudo 비밀번호를 허용하지 않습니다. 복사 버튼은 텍스트만 복사합니다. 그들은 결코 명령을 실행하지 않습니다.</p>
 <section class="setup-panel" id="lan" data-setup-panel="lan" aria-labelledby="lan-title">
-<h2 data-en="LAN: start with the shortest path" id="lan-title">局域网：先跑通最短的一条链路</h2>
-<p data-en="For a phone and work computer on the same reachable network." class="panel-intro">适合手机和工作电脑处于同一可互访网络。</p>
+<h2 data-en="LAN: start with the shortest path" id="lan-title">LAN: 최단 경로로 시작</h2>
+<p data-en="For a phone and work computer on the same reachable network." class="panel-intro">연결 가능한 동일한 네트워크에 있는 전화기와 업무용 컴퓨터의 경우.</p>
 <figure class="network-map">
 <div class="map-flow">
 <div class="map-node">
 <span class="map-index">1</span>
-<strong data-en="Phone / browser" >手机／浏览器</strong>
-<small data-en="Same network as computer" >与电脑同一网络</small>
+<strong data-en="Phone / browser" >전화/브라우저</strong>
+<small data-en="Same network as computer" >컴퓨터와 동일한 네트워크</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">2</span>
-<strong data-en="Local network" >局域网</strong>
-<small data-en="Computer LAN IP" >电脑的局域网 IP</small>
+<strong data-en="Local network" >로컬 네트워크</strong>
+<small data-en="Computer LAN IP" >컴퓨터 LAN IP</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">3</span>
-<strong data-en="Work computer" >工作电脑</strong>
-<small data-en="Gateway 8787 → Codex" >网关 8787 → Codex</small>
+<strong data-en="Work computer" >업무용 컴퓨터</strong>
+<small data-en="Gateway 8787 → Codex" >게이트웨이 8787 → Codex</small>
 </div>
 </div>
-<figcaption data-en="No domain or server needed. This address is normally unavailable outside this network." >不需要域名或服务器。离开这个网络后，此地址通常不可达。</figcaption>
+<figcaption data-en="No domain or server needed. This address is normally unavailable outside this network." >도메인이나 서버가 필요하지 않습니다. 이 주소는 일반적으로 이 네트워크 외부에서 사용할 수 없습니다.</figcaption>
 </figure>
 <article class="guide-step" id="lan-start">
 <div class="step-head">
 <span class="step-number">01</span>
 <div>
-<span data-en="Work computer · App" class="actor">工作电脑 · App</span>
-<h3 data-en="Start on your work computer" >在工作电脑启动网关</h3>
+<span data-en="Work computer · App" class="actor">업무용 컴퓨터 · 앱</span>
+<h3 data-en="Start on your work computer" >업무용 컴퓨터에서 시작</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Open Codex App. Enable LAN access in Network access, select the network interface you use, save and start the gateway." >先打开 Codex App。在网关的“网络访问”启用局域网访问，选择实际使用的网卡，保存并启动网关。</p>
-<p data-en="Check: The app shows a LAN address such as http://192.168.1.10:8787." class="checkpoint">确认结果：App 显示类似 http://192.168.1.10:8787 的局域网地址。</p>
+<p data-en="Open Codex App. Enable LAN access in Network access, select the network interface you use, save and start the gateway." >Codex 앱을 엽니다. 네트워크 액세스에서 LAN 액세스를 활성화하고 사용하는 네트워크 인터페이스를 선택한 다음 게이트웨이를 저장하고 시작합니다.</p>
+<p data-en="Check: The app shows a LAN address such as http://192.168.1.10:8787." class="checkpoint">확인: 앱에 http://192.168.1.10:8787.와 같은 LAN 주소가 표시됩니다.</p>
 </div>
 </article>
 <article class="guide-step" id="lan-phone">
 <div class="step-head">
 <span class="step-number">02</span>
 <div>
-<span data-en="Phone · Browser" class="actor">手机 · 浏览器</span>
-<h3 data-en="Join the same reachable network" >手机连接同一个可互访网络</h3>
+<span data-en="Phone · Browser" class="actor">전화 · 브라우저</span>
+<h3 data-en="Join the same reachable network" >연결 가능한 동일한 네트워크에 가입</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Open the address shown by the app or scan its sign-in QR code. Do not use localhost or 127.0.0.1 on your phone: those refer to the phone. Guest Wi-Fi, AP isolation and workplace network policies may block device-to-device access." >用手机打开 App 显示的地址或扫码登录。不要在手机输入 localhost 或 127.0.0.1，那表示手机自己。访客 Wi-Fi、AP 隔离和单位网络策略可能阻止设备互访。</p>
-<p data-en="Check: Sign in, load chats, and send a message in your own test chat to verify replies." class="checkpoint">确认结果：能登录、读取聊天；在自己的测试聊天中发送一条消息并收到回复。</p>
+<p data-en="Open the address shown by the app or scan its sign-in QR code. Do not use localhost or 127.0.0.1 on your phone: those refer to the phone. Guest Wi-Fi, AP isolation and workplace network policies may block device-to-device access." >앱에 표시된 주소를 열거나 로그인 QR 코드를 스캔하세요. 전화기에서 localhost 또는 127.0.0.1을 사용하지 마십시오. 이는 전화기를 참조합니다. 게스트 Wi-Fi, AP 격리 및 직장 네트워크 정책으로 인해 장치 간 액세스가 차단될 수 있습니다.</p>
+<p data-en="Check: Sign in, load chats, and send a message in your own test chat to verify replies." class="checkpoint">확인: 로그인하고 채팅을 로드한 다음 자신의 테스트 채팅에서 메시지를 보내 응답을 확인하세요.</p>
 </div>
 </article>
 </section>
 <section class="setup-panel" id="quick" data-setup-panel="quick" aria-labelledby="quick-title">
-<h2 data-en="Temporary HTTPS: no server setup" id="quick-title">临时 HTTPS：不用准备服务器</h2>
-<p class="callout" data-en="Recommended for quick personal access: no domain or server, with the fewest setup steps. The current URL can usually remain in use while the gateway and tunnel process stay running and connected; Cloudflare does not guarantee permanent allocation or uptime. Enable address notifications and configure a notification channel to receive the new URL when the tunnel is recreated. Delivery depends on connectivity and the notification service.">推荐个人快速接入：无需域名和服务器，配置最少、上手最快。网关与隧道进程持续运行且连接正常时，通常可以沿用当前地址；Cloudflare 不保证永久占用或持续可用。隧道重建导致地址变化后，启用“每次启动网关及入口变化时发送地址”并配置好通知渠道，即可接收新地址；送达时间取决于网络与通知服务。</p>
-<p data-en="For trying remote access when a changing URL is acceptable." class="panel-intro">适合先体验外网访问，可以接受地址变化。</p>
+<h2 data-en="Temporary HTTPS: no server setup" id="quick-title">임시 HTTPS: 서버 설정 없음</h2>
+<p class="callout" data-en="Recommended for quick personal access: no domain or server, with the fewest setup steps. The current URL can usually remain in use while the gateway and tunnel process stay running and connected; Cloudflare does not guarantee permanent allocation or uptime. Enable address notifications and configure a notification channel to receive the new URL when the tunnel is recreated. Delivery depends on connectivity and the notification service.">빠른 개인 액세스에 권장됩니다. 도메인이나 서버가 없고 최소한의 설정 단계만 거치면 됩니다. 현재 URL는 일반적으로 게이트웨이 및 터널 프로세스가 계속 실행 및 연결되어 있는 동안 계속 사용할 수 있습니다. Cloudflare는 영구 할당이나 가동 시간을 보장하지 않습니다. 주소 알림을 활성화하고 터널이 다시 생성될 때 새 URL를 수신하도록 알림 채널을 구성합니다. 전달은 연결 및 알림 서비스에 따라 달라집니다.</p>
+<p data-en="For trying remote access when a changing URL is acceptable." class="panel-intro">URL 변경이 허용될 때 원격 액세스를 시도하는 경우입니다.</p>
 <figure class="network-map">
 <div class="map-flow">
 <div class="map-node">
 <span class="map-index">1</span>
-<strong data-en="Phone away from home" >外地手机</strong>
-<small data-en="Temporary HTTPS address" >HTTPS 临时地址</small>
+<strong data-en="Phone away from home" >집에서 멀리 떨어진 곳에서 전화</strong>
+<small data-en="Temporary HTTPS address" >임시 HTTPS 주소</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">2</span>
 <strong data-en="Cloudflare" >Cloudflare</strong>
-<small data-en="Public tunnel entry" >公网隧道入口</small>
+<small data-en="Public tunnel entry" >공공 터널 진입</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">3</span>
-<strong data-en="Work computer" >工作电脑</strong>
-<small data-en="Connector → gateway → Codex" >内置连接器 → 网关 → Codex</small>
+<strong data-en="Work computer" >업무용 컴퓨터</strong>
+<small data-en="Connector → gateway → Codex" >커넥터 → 게이트웨이 → Codex</small>
 </div>
 </div>
-<figcaption data-en="Your computer connects out to Cloudflare; no public computer IP is needed. The temporary URL may change after a restart." >电脑主动连接 Cloudflare，不需要电脑公网 IP。临时地址可能在重启后变化。</figcaption>
+<figcaption data-en="Your computer connects out to Cloudflare; no public computer IP is needed. The temporary URL may change after a restart." >컴퓨터가 Cloudflare에 연결됩니다. 공용 컴퓨터 IP가 필요하지 않습니다. 다시 시작한 후 임시 URL가 변경될 수 있습니다.</figcaption>
 </figure>
 <article class="guide-step" id="quick-start">
 <div class="step-head">
 <span class="step-number">01</span>
 <div>
-<span data-en="Work computer · App" class="actor">工作电脑 · App</span>
-<h3 data-en="Add a temporary connection" >添加临时连接</h3>
+<span data-en="Work computer · App" class="actor">업무용 컴퓨터 · 앱</span>
+<h3 data-en="Add a temporary connection" >임시 연결 추가</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Open Codex App, add Temporary HTTPS · Cloudflare, enable it, save and start the gateway. Packages with bundled cloudflared need no extra connector installation. If an older package reports it missing, install it from Runtime settings first." >打开 Codex App，在网关添加“临时 HTTPS · Cloudflare”，勾选启用，保存后启动网关。带内置 cloudflared 的安装包无需另装连接器；较早的安装包若提示缺少组件，先在“运行配置”完成安装。</p>
-<p data-en="Check: The app shows an HTTPS address under .trycloudflare.com." class="checkpoint">确认结果：App 显示以 https:// 开头、以 .trycloudflare.com 为域名后缀的地址。</p>
+<p data-en="Open Codex App, add Temporary HTTPS · Cloudflare, enable it, save and start the gateway. Packages with bundled cloudflared need no extra connector installation. If an older package reports it missing, install it from Runtime settings first." >Codex 앱을 열고 임시 HTTPS · Cloudflare를 추가하고 활성화한 후 게이트웨이를 저장하고 시작하세요. cloudflared가 번들로 제공되는 패키지에는 추가 커넥터 설치가 필요하지 않습니다. 이전 패키지가 누락되었다고 보고하는 경우 먼저 런타임 설정에서 설치하십시오.</p>
+<p data-en="Check: The app shows an HTTPS address under .trycloudflare.com." class="checkpoint">확인: 앱이 .trycloudflare.com 아래에 HTTPS 주소를 표시합니다.</p>
 </div>
 </article>
 <article class="guide-step" id="quick-check">
 <div class="step-head">
 <span class="step-number">02</span>
 <div>
-<span data-en="Phone · Browser" class="actor">手机 · 浏览器</span>
-<h3 data-en="Verify over mobile data" >用蜂窝网络验证</h3>
+<span data-en="Phone · Browser" class="actor">전화 · 브라우저</span>
+<h3 data-en="Verify over mobile data" >모바일 데이터로 인증</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Turn off Wi-Fi and open the current URL from the app. Use gateway credentials or a valid sign-in QR code. Address notifications help you find the new URL after it changes." >关闭 Wi-Fi，打开 App 刚显示的地址，使用网关账号密码或有效的登录二维码。地址通知可帮助你在地址变化后找回新入口。</p>
-<p data-en="Check: Sign-in, reading and sending all work. The entry is unavailable when the gateway stops or the computer sleeps." class="checkpoint">确认结果：登录、读取和发送均成功。停止网关或电脑休眠后，入口不可用。</p>
+<p data-en="Turn off Wi-Fi and open the current URL from the app. Use gateway credentials or a valid sign-in QR code. Address notifications help you find the new URL after it changes." >Wi-Fi를 끄고 앱에서 현재 URL를 엽니다. 게이트웨이 자격 증명 또는 유효한 로그인 QR 코드를 사용하세요. 주소 알림은 변경된 후 새로운 URL를 찾는 데 도움이 됩니다.</p>
+<p data-en="Check: Sign-in, reading and sending all work. The entry is unavailable when the gateway stops or the computer sleeps." class="checkpoint">확인: 로그인하고 모든 작업을 읽고 보냅니다. 게이트웨이가 중지되거나 컴퓨터가 절전 모드인 경우 항목을 사용할 수 없습니다.</p>
 </div>
 </article>
-<p data-en="For a stable address, use a named Cloudflare Tunnel or your own server, rather than repeatedly redirecting a domain to temporary URLs." class="callout">需要长期固定地址时，使用 Cloudflare 固定隧道或自有服务器方案；不要靠域名反复重定向到临时地址。</p>
+<p data-en="For a stable address, use a named Cloudflare Tunnel or your own server, rather than repeatedly redirecting a domain to temporary URLs." class="callout">안정적인 주소를 얻으려면 도메인을 임시 URL로 반복적으로 리디렉션하는 대신 명명된 Cloudflare 터널이나 자체 서버를 사용하세요.</p>
 </section>
 <section class="setup-panel" id="tailscale" data-setup-panel="tailscale" aria-labelledby="tailscale-title">
-<h2 data-en="Tailscale: keep one HTTPS address" id="tailscale-title">Tailscale：保留一个固定 HTTPS 地址</h2><p class="example-note" data-en="Tailscale public forwarding or relay traffic may pass through overseas nodes. Direct access from mainland China can be slow or time out; private peer-to-peer routes differ from public Funnel access.">Tailscale 公网转发或中继链路可能经过境外节点，中国大陆直连可能较慢或超时；私有组网直连与公网 Funnel 的访问路径不同。</p>
-<p class="panel-intro" data-en="No server, domain purchase or invitation required. Install the official client on the work computer and connect it to the gateway.">无需自建服务器、购买域名或邀请码。在工作电脑安装官方客户端，再从网关接入。</p>
-<p class="example-note" data-en="Available in v2.0.0. Install and sign in to official Tailscale on the gateway computer, then grant the initial Serve / Funnel authorization.">v2.0.0 已支持。在网关电脑安装并登录官方 Tailscale，首次使用按提示完成 Serve / Funnel 授权。</p>
-<p class="actions"><a class="button" data-en="View stable source" href="https://github.com/try2love/codex-mobile-bridge/tree/v2.1.3">查看正式版源码</a></p>
+<h2 data-en="Tailscale: keep one HTTPS address" id="tailscale-title">Tailscale: 하나의 HTTPS 주소 유지</h2><p class="example-note" data-en="Tailscale public forwarding or relay traffic may pass through overseas nodes. Direct access from mainland China can be slow or time out; private peer-to-peer routes differ from public Funnel access.">Tailscale 공용 전달 또는 릴레이 트래픽은 해외 노드를 통과할 수 있습니다. 중국 본토에서의 직접 액세스는 느리거나 시간 초과될 수 있습니다. 비공개 P2P 경로는 공개 유입 경로 액세스와 다릅니다.</p>
+<p class="panel-intro" data-en="No server, domain purchase or invitation required. Install the official client on the work computer and connect it to the gateway.">서버, 도메인 구매 또는 초대가 필요하지 않습니다. 업무용 컴퓨터에 공식 클라이언트를 설치하고 게이트웨이에 연결하세요.</p>
+<p class="example-note" data-en="Available in v2.0.0. Install and sign in to official Tailscale on the gateway computer, then grant the initial Serve / Funnel authorization.">v2.0.0에서 사용 가능합니다. 게이트웨이 컴퓨터에 공식 Tailscale를 설치하고 로그인한 후 초기 서비스/퍼널 권한을 부여하세요.</p>
+<p class="actions"><a class="button" data-en="View stable source" href="https://github.com/try2love/codex-mobile-bridge/tree/v2.1.3">안정적인 소스 보기</a></p>
 <figure class="network-map"><div class="map-flow">
-<div class="map-node"><span class="map-index">1</span><strong data-en="Phone / browser">手机／浏览器</strong><small data-en="https://device.tailnet.ts.net">https://设备名.网络名.ts.net</small></div>
+<div class="map-node"><span class="map-index">1</span><strong data-en="Phone / browser">전화/브라우저</strong><small data-en="https://device.tailnet.ts.net">https://device.tailnet.ts.net</small></div>
 <span class="map-arrow" aria-hidden="true">→</span>
-<div class="map-node"><span class="map-index">2</span><strong>Tailscale Funnel</strong><small data-en="Public HTTPS entry">公网 HTTPS 入口</small></div>
+<div class="map-node"><span class="map-index">2</span><strong>Tailscale Funnel</strong><small data-en="Public HTTPS entry">공개 HTTPS 항목</small></div>
 <span class="map-arrow" aria-hidden="true">→</span>
-<div class="map-node"><span class="map-index">3</span><strong data-en="Work computer">工作电脑</strong><small data-en="Gateway → enabled desktop client">网关 → 已启用的桌面客户端</small></div>
-</div><figcaption data-en="Funnel allows public browser access without Tailscale on the phone. Serve is private and requires the visiting device to connect to the same Tailscale network.">Funnel 允许普通浏览器访问，手机不必安装 Tailscale。Serve 为私有访问，访问设备需接入同一 Tailscale 网络。</figcaption></figure>
-<article class="guide-step"><div class="step-head"><span class="step-number">01</span><div><span class="actor" data-en="Work computer · Tailscale">工作电脑 · Tailscale</span><h3 data-en="Install, sign in and connect">安装、登录并开启连接</h3></div></div><div class="step-body">
-<p data-en="Install Tailscale 1.52 or newer from the official source and sign in. On macOS, use the standalone distribution for Funnel and allow its network extension. On Windows or Linux, make sure the official service is running and this user can use the CLI.">从官方来源安装 Tailscale 1.52 或更高版本并登录。macOS 使用官网独立安装包来运行 Funnel，并允许系统网络扩展；Windows、Linux 需确保官方服务运行，且当前用户可以调用命令行客户端。</p>
-<p><a href="https://tailscale.com/download" data-en="Official downloads ↗">官方下载 ↗</a> · <a href="https://tailscale.com/docs/features/tailscale-funnel" data-en="Funnel requirements ↗">Funnel 使用条件 ↗</a></p>
+<div class="map-node"><span class="map-index">3</span><strong data-en="Work computer">업무용 컴퓨터</strong><small data-en="Gateway → enabled desktop client">게이트웨이 → 활성화된 데스크톱 클라이언트</small></div>
+</div><figcaption data-en="Funnel allows public browser access without Tailscale on the phone. Serve is private and requires the visiting device to connect to the same Tailscale network.">Funnel을 사용하면 전화기에서 Tailscale 없이 공개 브라우저에 액세스할 수 있습니다. 서비스는 비공개이며 동일한 Tailscale 네트워크에 연결하려면 방문 장치가 필요합니다.</figcaption></figure>
+<article class="guide-step"><div class="step-head"><span class="step-number">01</span><div><span class="actor" data-en="Work computer · Tailscale">업무용 컴퓨터 · Tailscale</span><h3 data-en="Install, sign in and connect">설치, 로그인 및 연결</h3></div></div><div class="step-body">
+<p data-en="Install Tailscale 1.52 or newer from the official source and sign in. On macOS, use the standalone distribution for Funnel and allow its network extension. On Windows or Linux, make sure the official service is running and this user can use the CLI.">공식 소스에서 Tailscale 1.52 이상을 설치하고 로그인합니다. macOS에서는 Funnel용 독립형 배포판을 사용하고 네트워크 확장을 허용합니다. Windows 또는 Linux에서 공식 서비스가 실행 중이고 이 사용자가 CLI를 사용할 수 있는지 확인하세요.</p>
+<p><a href="https://tailscale.com/download" data-en="Official downloads ↗">공식 다운로드 ↗</a> · <a href="https://tailscale.com/docs/features/tailscale-funnel" data-en="Funnel requirements ↗">퍼널 요구사항 ↗</a></p>
 </div></article>
-<article class="guide-step"><div class="step-head"><span class="step-number">02</span><div><span class="actor" data-en="Work computer · Gateway">工作电脑 · 网关</span><h3 data-en="Detect and save the fixed address">检测并保存固定地址</h3></div></div><div class="step-body">
-<p data-en="In Network access, add Fixed HTTPS · Tailscale, select Public access · Funnel and save. Click Detect Tailscale and read URL, then save again. Keep gateway sign-in enabled. The HTTPS address is supplied by Tailscale; no DNS record or certificate upload is needed.">在“网络访问”添加“固定 HTTPS · Tailscale”，选择“公网访问 · Funnel”并保存。点击“检测 Tailscale 并读取地址”，再保存一次。保留网关登录验证。HTTPS 地址由 Tailscale 提供，无需填写 DNS 解析或上传证书。</p>
-<p class="checkpoint" data-en="Check: the gateway displays your actual .ts.net address. Do not enter the illustrative address above.">确认结果：网关显示属于这台电脑的 .ts.net 地址。不要填写上方图示中的示例地址。</p>
+<article class="guide-step"><div class="step-head"><span class="step-number">02</span><div><span class="actor" data-en="Work computer · Gateway">업무용 컴퓨터 · 게이트웨이</span><h3 data-en="Detect and save the fixed address">고정 주소를 감지하고 저장합니다.</h3></div></div><div class="step-body">
+<p data-en="In Network access, add Fixed HTTPS · Tailscale, select Public access · Funnel and save. Click Detect Tailscale and read URL, then save again. Keep gateway sign-in enabled. The HTTPS address is supplied by Tailscale; no DNS record or certificate upload is needed.">네트워크 액세스에서 고정 HTTPS · Tailscale를 추가하고 공개 액세스 · 퍼널을 선택한 후 저장합니다. Tailscale 감지를 클릭하고 URL를 읽은 후 다시 저장하세요. 게이트웨이 로그인을 활성화된 상태로 유지하세요. HTTPS 주소는 Tailscale에서 제공됩니다. DNS 레코드나 인증서 업로드가 필요하지 않습니다.</p>
+<p class="checkpoint" data-en="Check: the gateway displays your actual .ts.net address. Do not enter the illustrative address above.">확인: 게이트웨이는 실제 .ts.net 주소를 표시합니다. 위의 예시 주소를 입력하지 마세요.</p>
 </div></article>
-<article class="guide-step"><div class="step-head"><span class="step-number">03</span><div><span class="actor" data-en="Work computer · Gateway and browser">工作电脑 · 网关与浏览器</span><h3 data-en="Start and complete first-time authorization">启动并完成首次授权</h3></div></div><div class="step-body">
-<p data-en="Start the gateway. If authorization is requested, click Continue Tailscale authorization and approve HTTPS / Funnel on the official page. Your Tailscale administrator may need to enable these features. First-time public DNS propagation can take up to 10 minutes.">启动网关。如提示授权，点击“继续 Tailscale 授权”，在官方页面启用 HTTPS／Funnel；无权限时需要 Tailscale 网络管理员启用。首次开通的公网 DNS 最多可能需要 10 分钟生效。</p>
-<p data-en="Use port 443 by default. If another Tailscale service owns it, choose 8443 or 10000, then detect and save again. The gateway does not overwrite existing services or log you out of Tailscale.">默认使用 443 端口。若已有 Tailscale 服务占用，可选择 8443 或 10000，再检测并保存。网关不会覆盖原有服务，也不会退出 Tailscale 账号。</p>
+<article class="guide-step"><div class="step-head"><span class="step-number">03</span><div><span class="actor" data-en="Work computer · Gateway and browser">업무용 컴퓨터 · 게이트웨이 및 브라우저</span><h3 data-en="Start and complete first-time authorization">최초 승인 시작 및 완료</h3></div></div><div class="step-body">
+<p data-en="Start the gateway. If authorization is requested, click Continue Tailscale authorization and approve HTTPS / Funnel on the official page. Your Tailscale administrator may need to enable these features. First-time public DNS propagation can take up to 10 minutes.">게이트웨이를 시작하십시오. 승인이 요청되면 공식 페이지에서 Continue Tailscale 승인을 클릭하고 HTTPS / Funnel을 승인하세요. Tailscale 관리자가 이러한 기능을 활성화해야 할 수도 있습니다. 최초 공개 DNS 전파에는 최대 10분이 걸릴 수 있습니다.</p>
+<p data-en="Use port 443 by default. If another Tailscale service owns it, choose 8443 or 10000, then detect and save again. The gateway does not overwrite existing services or log you out of Tailscale.">기본적으로 포트 443을 사용합니다. 다른 Tailscale 서비스가 이를 소유한 경우 8443 또는 10000을 선택한 다음 감지하고 다시 저장하십시오. 게이트웨이는 기존 서비스를 덮어쓰거나 Tailscale에서 로그아웃하지 않습니다.</p>
 </div></article>
-<article class="guide-step"><div class="step-head"><span class="step-number">04</span><div><span class="actor" data-en="Phone · Browser or app">手机 · 浏览器或 App</span><h3 data-en="Verify over cellular data">用蜂窝网络完成验证</h3></div></div><div class="step-body">
-<p data-en="Check the fixed entry in the gateway, then scan its pairing code or sign in from your phone. Turn off Wi-Fi and disconnect phone Tailscale when testing Funnel, so the test uses the public route. Verify chat loading, sending, downloads and reconnection.">先在网关点击“检测固定入口”，再用手机扫码配对或登录。验证 Funnel 时关闭 Wi-Fi，并断开手机上的 Tailscale，以确认普通公网访问。测试聊天加载、发送、文件下载和重新连接。</p>
-<p class="checkpoint" data-en="Keep the same device identity and name to retain the address after normal restarts. Renaming or removing the device, or changing accounts, requires detecting and saving again.">保留设备身份和名称时，正常重启后地址不变。设备改名、删除或更换账号后，需要重新检测并保存。</p>
+<article class="guide-step"><div class="step-head"><span class="step-number">04</span><div><span class="actor" data-en="Phone · Browser or app">전화 · 브라우저 또는 앱</span><h3 data-en="Verify over cellular data">셀룰러 데이터로 확인</h3></div></div><div class="step-body">
+<p data-en="Check the fixed entry in the gateway, then scan its pairing code or sign in from your phone. Turn off Wi-Fi and disconnect phone Tailscale when testing Funnel, so the test uses the public route. Verify chat loading, sending, downloads and reconnection.">게이트웨이의 고정 항목을 확인한 다음 페어링 코드를 스캔하거나 휴대폰에서 로그인하세요. Funnel을 테스트할 때는 Wi-Fi를 끄고 Tailscale 전화 연결을 끊으므로 테스트에서는 공개 경로를 사용합니다. 채팅 로드, 전송, 다운로드 및 다시 연결을 확인합니다.</p>
+<p class="checkpoint" data-en="Keep the same device identity and name to retain the address after normal restarts. Renaming or removing the device, or changing accounts, requires detecting and saving again.">정상적으로 다시 시작한 후에도 주소를 유지하려면 동일한 장치 ID와 이름을 유지하세요. 장치 이름을 바꾸거나 제거하거나 계정을 변경하려면 다시 감지하고 저장해야 합니다.</p>
 </div></article>
-<aside class="callout"><p data-en="The computer must stay awake and the gateway must keep running. Funnel has bandwidth limits and does not guarantee access speed on mainland Chinese networks; verify both cellular data and Wi-Fi. Its built-in HTTPS entry uses .ts.net rather than your own domain.">电脑需保持唤醒、网关需持续运行。Funnel 存在带宽限制，不保证中国境内网络的访问速度，请分别验证蜂窝流量和 Wi-Fi。内置 HTTPS 入口使用 .ts.net，不是自己的域名。</p></aside>
-<p class="example-note" data-en="Private alternative: choose Private network · Serve. Only authorized devices connected to the same Tailscale network can visit. The mobile app does not include a built-in Tailscale client.">私有访问：选择“私有组网 · Serve”，只有已接入同一 Tailscale 网络并获授权的设备可以访问。手机 App 未内嵌 Tailscale 客户端。</p>
-<p><a href="https://tailscale.com/docs/features/tailscale-serve" data-en="Official Serve guide ↗">Serve 官方说明 ↗</a></p>
+<aside class="callout"><p data-en="The computer must stay awake and the gateway must keep running. Funnel has bandwidth limits and does not guarantee access speed on mainland Chinese networks; verify both cellular data and Wi-Fi. Its built-in HTTPS entry uses .ts.net rather than your own domain.">컴퓨터는 활성 상태를 유지해야 하며 게이트웨이는 계속 실행되어야 합니다. Funnel에는 대역폭 제한이 있으며 중국 본토 네트워크의 액세스 속도를 보장하지 않습니다. 셀룰러 데이터와 Wi-Fi를 모두 확인하세요. 내장된 HTTPS 항목은 자신의 도메인이 아닌 .ts.net을 사용합니다.</p></aside>
+<p class="example-note" data-en="Private alternative: choose Private network · Serve. Only authorized devices connected to the same Tailscale network can visit. The mobile app does not include a built-in Tailscale client.">비공개 대안: 비공개 네트워크 · 서비스를 선택하세요. 동일한 Tailscale 네트워크에 연결된 승인된 장치만 방문할 수 있습니다. 모바일 앱에는 내장 Tailscale 클라이언트가 포함되어 있지 않습니다.</p>
+<p><a href="https://tailscale.com/docs/features/tailscale-serve" data-en="Official Serve guide ↗">공식 서비스 안내 ↗</a></p>
 </section>
 <section class="setup-panel" id="cloudflare" data-setup-panel="cloudflare" aria-labelledby="cloudflare-title">
-<h2 data-en="Named Cloudflare Tunnel: a domain is enough" id="cloudflare-title">Cloudflare 固定域名：只有域名也能配置</h2><p class="example-note" data-en="Cloudflare Tunnel traffic may pass through overseas nodes. Direct access from mainland China can be slow or time out; a stable proxy route may help, depending on the network.">Cloudflare Tunnel 的访问链路可能经过境外节点，中国大陆直连可能较慢或超时；稳定的代理线路可能改善访问体验，实际速度以当前网络为准。</p>
-<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">进阶方案需要具备 DNS、HTTPS、SSH、服务器或 NAS 管理等相关知识。本文命令与配置仅供参考，不保证适合你的环境；执行前请自行核对、备份并取得必要授权。使用、修改或执行这些示例的风险由使用者自行承担。在适用法律允许的最大范围内，项目作者与贡献者不对由此造成的数据丢失、服务中断、安全事件、费用或其他损失承担责任；依法不得排除或限制的责任除外。</p>
-<p class="example-note" data-en="The steps below use the v2.0.0 gateway. Prepare the server and HTTPS endpoint before enabling the connection.">下方步骤对应 v2.0.0 网关。请先准备服务器与 HTTPS 入口，再启用连接。</p>
-<p data-en="Requires your own domain, a Cloudflare account and an online work computer." class="panel-intro">需要自己的域名、Cloudflare 账号，以及保持在线的工作电脑。</p>
+<h2 data-en="Named Cloudflare Tunnel: a domain is enough" id="cloudflare-title">Cloudflare 터널이라는 이름: 도메인이면 충분합니다.</h2><p class="example-note" data-en="Cloudflare Tunnel traffic may pass through overseas nodes. Direct access from mainland China can be slow or time out; a stable proxy route may help, depending on the network.">Cloudflare 터널 트래픽은 해외 노드를 통과할 수 있습니다. 중국 본토에서의 직접 액세스는 느리거나 시간 초과될 수 있습니다. 네트워크에 따라 안정적인 프록시 경로가 도움이 될 수 있습니다.</p>
+<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">고급 설정에는 DNS, HTTPS, SSH, 서버 또는 NAS 관리에 대한 관련 지식이 필요합니다. 명령 및 구성은 참조용일 뿐이며 사용자 환경에 적합하지 않을 수 있습니다. 사용하기 전에 이를 검토하고 데이터를 백업하고 필요한 승인을 얻으십시오. 귀하는 이러한 예제를 사용, 수정 또는 실행하는 데 따른 위험을 감수합니다. 해당 법률이 허용하는 최대 범위 내에서 작성자와 기여자는 합법적으로 제외되거나 제한될 수 없는 책임을 제외하고 결과적인 데이터 손실, 서비스 중단, 보안 사고, 비용 또는 기타 손실에 대해 책임을 지지 않습니다.</p>
+<p class="example-note" data-en="The steps below use the v2.0.0 gateway. Prepare the server and HTTPS endpoint before enabling the connection.">아래 단계에서는 v2.0.0 게이트웨이를 사용합니다. 연결을 활성화하기 전에 서버와 HTTPS 엔드포인트를 준비하세요.</p>
+<p data-en="Requires your own domain, a Cloudflare account and an online work computer." class="panel-intro">자신의 도메인, Cloudflare 계정 및 온라인 업무 컴퓨터가 필요합니다.</p>
 <figure class="network-map">
 <div class="map-flow">
 <div class="map-node">
 <span class="map-index">1</span>
-<strong data-en="Phone browser" >手机浏览器</strong>
+<strong data-en="Phone browser" >전화 브라우저</strong>
 <small data-en="https://codex.try2love.com" >https://codex.try2love.com</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">2</span>
 <strong data-en="Cloudflare" >Cloudflare</strong>
-<small data-en="Named tunnel + HTTPS" >固定隧道 + HTTPS</small>
+<small data-en="Named tunnel + HTTPS" >명명된 터널 + HTTPS</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">3</span>
-<strong data-en="Work computer" >工作电脑</strong>
-<small data-en="localhost:8787 → Codex" >localhost:8787 → Codex</small>
+<strong data-en="Work computer" >업무용 컴퓨터</strong>
+<small data-en="localhost:8787 → Codex" >로컬 호스트:8787 → Codex</small>
 </div>
 </div>
-<figcaption data-en="localhost refers to the computer running the connector. Public requests reach it through the tunnel; the phone need not share the LAN." >localhost 是连接器所在电脑的地址。公网请求经隧道到达它，不要求手机在同一局域网。</figcaption>
+<figcaption data-en="localhost refers to the computer running the connector. Public requests reach it through the tunnel; the phone need not share the LAN." >localhost는 커넥터를 실행하는 컴퓨터를 나타냅니다. 공개 요청은 터널을 통해 도달합니다. 전화기는 LAN를 공유할 필요가 없습니다.</figcaption>
 </figure>
-<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">所有域名、IP、账号都是演示值。请替换为自己的信息；try2love.com 不是本教程提供的可访问演示服务。</p>
+<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">모든 도메인, IP 및 사용자 이름은 예시입니다. 이를 자신의 값으로 바꾸십시오. try2love.com은 호스팅된 데모가 아닙니다.</p>
 <article class="guide-step" id="cloudflare-dns">
 <div class="step-head">
 <span class="step-number">01</span>
 <div>
-<span data-en="Cloudflare and registrar websites" class="actor">Cloudflare 与域名注册商网页</span>
-<h3 data-en="Connect your domain to Cloudflare DNS" >把域名接入 Cloudflare DNS</h3>
+<span data-en="Cloudflare and registrar websites" class="actor">Cloudflare 및 등록 기관 웹사이트</span>
+<h3 data-en="Connect your domain to Cloudflare DNS" >도메인을 Cloudflare DNS에 연결하세요.</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Add your domain to Cloudflare, choose a suitable plan and review existing website and mail DNS records. Copy the two assigned nameservers. At your domain registrar, replace the domain nameservers with these two addresses." >在 Cloudflare 添加自己的域名，选择适合的套餐，核对已有网站、邮箱等 DNS 记录。复制 Cloudflare 分配的两条名称服务器（NS）。在购买域名的注册商处，将域名的 DNS 服务器改为这两条地址。</p>
-<p data-en="Change the domain nameservers, not two ordinary A records. Renew the domain at your registrar; manage DNS records in Cloudflare once active." >这是修改域名的名称服务器，不是添加两条普通 A 记录。域名仍在原注册商续费；生效后解析记录在 Cloudflare 管理。</p>
-<p data-en="Check: Cloudflare shows Active. If it remains Pending, check nameserver spelling and any previous DNSSEC setup against the official migration guide." class="checkpoint">确认结果：Cloudflare 中域名状态为 Active。若长期 Pending，核对 NS 拼写及原 DNSSEC 配置，按官方迁移说明处理。</p>
-<a data-en="Official: domain and nameserver setup ↗" href="https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/">官方：接入域名与名称服务器 ↗</a>
+<p data-en="Add your domain to Cloudflare, choose a suitable plan and review existing website and mail DNS records. Copy the two assigned nameservers. At your domain registrar, replace the domain nameservers with these two addresses." >Cloudflare에 도메인을 추가하고 적합한 계획을 선택한 후 기존 웹사이트와 메일 DNS 기록을 검토하세요. 할당된 두 개의 네임서버를 복사합니다. 도메인 등록기관에서 도메인 이름 서버를 이 두 주소로 바꾸세요.</p>
+<p data-en="Change the domain nameservers, not two ordinary A records. Renew the domain at your registrar; manage DNS records in Cloudflare once active." >두 개의 일반 A 레코드가 아닌 도메인 네임서버를 변경하세요. 등록기관에서 도메인을 갱신하세요. 활성화되면 Cloudflare의 DNS 레코드를 관리합니다.</p>
+<p data-en="Check: Cloudflare shows Active. If it remains Pending, check nameserver spelling and any previous DNSSEC setup against the official migration guide." class="checkpoint">확인: Cloudflare가 활성을 표시합니다. 보류 중인 경우 공식 마이그레이션 가이드를 참조하여 네임서버 철자와 이전 DNSSEC 설정을 확인하세요.</p>
+<a data-en="Official: domain and nameserver setup ↗" href="https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/">공식: 도메인 및 네임서버 설정 ↗</a>
 </div>
 </article>
 <article class="guide-step" id="cloudflare-token">
 <div class="step-head">
 <span class="step-number">02</span>
 <div>
-<span data-en="Cloudflare website" class="actor">Cloudflare 网页</span>
-<h3 data-en="Create a named tunnel and copy its token" >创建固定隧道，取出 Tunnel Token</h3>
+<span data-en="Cloudflare website" class="actor">Cloudflare 웹사이트</span>
+<h3 data-en="Create a named tunnel and copy its token" >명명된 터널을 만들고 해당 토큰을 복사합니다.</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Open Tunnels, create a Cloudflared tunnel, name it and inspect the connector installation command. Copy only the Tunnel Token, usually the long value after --token. It is not an API key or the whole command. Do not include it in public pages or screenshots." >进入 Tunnels，创建 Cloudflared 类型的隧道，命名后查看连接器安装命令。只复制其中的 Tunnel Token，通常是 --token 后的一长串内容；不是 API Key，也不是整条命令。不要将 Token 发到公开页面或截图中。</p>
-<p data-en="The app with its bundled connector runs the tunnel; you do not need to execute that installation command." >带内置连接器的 App 会负责运行隧道，无需再手动执行安装命令。</p>
-<p data-en="Check: You have the token for this tunnel, ready to save in the app." class="checkpoint">确认结果：已取得这条隧道的 Token；接下来在 App 保存。</p>
+<p data-en="Open Tunnels, create a Cloudflared tunnel, name it and inspect the connector installation command. Copy only the Tunnel Token, usually the long value after --token. It is not an API key or the whole command. Do not include it in public pages or screenshots." >터널을 열고 Cloudflared 터널을 생성한 후 이름을 지정하고 커넥터 설치 명령을 검사하세요. 일반적으로 --token 다음의 긴 값인 터널 토큰만 복사합니다. API 키나 전체 명령이 아닙니다. 공개 페이지나 스크린샷에 포함하지 마세요.</p>
+<p data-en="The app with its bundled connector runs the tunnel; you do not need to execute that installation command." >번들 커넥터가 있는 앱은 터널을 실행합니다. 해당 설치 명령을 실행할 필요가 없습니다.</p>
+<p data-en="Check: You have the token for this tunnel, ready to save in the app." class="checkpoint">확인: 이 터널에 대한 토큰이 있고 앱에 저장할 준비가 되었습니다.</p>
 </div>
 </article>
 <article class="guide-step" id="cloudflare-app">
 <div class="step-head">
 <span class="step-number">03</span>
 <div>
-<span data-en="Work computer · App" class="actor">工作电脑 · App</span>
-<h3 data-en="Save the address and token in the app" >把固定地址和 Token 填进 App</h3>
+<span data-en="Work computer · App" class="actor">업무용 컴퓨터 · 앱</span>
+<h3 data-en="Save the address and token in the app" >앱에 주소와 토큰을 저장하세요</h3>
 </div>
 </div>
 <div class="step-body">
@@ -269,203 +269,203 @@
 <table>
 <thead>
 <tr>
-<th data-en="App field" scope="col">App 字段</th>
-<th data-en="Value" scope="col">填写内容</th>
+<th data-en="App field" scope="col">앱 분야</th>
+<th data-en="Value" scope="col">값</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Connection" >连接方式</td>
-<td data-en="Fixed domain · Cloudflare Tunnel" >固定域名 · Cloudflare Tunnel</td>
+<td data-en="Connection" >연결</td>
+<td data-en="Fixed domain · Cloudflare Tunnel" >고정 도메인 · Cloudflare 터널</td>
 </tr>
 <tr>
-<td data-en="Phone URL" >手机访问地址</td>
+<td data-en="Phone URL" >전화번호 URL</td>
 <td data-en="https://codex.try2love.com" >https://codex.try2love.com</td>
 </tr>
 <tr>
-<td data-en="Tunnel Token" >Tunnel Token</td>
-<td data-en="Token from the previous step" >上一步的 Token</td>
+<td data-en="Tunnel Token" >터널 토큰</td>
+<td data-en="Token from the previous step" >이전 단계의 토큰</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="Enable the connection, save and start the gateway. If settings are locked, stop the gateway before saving, then start it again." >启用连接、保存配置，然后启动网关。配置被锁定时先停止网关，保存后再启动。</p>
-<p data-en="Check: Cloudflare shows Connected / Healthy. The public route still needs configuring." class="checkpoint">确认结果：Cloudflare 中连接器显示 Connected / Healthy。此时仍需配置公开路由。</p>
+<p data-en="Enable the connection, save and start the gateway. If settings are locked, stop the gateway before saving, then start it again." >연결을 활성화하고 게이트웨이를 저장하고 시작합니다. 설정이 잠겨 있으면 저장하기 전에 게이트웨이를 중지한 다음 다시 시작하십시오.</p>
+<p data-en="Check: Cloudflare shows Connected / Healthy. The public route still needs configuring." class="checkpoint">확인: Cloudflare에 연결됨/정상이 표시됩니다. 공개 경로는 여전히 구성이 필요합니다.</p>
 </div>
 </article>
 <article class="guide-step" id="cloudflare-route">
 <div class="step-head">
 <span class="step-number">04</span>
 <div>
-<span data-en="Cloudflare · Tunnel routes" class="actor">Cloudflare · 隧道路由</span>
-<h3 data-en="Route the hostname to the local gateway" >把公开主机名路由到本机端口</h3>
+<span data-en="Cloudflare · Tunnel routes" class="actor">Cloudflare · 터널 노선</span>
+<h3 data-en="Route the hostname to the local gateway" >호스트 이름을 로컬 게이트웨이로 라우팅합니다.</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Add a published application in this tunnel’s Routes / Published application / Public Hostname page. Labels vary between dashboard versions; create a hostname-to-service route." >在该隧道的 Routes / Published application / Public Hostname 页面添加公开应用。不同控制台版本名称可能不同，目标是创建一个主机名到服务的路由。</p>
+<p data-en="Add a published application in this tunnel’s Routes / Published application / Public Hostname page. Labels vary between dashboard versions; create a hostname-to-service route." >이 터널의 경로/게시된 애플리케이션/공개 호스트 이름 페이지에 게시된 애플리케이션을 추가합니다. 라벨은 대시보드 버전에 따라 다릅니다. 호스트 이름에서 서비스로의 경로를 만듭니다.</p>
 <div class="table-wrap">
 <table>
 <thead>
 <tr>
-<th data-en="Route field" scope="col">路由字段</th>
-<th data-en="Example" scope="col">示例</th>
+<th data-en="Route field" scope="col">경로 필드</th>
+<th data-en="Example" scope="col">예</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Subdomain" >子域名 / Subdomain</td>
-<td data-en="codex" >codex</td>
+<td data-en="Subdomain" >하위 도메인</td>
+<td data-en="codex" >사본</td>
 </tr>
 <tr>
-<td data-en="Domain" >域名 / Domain</td>
+<td data-en="Domain" >도메인</td>
 <td data-en="try2love.com" >try2love.com</td>
 </tr>
 <tr>
-<td data-en="Path" >路径 / Path</td>
-<td data-en="Leave empty" >留空</td>
+<td data-en="Path" >길</td>
+<td data-en="Leave empty" >비워두세요</td>
 </tr>
 <tr>
-<td data-en="Service type" >服务类型 / Type</td>
+<td data-en="Service type" >서비스 유형</td>
 <td data-en="HTTP" >HTTP</td>
 </tr>
 <tr>
-<td data-en="Service URL" >服务地址 / URL</td>
-<td data-en="localhost:8787" >localhost:8787</td>
+<td data-en="Service URL" >서비스 URL</td>
+<td data-en="localhost:8787" >로컬호스트:8787</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="If there is one service URL box, enter http://localhost:8787. Match the gateway’s listening port. Do not enter the phone’s HTTPS URL or point an A record to the computer’s LAN IP." >若只有一个服务地址输入框，填 http://localhost:8787。端口须与 App 的监听端口一致。不要填手机的 HTTPS 地址，也不要把 A 记录指向电脑局域网 IP。</p>
-<p data-en="Check: Saving creates a DNS record for the tunnel. Inspect conflicting records before changing them; do not overwrite another site." class="checkpoint">确认结果：保存后产生指向该隧道的 DNS 记录；同名记录冲突时先核对用途，不覆盖其他网站。</p>
+<p data-en="If there is one service URL box, enter http://localhost:8787. Match the gateway’s listening port. Do not enter the phone’s HTTPS URL or point an A record to the computer’s LAN IP." >서비스 URL 상자가 하나 있으면 http://localhost:8787.를 입력합니다. 게이트웨이의 청취 포트를 일치시킵니다. 전화기의 HTTPS URL를 입력하거나 A 레코드를 컴퓨터의 LAN IP에 지정하지 마십시오.</p>
+<p data-en="Check: Saving creates a DNS record for the tunnel. Inspect conflicting records before changing them; do not overwrite another site." class="checkpoint">확인: 저장하면 터널에 대한 DNS 레코드가 생성됩니다. 상충되는 기록을 변경하기 전에 검사하십시오. 다른 사이트를 덮어쓰지 마십시오.</p>
 </div>
 </article>
 <article class="guide-step" id="cloudflare-https">
 <div class="step-head">
 <span class="step-number">05</span>
 <div>
-<span data-en="Cloudflare · Rules" class="actor">Cloudflare · 规则</span>
-<h3 data-en="Redirect HTTP to HTTPS" >让 HTTP 自动跳转到 HTTPS</h3>
+<span data-en="Cloudflare · Rules" class="actor">Cloudflare · 규칙</span>
+<h3 data-en="Redirect HTTP to HTTPS" >HTTP를 HTTPS로 리디렉션</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Open the domain’s Rules → Overview → Create rule → Redirect Rule and choose a custom filter expression. This matches only the gateway hostname; replace the example domain." >进入域名的“规则 → 概述 → 创建规则 → 重定向规则”，选择自定义筛选表达式。下面仅匹配网关子域名；请替换示例域名。</p>
+<p data-en="Open the domain’s Rules → Overview → Create rule → Redirect Rule and choose a custom filter expression. This matches only the gateway hostname; replace the example domain." >도메인의 규칙 → 개요 → 규칙 생성 → 리디렉션 규칙을 열고 사용자 정의 필터 표현식을 선택합니다. 이는 게이트웨이 호스트 이름과만 일치합니다. 예제 도메인을 교체하세요.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="text">(http.request.full_uri wildcard r&quot;http://codex.try2love.com/*&quot;)</code>
 </pre>
 </div>
-<p data-en="Choose a dynamic URL redirect with the expression below, status 301 and Preserve query string. Deploy after validation succeeds." >URL 重定向类型选“动态”，目标表达式如下；状态码选 301，勾选“保留查询字符串”，校验通过后部署。</p>
+<p data-en="Choose a dynamic URL redirect with the expression below, status 301 and Preserve query string. Deploy after validation succeeds." >아래 표현식, 상태 301 및 쿼리 문자열 보존을 사용하여 동적 URL 리디렉션을 선택합니다. 유효성 검사가 성공한 후 배포합니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="text">concat(&quot;https://codex.try2love.com&quot;, http.request.uri.path)</code>
 </pre>
 </div>
-<p data-en="Check: Opening http://codex.try2love.com upgrades to HTTPS before showing sign-in. Reopen any old HTTP sign-in page." class="checkpoint">确认结果：打开 http://codex.try2love.com 会自动变为 HTTPS，再显示登录页。已经打开的 HTTP 登录页需重新打开。</p>
+<p data-en="Check: Opening http://codex.try2love.com upgrades to HTTPS before showing sign-in. Reopen any old HTTP sign-in page." class="checkpoint">확인: http://codex.try2love.com를 열면 로그인이 표시되기 전에 HTTPS로 업그레이드됩니다. 이전 HTTP 로그인 페이지를 다시 엽니다.</p>
 </div>
 </article>
 <article class="guide-step" id="cloudflare-verify">
 <div class="step-head">
 <span class="step-number">06</span>
 <div>
-<span data-en="Work computer and phone" class="actor">工作电脑与手机</span>
-<h3 data-en="Verify the gateway and phone access" >验证固定入口与手机访问</h3>
+<span data-en="Work computer and phone" class="actor">업무용 컴퓨터와 전화</span>
+<h3 data-en="Verify the gateway and phone access" >게이트웨이 및 전화 액세스 확인</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Select Check fixed entry in the app. Turn off phone Wi-Fi and open the domain over mobile data. Sign in with gateway credentials, not your Cloudflare or SSH password." >App 点击“检测固定入口”，然后手机关闭 Wi-Fi，用蜂窝网络打开域名。使用网关账号密码登录，不是 Cloudflare 密码或服务器 SSH 密码。</p>
-<p data-en="Check: The entry check passes and the phone can sign in, read chats, send and receive replies." class="checkpoint">确认结果：入口检测通过，手机可登录、读取聊天、发送并收到回复。</p>
+<p data-en="Select Check fixed entry in the app. Turn off phone Wi-Fi and open the domain over mobile data. Sign in with gateway credentials, not your Cloudflare or SSH password." >앱에서 수정된 항목 확인을 선택합니다. 휴대폰 Wi-Fi를 끄고 모바일 데이터를 통해 도메인을 엽니다. Cloudflare 또는 SSH 비밀번호가 아닌 게이트웨이 자격 증명으로 로그인하세요.</p>
+<p data-en="Check: The entry check passes and the phone can sign in, read chats, send and receive replies." class="checkpoint">확인: 항목 확인이 통과되고 휴대폰에서 로그인하고, 채팅을 읽고, 답장을 보내고 받을 수 있습니다.</p>
 </div>
 </article>
-<a data-en="Official: create a remotely managed tunnel ↗" href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/">官方：创建远程管理隧道 ↗</a>
+<a data-en="Official: create a remotely managed tunnel ↗" href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/">공식: 원격으로 관리되는 터널 생성 ↗</a>
 </section>
 <section class="setup-panel" id="server" data-setup-panel="server" aria-labelledby="server-title">
-<h2 data-en="Own server + SSH: prepare the server step by step" id="server-title">自有服务器 + SSH：把服务器准备清楚</h2>
-<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">进阶方案需要具备 DNS、HTTPS、SSH、服务器或 NAS 管理等相关知识。本文命令与配置仅供参考，不保证适合你的环境；执行前请自行核对、备份并取得必要授权。使用、修改或执行这些示例的风险由使用者自行承担。在适用法律允许的最大范围内，项目作者与贡献者不对由此造成的数据丢失、服务中断、安全事件、费用或其他损失承担责任；依法不得排除或限制的责任除外。</p>
-<p class="example-note" data-en="The steps below use the v2.0.0 gateway. Prepare the server and HTTPS endpoint before enabling the connection.">下方步骤对应 v2.0.0 网关。请先准备服务器与 HTTPS 入口，再启用连接。</p>
-<p data-en="The public server provides HTTPS; your work computer initiates the return tunnel." class="panel-intro">公网服务器提供固定 HTTPS 入口，工作电脑主动建立回程隧道。</p>
+<h2 data-en="Own server + SSH: prepare the server step by step" id="server-title">자체 서버 + SSH: 단계별로 서버 준비</h2>
+<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">고급 설정에는 DNS, HTTPS, SSH, 서버 또는 NAS 관리에 대한 관련 지식이 필요합니다. 명령 및 구성은 참조용일 뿐이며 사용자 환경에 적합하지 않을 수 있습니다. 사용하기 전에 이를 검토하고 데이터를 백업하고 필요한 승인을 얻으십시오. 귀하는 이러한 예제를 사용, 수정 또는 실행하는 데 따른 위험을 감수합니다. 해당 법률이 허용하는 최대 범위 내에서 작성자와 기여자는 합법적으로 제외되거나 제한될 수 없는 책임을 제외하고 결과적인 데이터 손실, 서비스 중단, 보안 사고, 비용 또는 기타 손실에 대해 책임을 지지 않습니다.</p>
+<p class="example-note" data-en="The steps below use the v2.0.0 gateway. Prepare the server and HTTPS endpoint before enabling the connection.">아래 단계에서는 v2.0.0 게이트웨이를 사용합니다. 연결을 활성화하기 전에 서버와 HTTPS 엔드포인트를 준비하세요.</p>
+<p data-en="The public server provides HTTPS; your work computer initiates the return tunnel." class="panel-intro">공용 서버는 HTTPS를 제공합니다. 업무용 컴퓨터가 복귀 터널을 시작합니다.</p>
 <figure class="network-map">
 <div class="map-flow">
 <div class="map-node">
 <span class="map-index">1</span>
-<strong data-en="Phone away from home" >外地手机</strong>
-<small data-en="Fixed HTTPS hostname" >固定 HTTPS 域名</small>
+<strong data-en="Phone away from home" >집에서 멀리 떨어진 곳에서 전화</strong>
+<small data-en="Fixed HTTPS hostname" >HTTPS 호스트 이름 수정</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">2</span>
-<strong data-en="Public server" >公网服务器</strong>
+<strong data-en="Public server" >공용 서버</strong>
 <small data-en="443 → 127.0.0.1:18787" >443 → 127.0.0.1:18787</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">3</span>
-<strong data-en="Work computer" >工作电脑</strong>
-<small data-en="SSH tunnel → 8787 → Codex" >SSH 隧道 → 8787 → Codex</small>
+<strong data-en="Work computer" >업무용 컴퓨터</strong>
+<small data-en="SSH tunnel → 8787 → Codex" >SSH 터널 → 8787 → Codex</small>
 </div>
 </div>
-<figcaption data-en="Arrows show the request path. The work computer initiates SSH to the server; the work computer needs no public IP." >图中箭头表示访问请求。SSH 连接由工作电脑主动发起到服务器，工作电脑无需公网 IP。</figcaption>
+<figcaption data-en="Arrows show the request path. The work computer initiates SSH to the server; the work computer needs no public IP." >화살표는 요청 경로를 표시합니다. 업무 컴퓨터는 서버에 대해 SSH를 시작합니다. 업무용 컴퓨터에는 공개 IP가 필요하지 않습니다.</figcaption>
 </figure>
-<p data-en="The server handles HTTPS and forwarding. Codex and the gateway run on your work computer. Prepare the server once, then start the computer gateway for everyday use." class="callout">服务器负责 HTTPS 入口和转发；Codex 和网关运行在工作电脑。先完成一次服务器配置，之后日常只需启动电脑网关。</p>
-<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">所有域名、IP、账号都是演示值。请替换为自己的信息；try2love.com 不是本教程提供的可访问演示服务。</p>
+<p data-en="The server handles HTTPS and forwarding. Codex and the gateway run on your work computer. Prepare the server once, then start the computer gateway for everyday use." class="callout">서버는 HTTPS 및 전달을 처리합니다. Codex 및 게이트웨이는 업무용 컴퓨터에서 실행됩니다. 서버를 한 번 준비한 다음 일상적인 사용을 위해 컴퓨터 게이트웨이를 시작합니다.</p>
+<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">모든 도메인, IP 및 사용자 이름은 예시입니다. 이를 자신의 값으로 바꾸십시오. try2love.com은 호스팅된 데모가 아닙니다.</p>
 <div class="table-wrap">
 <table>
 <thead>
 <tr>
-<th data-en="Record these values" scope="col">先记下这些信息</th>
-<th data-en="Example" scope="col">本文演示值</th>
-<th data-en="Used for" scope="col">用途</th>
+<th data-en="Record these values" scope="col">이 값을 기록해 보세요</th>
+<th data-en="Example" scope="col">예</th>
+<th data-en="Used for" scope="col">용도</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Server public IPv4" >服务器公网 IPv4</td>
+<td data-en="Server public IPv4" >서버 공용 IPv4</td>
 <td data-en="203.0.113.10" >203.0.113.10</td>
-<td data-en="DNS and SSH; this is a documentation-only IP" >DNS 与 SSH；此 IP 是文档示例</td>
+<td data-en="DNS and SSH; this is a documentation-only IP" >DNS 및 SSH; 이것은 문서 전용 IP입니다.</td>
 </tr>
 <tr>
-<td data-en="Fixed URL" >固定访问地址</td>
+<td data-en="Fixed URL" >URL 수정됨</td>
 <td data-en="https://codex.try2love.com" >https://codex.try2love.com</td>
-<td data-en="Phone browser and app" >手机浏览器与 App</td>
+<td data-en="Phone browser and app" >휴대폰 브라우저 및 앱</td>
 </tr>
 <tr>
-<td data-en="Regular SSH user" >普通 SSH 用户</td>
-<td data-en="try2love" >try2love</td>
-<td data-en="Daily tunnel, no sudo required" >日常隧道，不需要 sudo</td>
+<td data-en="Regular SSH user" >일반 SSH 사용자</td>
+<td data-en="try2love" >시도2사랑</td>
+<td data-en="Daily tunnel, no sudo required" >일일 터널, sudo 필요 없음</td>
 </tr>
 <tr>
-<td data-en="SSH port" >SSH 端口</td>
-<td data-en="22 (use the actual configured port)" >22（以服务器实际设置为准）</td>
-<td data-en="Computer connects to server" >电脑连接服务器</td>
+<td data-en="SSH port" >SSH 포트</td>
+<td data-en="22 (use the actual configured port)" >22(실제 구성된 포트 사용)</td>
+<td data-en="Computer connects to server" >컴퓨터가 서버에 연결됨</td>
 </tr>
 <tr>
-<td data-en="Server loopback port" >服务器回环端口</td>
+<td data-en="Server loopback port" >서버 루프백 포트</td>
 <td data-en="18787" >18787</td>
-<td data-en="Proxy upstream and tunnel must match" >HTTPS 反代与隧道两端配置须一致</td>
+<td data-en="Proxy upstream and tunnel must match" >프록시 업스트림과 터널은 일치해야 합니다.</td>
 </tr>
 <tr>
-<td data-en="Computer gateway port" >电脑网关端口</td>
+<td data-en="Computer gateway port" >컴퓨터 게이트웨이 포트</td>
 <td data-en="8787" >8787</td>
-<td data-en="App listening port" >App 监听端口</td>
+<td data-en="App listening port" >앱 수신 포트</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p class="callout" data-en="The phone URL is optional. For a domain, point DNS to the server public IP and configure HTTPS. Leave it blank to use the public IP from the SSH server address (or alias HostName); saving fills in https://public-IP. The server still needs a reverse proxy and a trusted certificate whose Subject Alternative Name includes that IP. SSH alone is not enough. ">“手机访问地址”可留空。使用域名时，需要自行解析到服务器公网 IP 并配置 HTTPS；留空时，从 SSH 服务器地址（或别名的 HostName）中的公网 IP 自动填入 https://公网IP。服务器仍需配置反向代理，以及 Subject Alternative Name 包含该 IP 的受信任证书；仅有 SSH 不能直接访问。</p>
-<p class="example-note"><a href="https://github.com/try2love/codex-mobile-bridge/blob/refactor/platform-feature-layout/docs/server-ssh.md" data-en="Read the public IP HTTPS requirements ↗">查看公网 IP HTTPS 的准备条件 ↗</a></p>
+<p class="callout" data-en="The phone URL is optional. For a domain, point DNS to the server public IP and configure HTTPS. Leave it blank to use the public IP from the SSH server address (or alias HostName); saving fills in https://public-IP. The server still needs a reverse proxy and a trusted certificate whose Subject Alternative Name includes that IP. SSH alone is not enough. ">전화 URL는 선택 사항입니다. 도메인의 경우 DNS가 공용 IP 서버를 가리키도록 하고 HTTPS를 구성합니다. SSH 서버 주소(또는 별칭 HostName)의 공개 IP를 사용하려면 공백으로 두십시오. 저장하면 https://public-IP.가 채워집니다. 서버에는 여전히 역방향 프록시와 해당 IP가 포함된 주체 대체 이름의 신뢰할 수 있는 인증서가 필요합니다. SSH만으로는 충분하지 않습니다.</p>
+<p class="example-note"><a href="https://github.com/try2love/codex-mobile-bridge/blob/refactor/platform-feature-layout/docs/server-ssh.md" data-en="Read the public IP HTTPS requirements ↗">공개 IP HTTPS 요구 사항 읽기 ↗</a></p>
 <article class="guide-step" id="server-inspect">
 <div class="step-head">
 <span class="step-number">01</span>
 <div>
-<span data-en="Server terminal · Read-only checks" class="actor">服务器终端 · 只读检查</span>
-<h3 data-en="Identify your server situation" >先判断你的服务器是哪种情况</h3>
+<span data-en="Server terminal · Read-only checks" class="actor">서버 터미널 · 읽기 전용 검사</span>
+<h3 data-en="Identify your server situation" >서버 상황 파악</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Sign in using your existing SSH method or cloud console. These commands inspect the OS and listening ports without changing services." >先通过已有的 SSH 方式或云厂商控制台登录服务器。下面的命令只查询系统和监听端口，不安装或修改服务。</p>
+<p data-en="Sign in using your existing SSH method or cloud console. These commands inspect the OS and listening ports without changing services." >기존 SSH 방법 또는 클라우드 콘솔을 사용하여 로그인합니다. 이 명령은 서비스를 변경하지 않고 OS 및 수신 대기 포트를 검사합니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">cat /etc/os-release
 id
@@ -474,73 +474,73 @@ command -v caddy
 command -v nginx</code>
 </pre>
 </div>
-<p data-en="Use the apt path below on Ubuntu / Debian. If :80 or :443 is listening, or you use a panel, Nginx or Caddy, choose the existing-site path and do not start a second web server. An empty command result may mean the program is absent; mark permission-limited checks as unverified." >Ubuntu / Debian 可用下文 apt 安装路径。看到 :80、:443 已监听，或知道自己使用了宝塔、1Panel、Nginx、Caddy，就选择“已有网站或面板”，不要再启动第二套 Web 服务。命令无输出可能只是未安装该程序；无权限查看的项目标为未确认。</p>
+<p data-en="Use the apt path below on Ubuntu / Debian. If :80 or :443 is listening, or you use a panel, Nginx or Caddy, choose the existing-site path and do not start a second web server. An empty command result may mean the program is absent; mark permission-limited checks as unverified." >Ubuntu/Debian에서는 아래의 적절한 경로를 사용하세요. :80 또는 :443이 수신 중이거나 Nginx 또는 Caddy 패널을 사용하는 경우 기존 사이트 경로를 선택하고 두 번째 웹 서버를 시작하지 마십시오. 빈 명령 결과는 프로그램이 없음을 의미할 수 있습니다. 권한 제한 검사를 확인되지 않은 것으로 표시합니다.</p>
 <details class="scenario">
-<summary data-en="Server is not publicly reachable, or I am unsure" >服务器不是公网可达，或我不确定</summary>
-<p data-en="Check the public address and inbound rules in your cloud console. A private server reachable only through campus networking or a VPN is not automatically a public phone entry just because SSH works. Ask for a public HTTPS entry or use a named Cloudflare Tunnel." >在云控制台核对公网地址及入站规则。只有私网地址、必须连校园网或 VPN 才能访问的服务器，不能仅靠“SSH 登录成功”成为手机公网入口。需要管理员提供公网 HTTPS 入口，或改用 Cloudflare 固定隧道。</p>
-<a data-en="Open the named Cloudflare Tunnel guide" href="#cloudflare">查看 Cloudflare 固定域名方案</a>
+<summary data-en="Server is not publicly reachable, or I am unsure" >서버에 공개적으로 접근할 수 없거나 확실하지 않습니다.</summary>
+<p data-en="Check the public address and inbound rules in your cloud console. A private server reachable only through campus networking or a VPN is not automatically a public phone entry just because SSH works. Ask for a public HTTPS entry or use a named Cloudflare Tunnel." >클라우드 콘솔에서 공개 주소와 인바운드 규칙을 확인하세요. 캠퍼스 네트워킹 또는 VPN를 통해서만 연결할 수 있는 개인 서버는 SSH가 작동한다고 해서 자동으로 공중 전화 통화가 되지 않습니다. 공개 HTTPS 항목을 요청하거나 명명된 Cloudflare 터널을 사용하세요.</p>
+<a data-en="Open the named Cloudflare Tunnel guide" href="#cloudflare">명명된 Cloudflare 터널 가이드를 엽니다.</a>
 </details>
-<p data-en="Check: You know the OS, whether a web server exists, and who can perform administrative steps." class="checkpoint">确认结果：已确定系统、是否有现成网站，以及谁能执行管理员操作。</p>
+<p data-en="Check: You know the OS, whether a web server exists, and who can perform administrative steps." class="checkpoint">확인: OS, 웹 서버 존재 여부, 관리 단계를 수행할 수 있는 사람을 알고 있습니다.</p>
 </div>
 </article>
 <article class="guide-step" id="server-dns">
 <div class="step-head">
 <span class="step-number">02</span>
 <div>
-<span data-en="DNS dashboard · Website" class="actor">DNS 控制台 · 网页</span>
-<h3 data-en="Point a dedicated hostname to the server" >将独立子域名解析到服务器</h3>
+<span data-en="DNS dashboard · Website" class="actor">DNS 대시보드 · 웹사이트</span>
+<h3 data-en="Point a dedicated hostname to the server" >전용 호스트 이름을 서버에 지정</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Add the record where DNS is actually hosted. If nameservers moved to Cloudflare, edit Cloudflare DNS rather than the registrar’s old DNS zone." >在实际托管 DNS 的平台添加记录。如果名称服务器已迁移到 Cloudflare，就在 Cloudflare 添加，不能继续在原注册商的旧解析区修改。</p>
+<p data-en="Add the record where DNS is actually hosted. If nameservers moved to Cloudflare, edit Cloudflare DNS rather than the registrar’s old DNS zone." >DNS가 실제로 호스팅되는 레코드를 추가합니다. 네임서버가 Cloudflare로 이동한 경우 등록 기관의 이전 DNS 영역이 아닌 Cloudflare DNS를 편집하세요.</p>
 <div class="table-wrap">
 <table>
 <thead>
 <tr>
-<th data-en="Field" scope="col">字段</th>
-<th data-en="Value" scope="col">填写</th>
+<th data-en="Field" scope="col">필드</th>
+<th data-en="Value" scope="col">값</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Type" >类型</td>
-<td data-en="A" >A</td>
+<td data-en="Type" >유형</td>
+<td data-en="A" >에이</td>
 </tr>
 <tr>
-<td data-en="Name" >主机记录</td>
-<td data-en="codex" >codex</td>
+<td data-en="Name" >이름</td>
+<td data-en="codex" >사본</td>
 </tr>
 <tr>
-<td data-en="Value" >记录值</td>
-<td data-en="Your server public IPv4" >你的服务器公网 IPv4</td>
+<td data-en="Value" >값</td>
+<td data-en="Your server public IPv4" >서버 공개 IPv4</td>
 </tr>
 <tr>
 <td data-en="TTL" >TTL</td>
-<td data-en="Default / Auto" >默认 / 自动</td>
+<td data-en="Default / Auto" >기본값 / 자동</td>
 </tr>
 <tr>
-<td data-en="Cloudflare proxy (initial verification)" >Cloudflare 代理状态（首次验证）</td>
-<td data-en="DNS only, gray cloud" >仅 DNS，灰云</td>
+<td data-en="Cloudflare proxy (initial verification)" >Cloudflare 프록시(초기 확인)</td>
+<td data-en="DNS only, gray cloud" >DNS만, 회색 구름</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="Add AAAA only if the server has working public IPv6. If this hostname already serves a Cloudflare Tunnel, test the server setup on a new hostname first. Do not point DNS to 127.0.0.1 or the computer’s 192.168.x.x address." >只有服务器具备可用公网 IPv6 时才添加 AAAA。若该子域名已用于 Cloudflare Tunnel，不要覆盖它；先用新的子域名测试服务器方案。不要把域名解析到 127.0.0.1 或电脑的 192.168.x.x 地址。</p>
+<p data-en="Add AAAA only if the server has working public IPv6. If this hostname already serves a Cloudflare Tunnel, test the server setup on a new hostname first. Do not point DNS to 127.0.0.1 or the computer’s 192.168.x.x address." >서버에 공용 IPv6이 작동하는 경우에만 AAAA를 추가하세요. 이 호스트 이름이 이미 Cloudflare 터널을 제공하는 경우 먼저 새 호스트 이름에서 서버 설정을 테스트하세요. DNS를 127.0.0.1 또는 컴퓨터의 192.168.x.x 주소로 지정하지 마십시오.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">nslookup codex.try2love.com</code>
 </pre>
 </div>
-<p data-en="Check: Run nslookup on the work computer; it should return the server public IP. Cached DNS results may take time to update." class="checkpoint">确认结果：在工作电脑运行 nslookup，结果是服务器公网 IP。DNS 生效可能需要等待缓存更新。</p>
+<p data-en="Check: Run nslookup on the work computer; it should return the server public IP. Cached DNS results may take time to update." class="checkpoint">확인: 작업 컴퓨터에서 nslookup을 실행합니다. 서버 공개 IP를 반환해야 합니다. 캐시된 DNS 결과를 업데이트하는 데 시간이 걸릴 수 있습니다.</p>
 </div>
 </article>
 <article class="guide-step" id="server-firewall">
 <div class="step-head">
 <span class="step-number">03</span>
 <div>
-<span data-en="Cloud console and server · Administrator" class="actor">云控制台与服务器 · 管理员</span>
-<h3 data-en="Allow the public entry, keep internal ports private" >开放公网入口，保留内部端口</h3>
+<span data-en="Cloud console and server · Administrator" class="actor">클라우드 콘솔 및 서버 · 관리자</span>
+<h3 data-en="Allow the public entry, keep internal ports private" >공개 항목을 허용하고 내부 포트를 비공개로 유지하세요.</h3>
 </div>
 </div>
 <div class="step-body">
@@ -548,95 +548,95 @@ command -v nginx</code>
 <table>
 <thead>
 <tr>
-<th data-en="Port" scope="col">端口</th>
-<th data-en="Where" scope="col">在哪开放</th>
-<th data-en="Access" scope="col">访问范围</th>
+<th data-en="Port" scope="col">포트</th>
+<th data-en="Where" scope="col">어디</th>
+<th data-en="Access" scope="col">접속</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Actual SSH port" >实际 SSH 端口</td>
-<td data-en="Cloud security group + host firewall" >云安全组 + 服务器防火墙</td>
-<td data-en="Allow the work computer; preserve existing admin access" >允许工作电脑来源，保留现有管理入口</td>
+<td data-en="Actual SSH port" >실제 SSH 포트</td>
+<td data-en="Cloud security group + host firewall" >클라우드 보안 그룹 + 호스트 방화벽</td>
+<td data-en="Allow the work computer; preserve existing admin access" >업무용 컴퓨터를 허용하십시오. 기존 관리자 액세스 유지</td>
 </tr>
 <tr>
 <td data-en="TCP 80 / 443" >TCP 80 / 443</td>
-<td data-en="Cloud security group + host firewall" >云安全组 + 服务器防火墙</td>
-<td data-en="Public; HTTPS and certificate validation" >公网；用于 HTTPS 与证书验证</td>
+<td data-en="Cloud security group + host firewall" >클라우드 보안 그룹 + 호스트 방화벽</td>
+<td data-en="Public; HTTPS and certificate validation" >공공의; HTTPS 및 인증서 유효성 검사</td>
 </tr>
 <tr>
 <td data-en="18787" >18787</td>
-<td data-en="Do not open publicly" >不添加公网放行规则</td>
-<td data-en="Server loopback only" >仅服务器 127.0.0.1</td>
+<td data-en="Do not open publicly" >공개적으로 열지 마세요.</td>
+<td data-en="Server loopback only" >서버 루프백만</td>
 </tr>
 <tr>
-<td data-en="Computer port 8787" >电脑 8787</td>
-<td data-en="No public port forwarding" >不做公网端口映射</td>
-<td data-en="Local computer gateway" >电脑本地网关</td>
+<td data-en="Computer port 8787" >컴퓨터 포트 8787</td>
+<td data-en="No public port forwarding" >공용 포트 전달 없음</td>
+<td data-en="Local computer gateway" >로컬 컴퓨터 게이트웨이</td>
 </tr>
 </tbody>
 </table>
 </div>
 <details class="scenario">
-<summary data-en="What if Ubuntu uses UFW?" >Ubuntu 使用 UFW 时怎么做？</summary>
-<p data-en="Have the administrator inspect status first. Add web-port rules only when UFW is already enabled. Do not enable/reset the firewall or remove SSH access for this guide. Cloud security groups are configured separately." >由管理员先查看状态。仅在 UFW 已启用时添加 Web 端口规则；不要为本教程启用、重置防火墙或关闭现有 SSH 入口。云安全组还需要单独配置。</p>
+<summary data-en="What if Ubuntu uses UFW?" >Ubuntu가 UFW를 사용하면 어떻게 되나요?</summary>
+<p data-en="Have the administrator inspect status first. Add web-port rules only when UFW is already enabled. Do not enable/reset the firewall or remove SSH access for this guide. Cloud security groups are configured separately." >관리자에게 먼저 상태를 검사하도록 하세요. UFW가 이미 활성화된 경우에만 웹 포트 규칙을 추가하세요. 이 가이드에 대한 방화벽을 활성화/재설정하거나 SSH 액세스를 제거하지 마세요. 클라우드 보안 그룹은 별도로 구성됩니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo ufw status verbose</code>
 </pre>
 </div>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp</code>
 </pre>
 </div>
 </details>
-<p data-en="For firewalld, cloud firewalls or panel firewalls, ask the administrator to add equivalent rules using the existing system. If a managed server cannot expose public 80/443, request another provisioned HTTPS entry." >使用 firewalld、云防火墙或面板防火墙时，由管理员在现有系统中添加同等规则。单位服务器若不能开放公网 80/443，需要管理员提供其他已配置好的 HTTPS 入口。</p>
-<p data-en="Check: Both cloud and host firewall rules are checked. You still need a running HTTPS service and an external test." class="checkpoint">确认结果：已核对云安全组和主机防火墙两层规则；接下来还要启动 HTTPS 服务并做外网验证。</p>
+<p data-en="For firewalld, cloud firewalls or panel firewalls, ask the administrator to add equivalent rules using the existing system. If a managed server cannot expose public 80/443, request another provisioned HTTPS entry." >방화벽d, 클라우드 방화벽, 패널 방화벽의 경우 관리자에게 기존 시스템을 사용하여 동등한 규칙을 추가하도록 요청하세요. 관리 서버가 공용 80/443을 노출할 수 없는 경우 프로비저닝된 다른 HTTPS 항목을 요청하십시오.</p>
+<p data-en="Check: Both cloud and host firewall rules are checked. You still need a running HTTPS service and an external test." class="checkpoint">확인: 클라우드 및 호스트 방화벽 규칙을 모두 확인합니다. 여전히 실행 중인 HTTPS 서비스와 외부 테스트가 필요합니다.</p>
 </div>
 </article>
 <article class="guide-step" id="server-user">
 <div class="step-head">
 <span class="step-number">04</span>
 <div>
-<span data-en="Work computer + server administrator" class="actor">工作电脑 + 服务器管理员</span>
-<h3 data-en="Prepare a regular SSH user" >准备能登录的普通 SSH 用户</h3>
+<span data-en="Work computer + server administrator" class="actor">업무용 컴퓨터 + 서버 관리자</span>
+<h3 data-en="Prepare a regular SSH user" >일반 SSH 사용자 준비</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Reuse an existing regular account that can sign in. A dedicated account or sudo access is not required. Verify sign-in from the work computer terminal, then exit and configure the app. Check the first host fingerprint against the server console or administrator’s value." >已有可登录的普通用户就直接使用，不必创建专用账号，也不必授予 sudo。先在工作电脑终端验证登录，退出后再填 App。首次连接的主机指纹应与服务器控制台或管理员提供的结果核对。</p>
+<p data-en="Reuse an existing regular account that can sign in. A dedicated account or sudo access is not required. Verify sign-in from the work computer terminal, then exit and configure the app. Check the first host fingerprint against the server console or administrator’s value." >로그인이 가능한 기존 일반 계정을 재사용하세요. 전용 계정이나 sudo 접속이 필요하지 않습니다. 업무용 컴퓨터 터미널에서 로그인을 확인한 후 앱을 종료하고 구성하세요. 서버 콘솔 또는 관리자 값과 비교하여 첫 번째 호스트 지문을 확인합니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">ssh -p 22 try2love@203.0.113.10</code>
 </pre>
 </div>
 <details class="scenario">
-<summary data-en="Only root is available: how do I prepare a regular user?" >只有 root 账号，怎样准备普通用户？</summary>
-<p data-en="An Ubuntu / Debian administrator can create the account below and follow the password prompts. This does not grant sudo access. Do not globally enable SSH password authentication just to make setup easier." >Ubuntu / Debian 管理员可执行下面命令创建账号。按提示设置账号密码；这不会自动给新用户 sudo 权限。不要为方便登录而全局启用 SSH 密码认证。</p>
+<summary data-en="Only root is available: how do I prepare a regular user?" >루트만 사용할 수 있습니다. 일반 사용자는 어떻게 준비합니까?</summary>
+<p data-en="An Ubuntu / Debian administrator can create the account below and follow the password prompts. This does not grant sudo access. Do not globally enable SSH password authentication just to make setup easier." >Ubuntu/Debian 관리자는 아래 계정을 만들고 비밀번호 프롬프트를 따를 수 있습니다. 이는 sudo 액세스 권한을 부여하지 않습니다. 설정을 더 쉽게 하기 위해 SSH 비밀번호 인증을 전역적으로 활성화하지 마십시오.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo adduser try2love</code>
 </pre>
 </div>
-<p data-en="If password sign-in is already allowed, verify this regular account. For key-only servers, install a public key as described next. On other systems, use the OS-specific account management process." >服务器已允许密码登录时，先验证该普通用户能正常登录。服务器仅允许密钥时，按下一项安装公钥。其他系统请由管理员使用该系统的用户管理方式创建账号。</p>
+<p data-en="If password sign-in is already allowed, verify this regular account. For key-only servers, install a public key as described next. On other systems, use the OS-specific account management process." >비밀번호 로그인이 이미 허용된 경우 이 일반 계정을 확인하세요. 키 전용 서버의 경우 다음에 설명된 대로 공개 키를 설치합니다. 다른 시스템에서는 OS 관련 계정 관리 프로세스를 사용합니다.</p>
 </details>
 <details class="scenario">
-<summary data-en="The server requires an SSH key" >服务器只允许密钥登录</summary>
-<p data-en="Reuse a working key if you have one. To create a key, run ssh-keygen on the work computer and choose a new filename so you do not overwrite an existing key. A passphrase is recommended." >已有可用私钥就直接使用。需要新建时，在工作电脑运行 ssh-keygen，按提示保存到一个新的文件名，避免覆盖已有密钥；建议设置私钥口令。</p>
+<summary data-en="The server requires an SSH key" >서버에는 SSH 키가 필요합니다</summary>
+<p data-en="Reuse a working key if you have one. To create a key, run ssh-keygen on the work computer and choose a new filename so you do not overwrite an existing key. A passphrase is recommended." >작동 중인 키가 있으면 재사용하세요. 키를 생성하려면 업무 컴퓨터에서 ssh-keygen을 실행하고 기존 키를 덮어쓰지 않도록 새 파일 이름을 선택하세요. 암호를 사용하는 것이 좋습니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">ssh-keygen -t ed25519</code>
 </pre>
 </div>
-<p data-en="Give the generated .pub public key to the administrator to append to the user’s ~/.ssh/authorized_keys. Keep the private key on the work computer. The example below assumes the default /home/try2love home on Ubuntu / Debian; append to existing files, do not overwrite." >将生成的 .pub 公钥交给管理员追加到该用户的 ~/.ssh/authorized_keys。私钥保留在工作电脑。以下是 Ubuntu / Debian 默认 /home/try2love 家目录的示例；已有文件只追加，不覆盖。</p>
+<p data-en="Give the generated .pub public key to the administrator to append to the user’s ~/.ssh/authorized_keys. Keep the private key on the work computer. The example below assumes the default /home/try2love home on Ubuntu / Debian; append to existing files, do not overwrite." >생성된 .pub 공개 키를 관리자에게 제공하여 사용자의 ~/.ssh/authorized_keys에 추가하세요. 개인 키를 업무 컴퓨터에 보관하세요. 아래 예에서는 Ubuntu/Debian의 기본 /home/try2love home을 가정합니다. 기존 파일에 추가하고 덮어쓰지 마십시오.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo install -d -m 700 -o try2love -g try2love /home/try2love/.ssh
 sudoedit /home/try2love/.ssh/authorized_keys
@@ -644,23 +644,23 @@ sudo chown try2love:try2love /home/try2love/.ssh/authorized_keys
 sudo chmod 600 /home/try2love/.ssh/authorized_keys</code>
 </pre>
 </div>
-<p data-en="In the app, choose Local private key and select the file without the .pub suffix. Enter its passphrase if set. Keep private keys and passwords out of public configuration and screenshots." >在 App 选择“本地私钥”，选没有 .pub 后缀的私钥文件；设置过口令时同时填写口令。不要把私钥或密码放到公开配置和截图中。</p>
+<p data-en="In the app, choose Local private key and select the file without the .pub suffix. Enter its passphrase if set. Keep private keys and passwords out of public configuration and screenshots." >앱에서 로컬 개인 키를 선택하고 .pub 접미사가 없는 파일을 선택합니다. 설정된 경우 암호를 입력하세요. 개인 키와 비밀번호를 공개 구성 및 스크린샷에 포함하지 마세요.</p>
 </details>
-<p data-en="Check: The work computer can sign in as the regular user. The server SSH password and phone gateway password are separate credentials." class="checkpoint">确认结果：工作电脑能以普通用户登录服务器。服务器 SSH 密码与手机网关登录密码是两套凭据。</p>
+<p data-en="Check: The work computer can sign in as the regular user. The server SSH password and phone gateway password are separate credentials." class="checkpoint">확인: 회사 컴퓨터가 일반 사용자로 로그인할 수 있습니다. 서버 SSH 비밀번호와 전화 게이트웨이 비밀번호는 별도의 자격 증명입니다.</p>
 </div>
 </article>
 <article class="guide-step" id="server-forwarding">
 <div class="step-head">
 <span class="step-number">05</span>
 <div>
-<span data-en="Server · Administrator checks and configuration" class="actor">服务器 · 管理员检查与配置</span>
-<h3 data-en="Allow this user to create the reverse tunnel" >允许这个用户建立反向隧道</h3>
+<span data-en="Server · Administrator checks and configuration" class="actor">서버 · 관리자 확인 및 구성</span>
+<h3 data-en="Allow this user to create the reverse tunnel" >이 사용자가 역방향 터널을 생성하도록 허용</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Reuse existing forwarding permissions if suitable. If changes are needed, have the administrator review sshd_config, included files, Match conditions and public-key restrictions, then add or adjust the target user’s rules below. Do not replace the entire SSH configuration." >已允许转发时可以沿用现有配置。需要调整时，让管理员检查现有 sshd_config、Include 文件、Match 条件及公钥限制，再为目标用户添加或调整以下规则；不要覆盖整个 SSH 配置。</p>
+<p data-en="Reuse existing forwarding permissions if suitable. If changes are needed, have the administrator review sshd_config, included files, Match conditions and public-key restrictions, then add or adjust the target user’s rules below. Do not replace the entire SSH configuration." >적합한 경우 기존 전달 권한을 재사용합니다. 변경이 필요한 경우 관리자가 sshd_config, 포함된 파일, 일치 조건 및 공개 키 제한 사항을 검토한 후 아래에서 대상 사용자의 규칙을 추가하거나 조정하도록 합니다. 전체 SSH 구성을 교체하지 마십시오.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sshd">Match User try2love
     AllowTcpForwarding remote
@@ -669,39 +669,39 @@ sudo chmod 600 /home/try2love/.ssh/authorized_keys</code>
 Match all</code>
 </pre>
 </div>
-<p data-en="AllowTcpForwarding remote permits reverse forwarding, PermitListen limits listening addresses, and GatewayPorts no keeps the listener on loopback. DisableForwarding yes, earlier matching rules or restrict / no-port-forwarding in authorized_keys may still block forwarding." >AllowTcpForwarding remote 允许反向转发；PermitListen 限制监听地址；GatewayPorts no 保持回环监听。已有 DisableForwarding yes、较早匹配的规则或 authorized_keys 的 restrict / no-port-forwarding 仍可能阻止转发。</p>
+<p data-en="AllowTcpForwarding remote permits reverse forwarding, PermitListen limits listening addresses, and GatewayPorts no keeps the listener on loopback. DisableForwarding yes, earlier matching rules or restrict / no-port-forwarding in authorized_keys may still block forwarding." >AllowTcpForwarding 원격은 역방향 전달을 허용하고 PermitListen은 수신 주소를 제한하며 GatewayPorts는 수신기를 루프백 상태로 유지하지 않습니다. DisableForwarding 예, Authorized_keys의 이전 일치 규칙 또는 제한/포트 전달 없음은 여전히 ​​전달을 차단할 수 있습니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo sshd -t</code>
 </pre>
 </div>
-<p data-en="Continue only when syntax validation exits with code 0 and no output. Ubuntu / Debian normally use the ssh service below; check the service name on other systems. Keep the existing SSH terminal open and verify a new sign-in from another terminal." >语法检查无输出且退出码为 0 才继续。Ubuntu / Debian 通常使用下面的 ssh 服务；其他系统先确认实际服务名。保留当前 SSH 终端，并在新终端再次验证登录。</p>
+<p data-en="Continue only when syntax validation exits with code 0 and no output. Ubuntu / Debian normally use the ssh service below; check the service name on other systems. Keep the existing SSH terminal open and verify a new sign-in from another terminal." >구문 유효성 검사가 코드 0으로 종료되고 출력이 없는 경우에만 계속합니다. Ubuntu/Debian은 일반적으로 아래 ssh 서비스를 사용합니다. 다른 시스템의 서비스 이름을 확인하십시오. 기존 SSH 터미널을 열어두고 다른 터미널에서 새로 로그인했는지 확인하세요.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo systemctl reload ssh</code>
 </pre>
 </div>
-<p data-en="Check: A new terminal can sign in. Actual forwarding is checked after starting the app tunnel in step 7." class="checkpoint">确认结果：新终端登录正常。真正的转发权限还需在第 7 步启动 App 隧道后验证。</p>
-<a data-en="Official: OpenSSH forwarding permissions ↗" href="https://man.openbsd.org/sshd_config#AllowTcpForwarding">官方：OpenSSH 转发权限 ↗</a>
+<p data-en="Check: A new terminal can sign in. Actual forwarding is checked after starting the app tunnel in step 7." class="checkpoint">확인: 새 단말기가 로그인할 수 있습니다. 실제 전달은 7단계에서 앱 터널을 시작한 후 확인됩니다.</p>
+<a data-en="Official: OpenSSH forwarding permissions ↗" href="https://man.openbsd.org/sshd_config#AllowTcpForwarding">공식: OpenSSH 전달 권한 ↗</a>
 </div>
 </article>
 <article class="guide-step" id="server-https">
 <div class="step-head">
 <span class="step-number">06</span>
 <div>
-<span data-en="Server or control panel · Administrator" class="actor">服务器或管理面板 · 管理员</span>
-<h3 data-en="Configure HTTPS: choose your situation" >配置 HTTPS 入口：选择你的情况</h3>
+<span data-en="Server or control panel · Administrator" class="actor">서버 또는 제어판 · 관리자</span>
+<h3 data-en="Configure HTTPS: choose your situation" >HTTPS 구성: 상황을 선택하세요.</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Choose one path. The upstream is always http://127.0.0.1:18787 on the SSH server itself, not the work computer’s LAN IP." >四种路径选一种即可。上游始终是 SSH 服务器自身的 http://127.0.0.1:18787；不是工作电脑的局域网 IP。</p>
+<p data-en="Choose one path. The upstream is always http://127.0.0.1:18787 on the SSH server itself, not the work computer’s LAN IP." >하나의 경로를 선택하십시오. 업스트림은 항상 업무 컴퓨터의 LAN IP가 아니라 SSH 서버 자체의 http://127.0.0.1:18787입니다.</p>
 <details class="scenario">
-<summary data-en="A · Fresh Ubuntu / Debian, no existing website" >A · 全新 Ubuntu / Debian，没有网站</summary>
-<p data-en="Confirm ports 80/443 are not used by another service and Caddy is not installed. The administrator installs from the official repository. Run one command at a time and resolve errors before proceeding. The package creates and starts a system service." >确认 80/443 未被现有服务占用，且未安装 Caddy，再由管理员按官方软件源安装。一次运行一条命令，失败时先处理错误。安装 Caddy 后会创建并启动系统服务。</p>
+<summary data-en="A · Fresh Ubuntu / Debian, no existing website" >A · 새로운 우분투/데비안, 기존 웹사이트 없음</summary>
+<p data-en="Confirm ports 80/443 are not used by another service and Caddy is not installed. The administrator installs from the official repository. Run one command at a time and resolve errors before proceeding. The package creates and starts a system service." >포트 80/443이 다른 서비스에서 사용되지 않고 Caddy가 설치되지 않았는지 확인하십시오. 관리자는 공식 저장소에서 설치합니다. 계속하기 전에 한 번에 하나의 명령을 실행하고 오류를 해결하십시오. 패키지는 시스템 서비스를 생성하고 시작합니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo apt update
 sudo apt install --yes debian-keyring debian-archive-keyring apt-transport-https curl gnupg
@@ -713,16 +713,16 @@ sudo apt update
 sudo apt install caddy</code>
 </pre>
 </div>
-<p data-en="Back up and edit the Caddyfile. Replace the example domain. On a fresh installation, replace the sample :80 site with the block below. If real sites already exist, use path B." >先备份再编辑 Caddyfile。把演示域名改为自己的域名；新安装文件中的示例 :80 站点可替换为下面的站点块。若文件已有真实网站，转到路径 B。</p>
+<p data-en="Back up and edit the Caddyfile. Replace the example domain. On a fresh installation, replace the sample :80 site with the block below. If real sites already exist, use path B." >Caddyfile을 백업하고 편집하세요. 예제 도메인을 교체합니다. 새로 설치하는 경우 샘플 :80 사이트를 아래 블록으로 바꿉니다. 실제 사이트가 이미 존재하는 경우 경로 B를 사용합니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo cp -a /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-codex-$(date +%Y%m%d%H%M%S)
 sudoedit /etc/caddy/Caddyfile</code>
 </pre>
 </div>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="caddy">codex.try2love.com {
     reverse_proxy 127.0.0.1:18787 {
@@ -733,23 +733,23 @@ sudoedit /etc/caddy/Caddyfile</code>
 </pre>
 </div>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy
 systemctl is-active caddy</code>
 </pre>
 </div>
-<p data-en="Reload only after validation succeeds; the last command should show active. Caddy obtains and renews certificates and redirects HTTP to HTTPS." >只有 validate 成功后才 reload；最后应显示 active。Caddy 自动申请和续期证书，并处理 HTTP → HTTPS。</p>
-<a data-en="Official installation instructions ↗" href="https://caddyserver.com/docs/install">官方安装步骤 ↗</a>
+<p data-en="Reload only after validation succeeds; the last command should show active. Caddy obtains and renews certificates and redirects HTTP to HTTPS." >검증이 성공한 후에만 다시 로드하십시오. 마지막 명령은 활성으로 표시되어야 합니다. 캐디는 인증서를 획득 및 갱신하고 HTTP를 HTTPS로 리디렉션합니다.</p>
+<a data-en="Official installation instructions ↗" href="https://caddyserver.com/docs/install">공식 설치 지침 ↗</a>
 </details>
 <details class="scenario">
-<summary data-en="B · Existing Caddy or Nginx websites" >B · 已有 Caddy 或 Nginx 网站</summary>
-<p data-en="Back up configuration and add a dedicated hostname for the gateway. Do not overwrite existing sites or stop the web server." >先备份配置，为网关使用一个独立域名站点，不覆盖原站点，也不停止现有 Web 服务。</p>
-<h3 data-en="Existing Caddy" >已有 Caddy</h3>
-<p data-en="Add this block to the active Caddyfile or an imported site file. Preserve other sites and avoid duplicate definitions for the same hostname." >在实际使用的 Caddyfile 或已被 import 的站点文件中添加以下站点块。原有站点保持不变，确认未为同一域名重复定义站点。</p>
+<summary data-en="B · Existing Caddy or Nginx websites" >B · 기존 Caddy 또는 Nginx 웹사이트</summary>
+<p data-en="Back up configuration and add a dedicated hostname for the gateway. Do not overwrite existing sites or stop the web server." >구성을 백업하고 게이트웨이에 대한 전용 호스트 이름을 추가합니다. 기존 사이트를 덮어쓰거나 웹 서버를 중지하지 마십시오.</p>
+<h3 data-en="Existing Caddy" >기존 캐디</h3>
+<p data-en="Add this block to the active Caddyfile or an imported site file. Preserve other sites and avoid duplicate definitions for the same hostname." >이 블록을 활성 Caddyfile 또는 가져온 사이트 파일에 추가합니다. 다른 사이트를 보존하고 동일한 호스트 이름에 대한 중복 정의를 피하십시오.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="caddy">codex.try2love.com {
     reverse_proxy 127.0.0.1:18787 {
@@ -760,16 +760,16 @@ systemctl is-active caddy</code>
 </pre>
 </div>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy</code>
 </pre>
 </div>
-<h3 data-en="Existing Nginx" >已有 Nginx</h3>
-<p data-en="First provision a valid certificate and HTTP-to-HTTPS redirect for the gateway hostname using your existing certificate tool or panel. Put this location inside that hostname’s HTTPS server block. If location / exists, edit that site’s block rather than duplicating it. This does not issue certificates and is not a complete Nginx configuration file." >先用现有证书工具或面板为网关域名配置有效 HTTPS 证书与 HTTP → HTTPS 跳转。将以下 location 放入该域名的 HTTPS server 块；如果已经有 location /，只调整该站点，不重复添加。这里不包含证书签发步骤，不能直接当成完整 Nginx 配置文件。</p>
+<h3 data-en="Existing Nginx" >기존 Nginx</h3>
+<p data-en="First provision a valid certificate and HTTP-to-HTTPS redirect for the gateway hostname using your existing certificate tool or panel. Put this location inside that hostname’s HTTPS server block. If location / exists, edit that site’s block rather than duplicating it. This does not issue certificates and is not a complete Nginx configuration file." >먼저 유효한 인증서를 프로비저닝하고 기존 인증서 도구 또는 패널을 사용하여 게이트웨이 호스트 이름에 대해 HTTP에서 HTTPS로 리디렉션합니다. 이 위치를 해당 호스트 이름의 HTTPS 서버 블록 안에 넣으세요. 위치 /가 존재하는 경우 해당 사이트의 블록을 복제하기보다는 편집하세요. 이는 인증서를 발급하지 않으며 완전한 Nginx 구성 파일이 아닙니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="nginx">location / {
     proxy_pass http://127.0.0.1:18787;
@@ -784,67 +784,67 @@ sudo systemctl reload caddy</code>
 </pre>
 </div>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">sudo nginx -t
 sudo systemctl reload nginx</code>
 </pre>
 </div>
-<p data-en="Reload only after nginx -t succeeds. If a panel or container manages the proxy, use its existing configuration and reload controls rather than creating another systemd service." >仅在 nginx -t 成功后重新加载。Caddy/Nginx 若由面板或容器管理，应使用其现有配置和重载方式，不另建 systemd 服务。</p>
+<p data-en="Reload only after nginx -t succeeds. If a panel or container manages the proxy, use its existing configuration and reload controls rather than creating another systemd service." >nginx -t가 성공한 후에만 다시 로드하세요. 패널이나 컨테이너가 프록시를 관리하는 경우 다른 시스템 서비스를 만드는 대신 기존 구성 및 다시 로드 컨트롤을 사용하세요.</p>
 </details>
 <details class="scenario">
-<summary data-en="C · A website control panel" >C · 宝塔、1Panel 或其他网站面板</summary>
-<p data-en="Create a dedicated hostname site or reverse-proxy entry in the existing panel and preserve other sites. Menu labels vary by panel version; map the fields below." >在现有面板中新建独立域名站点或反向代理条目，保留其他站点。不同版本菜单名称不同，逐项对应下面的字段即可。</p>
+<summary data-en="C · A website control panel" >C · 웹사이트 제어판</summary>
+<p data-en="Create a dedicated hostname site or reverse-proxy entry in the existing panel and preserve other sites. Menu labels vary by panel version; map the fields below." >기존 패널에 전용 호스트 이름 사이트 또는 역방향 프록시 항목을 만들고 다른 사이트를 보존합니다. 메뉴 라벨은 패널 버전에 따라 다릅니다. 아래 필드를 매핑하세요.</p>
 <div class="table-wrap">
 <table>
 <thead>
 <tr>
-<th data-en="Panel setting" scope="col">面板设置</th>
-<th data-en="Value" scope="col">内容</th>
+<th data-en="Panel setting" scope="col">패널 설정</th>
+<th data-en="Value" scope="col">값</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Hostname" >域名</td>
+<td data-en="Hostname" >호스트 이름</td>
 <td data-en="codex.try2love.com" >codex.try2love.com</td>
 </tr>
 <tr>
-<td data-en="Upstream protocol and address" >上游协议与地址</td>
+<td data-en="Upstream protocol and address" >업스트림 프로토콜 및 주소</td>
 <td data-en="HTTP · 127.0.0.1:18787" >HTTP · 127.0.0.1:18787</td>
 </tr>
 <tr>
-<td data-en="Upstream Host header" >发送给上游的 Host</td>
-<td data-en="Original public hostname codex.try2love.com" >原始访问域名 codex.try2love.com</td>
+<td data-en="Upstream Host header" >업스트림 호스트 헤더</td>
+<td data-en="Original public hostname codex.try2love.com" >원래 공개 호스트 이름 codex.try2love.com</td>
 </tr>
 <tr>
 <td data-en="SSL / HTTPS" >SSL / HTTPS</td>
-<td data-en="Issue a valid certificate for this hostname; redirect HTTP" >为此域名申请有效证书，启用 HTTP 跳转</td>
+<td data-en="Issue a valid certificate for this hostname; redirect HTTP" >이 호스트 이름에 대한 유효한 인증서를 발급하십시오. HTTP 리디렉션</td>
 </tr>
 <tr>
-<td data-en="Caching and streaming" >缓存与流式响应</td>
-<td data-en="Disable proxy caching and response buffering" >关闭代理缓存、关闭响应缓冲</td>
+<td data-en="Caching and streaming" >캐싱 및 스트리밍</td>
+<td data-en="Disable proxy caching and response buffering" >프록시 캐싱 및 응답 버퍼링 비활성화</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="If the panel proxy runs in a container, 127.0.0.1 refers to that container, not necessarily the SSH host. Have the administrator verify network namespaces and a safely reachable upstream; do not expose port 18787 publicly." >如果面板反代运行在容器中，127.0.0.1 指向容器自己，可能不是 SSH 服务器。让管理员确认网络命名空间与安全可达的上游，不要为了连通而把 18787 暴露到公网。</p>
+<p data-en="If the panel proxy runs in a container, 127.0.0.1 refers to that container, not necessarily the SSH host. Have the administrator verify network namespaces and a safely reachable upstream; do not expose port 18787 publicly." >패널 프록시가 컨테이너에서 실행되는 경우 127.0.0.1은 해당 컨테이너를 참조하며 반드시 SSH 호스트일 필요는 없습니다. 관리자에게 네트워크 네임스페이스와 안전하게 연결 가능한 업스트림을 확인하도록 하세요. 포트 18787을 공개적으로 노출하지 마십시오.</p>
 </details>
 <details class="scenario">
-<summary data-en="D · Other OS, Docker, or no administrator access" >D · 其他系统、Docker，或没有管理员权限</summary>
-<p data-en="For other Linux systems, choose the matching package manager in the official Caddy guide; hostname, upstream and verification remain the same. Do not copy apt commands onto Rocky / AlmaLinux. Windows servers require administrator-provided equivalent SSH and HTTPS services; these Linux commands do not apply." >其他 Linux 系统按 Caddy 官方安装页选择对应包管理器，后续域名、上游和验收步骤相同。不要在 Rocky / AlmaLinux 等系统照抄 apt 命令。Windows 服务器不在这份 Linux 命令教程范围内，请由管理员提供等效的 SSH 与 HTTPS 服务。</p>
-<p data-en="With existing Linux Docker Engine, the app’s exported manual reference includes an optional Caddy Compose setup. Start it only when 80/443 are free, and retain certificate volumes. It uses host networking on the same Linux host as SSH. Docker does not bypass administrator permissions." >已有 Linux Docker Engine 时，可使用 App“导出手动配置参考”中的 Caddy Compose 方案。仅在 80/443 空闲时启动，保留证书卷；该方案使用 host 网络，必须与 SSH 服务在同一 Linux 主机。Docker 不是绕过管理员权限的方法。</p>
-<p data-en="Without administrator access, give steps 2–6 to the administrator. You only need a regular SSH account and permitted forwarding port, not sudo. The app’s Copy server inspection prompt lets a server-side agent inspect read-only; it does not grant administrative permission." >没有管理员权限时，将第 2—6 步交给管理员完成。你只需普通 SSH 用户和允许的转发端口，不需要申请 sudo 权限。App 的“复制服务器检查 Prompt”可先让服务器内的 Agent 只读检查，不能代替管理员授权。</p>
-<a data-en="Choose Caddy installation instructions for your OS ↗" href="https://caddyserver.com/docs/install">按系统选择 Caddy 安装方法 ↗</a>
+<summary data-en="D · Other OS, Docker, or no administrator access" >D · 기타 OS, Docker 또는 관리자 액세스 권한 없음</summary>
+<p data-en="For other Linux systems, choose the matching package manager in the official Caddy guide; hostname, upstream and verification remain the same. Do not copy apt commands onto Rocky / AlmaLinux. Windows servers require administrator-provided equivalent SSH and HTTPS services; these Linux commands do not apply." >다른 Linux 시스템의 경우 공식 캐디 가이드에서 일치하는 패키지 관리자를 선택하세요. 호스트 이름, 업스트림 및 확인은 동일하게 유지됩니다. Rocky/AlmaLinux에 apt 명령을 복사하지 마십시오. Windows 서버에는 관리자가 제공한 동등한 SSH 및 HTTPS 서비스가 필요합니다. 이러한 Linux 명령은 적용되지 않습니다.</p>
+<p data-en="With existing Linux Docker Engine, the app’s exported manual reference includes an optional Caddy Compose setup. Start it only when 80/443 are free, and retain certificate volumes. It uses host networking on the same Linux host as SSH. Docker does not bypass administrator permissions." >기존 Linux Docker 엔진을 사용하면 앱에서 내보낸 수동 참조에 선택적 Caddy Compose 설정이 포함됩니다. 80/443이 비어 있을 때만 시작하고 인증서 볼륨을 유지하십시오. SSH와 동일한 Linux 호스트에서 호스트 네트워킹을 사용합니다. Docker는 관리자 권한을 우회하지 않습니다.</p>
+<p data-en="Without administrator access, give steps 2–6 to the administrator. You only need a regular SSH account and permitted forwarding port, not sudo. The app’s Copy server inspection prompt lets a server-side agent inspect read-only; it does not grant administrative permission." >관리자 액세스 권한이 없으면 관리자에게 2~6단계를 제공합니다. sudo가 아닌 일반 SSH 계정과 허용된 전달 포트만 필요합니다. 앱의 복사 서버 검사 프롬프트를 사용하면 서버 측 에이전트가 읽기 전용으로 검사할 수 있습니다. 관리 권한은 부여되지 않습니다.</p>
+<a data-en="Choose Caddy installation instructions for your OS ↗" href="https://caddyserver.com/docs/install">OS에 대한 캐디 설치 지침을 선택하세요 ↗</a>
 </details>
-<p data-en="Check: The HTTPS certificate is valid and HTTP redirects to HTTPS. A 502 may be expected before the tunnel starts; fix certificate errors or an unrelated site before proceeding." class="checkpoint">确认结果：HTTPS 证书正常、HTTP 会跳到 HTTPS。隧道尚未启动时显示 502 可能是预期状态；看到默认证书错误或其他网站则先修正此步。</p>
+<p data-en="Check: The HTTPS certificate is valid and HTTP redirects to HTTPS. A 502 may be expected before the tunnel starts; fix certificate errors or an unrelated site before proceeding." class="checkpoint">확인: HTTPS 인증서가 유효하고 HTTP가 HTTPS로 리디렉션됩니다. 터널이 시작되기 전에 502가 발생할 수 있습니다. 계속하기 전에 인증서 오류나 관련 없는 사이트를 수정하세요.</p>
 </div>
 </article>
 <article class="guide-step" id="server-app">
 <div class="step-head">
 <span class="step-number">07</span>
 <div>
-<span data-en="Work computer · App" class="actor">工作电脑 · App</span>
-<h3 data-en="Configure and start SSH on the work computer" >回到工作电脑，填写并启动 SSH 连接</h3>
+<span data-en="Work computer · App" class="actor">업무용 컴퓨터 · 앱</span>
+<h3 data-en="Configure and start SSH on the work computer" >업무 컴퓨터에서 SSH 구성 및 시작</h3>
 </div>
 </div>
 <div class="step-body">
@@ -852,159 +852,159 @@ sudo systemctl reload nginx</code>
 <table>
 <thead>
 <tr>
-<th data-en="App field" scope="col">App 字段</th>
-<th data-en="Example" scope="col">示例</th>
+<th data-en="App field" scope="col">앱 분야</th>
+<th data-en="Example" scope="col">예</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Connection" >连接方式</td>
-<td data-en="Fixed domain · Own server + SSH" >固定域名 · 自有服务器 + SSH</td>
+<td data-en="Connection" >연결</td>
+<td data-en="Fixed domain · Own server + SSH" >고정도메인 · 자체 서버 + SSH</td>
 </tr>
 <tr>
-<td data-en="Phone URL" >手机访问地址</td>
+<td data-en="Phone URL" >전화번호 URL</td>
 <td data-en="https://codex.try2love.com" >https://codex.try2love.com</td>
 </tr>
 <tr>
-<td data-en="Server address" >服务器地址</td>
+<td data-en="Server address" >서버 주소</td>
 <td data-en="203.0.113.10" >203.0.113.10</td>
 </tr>
 <tr>
-<td data-en="SSH port" >SSH 端口</td>
-<td data-en="22 (actual port)" >22（实际端口）</td>
+<td data-en="SSH port" >SSH 포트</td>
+<td data-en="22 (actual port)" >22(실제 포트)</td>
 </tr>
 <tr>
-<td data-en="SSH username" >SSH 用户名</td>
-<td data-en="try2love" >try2love</td>
+<td data-en="SSH username" >SSH 사용자 이름</td>
+<td data-en="try2love" >시도2사랑</td>
 </tr>
 <tr>
-<td data-en="Authentication" >认证方式</td>
-<td data-en="Use the verified password, key, agent or SSH alias" >沿用已验证的密码、私钥、Agent 或 SSH 别名</td>
+<td data-en="Authentication" >입증</td>
+<td data-en="Use the verified password, key, agent or SSH alias" >확인된 비밀번호, 키, 에이전트 또는 SSH 별칭을 사용하세요.</td>
 </tr>
 <tr>
-<td data-en="Server loopback port" >服务器回环端口</td>
-<td data-en="18787; matches the proxy upstream" >18787；与反代上游一致</td>
+<td data-en="Server loopback port" >서버 루프백 포트</td>
+<td data-en="18787; matches the proxy upstream" >18787; 프록시 업스트림과 일치합니다.</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="Save settings, verify the first host fingerprint, and select Check SSH sign-in. Then enable and save the connection and select Start SSH connection. A disabled profile can be checked but will not start forwarding." >保存配置，核对首次主机指纹，再点击“检查 SSH 登录”。登录通过后启用该连接并保存，点击“启动 SSH 连接”。若服务器配置被禁用，检查可以执行，但不会建立转发。</p>
-<p data-en="Check SSH sign-in only proves authentication. It does not prove certificates, forwarding permissions or phone access. The app does not run sudo or install server software." >“检查 SSH 登录”只证明认证成功。不要把它当作证书、转发权限或手机公网访问已经通过。App 不会执行 sudo，也不会自动安装服务器软件。</p>
-<p data-en="Check: SSH status shows forwarding established. On the server, ss -ltn shows 127.0.0.1:18787, not 0.0.0.0:18787." class="checkpoint">确认结果：SSH 状态显示转发已建立。服务器上 ss -ltn 可以看到 127.0.0.1:18787；不应是 0.0.0.0:18787。</p>
+<p data-en="Save settings, verify the first host fingerprint, and select Check SSH sign-in. Then enable and save the connection and select Start SSH connection. A disabled profile can be checked but will not start forwarding." >설정을 저장하고 첫 번째 호스트 지문을 확인한 후 SSH 로그인 확인을 선택합니다. 그런 다음 연결을 활성화 및 저장하고 SSH 연결 시작을 선택합니다. 비활성화된 프로필은 확인할 수 있지만 전달이 시작되지는 않습니다.</p>
+<p data-en="Check SSH sign-in only proves authentication. It does not prove certificates, forwarding permissions or phone access. The app does not run sudo or install server software." >SSH 로그인을 확인하면 인증만 증명됩니다. 인증서, 전달 권한 또는 전화 액세스를 증명하지 않습니다. 앱이 sudo를 실행하거나 서버 소프트웨어를 설치하지 않습니다.</p>
+<p data-en="Check: SSH status shows forwarding established. On the server, ss -ltn shows 127.0.0.1:18787, not 0.0.0.0:18787." class="checkpoint">확인: SSH 상태에 전달이 설정된 것으로 표시됩니다. 서버에서 ss -ltn은 0.0.0.0:18787이 아닌 127.0.0.1:18787을 표시합니다.</p>
 </div>
 </article>
 <article class="guide-step" id="server-verify">
 <div class="step-head">
 <span class="step-number">08</span>
 <div>
-<span data-en="Server → work computer → phone" class="actor">服务器 → 工作电脑 → 手机</span>
-<h3 data-en="Verify each layer in order" >按顺序验收，不跳步</h3>
+<span data-en="Server → work computer → phone" class="actor">서버 → 업무용 컴퓨터 → 전화</span>
+<h3 data-en="Verify each layer in order" >각 레이어를 순서대로 확인</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="First verify that the server’s reverse tunnel reaches the computer gateway. Use the public hostname saved in the app as Host. This request contains no password." >先在服务器确认反向隧道能到达电脑网关。Host 必须使用已经在 App 保存的访问域名。此请求不包含密码。</p>
+<p data-en="First verify that the server’s reverse tunnel reaches the computer gateway. Use the public hostname saved in the app as Host. This request contains no password." >먼저 서버의 역방향 터널이 컴퓨터 게이트웨이에 도달하는지 확인합니다. 앱에 저장된 공개 호스트 이름을 호스트로 사용하세요. 이 요청에는 비밀번호가 없습니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">curl --max-time 10 -H &#x27;Host: codex.try2love.com&#x27; http://127.0.0.1:18787/api/auth</code>
 </pre>
 </div>
-<p data-en="Expect JSON containing authenticated and other fields. Then select Check fixed entry in the app to compare the public HTTPS instance with the local gateway. Finally verify sign-in, chat loading and sending over phone mobile data." >应返回包含 authenticated 等字段的 JSON。然后在 App 点击“检测固定入口”，比较固定 HTTPS 地址与本机网关实例。最后用手机蜂窝网络验证登录、聊天读取和发送。</p>
-<p data-en="Check: All three layers pass. Daily operation needs no sudo. Keep the computer awake and online; the gateway maintains and retries the SSH connection." class="checkpoint">确认结果：三层都通过。之后无需日常 sudo 操作，电脑保持开机、联网且不休眠，网关会维持并重试 SSH 连接。</p>
+<p data-en="Expect JSON containing authenticated and other fields. Then select Check fixed entry in the app to compare the public HTTPS instance with the local gateway. Finally verify sign-in, chat loading and sending over phone mobile data." >인증된 필드와 기타 필드가 포함된 JSON가 필요합니다. 그런 다음 앱에서 고정 항목 확인을 선택하여 공용 HTTPS 인스턴스를 로컬 게이트웨이와 비교합니다. 마지막으로 로그인, 채팅 로딩 및 전화 모바일 데이터 전송을 확인합니다.</p>
+<p data-en="Check: All three layers pass. Daily operation needs no sudo. Keep the computer awake and online; the gateway maintains and retries the SSH connection." class="checkpoint">확인: 세 개의 레이어가 모두 통과됩니다. 일일 작업에는 sudo가 필요하지 않습니다. 컴퓨터를 깨어 있고 온라인 상태로 유지하십시오. 게이트웨이는 SSH 연결을 유지하고 재시도합니다.</p>
 </div>
 </article>
 </section>
 <section class="setup-panel" id="external" data-setup-panel="external" aria-labelledby="external-title">
-<h2 data-en="Existing tunnel / reverse proxy: keep your HTTPS entry" id="external-title">已有穿透 / 反向代理：沿用你的 HTTPS 入口</h2>
-<p class="panel-intro" data-en="Available in v2.1.0. Use an existing trusted HTTPS tunnel or reverse proxy to reach this gateway.">v2.1.0 正式版已支持。复用已有受信任的 HTTPS 穿透或反向代理访问网关。</p>
+<h2 data-en="Existing tunnel / reverse proxy: keep your HTTPS entry" id="external-title">기존 터널/역방향 프록시: HTTPS 항목 유지</h2>
+<p class="panel-intro" data-en="Available in v2.1.0. Use an existing trusted HTTPS tunnel or reverse proxy to reach this gateway.">v2.1.0에서 사용 가능합니다. 이 게이트웨이에 연결하려면 기존의 신뢰할 수 있는 HTTPS 터널 또는 역방향 프록시를 사용하세요.</p>
 <figure class="network-map"><div class="map-flow">
-<div class="map-node"><span class="map-index">1</span><strong data-en="Phone" >手机</strong><small data-en="Trusted HTTPS root URL" >受信任的 HTTPS 根地址</small></div>
+<div class="map-node"><span class="map-index">1</span><strong data-en="Phone" >핸드폰</strong><small data-en="Trusted HTTPS root URL" >신뢰할 수 있는 HTTPS 루트 URL</small></div>
 <span class="map-arrow" aria-hidden="true">→</span>
-<div class="map-node"><span class="map-index">2</span><strong data-en="Your tunnel / proxy" >你的穿透／代理</strong><small data-en="Preserve public Host" >保留公开 Host</small></div>
+<div class="map-node"><span class="map-index">2</span><strong data-en="Your tunnel / proxy" >터널/프록시</strong><small data-en="Preserve public Host" >공개 호스트 유지</small></div>
 <span class="map-arrow" aria-hidden="true">→</span>
-<div class="map-node"><span class="map-index">3</span><strong data-en="This computer" >这台电脑</strong><small data-en="127.0.0.1:actual gateway port" >127.0.0.1:网关实际端口</small></div>
-</div><figcaption data-en="Bridge saves the public URL; you manage the tunnel and HTTPS certificate.">Bridge 只保存公开地址；穿透和 HTTPS 证书由你管理。</figcaption></figure>
-<article class="guide-step"><div class="step-head"><span class="step-number">01</span><div><span class="actor" data-en="Your tunnel or proxy">你的穿透或代理</span><h3 data-en="Forward to this computer's actual loopback port">上游指向本机实际回环端口</h3></div></div><div class="step-body">
-<p data-en="Set the HTTP upstream to http://127.0.0.1:8787 only if the gateway really uses port 8787; otherwise replace it with the port shown in the desktop App. If the proxy runs in a container, its own 127.0.0.1 may be a different network namespace.">仅当网关实际使用 8787 时，上游才填 http://127.0.0.1:8787；否则使用电脑 App 显示的实际端口。代理若在容器内运行，容器的 127.0.0.1 可能指向另一网络空间。</p>
-<p class="checkpoint" data-en="Check: the tunnel can reach this computer's gateway without exposing its HTTP port directly to the public Internet.">确认结果：穿透能连到这台电脑的网关，网关 HTTP 端口未直接暴露到公网。</p>
+<div class="map-node"><span class="map-index">3</span><strong data-en="This computer" >이 컴퓨터</strong><small data-en="127.0.0.1:actual gateway port" >127.0.0.1:실제 게이트웨이 포트</small></div>
+</div><figcaption data-en="Bridge saves the public URL; you manage the tunnel and HTTPS certificate.">Bridge는 공개 URL를 저장합니다. 터널 및 HTTPS 인증서를 관리합니다.</figcaption></figure>
+<article class="guide-step"><div class="step-head"><span class="step-number">01</span><div><span class="actor" data-en="Your tunnel or proxy">터널 또는 프록시</span><h3 data-en="Forward to this computer's actual loopback port">이 컴퓨터의 실제 루프백 포트로 전달</h3></div></div><div class="step-body">
+<p data-en="Set the HTTP upstream to http://127.0.0.1:8787 only if the gateway really uses port 8787; otherwise replace it with the port shown in the desktop App. If the proxy runs in a container, its own 127.0.0.1 may be a different network namespace.">게이트웨이가 실제로 포트 8787을 사용하는 경우에만 HTTP 업스트림을 http://127.0.0.1:8787로 설정합니다. 그렇지 않으면 데스크탑 앱에 표시된 포트로 교체하십시오. 프록시가 컨테이너에서 실행되는 경우 자체 127.0.0.1은 다른 네트워크 네임스페이스일 수 있습니다.</p>
+<p class="checkpoint" data-en="Check: the tunnel can reach this computer's gateway without exposing its HTTP port directly to the public Internet.">확인: 터널은 HTTP 포트를 공용 인터넷에 직접 노출하지 않고도 이 컴퓨터의 게이트웨이에 연결할 수 있습니다.</p>
 </div></article>
-<article class="guide-step"><div class="step-head"><span class="step-number">02</span><div><span class="actor" data-en="Desktop App">电脑 App</span><h3 data-en="Save the phone's HTTPS URL">保存手机 HTTPS 地址</h3></div></div><div class="step-body">
-<p data-en="Under Network access → Add connection, choose Existing tunnel / reverse proxy and enter a complete trusted HTTPS root URL, such as https://bridge.example.com or https://bridge.example.com:8443. Public HTTP, paths such as /codex/, query parameters and redirects are unsupported. Do not disable certificate verification.">在“网络访问 → 添加连接”选择“已有穿透 / 反向代理”，填写完整且证书受信任的 HTTPS 根地址，例如 https://bridge.example.com 或 https://bridge.example.com:8443。不能填公网 HTTP、/codex/ 子路径、查询参数或重定向地址；不要关闭证书校验。</p>
-<p data-en="Save and start the gateway. LAN and local browser access can remain off for a same-computer tunnel; the loopback upstream stays available only through the configured public Host.">保存并启动网关。同机穿透可关闭局域网和本机网页访问；回环上游只接受已配置的公开 Host。</p>
+<article class="guide-step"><div class="step-head"><span class="step-number">02</span><div><span class="actor" data-en="Desktop App">데스크탑 앱</span><h3 data-en="Save the phone's HTTPS URL">전화기의 HTTPS URL를 저장합니다.</h3></div></div><div class="step-body">
+<p data-en="Under Network access → Add connection, choose Existing tunnel / reverse proxy and enter a complete trusted HTTPS root URL, such as https://bridge.example.com or https://bridge.example.com:8443. Public HTTP, paths such as /codex/, query parameters and redirects are unsupported. Do not disable certificate verification.">네트워크 액세스 → 연결 추가에서 기존 터널/역방향 프록시를 선택하고 신뢰할 수 있는 전체 HTTPS 루트 URL(예: https://bridge.example.com 또는 https://bridge.example.com:8443. 공용 HTTP)를 입력합니다. /codex/와 같은 경로, 쿼리 매개변수 및 리디렉션은 지원되지 않습니다. 인증서 확인을 비활성화하지 마십시오.</p>
+<p data-en="Save and start the gateway. LAN and local browser access can remain off for a same-computer tunnel; the loopback upstream stays available only through the configured public Host.">게이트웨이를 저장하고 시작합니다. LAN 및 로컬 브라우저 액세스는 동일한 컴퓨터 터널에 대해 꺼진 상태로 유지될 수 있습니다. 루프백 업스트림은 구성된 공용 호스트를 통해서만 사용할 수 있습니다.</p>
 </div></article>
-<article class="guide-step"><div class="step-head"><span class="step-number">03</span><div><span class="actor" data-en="Proxy → App → phone">代理 → App → 手机</span><h3 data-en="Preserve headers and verify each layer">保留请求头并逐层验收</h3></div></div><div class="step-body">
-<p data-en="Preserve the original public Host (including a custom port), Origin, Cookie and X-CSRF-Token. In Nginx, $http_host preserves :8443; $host may drop it. Disable caching and response buffering; allow streaming, long requests and the upload/download sizes you need. Bridge uses HTTP long polling or SSE; WebSocket upgrade support alone is not enough.">保留原始公开 Host（含自定义端口）、Origin、Cookie 和 X-CSRF-Token。Nginx 用 $http_host 保留 :8443；$host 可能丢失端口。关闭缓存和响应缓冲，允许流式响应、长请求及所需上传／下载大小。Bridge 使用 HTTP 长轮询或 SSE；仅支持 WebSocket 升级仍不够。</p>
-<p data-en="Select Check fixed entry in the App. It makes a credential-free HTTPS probe, validates the certificate and current gateway instance, and never follows redirects. Then test sign-in, chat and files over phone mobile data; QR sign-in is issued only when the address reaches the current gateway.">在 App 点击“检测固定入口”：它用无凭据 HTTPS 请求核验证书与当前网关实例，不跟随重定向。再用手机蜂窝网络测试登录、聊天和文件；只有地址指向当前网关时才签发扫码登录。</p>
-<p data-en="A proxy on another NAS or server should use advanced NAS setup with a reachable computer LAN address, not this computer's loopback.">若代理位于另一台 NAS 或服务器，请使用进阶 NAS 配置及它可达的电脑局域网地址，不能填写那台设备自己的回环地址。</p>
-<a data-en="Read the complete existing-tunnel guide ↗" href="https://github.com/try2love/codex-mobile-bridge/blob/main/docs/external-tunnel.md">阅读完整的已有穿透说明 ↗</a>
+<article class="guide-step"><div class="step-head"><span class="step-number">03</span><div><span class="actor" data-en="Proxy → App → phone">프록시 → 앱 → 전화</span><h3 data-en="Preserve headers and verify each layer">헤더를 보존하고 각 레이어를 확인합니다.</h3></div></div><div class="step-body">
+<p data-en="Preserve the original public Host (including a custom port), Origin, Cookie and X-CSRF-Token. In Nginx, $http_host preserves :8443; $host may drop it. Disable caching and response buffering; allow streaming, long requests and the upload/download sizes you need. Bridge uses HTTP long polling or SSE; WebSocket upgrade support alone is not enough.">원래 공용 호스트(사용자 정의 포트 포함), 원본, 쿠키 및 X-CSRF-Token을 보존합니다. Nginx에서는 $http_host가 :8443을 유지합니다. $host가 이를 삭제할 수 있습니다. 캐싱 및 응답 버퍼링을 비활성화합니다. 스트리밍, 긴 요청 및 필요한 업로드/다운로드 크기를 허용합니다. Bridge는 HTTP 긴 폴링 또는 SSE를 사용합니다. WebSocket 업그레이드 지원만으로는 충분하지 않습니다.</p>
+<p data-en="Select Check fixed entry in the App. It makes a credential-free HTTPS probe, validates the certificate and current gateway instance, and never follows redirects. Then test sign-in, chat and files over phone mobile data; QR sign-in is issued only when the address reaches the current gateway.">앱에서 수정된 항목 확인을 선택합니다. 자격 증명이 필요 없는 HTTPS 프로브를 만들고 인증서와 현재 게이트웨이 인스턴스의 유효성을 검사하며 절대 리디렉션을 따르지 않습니다. 그런 다음 전화 모바일 데이터를 통해 로그인, 채팅 및 파일을 테스트합니다. QR 로그인은 주소가 현재 게이트웨이에 도달한 경우에만 발급됩니다.</p>
+<p data-en="A proxy on another NAS or server should use advanced NAS setup with a reachable computer LAN address, not this computer's loopback.">다른 NAS 또는 서버의 프록시는 이 컴퓨터의 루프백이 아닌 연결 가능한 컴퓨터 LAN 주소와 함께 고급 NAS 설정을 사용해야 합니다.</p>
+<a data-en="Read the complete existing-tunnel guide ↗" href="https://github.com/try2love/codex-mobile-bridge/blob/main/docs/external-tunnel.md">전체 기존 터널 가이드 읽기 ↗</a>
 </div></article>
 </section>
 <section class="setup-panel" id="nas" data-setup-panel="nas" aria-labelledby="nas-title">
-<h2 data-en="NAS / existing proxy: reuse a reachable network" id="nas-title">NAS / 已有反代：复用已连通的网络</h2>
-<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">进阶方案需要具备 DNS、HTTPS、SSH、服务器或 NAS 管理等相关知识。本文命令与配置仅供参考，不保证适合你的环境；执行前请自行核对、备份并取得必要授权。使用、修改或执行这些示例的风险由使用者自行承担。在适用法律允许的最大范围内，项目作者与贡献者不对由此造成的数据丢失、服务中断、安全事件、费用或其他损失承担责任；依法不得排除或限制的责任除外。</p>
-<p data-en="Requires a public HTTPS entry and NAS reachability to the work computer gateway." class="panel-intro">需要已有公网 HTTPS 入口，并且 NAS 能访问工作电脑网关。</p>
+<h2 data-en="NAS / existing proxy: reuse a reachable network" id="nas-title">NAS / 기존 프록시: 연결 가능한 네트워크 재사용</h2>
+<p class="callout" data-en="Advanced setups require relevant knowledge of DNS, HTTPS, SSH, server or NAS administration. Commands and configurations are references only and may not suit your environment. Review them, back up your data and obtain the necessary authorization before use. You assume the risks of using, modifying or executing these examples. To the maximum extent permitted by applicable law, the authors and contributors are not liable for resulting data loss, service interruption, security incidents, costs or other loss, except liability that cannot lawfully be excluded or limited.">고급 설정에는 DNS, HTTPS, SSH, 서버 또는 NAS 관리에 대한 관련 지식이 필요합니다. 명령 및 구성은 참조용일 뿐이며 사용자 환경에 적합하지 않을 수 있습니다. 사용하기 전에 이를 검토하고 데이터를 백업하고 필요한 승인을 얻으십시오. 귀하는 이러한 예제를 사용, 수정 또는 실행하는 데 따른 위험을 감수합니다. 해당 법률이 허용하는 최대 범위 내에서 작성자와 기여자는 합법적으로 제외되거나 제한될 수 없는 책임을 제외하고 결과적인 데이터 손실, 서비스 중단, 보안 사고, 비용 또는 기타 손실에 대해 책임을 지지 않습니다.</p>
+<p data-en="Requires a public HTTPS entry and NAS reachability to the work computer gateway." class="panel-intro">공용 HTTPS 항목과 업무용 컴퓨터 게이트웨이에 대한 NAS 연결 가능성이 필요합니다.</p>
 <figure class="network-map">
 <div class="map-flow">
 <div class="map-node">
 <span class="map-index">1</span>
-<strong data-en="Phone away from home" >外地手机</strong>
-<small data-en="Fixed HTTPS hostname" >HTTPS 固定域名</small>
+<strong data-en="Phone away from home" >집에서 멀리 떨어진 곳에서 전화</strong>
+<small data-en="Fixed HTTPS hostname" >HTTPS 호스트 이름 수정</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">2</span>
-<strong data-en="NAS / existing proxy" >NAS／已有反代</strong>
-<small data-en="443 → computer LAN address" >443 → 电脑局域网地址</small>
+<strong data-en="NAS / existing proxy" >NAS / 기존 프록시</strong>
+<small data-en="443 → computer LAN address" >443 → 컴퓨터 LAN 주소</small>
 </div>
 <span class="map-arrow" aria-hidden="true">→</span>
 <div class="map-node">
 <span class="map-index">3</span>
-<strong data-en="Work computer" >工作电脑</strong>
+<strong data-en="Work computer" >업무용 컴퓨터</strong>
 <small data-en="192.168.1.10:8787 → Codex" >192.168.1.10:8787 → Codex</small>
 </div>
 </div>
-<figcaption data-en="The NAS must be able to reach the work computer. A domain alone cannot connect a home NAS to a computer on another network." >NAS 必须能访问工作电脑；它在家、电脑在公司时，不能仅凭一个域名打通两个网络。</figcaption>
+<figcaption data-en="The NAS must be able to reach the work computer. A domain alone cannot connect a home NAS to a computer on another network." >NAS는 업무 컴퓨터에 연결할 수 있어야 합니다. 도메인만으로는 홈 NAS를 다른 네트워크의 컴퓨터에 연결할 수 없습니다.</figcaption>
 </figure>
-<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">所有域名、IP、账号都是演示值。请替换为自己的信息；try2love.com 不是本教程提供的可访问演示服务。</p>
+<p data-en="All domains, IPs and usernames are examples. Replace them with your own values; try2love.com is not a hosted demo." class="example-note">모든 도메인, IP 및 사용자 이름은 예시입니다. 이를 자신의 값으로 바꾸십시오. try2love.com은 호스팅된 데모가 아닙니다.</p>
 <article class="guide-step" id="nas-network">
 <div class="step-head">
 <span class="step-number">01</span>
 <div>
-<span data-en="Work computer + NAS terminal" class="actor">工作电脑 + NAS 终端</span>
-<h3 data-en="Verify NAS-to-computer reachability first" >先验证 NAS 到电脑的网络</h3>
+<span data-en="Work computer + NAS terminal" class="actor">업무용 컴퓨터 + NAS 터미널</span>
+<h3 data-en="Verify NAS-to-computer reachability first" >먼저 NAS-컴퓨터 연결 가능성을 확인하세요.</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Enable LAN access and start the gateway. From the NAS terminal or an existing diagnostic tool, access the computer’s LAN address. A DHCP reservation helps keep the upstream stable." >在电脑 App 启用局域网访问，启动网关。从 NAS 的终端或已有诊断工具访问电脑的局域网地址。建议为电脑保留固定 DHCP 地址，避免上游变化。</p>
+<p data-en="Enable LAN access and start the gateway. From the NAS terminal or an existing diagnostic tool, access the computer’s LAN address. A DHCP reservation helps keep the upstream stable." >LAN 액세스를 활성화하고 게이트웨이를 시작합니다. NAS 터미널 또는 기존 진단 도구에서 컴퓨터의 LAN 주소에 액세스합니다. DHCP 예약은 업스트림 안정성을 유지하는 데 도움이 됩니다.</p>
 <div class="code-block">
-<button data-en="Copy" type="button" data-copy>复制</button>
+<button data-en="Copy" type="button" data-copy>복사</button>
 <pre>
 <code data-code-kind="sh">curl --max-time 10 http://192.168.1.10:8787/api/auth</code>
 </pre>
 </div>
-<p data-en="Check: Gateway JSON is returned. Resolve routing, interface or firewall issues before proceeding. For separate networks, use own-server SSH or Cloudflare." class="checkpoint">确认结果：返回网关 JSON。若超时，先解决路由、网卡或防火墙；两地网络不通时改用自有服务器 SSH 或 Cloudflare。</p>
+<p data-en="Check: Gateway JSON is returned. Resolve routing, interface or firewall issues before proceeding. For separate networks, use own-server SSH or Cloudflare." class="checkpoint">확인: 게이트웨이 JSON가 반환되었습니다. 계속하기 전에 라우팅, 인터페이스 또는 방화벽 문제를 해결하세요. 별도의 네트워크의 경우 자체 서버 SSH 또는 Cloudflare를 사용합니다.</p>
 </div>
 </article>
 <article class="guide-step" id="nas-public">
 <div class="step-head">
 <span class="step-number">02</span>
 <div>
-<span data-en="DNS, router and NAS dashboards" class="actor">DNS、路由器与 NAS 管理页面</span>
-<h3 data-en="Prepare the NAS public HTTPS entry" >准备 NAS 的公网 HTTPS 入口</h3>
+<span data-en="DNS, router and NAS dashboards" class="actor">DNS, 라우터 및 NAS 대시보드</span>
+<h3 data-en="Prepare the NAS public HTTPS entry" >NAS 공개 HTTPS 항목 준비</h3>
 </div>
 </div>
 <div class="step-body">
-<p data-en="Use a dedicated hostname with a valid matching certificate and HTTP-to-HTTPS redirect. Reuse an existing public entry. Otherwise first check public IP availability, ISP inbound restrictions and router forwarding requirements." >使用独立子域名，配置与之匹配的有效证书和 HTTP → HTTPS 跳转。已有公网入口可复用；没有时，必须先确认公网 IP、运营商入站限制及路由器转发条件。</p>
-<p data-en="If exposing the NAS entry yourself, forward only the required HTTPS port to its proxy; prepare port 80 if your certificate validation method requires HTTP. Do not expose computer port 8787 or internal relay port 18787. Router forwarding alone usually cannot overcome CGNAT or a campus private network." >自行暴露 NAS 入口时，只把必要的 HTTPS 端口转给 NAS 反代；证书方式若要求 HTTP 验证，再准备 80 端口。不要映射电脑 8787 或 NAS 内部中转 18787。CGNAT 或校园内网通常不能靠路由器端口映射解决公网访问。</p>
-<p data-en="Check: A phone on mobile data can reach the NAS HTTPS hostname with a valid certificate." class="checkpoint">确认结果：手机蜂窝网络能连接 NAS 的 HTTPS 域名，证书可信。</p>
+<p data-en="Use a dedicated hostname with a valid matching certificate and HTTP-to-HTTPS redirect. Reuse an existing public entry. Otherwise first check public IP availability, ISP inbound restrictions and router forwarding requirements." >유효한 일치 인증서와 HTTP에서 HTTPS로 리디렉션되는 전용 호스트 이름을 사용하세요. 기존 공개 항목을 재사용합니다. 그렇지 않은 경우 먼저 공개 IP 가용성, ISP 인바운드 제한 및 라우터 전달 요구 사항을 확인하세요.</p>
+<p data-en="If exposing the NAS entry yourself, forward only the required HTTPS port to its proxy; prepare port 80 if your certificate validation method requires HTTP. Do not expose computer port 8787 or internal relay port 18787. Router forwarding alone usually cannot overcome CGNAT or a campus private network." >NAS 항목을 직접 노출하는 경우 필요한 HTTPS 포트만 해당 프록시로 전달하세요. 인증서 검증 방법에 HTTP가 필요한 경우 포트 80을 준비하십시오. 컴퓨터 포트 8787 또는 내부 릴레이 포트 18787을 노출하지 마십시오. 일반적으로 라우터 전달만으로는 CGNAT 또는 캠퍼스 개인 네트워크를 극복할 수 없습니다.</p>
+<p data-en="Check: A phone on mobile data can reach the NAS HTTPS hostname with a valid certificate." class="checkpoint">확인: 모바일 데이터의 전화는 유효한 인증서를 사용하여 NAS HTTPS 호스트 이름에 연결할 수 있습니다.</p>
 </div>
 </article>
 <article class="guide-step" id="nas-proxy">
 <div class="step-head">
 <span class="step-number">03</span>
 <div>
-<span data-en="NAS dashboard + computer app" class="actor">NAS 管理页面 + 工作电脑 App</span>
-<h3 data-en="Configure the proxy and app" >填写反向代理和 App</h3>
+<span data-en="NAS dashboard + computer app" class="actor">NAS 대시보드 + 컴퓨터 앱</span>
+<h3 data-en="Configure the proxy and app" >프록시 및 앱 구성</h3>
 </div>
 </div>
 <div class="step-body">
@@ -1012,113 +1012,113 @@ sudo systemctl reload nginx</code>
 <table>
 <thead>
 <tr>
-<th data-en="Location" scope="col">位置</th>
-<th data-en="Field" scope="col">字段</th>
-<th data-en="Example" scope="col">示例</th>
+<th data-en="Location" scope="col">위치</th>
+<th data-en="Field" scope="col">필드</th>
+<th data-en="Example" scope="col">예</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="NAS proxy" >NAS 反代</td>
-<td data-en="Source" >来源</td>
+<td data-en="NAS proxy" >NAS 프록시</td>
+<td data-en="Source" >원천</td>
 <td data-en="HTTPS · codex.try2love.com · 443" >HTTPS · codex.try2love.com · 443</td>
 </tr>
 <tr>
-<td data-en="NAS proxy" >NAS 反代</td>
-<td data-en="Target" >目标</td>
+<td data-en="NAS proxy" >NAS 프록시</td>
+<td data-en="Target" >목표</td>
 <td data-en="HTTP · 192.168.1.10 · 8787" >HTTP · 192.168.1.10 · 8787</td>
 </tr>
 <tr>
-<td data-en="NAS proxy" >NAS 反代</td>
-<td data-en="Host / buffering" >Host / 缓冲</td>
-<td data-en="Preserve public Host; disable cache and buffering" >保留公网 Host，关闭缓存和响应缓冲</td>
+<td data-en="NAS proxy" >NAS 프록시</td>
+<td data-en="Host / buffering" >호스트/버퍼링</td>
+<td data-en="Preserve public Host; disable cache and buffering" >공개 호스트를 보존합니다. 캐시 및 버퍼링 비활성화</td>
 </tr>
 <tr>
-<td data-en="Computer app" >电脑 App</td>
-<td data-en="Connection" >连接方式</td>
-<td data-en="Fixed domain · NAS / existing proxy / Docker" >固定域名 · NAS / 已有反代 / Docker</td>
+<td data-en="Computer app" >컴퓨터 앱</td>
+<td data-en="Connection" >연결</td>
+<td data-en="Fixed domain · NAS / existing proxy / Docker" >고정 도메인 · NAS / 기존 프록시 / Docker</td>
 </tr>
 <tr>
-<td data-en="Computer app" >电脑 App</td>
-<td data-en="Phone URL" >手机访问地址</td>
+<td data-en="Computer app" >컴퓨터 앱</td>
+<td data-en="Phone URL" >전화번호 URL</td>
 <td data-en="https://codex.try2love.com" >https://codex.try2love.com</td>
 </tr>
 <tr>
-<td data-en="Computer app" >电脑 App</td>
-<td data-en="Computer URL reachable from NAS" >NAS 可访问的电脑地址</td>
+<td data-en="Computer app" >컴퓨터 앱</td>
+<td data-en="Computer URL reachable from NAS" >NAS에서 연결할 수 있는 컴퓨터 URL</td>
 <td data-en="http://192.168.1.10:8787" >http://192.168.1.10:8787</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="Save and enable the connection, restart the gateway and check the fixed entry. Use the hostname root, not a subpath such as /codex/." >保存并启用连接，重新启动网关，再检测固定入口。使用域名根路径，不要配置为 /codex/ 等子路径。</p>
-<p data-en="Check: The app check passes and the phone can sign in and exchange messages over mobile data." class="checkpoint">确认结果：App 检测通过，手机蜂窝网络可以登录并收发消息。</p>
+<p data-en="Save and enable the connection, restart the gateway and check the fixed entry. Use the hostname root, not a subpath such as /codex/." >연결을 저장하고 활성화한 후 게이트웨이를 다시 시작하고 수정된 항목을 확인하세요. /codex/와 같은 하위 경로가 아닌 호스트 이름 루트를 사용하십시오.</p>
+<p data-en="Check: The app check passes and the phone can sign in and exchange messages over mobile data." class="checkpoint">확인: 앱 확인이 통과되고 휴대폰이 로그인하여 모바일 데이터를 통해 메시지를 교환할 수 있습니다.</p>
 </div>
 </article>
 <details class="scenario">
-<summary data-en="When is a Docker relay needed?" >什么时候需要 Docker 中转？</summary>
-<p data-en="If the NAS can proxy directly to the computer, no Docker relay is needed. Use the exported NAS bundle only when an intermediate HTTP relay is actually required." >NAS 已能直接反代到电脑时，不需要再加 Docker。只有确实需要中间 HTTP 转发时，才使用 App 导出的 NAS 部署包。</p>
-<p data-en="The container is an HTTP relay; it does not replace NAS certificates or public HTTPS. A host-level proxy can use http://127.0.0.1:18787. If the outer proxy is containerized, 127.0.0.1 refers to that container; configure a reachable NAS address with restricted access as described in the bundle." >该包的容器提供 HTTP 中转，不能独立代替 NAS 的证书和公网 HTTPS。若外层反代运行在宿主机，上游可用 http://127.0.0.1:18787；若它也在容器中，127.0.0.1 指向该容器自己，需按部署包说明设置可达的 NAS 地址并限制访问。</p>
-<p data-en="An authorized user performs Docker operations. Read the exported instructions and verify ports and networking before checking the Compose configuration. Do not modify unrelated containers or expose internal ports for this guide." >Docker 操作由有权限的用户自行完成。先查看导出包中的部署说明，核对端口和网络，再运行配置检查；不要为了本教程修改其他容器或公开内部端口。</p>
+<summary data-en="When is a Docker relay needed?" >Docker 릴레이는 언제 필요합니까?</summary>
+<p data-en="If the NAS can proxy directly to the computer, no Docker relay is needed. Use the exported NAS bundle only when an intermediate HTTP relay is actually required." >NAS가 컴퓨터에 직접 프록시할 수 있는 경우 Docker 릴레이가 필요하지 않습니다. 중간 HTTP 릴레이가 실제로 필요한 경우에만 내보낸 NAS 번들을 사용하십시오.</p>
+<p data-en="The container is an HTTP relay; it does not replace NAS certificates or public HTTPS. A host-level proxy can use http://127.0.0.1:18787. If the outer proxy is containerized, 127.0.0.1 refers to that container; configure a reachable NAS address with restricted access as described in the bundle." >컨테이너는 HTTP 릴레이입니다. NAS 인증서 또는 공용 HTTPS를 대체하지 않습니다. 호스트 수준 프록시는 http://127.0.0.1:18787.를 사용할 수 있습니다. 외부 프록시가 컨테이너화된 경우 127.0.0.1은 해당 컨테이너를 참조합니다. 번들에 설명된 대로 제한된 액세스로 연결 가능한 NAS 주소를 구성합니다.</p>
+<p data-en="An authorized user performs Docker operations. Read the exported instructions and verify ports and networking before checking the Compose configuration. Do not modify unrelated containers or expose internal ports for this guide." >권한 있는 사용자는 Docker 작업을 수행합니다. Compose 구성을 확인하기 전에 내보낸 지침을 읽고 포트와 네트워킹을 확인하세요. 이 가이드와 관련 없는 컨테이너를 수정하거나 내부 포트를 노출하지 마세요.</p>
 </details>
 </section>
 <section class="troubleshooting" id="troubleshooting">
-<h2 data-en="When stuck, start with the symptom" >卡住时，从现象找下一步</h2>
+<h2 data-en="When stuck, start with the symptom" >문제가 발생하면 증상부터 시작하세요.</h2>
 <div class="table-wrap">
 <table>
 <thead>
 <tr>
-<th data-en="Symptom" scope="col">看到什么</th>
-<th data-en="Check first" scope="col">先查哪里</th>
+<th data-en="Symptom" scope="col">징후</th>
+<th data-en="Check first" scope="col">먼저 확인하세요</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td data-en="Domain not found / DNS error" >域名找不到 / DNS 错误</td>
-<td data-en="DNS hosting, record values, nameservers and incorrect AAAA records" >DNS 在哪托管、记录值、NS 是否生效、是否存在错误 AAAA</td>
+<td data-en="Domain not found / DNS error" >도메인을 찾을 수 없음 / DNS 오류</td>
+<td data-en="DNS hosting, record values, nameservers and incorrect AAAA records" >DNS 호스팅, 레코드 값, 네임서버 및 잘못된 AAAA 레코드</td>
 </tr>
 <tr>
-<td data-en="Connection timeout" >连接超时</td>
-<td data-en="Public IP, security groups, firewall and service listeners; check phone and server networks separately" >公网 IP、安全组、防火墙、服务监听；分别检查手机与服务器网络</td>
+<td data-en="Connection timeout" >연결 시간 초과</td>
+<td data-en="Public IP, security groups, firewall and service listeners; check phone and server networks separately" >공용 IP, 보안 그룹, 방화벽 및 서비스 수신기; 전화 및 서버 네트워크를 별도로 확인하세요</td>
 </tr>
 <tr>
-<td data-en="Certificate error" >证书错误</td>
-<td data-en="Certificate hostname, issuance logs and public 80/443 reachability" >域名与证书是否匹配、证书签发日志、80/443 可达性</td>
+<td data-en="Certificate error" >인증서 오류</td>
+<td data-en="Certificate hostname, issuance logs and public 80/443 reachability" >인증서 호스트 이름, 발급 로그 및 공개 80/443 연결 가능성</td>
 </tr>
 <tr>
 <td data-en="Cloudflare 1033" >Cloudflare 1033</td>
-<td data-en="Connector online status and correct tunnel token" >连接器是否在线、隧道 Token 与隧道是否一致</td>
+<td data-en="Connector online status and correct tunnel token" >커넥터 온라인 상태 및 올바른 터널 토큰</td>
 </tr>
 <tr>
 <td data-en="502 / 504" >502 / 504</td>
-<td data-en="Proxy upstream port, SSH tunnel and NAS-to-computer route; not the sign-in password" >反代上游端口、SSH 隧道、NAS 到电脑路由；不要先改登录密码</td>
+<td data-en="Proxy upstream port, SSH tunnel and NAS-to-computer route; not the sign-in password" >프록시 업스트림 포트, SSH 터널 및 NAS-컴퓨터 경로; 로그인 비밀번호가 아님</td>
 </tr>
 <tr>
-<td data-en="Home loads, sign-in reports cross-site request" >首页可见，登录报跨站错误</td>
-<td data-en="Check whether the browser used HTTP; configure an HTTPS redirect and reopen the page" >浏览器是否在 HTTP；先配置 HTTPS 跳转并重新打开页面</td>
+<td data-en="Home loads, sign-in reports cross-site request" >홈 로드, 로그인 보고서 교차 사이트 요청</td>
+<td data-en="Check whether the browser used HTTP; configure an HTTPS redirect and reopen the page" >브라우저가 HTTP를 사용했는지 확인하세요. HTTPS 리디렉션을 구성하고 페이지를 다시 엽니다.</td>
 </tr>
 <tr>
-<td data-en="SSH sign-in succeeds, forwarding fails" >SSH 登录成功，转发不成功</td>
-<td data-en="Forwarding permissions, loopback port conflicts, key restrictions and other Match rules" >转发权限、回环端口占用、公钥限制、其他 Match 规则</td>
+<td data-en="SSH sign-in succeeds, forwarding fails" >SSH 로그인 성공, 전달 실패</td>
+<td data-en="Forwarding permissions, loopback port conflicts, key restrictions and other Match rules" >전달 권한, 루프백 포트 충돌, 키 제한 및 기타 일치 규칙</td>
 </tr>
 <tr>
-<td data-en="Replies arrive in a delayed batch" >回复等很久才整段出现</td>
-<td data-en="Proxy buffering and caching; preserve streaming" >反代响应缓冲与缓存；保持流式响应</td>
+<td data-en="Replies arrive in a delayed batch" >답변이 지연된 일괄 도착으로 도착함</td>
+<td data-en="Proxy buffering and caching; preserve streaming" >프록시 버퍼링 및 캐싱 스트리밍 보존</td>
 </tr>
 <tr>
-<td data-en="Entry check reports a different gateway" >检测提示不是当前网关</td>
-<td data-en="DNS, public Host and whether the upstream reaches another instance" >DNS、站点 Host 和上游是否指到了其他实例</td>
+<td data-en="Entry check reports a different gateway" >항목 확인에서 다른 게이트웨이를 보고합니다.</td>
+<td data-en="DNS, public Host and whether the upstream reaches another instance" >DNS, 공용 호스트 및 업스트림이 다른 인스턴스에 도달하는지 여부</td>
 </tr>
 </tbody>
 </table>
 </div>
-<p data-en="Check fixed entry proves that the testing computer can reach this gateway via HTTPS. A real phone test with Wi-Fi off completes external-access verification." class="callout">检测固定入口只能证明执行检测的电脑能经 HTTPS 连到当前网关；手机关闭 Wi-Fi 的真实访问，才是外网链路的最后验收。</p>
-<a data-en="Official Caddy automatic HTTPS documentation ↗" href="https://caddyserver.com/docs/automatic-https">Caddy 自动 HTTPS 官方说明 ↗</a> · <a data-en="Official Nginx proxy documentation ↗" href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html">Nginx 反向代理官方说明 ↗</a>
+<p data-en="Check fixed entry proves that the testing computer can reach this gateway via HTTPS. A real phone test with Wi-Fi off completes external-access verification." class="callout">고정 항목을 확인하면 테스트 컴퓨터가 HTTPS를 통해 이 게이트웨이에 도달할 수 있음을 증명합니다. Wi-Fi가 꺼진 상태에서 실제 전화 테스트를 수행하면 외부 접속 인증이 완료됩니다.</p>
+<a data-en="Official Caddy automatic HTTPS documentation ↗" href="https://caddyserver.com/docs/automatic-https">공식 캐디 자동 HTTPS 문서 ↗</a> · <a data-en="Official Nginx proxy documentation ↗" href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html">공식 Nginx 프록시 문서 ↗</a>
 </section>
 </main>
 <footer class="setup-footer">
-<a data-en="Back to overview" href="./#connect">返回产品介绍</a>
-<p>Codex Mobile Bridge · <span data-en="Examples are illustrative. Replace them before use." >示例信息用于演示，请替换后再操作。</span>
+<a data-en="Back to overview" href="./#connect">개요로 돌아가기</a>
+<p>Codex Mobile Bridge · <span data-en="Examples are illustrative. Replace them before use." >예시는 예시입니다. 사용하기 전에 교체하십시오.</span>
 </p>
 </footer>
 <div id="copy-status" class="copy-status" role="status" aria-live="polite" hidden>

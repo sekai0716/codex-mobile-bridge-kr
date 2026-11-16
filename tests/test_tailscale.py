@@ -176,10 +176,10 @@ class TailscaleTests(unittest.TestCase):
             read.return_value = {**STATUS, 'BackendState': 'NeedsLogin', 'AuthURL': 'https://evil.test/login'}
             self.assertEqual(tailscale.inspect(ENTRY)['authUrl'], '')
             read.return_value = {**STATUS, 'Self': {**STATUS['Self'], 'KeyExpired': True}}
-            with self.assertRaisesRegex(ValueError, '过期'):
+            with self.assertRaisesRegex(ValueError, "Tailscale\\ 장치\\ 인증이\\ 만료되었습니다\\.\\ 다시\\ 로그인하세요\\."):
                 tailscale.inspect(ENTRY)
             read.return_value = {**STATUS, 'Self': {**STATUS['Self'], 'ID': 'nOther'}}
-            with self.assertRaisesRegex(ValueError, '变化'):
+            with self.assertRaisesRegex(ValueError, "Tailscale\\ 계정\\ 또는\\ 장치\\ 주소가\\ 변경되었습니다\\.\\ 연결을\\ 다시\\ 감지하고\\ 저장하십시오\\."):
                 tailscale.require_identity(ENTRY)
 
     def test_validation_rejects_foreign_urls_bad_modes_ports_and_duplicate_entries(self):
@@ -188,7 +188,7 @@ class TailscaleTests(unittest.TestCase):
                        {'tailscalePort': 8443}, {'tailscaleNodeId': 'one\ntwo'}):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 access.validate_connections({'connections': [{**ENTRY, **change}]})
-        with self.assertRaisesRegex(ValueError, '一个 Tailscale'):
+        with self.assertRaisesRegex(ValueError, "게이트웨이당\\ 하나의\\ Tailscale\\ 항목만\\ 활성화합니다\\."):
             access.validate_connections({'connections': [ENTRY, {**ENTRY, 'id': 'second', 'publicUrl': 'https://other.example.ts.net'}]})
         self.assertEqual(access.public_urls({'connections': [{**ENTRY, 'publicUrl': ''}]}), [])
         self.assertEqual(access.validate_connections({'connections': [{**ENTRY, 'publicUrl': '', 'tailscaleNodeId': ''}]})[0]['publicUrl'], '')
@@ -239,7 +239,7 @@ class TailscaleTests(unittest.TestCase):
             original = tunnel.status
             def status(state, message, auth_url=''):
                 original(state, message, auth_url)
-                if state == 'connected' and '接管' in message:
+                if state == 'connected' and '기존 Tailscale 고정 접속 경로' in message:
                     connected.set()
             tunnel.status = status
             with patch.object(tailscale, 'require_identity'), \
@@ -294,7 +294,7 @@ class TailscaleTests(unittest.TestCase):
             value = desktop.snapshot()
             value['preferences'].update(codexHome=folder, connections=[ENTRY])
             value['auth']['mode'] = 'none'
-            with self.assertRaisesRegex(ValueError, '登录验证'):
+            with self.assertRaisesRegex(ValueError, "공개\\ 유입경로에\\ 액세스하려면\\ 게이트웨이\\ 로그인이\\ 필요합니다\\.\\ 휴대폰은\\ 여전히\\ ​​QR\\ 코드로\\ 페어링할\\ 수\\ 있습니다\\."):
                 desktop.save(value)
             value['auth']['mode'] = 'password'
             desktop.save(value)
@@ -315,7 +315,7 @@ class TailscaleTests(unittest.TestCase):
         with patch.object(access, 'read_auth', return_value={'instanceId': 'actual'}) as read:
             access.check_entry(preferences, instance_id='actual')
             self.assertEqual(read.call_args.args, (ENTRY['publicUrl'],))
-        with patch.object(access, 'read_auth', return_value={'instanceId': 'other'}), self.assertRaisesRegex(ValueError, '当前网关'):
+        with patch.object(access, 'read_auth', return_value={'instanceId': 'other'}), self.assertRaisesRegex(ValueError, '현재 게이트웨이'):
             access.check_entry(preferences, instance_id='actual')
 
     def test_runtime_uses_private_listener_and_closes_owned_entry(self):

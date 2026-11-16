@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 enum DshMobileURL {
-    struct Invalid: LocalizedError { var errorDescription: String? { "请使用完整的 DSH Mobile HTTPS 链接，或局域网 HTTP 链接。" } }
+    struct Invalid: LocalizedError { var errorDescription: String? { "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요." } }
     static func connection(_ input: String) throws -> URL {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard value.utf16.count <= 8192, !value.unicodeScalars.contains(where: { $0.value <= 32 || $0.value == 127 || $0.value == 92 }),

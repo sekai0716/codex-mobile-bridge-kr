@@ -69,7 +69,7 @@ class MacNormalQuitTests(unittest.TestCase):
                 patch.object(desktop, 'quit_application', return_value='submitted') as quit_, \
                 patch.object(desktop, 'terminate') as signal, \
                 patch('bridge.clients.desktop_app.time.monotonic', side_effect=[0, 26]):
-            with self.assertRaisesRegex(ValueError, '尚未退出.*尚未强制'):
+            with self.assertRaisesRegex(ValueError, "데스크톱\\ 프로그램이\\ 종료되지\\ 않았습니다\\.\\ 컴퓨터에서\\ 프로그램을\\ 닫고\\ 다시\\ 시도하세요\\.\\ 프로세스가\\ 강제로\\ 종료되지\\ 않았습니다\\."):
                 app.stop(gui_pids=[41], provider='codex')
         quit_.assert_called_once_with(app.executable, pids=[41])
         signal.assert_not_called()

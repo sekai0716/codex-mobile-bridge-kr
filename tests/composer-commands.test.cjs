@@ -4,14 +4,14 @@ global.BridgeI18n={t:value=>value};
 
 function fixture(text){
   let scope='original';const calls=[],notices=[];
-  const action={id:'plan',label:'计划模式',enabled:true,args:true,run:()=>calls.push('plan')};
+  const action={id:'plan',label:'계획 모드',enabled:true,args:true,run:()=>calls.push('plan')};
   const input={value:text,dispatchEvent:event=>calls.push(event.type),setAttribute(){},removeAttribute(){}};
   const picker=Object.assign(Object.create(ComposerCommands.prototype),{input,menu:{hidden:false},actions:()=>[action],scope:()=>scope,onError:text=>notices.push(text)});
   return {picker,input,action,calls,notices,changeScope:()=>scope='another'};
 }
 test('plan command preserves its prompt without sending and does not touch unrelated drafts',()=>{
-  const f=fixture('/plan 保留这段输入');assert.equal(f.picker.consume(),true);
-  assert.equal(f.input.value,'保留这段输入');assert.deepEqual(f.calls,['input','plan']);
+  const f=fixture('/plan 이 입력을 유지하세요');assert.equal(f.picker.consume(),true);
+  assert.equal(f.input.value,'이 입력을 유지하세요');assert.deepEqual(f.calls,['input','plan']);
 });
 test('unavailable known commands and unsupported arguments remain drafts instead of model messages',()=>{
   for(const text of ['/plan text','/compact','/model unsupported']){
@@ -19,7 +19,7 @@ test('unavailable known commands and unsupported arguments remain drafts instead
   }
 });
 test('ordinary paths and unknown native custom commands retain the existing send path',()=>{
-  for(const text of ['/Users/me/file','/plugin:custom arg','/custom-skill arg','请看 /plan','text\n/plan']){
+  for(const text of ['/Users/me/file','/plugin:custom arg','/custom-skill arg','참조하세요 /plan','text\n/plan']){
     const f=fixture(text);assert.equal(f.picker.consume(),false);assert.equal(f.input.value,text);assert.deepEqual(f.calls,[]);
   }
 });
