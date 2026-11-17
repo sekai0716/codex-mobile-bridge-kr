@@ -2,6 +2,10 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Ran commands": "已运行命令",
+  "Edited files": "文件变更",
+  "Searched the web": "网页搜索",
+  "{count} activities": "{count} 项活动",
   "展开聊天列表": "展开聊天列表",
   "收起聊天列表": "收起聊天列表",
   "Codex 会话同步格式已变化，请更新 Bridge；历史和草稿仍可查看。": "Codex 会话同步格式已变化，请更新 Bridge；历史和草稿仍可查看。",

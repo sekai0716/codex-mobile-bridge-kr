@@ -2,6 +2,10 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Ran commands": "명령을 실행함",
+  "Edited files": "파일 변경",
+  "Searched the web": "웹 검색",
+  "{count} activities": "활동 {count}개",
   "展开聊天列表": "채팅 목록 펼치기",
   "收起聊天列表": "채팅 목록 접기",
   "Codex 会话同步格式已变化，请更新 Bridge；历史和草稿仍可查看。": "Codex 세션 형식이 변경되었습니다. Bridge 업데이트; 기록과 초안은 계속 사용할 수 있습니다.",

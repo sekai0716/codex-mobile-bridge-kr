@@ -22,7 +22,11 @@ function chatFollowsLatest(viewport){
 function captureChatScrollAnchor(viewport,container,accept=()=>true){
   const top=viewport.getBoundingClientRect().top;
   let anchor=null;
-  for(const node of container.children){
+  // 펼친 묶음에서는 머리글과 개별 행을 기준으로 삼아 내부에 기록이
+  // 추가되어도 사용자가 읽던 명령의 위치를 유지한다.
+  const nodes=[...container.children].flatMap(node=>node.hidden?[]:node.dataset.activityGroup==='true'&&node.open
+    ?[node.firstElementChild,...node.lastElementChild.children]:[node]);
+  for(const node of nodes){
     if(node.hidden||node.dataset.key===undefined||!accept(node))continue;
     const rect=node.getBoundingClientRect();
     anchor={key:node.dataset.key,offset:rect.top-top};
@@ -70,6 +74,93 @@ function syncChatMessageNodes(container,nodes){
   // Restore only changed/moved rows, after their new layout exists. Browsers
   // clamp offsets naturally when an updated activity becomes shorter.
   for(const [node,state] of reading)restoreChatActivityState(node,state);
+}
+// 원본 종류와 turn 경계로만 묶는다. 번역된 제목이나 명령 내용으로
+// 종류를 추측하지 않으며, 이미지와 확인이 필요한 항목은 독립 행이다.
+function chatActivityGroupKind(row){
+  if(!['activity','fileChanges'].includes(row.role)||row.attachments?.length||['denied','declined'].includes(row.status))return null;
+  if(row.role==='fileChanges')return 'files';
+  switch(row.kind){
+    case 'commandExecution':return 'commands';
+    case 'fileChange':case 'FileChange':case 'fileChanges':return 'files';
+    case 'webSearch':return 'web';
+    case 'mcpToolCall':case 'dynamicToolCall':case 'storedToolEvent':return 'tools';
+    case 'automaticApprovalReview':return row.status==='inProgress'?'review':null;
+    default:return null;
+  }
+}
+function groupChatActivityRows(rows){
+  const units=[];let pending=[];
+  const flush=()=>{if(pending.length){units.push({kind:pending.length>1?'group':'standalone',rows:pending});pending=[];}};
+  for(const row of rows){
+    if(row.kind==='reasoning')continue;
+    if(!chatActivityGroupKind(row)){flush();units.push({kind:'standalone',rows:[row]});continue;}
+    if(pending.length&&pending[0].turnId!==row.turnId)flush();
+    pending.push(row);
+  }
+  flush();return units;
+}
+function chatCommandFirstLine(row){
+  return row.kind==='commandExecution'&&typeof row.text==='string'?row.text.split(/[\r\n\u2028\u2029]/,1)[0].trim():'';
+}
+// 묶음은 표시만 담당한다. 각 행의 노드·상세 조회·읽기 상태는 기존
+// 타임라인에 남기고, 과거 페이지가 앞에 붙어도 같은 묶음을 재사용한다.
+class ChatActivityGroups {
+  constructor(onDisclosure=()=>{}){this.onDisclosure=onDisclosure;this.groups=new Map();this.members=new Map();this.previous=new Map();this.serial=0;}
+  clear(){this.groups.clear();this.members.clear();this.previous.clear();}
+  anchorNode(key){const group=this.groups.get(key);return group&&!group.node.hidden?group.summary:null;}
+  rows(key){return this.groups.get(key)?.rows;}
+  sync(container,entries){
+    const byKey=new Map(entries.map(entry=>[entry.row.key,entry])),reading=new Map();
+    for(const {row,node} of entries)reading.set(node,captureChatActivityState(this.previous.get(row.key)||node));
+    const groups=new Map(),members=new Map(),nodes=[];
+    for(const unit of groupChatActivityRows(entries.map(entry=>entry.row))){
+      const items=unit.rows.map(row=>byKey.get(row.key));
+      if(unit.kind==='standalone'){nodes.push(items[0].node);continue;}
+      let group=unit.rows.map(row=>this.members.get(row.key)).find(group=>group&&!groups.has(group.node.dataset.key));
+      if(!group){
+        const node=document.createElement('details'),summary=document.createElement('summary'),body=document.createElement('div');
+        node.className='activity-group timeline-row';node.dataset.activityGroup='true';
+        // 나중에 설명이 끼어 묶음이 나뉘어도 기존 묶음과 키가 겹치지 않는다.
+        node.dataset.key='activity-group:'+unit.rows[0].key+':'+(++this.serial);
+        summary.dataset.key=node.dataset.key;body.className='activity-group-items';
+        const label=document.createElement('span'),count=document.createElement('small');label.className='activity-group-label';count.className='activity-group-count';
+        summary.append(label,count);node.append(summary,body);
+        // 이미 개별 출력을 읽던 중 묶음이 생기면 그 내용을 숨기지 않는다.
+        node.open=items.some(({row,node})=>this.members.get(row.key)?.node.open??reading.get(node)?.open);
+        summary.addEventListener('click',()=>this.onDisclosure(summary));
+        // 접힌 동안 바뀐 출력은 목록을 다시 펼쳐 실제로 드러날 때 읽는다.
+        node.addEventListener('toggle',()=>{if(node.open&&node.isConnected)for(const child of body.children)child.ontoggle?.();});
+        group={node,summary,body,label,count};
+      }
+      group.rows=unit.rows;groups.set(group.node.dataset.key,group);
+      for(const {row} of items)members.set(row.key,group);
+      const visible=items.filter(({node})=>!node.hidden),labels={commands:'Ran commands',files:'Edited files',web:'Searched the web',tools:'Tool activity',review:'Automatic approval review'};
+      const types=[...new Set(visible.map(({row})=>chatActivityGroupKind(row)))];
+      const active=visible.some(({row})=>row.status==='inProgress');
+      const text=types.map(kind=>BridgeI18n.t(labels[kind])).join(' · ')+(active?BridgeI18n.t('· 진행중'):'');
+      if(group.label.textContent!==text)group.label.textContent=text;
+      group.summary.title=text;group.count.textContent=String(visible.length);
+      group.count.title=BridgeI18n.t('{count} activities').replace('{count}',visible.length);
+      group.summary.setAttribute('aria-label',text+' · '+group.count.title);
+      group.node.hidden=!visible.length;
+      syncChatMessageNodes(group.body,items.map(({node})=>node));nodes.push(group.node);
+    }
+    // 묶음 안 명령은 첫 줄만 보여 주고, 전체 명령/출력은 기존 개별
+    // details를 펼칠 때 읽는다. 빈 첫 줄을 출력 내용으로 대체하지 않는다.
+    for(const {row,node} of entries){
+      if(row.kind!=='commandExecution')continue;
+      const heading=node.firstElementChild,nested=members.has(row.key),first=chatCommandFirstLine(row);
+      node.classList.toggle('grouped-command',nested);
+      const text=nested&&first?first:chatActivityLabel(row);
+      if(heading.textContent!==text)heading.textContent=text;
+      heading.title=nested?first:'';
+    }
+    syncChatMessageNodes(container,nodes);
+    // 분할·병합 중 다른 컨테이너로 옮긴 행도 새 레이아웃에서 복원한다.
+    for(const [node,state] of reading)restoreChatActivityState(node,state);
+    this.groups=groups;this.members=members;this.previous=new Map(entries.map(({row,node})=>[row.key,node]));
+  }
 }
 // All chat surfaces render native task evidence through this shared indicator.
 // 일반 텍스트 상태줄에서는 굵게 구분자만 지운 뒤 마지막 유효 줄을 선택한다.

@@ -79,3 +79,97 @@ async function runChatReadingStateChecks(){
   }
   return {width:innerWidth,passed:checks.length,checks};
 }
+
+// 실제 타임라인·CSS를 사용하고 명령 실행 없이 메모리의 상세 응답만 읽는다.
+async function runChatActivityGroupChecks(){
+  await BridgeFeatures.load('chat');
+  const checks=[],frame=()=>new Promise(requestAnimationFrame),check=(value,label)=>{if(!value)throw Error(label);checks.push(label);};
+  const until=async fn=>{const end=performance.now()+3000;while(!fn()){if(performance.now()>end)throw Error('Timed out waiting for activity details');await frame();}};
+  const root=document.createElement('div');root.id='activity-group-fixture';root.style.cssText='position:fixed;inset:0;z-index:30;background:var(--page);padding:16px;box-sizing:border-box';document.body.append(root);
+  const viewport=document.createElement('div');viewport.style.cssText='height:100%;max-width:760px;margin:auto;overflow:auto;overflow-anchor:none';
+  const container=document.createElement('div'),older=document.createElement('button'),newer=document.createElement('button');viewport.append(container);root.append(viewport,older,newer);
+  let sequence=0,rows=[],reads=[];
+  const source=(key,order,kind='commandExecution',text='python3 -B scripts/check-boundaries.py',extra={})=>({key,order,kind,role:'activity',title:kind==='commandExecution'?'명령을 실행하다':kind==='fileChange'?'파일 변경':kind,turnId:'turn-a',version:'v1',text,...extra});
+  rows=[
+    source('progress',0,'agentMessage','언어 설정과 도구줄을 확인하고 있습니다.',{role:'assistant',phase:'commentary'}),
+    source('cmd1',1,'commandExecution','git status --short\nprintf second-line',{truncated:true}),
+    source('cmd2',2,'commandExecution','npm test -- '+('long-command-argument '.repeat(20)),{truncated:true}),
+    source('patch',3,'fileChange','web/features/chat/timeline.js\n+ grouped activity'),
+    source('web',4,'webSearch','{"query":"activity grouping"}'),
+    source('next-progress',5,'agentMessage','수정을 적용했고 모바일 화면을 확인하고 있습니다.',{role:'assistant',phase:'commentary'}),
+    source('single',6),source('image',7,'imageView','Image preview'),source('cmd3',8),
+    source('cmd4',9,'commandExecution',"printf '<img src=x onerror=alert(1)>'\nprintf second"),
+    source('denied',10,'automaticApprovalReview','A request was declined',{status:'denied'}),
+    source('error',11,'error','Synthetic system error',{role:'error'}),
+    source('other-turn',12,'commandExecution','git diff --stat',{turnId:'turn-b'}),
+    source('final',13,'agentMessage','실행 기록을 확인했습니다.',{role:'assistant',phase:'final_answer',turnId:'turn-b'}),
+  ];
+  const timeline=new ChatTimeline({url:action=>'/synthetic/'+action+'?',elements:{viewport,container,older,newer},
+    renderMeta(){},renderText:(node,text)=>node.textContent=text,status(){},request:async(url,body)=>{
+      if(body!==undefined)throw Error('Unexpected write');const path=new URL(url,location.origin);if(!path.pathname.endsWith('/detail'))throw Error('Unexpected read');
+      const key=path.searchParams.get('key').slice('groups.'.length),row=rows.find(row=>row.key===key);reads.push(key);
+      return {version:row.version,offset:0,text:row.text+'\n\n'+Array.from({length:200},(_,i)=>'Output line '+i).join('\n'),next:null,files:[]};
+    }});
+  const apply=(items=rows,reset=false,history=false)=>timeline.apply({epoch:'groups',sequence:++sequence,rows:items,meta:{requests:[{id:'pending'}]},files:[],hasMore:false},reset,history);
+  const groups=()=>[...container.querySelectorAll(':scope > .activity-group')],node=key=>timeline.nodes.get(key).node;
+  const language=BridgeI18n.language();
+  try{
+    BridgeI18n.setLanguage('ko');apply(rows,true);await frame();await frame();
+    const group=groups()[0],summary=group.firstElementChild;
+    check(groups().length===2&&!groups().some(group=>group.open),'activity runs are grouped and initially collapsed');
+    check(summary.textContent==='명령을 실행함 · 파일 변경 · 웹 검색4','mixed activity header summarizes kinds once');
+    check(node('progress').parentNode===container&&node('next-progress').parentNode===container&&node('final').parentNode===container,'commentary and final text remain outside activity groups');
+    for(const key of ['single','image','denied','error','other-turn'])check(node(key).parentNode===container,key+' is an independent boundary');
+    check(timeline.pendingRequests&&reads.length===0,'approval metadata remains available without eagerly loading activity output');
+    summary.click();await frame();await frame();
+    check(group.open&&reads.length===0,'opening a group shows rows without fetching their output');
+    check(node('cmd1').firstElementChild.textContent==='git status --short','nested command shows only its first line');
+    check(node('cmd4').firstElementChild.textContent==="printf '<img src=x onerror=alert(1)>'"&&!node('cmd4').firstElementChild.querySelector('img'),'command labels remain literal and cannot inject HTML');
+    check([...group.lastElementChild.children].map(n=>n.dataset.key).join(',')==='cmd1,cmd2,patch,web','mixed activity preserves source order');
+    node('cmd1').firstElementChild.click();await until(()=>reads.length===1&&node('cmd1').querySelector('.activity-body').textContent.includes('Output line 199'));
+    let body=node('cmd1').querySelector('.activity-body');body.scrollTop=230;
+    const original=node('cmd1');
+    check(body.scrollTop===230&&node('cmd1').textContent.includes('printf second-line'),'individual expansion loads the full command and scrollable output');
+    const mutations=[],observer=new MutationObserver(records=>mutations.push(...records));observer.observe(container,{childList:true});apply();apply();await frame();observer.disconnect();
+    check(!mutations.length&&groups()[0]===group&&node('cmd1')===original,'unchanged refresh keeps group and row nodes attached');
+    check(node('cmd1').open&&body.scrollTop===230&&reads.length===1,'refresh preserves inner reading position without duplicate detail requests');
+    const updated={...rows.find(row=>row.key==='cmd2'),status:'inProgress'};rows=rows.map(row=>row.key===updated.key?updated:row);apply([updated]);await frame();
+    check(groups()[0]===group&&group.open&&summary.textContent.includes('진행 중'),'live status updates keep the group open and report active work');
+    check(node('cmd1').open&&body.scrollTop===230&&reads.length===1,'updating another activity preserves the expanded command');
+    const earlier=source('earlier',.5,'commandExecution','git diff --check');rows.push(earlier);apply([earlier],false,true);await frame();
+    check(groups()[0]===group&&group.open&&group.lastElementChild.firstElementChild===node('earlier'),'history extends the existing group instead of replacing it');
+    check(node('cmd1').open&&body.scrollTop===230,'history extension preserves inner output scrolling');
+    summary.click();await frame();
+    const freshCommand={...rows.find(row=>row.key==='cmd1'),version:'v2',text:'git status --short\nprintf updated-second-line'};
+    rows=rows.map(row=>row.key===freshCommand.key?freshCommand:row);apply([freshCommand]);await frame();await frame();
+    check(!group.open&&node('cmd1').open&&reads.length===1,'a collapsed group keeps individual disclosure state without fetching changed hidden output');
+    summary.click();await until(()=>reads.length===2&&node('cmd1').querySelector('.activity-body').textContent.includes('updated-second-line'));
+    body=node('cmd1').querySelector('.activity-body');body.scrollTop=230;
+    check(group.open&&node('cmd1').open&&reads.length===2,'revealing an already expanded command reads its latest output once');
+    node('cmd1').open=false;await frame();
+    viewport.scrollTop+=node('cmd2').getBoundingClientRect().top-viewport.getBoundingClientRect().top+2;timeline.following=false;
+    const anchor=timeline.capture(),anchorNode=timeline.nodes.get(anchor.key)?.node||timeline.activityGroups.anchorNode(anchor.key);
+    const offset=anchorNode.getBoundingClientRect().top-viewport.getBoundingClientRect().top;
+    const backfill=source('backfill',.25,'commandExecution','git log -1');rows.push(backfill);apply([backfill],false,true);await frame();
+    check(Math.abs(anchorNode.getBoundingClientRect().top-viewport.getBoundingClientRect().top-offset)<2,'prepending inside a group retains the visible row and pixel offset');
+    timeline.setVisibility({showProcess:false});await frame();check(groups().every(group=>group.hidden)&&!node('final').hidden&&!node('error').hidden,'activity filter hides groups while replies and errors remain visible');
+    timeline.setVisibility({showProcess:true});await frame();check(!group.hidden&&group.open,'restoring activity retains group expansion');
+    for(const [lang,label]of [['en','Ran commands'],['zh','已运行命令'],['ko','명령을 실행함']]){
+      BridgeI18n.setLanguage(lang);timeline.relabel();
+      check(summary.textContent.startsWith(label)&&node('cmd1').firstElementChild.textContent==='git status --short'&&group.open,'language '+lang+' updates group labels without translating commands or closing them');
+    }
+    root.style.width='320px';viewport.scrollTop=0;await frame();
+    const heading=node('cmd2').firstElementChild,rect=heading.getBoundingClientRect();
+    check(getComputedStyle(heading).whiteSpace==='nowrap'&&rect.height<=31&&heading.scrollWidth>heading.clientWidth,'long command labels stay on one truncated line at 320px');
+    check(container.scrollWidth<=container.clientWidth+1,'activity groups do not overflow the narrow conversation');
+    // 기존 묶음의 첫 키보다 앞에 기록이 붙은 뒤 설명이 중간에 나타나도
+    // 두 묶음의 키와 펼침 상태가 서로 섞이지 않아야 한다.
+    apply([source('late-commentary',.75,'agentMessage','이 구간의 검사 결과를 정리하고 있습니다.',{role:'assistant',phase:'commentary'})]);await frame();
+    check(groups().length===3&&new Set(groups().map(group=>group.dataset.key)).size===3,'splitting an extended group keeps unique stable group keys');
+    check(node('cmd1').parentNode.parentNode.open&&node('late-commentary').parentNode===container,'a late commentary splits activity without hiding the previously expanded list');
+    check(container.querySelectorAll('[data-key="cmd1"]').length===1,'group splitting never duplicates a command');
+    root.style.width='';apply(rows,true);await frame();check(groups().every(group=>!group.open)&&!node('cmd1').open,'a new timeline does not inherit disclosure state from the previous one');
+    groups()[0].firstElementChild.click();await frame();viewport.scrollTop=0;
+    return {width:innerWidth,passed:checks.length,checks};
+  }finally{BridgeI18n.setLanguage(language);timeline.dispose();}
+}

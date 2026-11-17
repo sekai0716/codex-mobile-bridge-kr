@@ -35,6 +35,9 @@ class ChatTimeline {
     this.older=elements.older||document.getElementById('older');
     this.newer=elements.newer||document.getElementById('newer');
     this.abort=new AbortController();this.rows=new Map();this.nodes=new Map();this.details=new Map();
+    this.activityGroups=new ChatActivityGroups(summary=>{
+      this.following=false;this.anchor={key:summary.dataset.key,offset:summary.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
+    });
     this.mermaidScope=window.BridgeMermaidCards?.createScope();
     this.files=new Map();this.sequence=-1;this.epoch='';this.before=null;this.hasMore=false;
     this.busy=false;this.generation=0;this.windowRevision=0;this.following=true;this.lastTop=0;this.retryCount=0;
@@ -62,7 +65,7 @@ class ChatTimeline {
     this.resize=new ResizeObserver(()=>this.restore(this.anchor,this.following));
     this.resize.observe(this.container);
   }
-  dispose(){this.abort.abort();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
+  dispose(){this.abort.abort();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
   atBottom(){return chatFollowsLatest(this.viewport);}
   nearTop(){const nodes=[...this.container.children].filter(n=>!n.hidden);return nodes.length>0&&nodes.slice(0,11).some(n=>n.getBoundingClientRect().bottom>=this.viewport.getBoundingClientRect().top);}
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
@@ -77,7 +80,10 @@ class ChatTimeline {
     const imagesChanged=this.showToolImages!==showToolImages;
     this.showToolImages=showToolImages;
     this.showReasoning=showReasoning;this.showProcess=showProcess;
-    const anchor=this.capture(node=>this.rowVisible(this.rows.get(node.dataset.key).row)),bottom=this.following;
+    const anchor=this.capture(node=>{
+      const row=this.rows.get(node.dataset.key)?.row;
+      return row?this.rowVisible(row):this.activityGroups.rows(node.dataset.key)?.some(row=>this.rowVisible(row));
+    }),bottom=this.following;
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key).row;
       if(imagesChanged&&row.attachments?.some(item=>item.type==='toolImage')){
@@ -87,16 +93,16 @@ class ChatTimeline {
       }
       entry.node.hidden=!this.rowVisible(row);
     }
-    this.refreshActions();
+    this.syncRows();this.refreshActions();
     this.restore(anchor,bottom);
   }
   jumpBottom(){this.viewport.scrollTop=this.viewport.scrollHeight;this.following=true;this.newer.hidden=true;}
   restore(anchor,bottom=false){
     if(this.abort.signal.aborted||!this.viewport.clientHeight)return;
     const reading=window.BridgeMobileHandoff?.readingAnchor?.(this);
-    if(reading && this.nodes.has(reading.key)){anchor=reading;bottom=false;this.following=false;}
+    if(reading && (this.nodes.has(reading.key)||this.activityGroups?.anchorNode(reading.key))){anchor=reading;bottom=false;this.following=false;}
     this.suppress=true;
-    const node=anchor&&this.nodes.get(anchor.key)?.node;
+    const node=anchor&&(this.nodes.get(anchor.key)?.node||this.activityGroups?.anchorNode(anchor.key));
     if(bottom)this.jumpBottom();
     else restoreChatScrollAnchor(this.viewport,node,anchor);
     this.lastTop=this.viewport.scrollTop;
@@ -150,7 +156,7 @@ class ChatTimeline {
     }
     this.cached=cached;
     const anchor=this.capture(),bottom=this.following;
-    if(reset){this.generation++;window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
+    if(reset){this.generation++;this.activityGroups?.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
     for(const file of page.files||[])this.files.set(file.id,file);
     if((!history&&page.sequence>=this.sequence)||reset){this.sequence=page.sequence;this.meta=page.meta;if(!cached)this.renderMeta({...page.meta,files:[...this.files.values()]});}
     if(!history)this.pendingRequests=!cached&&!!page.meta.requests?.length;
@@ -175,7 +181,7 @@ class ChatTimeline {
       this.nodes.set(row.key,{node,stamp});
     }
     const ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
-    syncChatMessageNodes(this.container,ordered.filter(row=>row.kind!=='reasoning').map(row=>this.nodes.get(row.key).node));
+    this.syncRows(ordered);
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
     if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
@@ -189,6 +195,10 @@ class ChatTimeline {
       while(recentTimelinePages.size>8)recentTimelinePages.delete(recentTimelinePages.keys().next().value);
     }
     if(!cached&&!history&&!this.abort.signal.aborted&&!page.meta.loadingHistory)this.onReady?.();
+  }
+  syncRows(ordered=[...this.rows.values()].map(entry=>entry.row).sort((a,b)=>a.order-b.order)){
+    this.activityGroups??=new ChatActivityGroups();
+    this.activityGroups.sync(this.container,ordered.filter(row=>row.kind!=='reasoning').map(row=>({row,node:this.nodes.get(row.key).node})));
   }
   renderRow(row,open){
     const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&row.attachments?.some(item=>item.type==='toolImage');
@@ -270,7 +280,10 @@ class ChatTimeline {
       content.open=open??false;
       // 기본값을 바꿔도 이 대화에서 직접 펼치거나 접은 선택은 유지한다.
       // 숨겨진 항목과 이미 온전한 요약은 기본 펼침 때문에 다시 조회하지 않는다.
-      content.ontoggle=()=>{if(content.open&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();};
+      content.ontoggle=()=>{
+        const group=node.closest('.activity-group');
+        if(content.open&&(!group||group.open)&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();
+      };
     }
     return node;
   }
@@ -320,6 +333,7 @@ class ChatTimeline {
       if(attachment)attachment.textContent=timelineText('부착:')+row.attachments.map(a=>a.name||a.type).join('、');
     }
     this.newer.textContent=timelineText(this.pendingRequests?'확인 필요 ↓':'새로운 콘텐츠 ↓');
+    this.syncRows();
   }
   async updates(){
     while(!this.abort.signal.aborted){
