@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('web/shared/i18n.js','utf8');
-function i18n(){const context=vm.createContext({module:{exports:{}},localStorage:{getItem(){return null;},setItem(){}}});vm.runInContext(source,context);return context.module.exports;}
+const {loadLanguagePacks:i18n}=require('./helpers/language-packs.cjs');
 
 test('Korean is the default and English keeps each message meaning',()=>{
   const ui=i18n();assert.equal(ui.language(),'ko');assert.equal(ui.locale(),'ko-KR');
@@ -12,8 +12,8 @@ test('Korean is the default and English keeps each message meaning',()=>{
 });
 
 test('Korean dictionary keys cannot overwrite a different English message',()=>{
-  const start=source.indexOf('const en={'),end=source.indexOf('\n};',start),seen=new Map();
-  const rows=source.slice(start,end).matchAll(/^\s*("(?:\\.|[^"\\])*")\s*:\s*("(?:\\.|[^"\\])*")/gm);
+  const data=fs.readFileSync('web/shared/locales/legacy.js','utf8'),start=data.indexOf('const messages={'),end=data.indexOf('\n};',start),seen=new Map();
+  const rows=data.slice(start,end).matchAll(/^\s*("(?:\\.|[^"\\])*")\s*:\s*("(?:\\.|[^"\\])*")/gm);
   let count=0;for(const row of rows){const key=JSON.parse(row[1]),value=JSON.parse(row[2]);if(seen.has(key))assert.equal(value,seen.get(key),'서로 다른 메시지가 같은 한국어 키를 사용합니다: '+key);seen.set(key,value);count++;}
   assert.ok(count>3000,'전체 UI 사전이 검사되어야 합니다.');
 });

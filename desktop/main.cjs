@@ -18,8 +18,8 @@ const loginStartup=createLoginStartup(app);
 const {spawn}=require('node:child_process');
 const {randomUUID}=require('node:crypto');
 const {interfaces}=require('./features/connections/network.cjs');
-let language='ko-KR';
-const t=text=>translate(text,language);
+let language='en';
+const t=(text,selected=language)=>translate(text,selected);
 const root=path.resolve(__dirname,'..');
 // An explicit data directory also keeps test caches inside the project.
 if(process.env.CMB_DATA_DIR)app.setPath('userData',path.join(path.resolve(process.env.CMB_DATA_DIR),'desktop-runtime'));
@@ -147,7 +147,7 @@ function register(){
   ipcMain.handle('bridge:language',event=>{authorize(event);return language;});
   ipcMain.handle('bridge:set-language',(event,value)=>{
     authorize(event);
-    if(!['ko-KR','en'].includes(value))throw Error('Unsupported language');
+    if(!['ko-KR','en','zh-CN'].includes(value))throw Error('Unsupported language');
     const directory=app.getPath('userData');fs.mkdirSync(directory,{recursive:true});
     publishLanguage(dataDir,value);
     fs.writeFileSync(path.join(directory,'language.json'),JSON.stringify({language:value}));
@@ -226,7 +226,7 @@ function register(){
   });
   ipcMain.handle('bridge:copy-server-diagnostics',async(event,value)=>{
     authorize(event);const result=await worker('server-setup',{id:value.id,action:'diagnostics',language:value.language});
-    clipboard.writeText(result.prompt);return {message:value.language==='en'?'Read-only server inspection prompt copied.':'읽기 전용 서버 검사 프롬프트가 복사되었습니다.'};
+    clipboard.writeText(result.prompt);return {message:t('Read-only server inspection prompt copied.',value.language)};
   });
   ipcMain.handle('bridge:server-setup',async(event,value)=>{
     authorize(event);
@@ -269,19 +269,19 @@ function register(){
   });
   ipcMain.handle('bridge:export-deployment',async(event,payload)=>{
     authorize(event);
-    const result=await dialog.showSaveDialog(window,{defaultPath:'Codex-deployment.zip',filters:[{name:payload?.language==='en'?'Deployment ZIP':'ZIP 배포 패키지',extensions:['zip']}]});
+    const result=await dialog.showSaveDialog(window,{defaultPath:'Codex-deployment.zip',filters:[{name:t('Deployment ZIP',payload?.language),extensions:['zip']}]});
     if(result.canceled)return null;
     const bundle=await worker('export-deployment',payload);
     fs.copyFileSync(bundle.path,result.filePath);
-    return {message:payload?.language==='en'?'Deployment ZIP exported: '+result.filePath:'배포 패키지를 내보냈습니다.：'+result.filePath};
+    return {message:t('Deployment ZIP exported: {path}',payload?.language).replace('{path}',result.filePath)};
   });
   ipcMain.handle('bridge:copy-deployment',async(event,payload)=>{
     authorize(event);const bundle=await worker('deployment',payload);
-    const english=payload?.language==='en';
+    const english=normalize(payload?.language)!=='ko-KR',selected=payload?.language;
     const manual=bundle.accessMode==='server';
-    const intro=manual?(english?'Manual setup reference. Review the configuration; administrative commands must be run by the user.':'수동 구성 참조. 다음 구성을 확인하십시오. 관리자 권한이 포함된 명령은 사용자가 직접 실행해야 합니다.。'):english?'Deploy Codex Mobile Bridge using the configuration below. Check existing services first; do not overwrite existing sites.':'다음 구성에 따라 배포하도록 도와주세요. Codex 휴대폰 게이트웨이의 고정된 입구입니다. 기존 서비스를 먼저 확인하고 기존 사이트를 덮어쓰지 마세요.。';
+    const intro=t(manual?'Manual setup reference. Review the configuration; administrative commands must be run by the user.':'Deploy Codex Mobile Bridge using the configuration below. Check existing services first; do not overwrite existing sites.',selected);
     const text=intro+'\n\n'+Object.entries(bundle.files).filter(([name])=>name!==(english?'배포 지침.md':'DEPLOYMENT_EN.md')).map(([name,content])=>'--- '+name+' ---\n'+content).join('\n');
-    clipboard.writeText(text);return {message:manual?(english?'Manual setup reference copied. Administrative steps must be performed by the user.':'수동 구성 참조가 복사되었습니다. 관리자 작업은 사용자가 직접 완료해야 합니다.。'):english?'Deployment instructions and configuration copied. Paste them into your server or NAS Agent.':'배포 지침 및 구성이 복사되었습니다. 서버나 NAS 에이전트에 붙여넣으세요.'};
+    clipboard.writeText(text);return {message:t(manual?'Manual setup reference copied. Administrative steps must be performed by the user.':'Deployment instructions and configuration copied. Paste them into your server or NAS Agent.',selected)};
   });
   ipcMain.handle('bridge:choose',async(event,kind)=>{
     authorize(event);
@@ -371,7 +371,7 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',(_event,argv)=>{if(!loginStartup.hidden(argv))showWindow();});
   app.whenReady().then(async()=>{
-    language='ko-KR';
+    language=normalize(app.getLocale());
     try{language=normalize(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'),'language.json'),'utf8')).language);}catch{}
     dataDir=loadDataDir();publishLanguage(dataDir,language);
     setupUpdater();register();

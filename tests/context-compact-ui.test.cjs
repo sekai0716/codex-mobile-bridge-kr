@@ -8,7 +8,7 @@ function fixture(){
   chatKey:(id,host)=>host+':'+id,uuid:()=>String(++serial),t:s=>s,toast:s=>messages.push(s),$:()=>({after(){}}),
   sessionUrl:(id,action,host)=>`/${host}/${id}/${action}`,api:async(path,body)=>{calls.push({path,body});return reply();},
   ContextUsageControl:class{constructor(options){this.options=options;control=this;}update(state){this.state=state;}},
-  document:{createElement:()=>({}),addEventListener(){}},FastModeToggle:class{constructor({button}){this.button=button;}}});
+  AccountUsageControl:class{constructor(){this.button={};}update(){}relabel(){}},document:{createElement:()=>({append(){}}),addEventListener(){}},FastModeToggle:class{constructor({button}){this.button=button;}}});
  vm.runInContext(code,context);return {context,calls,messages,control,reply:fn=>{reply=fn;}};
 }
 test('compact uses selected host and shares the existing context control',async()=>{

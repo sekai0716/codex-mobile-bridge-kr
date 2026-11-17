@@ -13,7 +13,7 @@ function fixture(language='ko'){
  }
  document.createElement=element;document.body=element('body');
  const context=vm.createContext({document,setTimeout,clearTimeout,AbortController,localStorage:{getItem:()=>language,setItem(){}}});
- for(const file of ['web/shared/i18n.js','web/features/clients/client-lifecycle.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),context);
+ for(const file of ['web/shared/locales/en.js','web/shared/locales/ko-KR.js','web/shared/locales/zh-CN.js','web/shared/locales/legacy.js','web/shared/i18n.js','web/features/clients/client-lifecycle.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),context);
  return {context,document,choose:client=>vm.runInContext('ClientLifecycle',context).chooseDisable(client),initialize:client=>vm.runInContext('ClientLifecycle',context).chooseInitialize(client),dialog:()=>document.body.children[0]};
 }
 test('WSL clients distinguish a stopped environment, a pending CLI connection and unknown status',()=>{

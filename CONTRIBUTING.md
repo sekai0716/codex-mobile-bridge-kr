@@ -19,6 +19,10 @@
 
 ## 검증
 
+UI 번역은 `web/shared/locales/{en,ko-KR,zh-CN}.js`의 같은 메시지 키에 추가한다. `legacy.js`는 기존 한국어 호출 키와 원문 키의 대응표이며, `web/shared/i18n.js`에는 언어 선택과 등록된 문구 조회만 둔다. `/i18n.js` 공개 URL은 `web/assets.json`에서 언어팩과 엔진을 순서대로 묶는다. 채팅 내용·명령·파일명 등 사용자 데이터는 번역 함수에 전달하지 않는다.
+
+네이티브 문구의 원본은 `mobile/shared/locales/messages.json`이다. 수정 후 `python3 scripts/generate-mobile-locales.py`로 Java·Swift 테이블을 생성하고 `--check`로 일치를 검사한다. 언어팩 추가 시 기존 언어와 저장된 선택값을 보존한다.
+
 먼저 변경과 직접 관련된 테스트를 실행한 뒤 필요한 공통 회귀 검사를 실행한다. 진입점과 한계는 [tests/README.md](tests/README.md)를 참고한다.
 
 - Python·Node 소스 테스트는 새 테스트를 자동으로 찾는다. 모듈 경계 검사는 Python discovery에 포함된다.

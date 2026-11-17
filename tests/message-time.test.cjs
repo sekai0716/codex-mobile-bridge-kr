@@ -9,8 +9,8 @@ test('native milliseconds and ISO instants agree; local calendar dates include y
  const render=fixture(),now=new Date(2026,10,9,22),date=new Date(2026,10,9,8,7);
  const [time]=render(date.getTime(),now);assert.equal(time.textContent,'08:07');assert.equal(time.dateTime,date.toISOString());
  assert.equal(render(date.toISOString(),now)[0].textContent,time.textContent);
- assert.equal(render(new Date(2026,10,8,8,7).getTime(),now)[0].textContent,'11달8낮 08:07');
- assert.equal(render(new Date(2025,10,8,8,7).getTime(),now)[0].textContent,'2025년도11달8낮 08:07');
+ assert.equal(render(new Date(2026,10,8,8,7).getTime(),now)[0].textContent,'11. 8. 08:07');
+ assert.equal(render(new Date(2025,10,8,8,7).getTime(),now)[0].textContent,'2025. 11. 8. 08:07');
  assert.ok(time.title.includes('2026'));assert.equal(time['aria-label'],time.title);
 });
 test('missing, invalid and ambiguous timestamps never become current time',()=>{

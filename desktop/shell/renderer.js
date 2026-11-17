@@ -446,7 +446,7 @@ let refreshTimer=setInterval(refresh,3000);
 document.addEventListener('visibilitychange',()=>{clearInterval(refreshTimer);refreshTimer=null;if(!document.hidden){refresh();refreshTimer=setInterval(refresh,3000);}});
 
 function applyLanguage(value){
-  BridgeI18n.setLanguage(value==='en'?'en':'ko');BridgeI18n.apply();if(typeof accountsPanel!=="undefined")accountsPanel?.render();
+  BridgeI18n.setLanguage(value);BridgeI18n.apply();if(typeof accountsPanel!=="undefined")accountsPanel?.render();
   $('language').value=BridgeI18n.language();
   document.title=t('Codex 모바일 Bridge');
   if(snapshot){const pending=dirty;dirty=true;render(snapshot);dirty=pending;renderConnections();updateDirty();}
@@ -457,7 +457,7 @@ function applyLanguage(value){
 $('language').value=BridgeI18n.language();
 $('language').onchange=async()=>{
   $('language').disabled=true;
-  try{applyLanguage(await api.setLanguage($('language').value==='en'?'en':'ko-KR'));}
+  try{const value=$('language').value;applyLanguage(await api.setLanguage(value==='en'?'en':value==='zh'?'zh-CN':'ko-KR'));}
   catch(error){$('language').value=BridgeI18n.language();feedback(error.message,true);}
   finally{$('language').disabled=false;}
 };

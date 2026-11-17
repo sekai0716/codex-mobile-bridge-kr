@@ -7,7 +7,7 @@ const i18n=require('../desktop/shared/i18n.js');
 
 test('language normalization and error translation preserve unknown details',()=>{
   assert.equal(i18n.normalize('en-US'),'en');assert.equal(i18n.normalize('ko-TW'),'ko-KR');
-  assert.equal(i18n.normalize(null),'ko-KR');
+  assert.equal(i18n.normalize(null),'en');assert.equal(i18n.normalize('zh-TW'),'zh-CN');assert.equal(i18n.translate('보조 채팅','zh-CN'),'侧边聊天');
   assert.equal(i18n.translate('실행 중','en'),'Running');
   assert.equal(i18n.translate("Error invoking remote method 'bridge:save': Error: 새 비밀번호는 12자 이상이어야 합니다.",'en'),i18n.english['새 비밀번호는 12자 이상이어야 합니다.']);
   assert.equal(i18n.translate('C:\\private\\알려지지 않은.log','en'),'C:\\private\\알려지지 않은.log');
@@ -125,7 +125,7 @@ async function renderer(initialLanguage='ko-KR',{autoStart=false,hidden=false,lo
   const context=vm.createContext({window:{bridgeDesktop:api},AccountsPanel,DesktopConnectionsPanel,Option:function(text,value){return Object.assign(node(),{textContent:text,value});},
     localStorage:{getItem(){return null;},setItem(){}},document:{head:{append(script){script.onload?.();}},hidden,addEventListener(name,fn){this[name]=fn;},documentElement:{},getElementById:id=>nodes.get(id),createElement:node,querySelectorAll:()=>[]},
     URL,Date:class extends Date{static now(){return now;}},setTimeout(){},clearTimeout(){},clearInterval(){},setInterval:(callback,ms)=>{if(callback.name==='refresh')poll=callback;}});
-  for(const name of ['web/shared/i18n.js','desktop/shared/secret-fields.js','desktop/features/connections/connections.js','desktop/features/connections/pairing.js','web/features/accounts/account.js','desktop/features/notifications/watches.js','web/features/accounts/wsl-accounts.js','desktop/shell/renderer.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),context);
+  for(const name of ['web/shared/locales/en.js','web/shared/locales/ko-KR.js','web/shared/locales/zh-CN.js','web/shared/locales/legacy.js','web/shared/i18n.js','desktop/shared/secret-fields.js','desktop/features/connections/connections.js','desktop/features/connections/pairing.js','web/features/accounts/account.js','desktop/features/notifications/watches.js','web/features/accounts/wsl-accounts.js','desktop/shell/renderer.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),context);
   await new Promise(setImmediate);
   return {nodes,value,context,api,calls,run:code=>vm.runInContext(code,context),poll:()=>poll(),advance:ms=>{now+=ms;},start:()=>nodes.get('start').onclick()};
 }
@@ -1054,9 +1054,9 @@ test('native window title and local target copy respect their fixed origins',asy
   }});
   vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../desktop/main.cjs'),'utf8'),context);
   context.createWindow();context.register();
-  assert.equal(instance.title,'Codex 모바일 Bridge');
+  assert.equal(instance.title,'Codex Mobile Bridge');
   let prevented=0;events['page-title-updated']({preventDefault(){prevented++;}},'Different page title');
-  assert.equal(prevented,1);assert.equal(instance.title,'Codex 모바일 Bridge');
+  assert.equal(prevented,1);assert.equal(instance.title,'Codex Mobile Bridge');
   const event={sender:instance.webContents,senderFrame:instance.webContents.mainFrame};
   const originalWorker=context.worker,networkCalls=[];
   context.worker=async(action,payload)=>{networkCalls.push({action,payload});return {enabled:payload.enabled===true};};
@@ -1064,9 +1064,9 @@ test('native window title and local target copy respect their fixed origins',asy
   assert.deepEqual(networkCalls,[{action:'network-adaptation',payload:{action:'set',enabled:true}}]);
   await assert.rejects(handlers['bridge:network-adaptation']({...event,senderFrame:{}},{action:'set',enabled:false}),/이 UI 소스는 허용되지 않습니다\./);
   assert.equal(networkCalls.length,1);context.worker=originalWorker;
-  handlers['bridge:set-language'](event,'ko-KR');assert.equal(changes,0);
-  handlers['bridge:set-language'](event,'en');assert.equal(changes,1);
-  handlers['bridge:set-language'](event,'en');assert.equal(changes,1);
+  handlers['bridge:set-language'](event,'ko-KR');assert.equal(changes,1);assert.equal(instance.title,'Codex 모바일 Bridge');
+  handlers['bridge:set-language'](event,'en');assert.equal(changes,2);
+  handlers['bridge:set-language'](event,'en');assert.equal(changes,2);
   vm.runInContext("lastSnapshot={urls:[],preferences:{port:8787}};updateQuitting=true;updater={status(){return {}}}",context);
   await handlers['bridge:copy'](event,'http://127.0.0.1:8787');
   await handlers['bridge:copy'](event,'http://127.0.0.1:8788');

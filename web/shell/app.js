@@ -190,7 +190,7 @@ function showLogin(passwordless=false,status){sessionPins.suspend();clearQuoteCo
 async function start(pairingToken=null){
   window.BridgeBootstrap?.waitingForAuth();
   const auth=window.BridgeBootstrap?.readAuth?await window.BridgeBootstrap.readAuth(signal=>api('/api/auth',undefined,signal)):await api('/api/auth');
-  if(['en','ko'].includes(auth.uiLanguage)){$('phone-language').value=auth.uiLanguage;$('phone-language').onchange();}
+  if(['en','ko','zh'].includes(auth.uiLanguage)){$('phone-language').value=auth.uiLanguage;$('phone-language').onchange();}
   if(pairingToken!==null){
     try{window.BridgeBootstrap?.pairingSubmitted();const result=await api('/api/pair',{token:pairingToken});csrf=result.csrf;await enter();return;}
     catch(error){
@@ -590,6 +590,9 @@ $('session-diagnostics-copy').onclick=()=>window.BridgeClipboard.copyWithFeedbac
 $('session-diagnostics-export').onclick=event=>{if(BridgeHost.isNativeApp()&&window.BridgeMobileCapabilities?.diagnosticsExport!==true){event.preventDefault();return;}event.currentTarget.href=window.BridgeRelayURL?.(diagnosticsPath)||diagnosticsPath;};
 $('archived').onchange=()=>loadList(true).catch(e=>toast(e.message));
 const listSync=window.BridgeListSync=new ListSync({root:$('sessions'),status:$('list-sync'),refresh:()=>loadList(true),visible:()=>!$('app').hidden&&$('sidebar').getBoundingClientRect().width>0,ready:()=>!listLoading&&document.activeElement!==$('search')});
+function renderCodexProgress(view=state){if(!view)return;renderChatProgress($('working'),{agentName:'Codex',active:view.status==='active',waiting:!!view.requests.length,connected:!!view.connected,reasoningSummary:view.reasoningSummary,reasoningScope:JSON.stringify([currentHost,view.id,view.reasoningTurnId])});if(!view.connected&&view.status!=='active')$('working').hidden=true;}
+document.addEventListener('bridge-appearance-change',()=>renderCodexProgress());
+document.addEventListener('bridge-language',()=>renderCodexProgress());
 const contextCompactions=new Map(),contextCompacting=new Set();
 const contextUsageControl=new ContextUsageControl({onCompact:async()=>{
   const id=currentId,host=currentHost,key=chatKey(id,host);if(contextCompacting.has(key)||!state?.connected)return false;
@@ -619,7 +622,13 @@ const fastModeToggle=new FastModeToggle({button:document.createElement('button')
     return result;
   }finally{modelSaving=false;renderFastModeToggle();}
 }});
-$('permissions-button').after(fastModeToggle.button,contextUsageControl.button);
+const accountUsageControl=new AccountUsageControl({read:(scope,force)=>api('/api/account?cached='+(force?'0':'1')+'&entry='+encodeURIComponent(scope.host==='local'?'desktop':scope.host))});
+const contextGroup=document.createElement('span');contextGroup.className='composer-context-group';contextGroup.append(fastModeToggle.button,contextUsageControl.button,accountUsageControl.button);$('permissions-button').after(contextGroup);
+function renderAccountUsage(view=state){
+  const available=view?.provider==='openai'&&(currentHost==='local'||currentHost.startsWith('codex:'));
+  accountUsageControl.update(available?{host:currentHost,provider:view.provider,identity:JSON.stringify([listIdentity,view.draftAccountIdentity||view.modelCatalogIdentity||''])}:null);
+}
+document.addEventListener('bridge-language',()=>accountUsageControl.relabel());
 document.addEventListener('bridge-language',()=>renderFastModeToggle());
 let newChatProjects=[],newChatEnvironments=[],newChatCanBrowse=false,newChatEntry='desktop',newChatPreferredHost='local',creatingChat=false,approvalBusy=0;
 const newChatUrl=path=>path+(isCodexEntry(newChatEntry)?'?entry='+encodeURIComponent(newChatEntry):'');
@@ -953,7 +962,7 @@ async function openChat(id,host="local"){
   try {route=known&&!known.attachedParentId?{rootId:id,cwd:known.cwd}:await workbench.resolveChat(id,host,async target=>{const meta=(await api(sessionUrl(target,'timeline',host)+'&limit=1')).meta;if(target===id)routeAccess=meta.access;return meta;});}
   catch(error) {if(openGeneration===chatOpenGeneration)toast(t(error.message));return;}
   if(openGeneration!==chatOpenGeneration||clientNavigation.provider!==routeProvider)return;
-  messageActions.dialog.close();workbench.open(id,host,route);saveDraft();chatTimeline?.dispose();codexQuotes?.reset();currentId=id;currentHost=host;refreshEntryAccounts();codexDraftScope=null;codexDraftTouched=false;state=null;catalogStarted=false;workbench.current.access=sessionAccess(listRows.find(row=>row.id===id&&row.host===host)?.access);contextUsageControl.update(null);renderFastModeToggle();workModes.open(chatKey(id,host));$('send-mode').value='auto';attachments.open(chatKey(id,host));modelCatalogGeneration++;catalogData={models:null,skills:null};catalogResults={models:null,skills:null};catalogTasks={models:null,skills:null};skillIndex=new Map();skillTotal=0;skillPages=[];skillQuery={q:'',offset:0,limit:200};invalidSkills=new Set();skillRequest++;modelRequest++;modelTarget=null;fastModeControl.reset();$('model-dialog').close();notificationState={available:false,watching:false,notifyOnCompletion:false};notificationRequest++;$('notify-dialog').close();try{selectedSkills=new Set(JSON.parse(!draftGateway?sessionStorage.getItem('skills:'+chatKey(id,host))||'[]':'[]'));}catch{selectedSkills=new Set();}renderSkillPills();approvalStamp='';submittedRequestIds.clear();$('messages').replaceChildren();$('approvals').replaceChildren();$('queued').replaceChildren();$('message').value=!draftGateway?sessionStorage.getItem('draft:'+chatKey(id,host))||'':'';$('send-error').textContent='';$('chat-title').textContent=t('연결 중…');$('status').textContent=t('연결 중');$('welcome').hidden=true;$('chat').hidden=false;$('app').classList.add('chat-open');$('send').disabled=true;if(!browserNavigation.sync({provider:'codex',id,host}))history.replaceState(null,'','#'+id+'~'+encodeURIComponent(host));document.querySelectorAll('.session').forEach(n=>n.classList.toggle('selected',n.dataset.id===id&&n.dataset.host===host));const opening=workbench.current;
+  messageActions.dialog.close();workbench.open(id,host,route);saveDraft();chatTimeline?.dispose();codexQuotes?.reset();currentId=id;currentHost=host;refreshEntryAccounts();codexDraftScope=null;codexDraftTouched=false;state=null;catalogStarted=false;workbench.current.access=sessionAccess(listRows.find(row=>row.id===id&&row.host===host)?.access);contextUsageControl.update(null);accountUsageControl.update(null);renderFastModeToggle();workModes.open(chatKey(id,host));$('send-mode').value='auto';attachments.open(chatKey(id,host));modelCatalogGeneration++;catalogData={models:null,skills:null};catalogResults={models:null,skills:null};catalogTasks={models:null,skills:null};skillIndex=new Map();skillTotal=0;skillPages=[];skillQuery={q:'',offset:0,limit:200};invalidSkills=new Set();skillRequest++;modelRequest++;modelTarget=null;fastModeControl.reset();$('model-dialog').close();notificationState={available:false,watching:false,notifyOnCompletion:false};notificationRequest++;$('notify-dialog').close();try{selectedSkills=new Set(JSON.parse(!draftGateway?sessionStorage.getItem('skills:'+chatKey(id,host))||'[]':'[]'));}catch{selectedSkills=new Set();}renderSkillPills();approvalStamp='';submittedRequestIds.clear();$('messages').replaceChildren();$('approvals').replaceChildren();$('queued').replaceChildren();$('message').value=!draftGateway?sessionStorage.getItem('draft:'+chatKey(id,host))||'':'';$('send-error').textContent='';$('chat-title').textContent=t('연결 중…');$('status').textContent=t('연결 중');$('welcome').hidden=true;$('chat').hidden=false;$('app').classList.add('chat-open');$('send').disabled=true;if(!browserNavigation.sync({provider:'codex',id,host}))history.replaceState(null,'','#'+id+'~'+encodeURIComponent(host));document.querySelectorAll('.session').forEach(n=>n.classList.toggle('selected',n.dataset.id===id&&n.dataset.host===host));const opening=workbench.current;
 try{if(window.BridgeFeatures)await window.BridgeFeatures.load('chat');}catch(error){if(openGeneration===chatOpenGeneration&&workbench.current===opening&&$('app').classList.contains('chat-open')){$('status').textContent=t('연결 실패');$('send-error').textContent=t(error.message);}return;}
 if(openGeneration!==chatOpenGeneration||workbench.current!==opening||currentId!==id||currentHost!==host||!$('app').classList.contains('chat-open'))return;
 const timeline=chatTimeline=new ChatTimeline({cacheKey:listIdentity?JSON.stringify([listIdentity,host,id]):'',url:action=>sessionUrl(id,action,host),request:api,renderMeta:renderState,onReady:reportVisibleChat,onFile:async path=>{const session=workbench.current;if(currentId!==id||currentHost!==host||!session||(session.chatId||session.id)!==id||session.host!==host)return;try{const childRelative=timelineFilePath(path,state?.cwd),relative=timelineFilePath(state.cwd.replace(/[\\/]$/,'')+'/'+childRelative,session.cwd||state.cwd);await workbench.request(workbench.url(session,'info',relative));if(workbench.current!==session||currentId!==id||currentHost!==host)return;await workbench.locate(session,relative);}catch(error){if(workbench.current===session)toast(t(error.message));}},canEdit:()=>currentAccess().canEditMessages,renderText:(node,text,files,fullText)=>renderMarkdown(node,text,files,file=>timeline.fileUrl(file),{fullText}),onAction:(action,row,timeline)=>{if(!currentAccess().canEditMessages)return;const pendingKey='fork-edit:'+host+'|'+id;let pending;try{pending=JSON.parse(sessionStorage.getItem(pendingKey));}catch{}if(pending&&pending.sourceTurnId===row.turnId&&action==='edit'){sessionStorage.setItem('message-edit:'+timeline.url('message-action')+':'+row.key,pending.text);sessionStorage.removeItem(pendingKey);}return messageActions.open(action,row,timeline);},status:text=>{$('status').textContent=t(text);}});
@@ -1040,7 +1049,7 @@ function applyEntryCapabilities(view){
 }
 function renderState(view){
   applyEntryCapabilities(view);
-  contextUsageControl.update({...view,busy:contextCompacting.has(chatKey(currentId,currentHost))});state=view;if(typeof bindCodexDraft==='function')bindCodexDraft(view);renderFastModeToggle(view);
+  contextUsageControl.update({...view,busy:contextCompacting.has(chatKey(currentId,currentHost))});state=view;renderAccountUsage(view);if(typeof bindCodexDraft==='function')bindCodexDraft(view);renderFastModeToggle(view);
   if(typeof messageManagement!=='undefined')messageManagement?.reconcile();
   if(typeof document!=='undefined')for(const dialog of document.querySelectorAll('dialog[data-permission-runtime]')){
     if(!view.connected||dialog.dataset.permissionThread!==currentId||dialog.dataset.permissionHost!==currentHost||
@@ -1064,7 +1073,7 @@ function renderState(view){
   $('reconnect').textContent=t(access.source==='cli'?'계속 채팅':view.rebuildRecommended||view.desktopRestartRecommended?'연결 재구축':'다시 연결');
   $('reconnect-manager').hidden=view.connected||!view.desktopRestartRecommended;
   $('history').hidden=view.historyComplete||!view.connected;
-  renderChatProgress($('working'),{agentName:'Codex',active:view.status==='active',waiting:!!view.requests.length,connected:!!view.connected});if(!view.connected&&view.status!=='active')$('working').hidden=true;$('stop').hidden=view.status!=='active'||!view.connected||!access.canInterrupt;
+  renderCodexProgress(view);$('stop').hidden=view.status!=='active'||!view.connected||!access.canInterrupt;
   $('send').disabled=view.loadingHistory||view.activating||sending||!attachments.ready()||!access.canSend;
   $('message').disabled=limited&&!access.canSend;
   $('attach-button').disabled=limited&&!access.canSend;

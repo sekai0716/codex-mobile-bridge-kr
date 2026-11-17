@@ -93,6 +93,12 @@ async function main(){
     assert.equal(await client.evaluate('snapshot.dataDir'),data);
     assert.equal(await client.evaluate('snapshot.update.state'),'unsupported');
     assert.equal(await client.evaluate('snapshot.runtime.running'),false);
+    for(const [choice,language,label] of [['ko','ko-KR','사이드 채팅'],['zh','zh-CN','侧边聊天']]){
+      await client.evaluate(`document.getElementById('language').value=${JSON.stringify(choice)};document.getElementById('language').dispatchEvent(new Event('change'))`);
+      await until(()=>client.evaluate(`document.documentElement.lang===${JSON.stringify(language)}`),language+' UI');
+      assert.equal(await client.evaluate("BridgeI18n.t('보조 채팅')"),label);
+      assert.equal(JSON.parse(await fs.readFile(path.join(data,'desktop-runtime/language.json'),'utf8')).language,language);
+    }
     await client.evaluate("document.getElementById('language').value='en';document.getElementById('language').dispatchEvent(new Event('change'))");
     await until(()=>client.evaluate("document.documentElement.lang==='en'"),'English UI');
     for(const [width,height] of [[1100,850],[820,640]]){

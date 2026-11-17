@@ -140,9 +140,10 @@ class GatewayServer(ThreadingHTTPServer):
     def ui_language(self):
         try:
             value = json.loads(self.ui_language_path.read_text(encoding='utf-8')) if self.ui_language_path else {}
-            return 'en' if value.get('language') == 'en' else 'ko'
+            language = value.get('language')
+            return language if language in ('en', 'ko', 'zh') else None
         except (OSError, ValueError, AttributeError):
-            return 'ko'
+            return None
 
     def server_close(self):
         if self.mobile_updates_owner and self.cli_connections:

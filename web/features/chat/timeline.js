@@ -1,5 +1,6 @@
 'use strict';
 const timelineText=source=>typeof BridgeI18n==='undefined'?source:BridgeI18n.t(source);
+const timelineActivityHeading=row=>typeof chatActivityLabel==='function'?chatActivityLabel(row):timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):'');
 const fileChangeLabel=row=>timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
 const recentTimelinePages=new Map();
 function timelineFilePath(path,cwd){
@@ -38,8 +39,6 @@ class ChatTimeline {
     this.files=new Map();this.sequence=-1;this.epoch='';this.before=null;this.hasMore=false;
     this.busy=false;this.generation=0;this.windowRevision=0;this.following=true;this.lastTop=0;this.retryCount=0;
     this.showReasoning=document.documentElement.dataset.showReasoning!=='false';
-    this.expandReasoning=document.documentElement.dataset.expandReasoning!=='false';
-    this.reasoningExpanded=new Map();
     this.showProcess=document.documentElement.dataset.showProcess!=='false';
     this.showToolImages=document.documentElement.dataset.showToolImages!=='false';
     this.onScroll=()=>{
@@ -69,15 +68,13 @@ class ChatTimeline {
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
   rowVisible(row){
     if(row.role==='user'||row.role==='error')return true;
-    if(row.kind==='reasoning')return this.showReasoning;
+    if(row.kind==='reasoning')return false;
     if(row.role==='activity'||row.phase==='commentary')return this.showProcess;
     return true;
   }
-  setVisibility({showReasoning=this.showReasoning,expandReasoning=this.expandReasoning,showProcess=this.showProcess,showToolImages=this.showToolImages}){
-    if(this.showReasoning===showReasoning&&this.expandReasoning===expandReasoning&&this.showProcess===showProcess&&this.showToolImages===showToolImages)return;
+  setVisibility({showReasoning=this.showReasoning,showProcess=this.showProcess,showToolImages=this.showToolImages}){
+    if(this.showReasoning===showReasoning&&this.showProcess===showProcess&&this.showToolImages===showToolImages)return;
     const imagesChanged=this.showToolImages!==showToolImages;
-    const expansionChanged=this.expandReasoning!==expandReasoning;
-    this.expandReasoning=expandReasoning;
     this.showToolImages=showToolImages;
     this.showReasoning=showReasoning;this.showProcess=showProcess;
     const anchor=this.capture(node=>this.rowVisible(this.rows.get(node.dataset.key).row)),bottom=this.following;
@@ -87,10 +84,6 @@ class ChatTimeline {
         const reading=captureChatActivityState(entry.node);
         const node=this.renderRow(row,reading?.open);node.dataset.key=key;
         entry.node.replaceWith(node);entry.node=node;restoreChatActivityState(node,reading);
-      }
-      if(expansionChanged&&row.kind==='reasoning'&&!this.reasoningExpanded.has(key)){
-        const details=entry.node.tagName==='DETAILS'?entry.node:entry.node.querySelector('details.activity');
-        if(details)details.open=expandReasoning;
       }
       entry.node.hidden=!this.rowVisible(row);
     }
@@ -157,7 +150,7 @@ class ChatTimeline {
     }
     this.cached=cached;
     const anchor=this.capture(),bottom=this.following;
-    if(reset){this.generation++;window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.reasoningExpanded.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
+    if(reset){this.generation++;window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
     for(const file of page.files||[])this.files.set(file.id,file);
     if((!history&&page.sequence>=this.sequence)||reset){this.sequence=page.sequence;this.meta=page.meta;if(!cached)this.renderMeta({...page.meta,files:[...this.files.values()]});}
     if(!history)this.pendingRequests=!cached&&!!page.meta.requests?.length;
@@ -182,7 +175,7 @@ class ChatTimeline {
       this.nodes.set(row.key,{node,stamp});
     }
     const ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
-    syncChatMessageNodes(this.container,ordered.map(row=>this.nodes.get(row.key).node));
+    syncChatMessageNodes(this.container,ordered.filter(row=>row.kind!=='reasoning').map(row=>this.nodes.get(row.key).node));
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
     if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
@@ -204,7 +197,7 @@ class ChatTimeline {
     const content=toolImages?document.createElement('details'):node;
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
-    heading.textContent=activity?timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
+    heading.textContent=activity?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
       heading.replaceChildren();
@@ -274,10 +267,8 @@ class ChatTimeline {
       return {preview:source,original:item.uploadId?source+'&variant=original':source};
     }});
     if(activity){
-      // 미지정 상태의 추론 요약만 처음에 펼친다. 갱신 시에는 기존 접힘 상태를 따른다.
-      content.open=open??(row.kind==='reasoning'?(this.reasoningExpanded.get(row.key)??this.expandReasoning):false);
+      content.open=open??false;
       // 기본값을 바꿔도 이 대화에서 직접 펼치거나 접은 선택은 유지한다.
-      if(row.kind==='reasoning')heading.addEventListener('click',()=>this.reasoningExpanded.set(row.key,!content.open));
       // 숨겨진 항목과 이미 온전한 요약은 기본 펼침 때문에 다시 조회하지 않는다.
       content.ontoggle=()=>{if(content.open&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();};
     }
@@ -322,7 +313,7 @@ class ChatTimeline {
       const row=this.rows.get(key)?.row;if(!row)continue;
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
       if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');}
-      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):''):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       const more=node.querySelector('.detail-more');
       if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'더 많은 텍스트 로드':'전체 콘텐츠 표시');
       const attachment=node.querySelector('.timeline-attachments small.muted');

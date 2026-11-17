@@ -7,15 +7,15 @@ struct TaskActivity: ActivityAttributes {
         var phase: String
         var updatedAt: Date
         var language: String? = nil
-        func text(_ ko: String, _ en: String) -> String { (language ?? "ko").hasPrefix("en") ? en : ko }
+        func text(_ key: String) -> String { MobileLocaleData.text(key, language: language) }
         var label: String {
             switch phase {
-            case "running": return text("실행 중", "Running")
-            case "waiting": return text("응답을 기다리는 중", "Waiting for you")
-            case "ended": return text("응답 완료", "Turn completed")
-            case "paused": return text("앱을 열어 동기화하세요", "Open app to sync")
-            case "offline": return text("연결 끊김", "Disconnected")
-            default: return text("연결됨", "Connected")
+            case "running": return text("실행 중")
+            case "waiting": return text("응답을 기다리는 중")
+            case "ended": return text("응답 완료")
+            case "paused": return text("앱을 열어 동기화하세요")
+            case "offline": return text("연결 끊김")
+            default: return text("연결됨")
             }
         }
         var symbol: String {

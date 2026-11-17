@@ -61,7 +61,7 @@ test('an unreadable shell stylesheet keeps the initial request within the three-
   const ui=fixture({shellSheet:sheet,scripts:['/app.js']});
   ui.finish(ui.requests[0],true);await ui.tick(1500);ui.finish(ui.requests[1],true);await ui.tick(60000);
   assert.deepEqual(ui.requests.map(n=>n.href),[retried('/style.css?v=hash',2),retried('/style.css?v=hash',3)]);
-  assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+  assert.match(ui.nodes.get('bootstrap-title').textContent,/화면을 아직 불러오지 못했습니다\./);
 });
 
 test('styles retain cascade order, stay bounded at four and all finish before scripts',()=>{
@@ -163,7 +163,7 @@ test('unknown promise rejections remain nonfatal and never postpone the startup 
     ui.dispatch('unhandledrejection',{reason});
     assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
     await ui.tick(29000);ui.dispatch('unhandledrejection',{reason});await ui.tick(1000);
-    assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+    assert.match(ui.nodes.get('bootstrap-title').textContent,/화면을 아직 불러오지 못했습니다\./);
     assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/페이지 구성 요소/);
     assert.doesNotMatch(ui.nodes.get('bootstrap-diagnostics').textContent,/private-|other\.test/);
   }
@@ -196,7 +196,7 @@ test('the bootstrap itself remains a required runtime source',()=>{
 test('permanent script failure stops after three attempts and keeps diagnostics collapsed',async()=>{
   const ui=fixture({scripts:['/a.js?v=secret-query','/b.js']});
   ui.finish(ui.requests[0],true);await ui.tick(500);ui.finish(ui.requests[1],true);await ui.tick(1500);ui.finish(ui.requests[2],true);await ui.tick(60000);
-  assert.equal(ui.requests.length,3);assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+  assert.equal(ui.requests.length,3);assert.match(ui.nodes.get('bootstrap-title').textContent,/화면을 아직 불러오지 못했습니다\./);
   assert.doesNotMatch(ui.nodes.get('bootstrap-message').textContent,/resource|fixture-no-secrets|진단 시작/);
   assert.match(ui.nodes.get('bootstrap-diagnostics').textContent,/resource @ \/a.js/);
   assert.doesNotMatch(ui.nodes.get('bootstrap-diagnostics').textContent,/secret-query|gateway.test/);
@@ -206,7 +206,7 @@ test('permanent script failure stops after three attempts and keeps diagnostics 
 test('a hanging script is not duplicated at the soft deadline and cannot resume after the hard deadline',async()=>{
   const ui=fixture({scripts:['/a.js','/b.js']}),late=ui.requests[0].onload;
   await ui.tick(12000);assert.equal(ui.requests.length,1);assert.doesNotMatch(ui.nodes.get('bootstrap-title').textContent,/아직 로드되지 않음/);
-  await ui.tick(18000);assert.match(ui.nodes.get('bootstrap-title').textContent,/워크벤치가 아직 로드되지 않았습니다\./);
+  await ui.tick(18000);assert.match(ui.nodes.get('bootstrap-title').textContent,/화면을 아직 불러오지 못했습니다\./);
   late();assert.equal(ui.requests.length,1);
 });
 

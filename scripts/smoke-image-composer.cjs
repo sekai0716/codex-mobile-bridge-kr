@@ -10,7 +10,7 @@ let writes=0;const server=http.createServer((req,res)=>{if(req.method!=='GET'){w
 app.whenReady().then(async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const window=new BrowserWindow({width:390,height:844,show:false});const errors=[];window.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  await window.loadURL('http://127.0.0.1:'+server.address().port);const run=source=>window.webContents.executeJavaScript(source);
- for(const file of ['web/shared/i18n.js','web/layouts/viewport.js','web/features/chat/composer-quotes.js','web/features/chat/attachments.js','web/features/workspace/workbench.js','web/shared/image-viewer.js','tests/browser/image-composer.browser.js'])await run(read(file));
+ for(const file of ['web/shared/locales/en.js','web/shared/locales/ko-KR.js','web/shared/locales/zh-CN.js','web/shared/locales/legacy.js','web/shared/i18n.js','web/layouts/viewport.js','web/features/chat/composer-quotes.js','web/features/chat/attachments.js','web/features/workspace/workbench.js','web/shared/image-viewer.js','tests/browser/image-composer.browser.js'])await run(read(file));
  const source=read('web/shell/app.js'),start=source.indexOf('function imageComposerTarget(){'),end=source.indexOf('function saveDraft(){',start);assert.ok(start>0&&end>start);const callback=source.slice(start,end),checks=[];
  for(const [width,height] of [[390,844],[1280,900]]){
   window.setSize(width,height);await run("document.querySelector('[data-image-composer-fixture]')?.remove()");

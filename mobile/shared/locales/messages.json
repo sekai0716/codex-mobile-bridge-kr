@@ -1,0 +1,2737 @@
+{
+  "version": 1,
+  "android": {
+    "Android가 설치된 UU 원격 앱에서 원격 제어 링크를 열 수 없습니다.": {
+      "en": "Android could not open the remote control link in the installed UU Remote app",
+      "ko": "설치된 UU Remote 앱에서 원격 제어 링크를 열 수 없습니다.",
+      "zh": "系统未能打开已安装的 UU 远程的远控入口"
+    },
+    "UU 원격 링크 처리기를 찾을 수 없습니다. 이 Android 프로필에 UU 원격이 설치되어 있는지 확인하세요.": {
+      "en": "No UU Remote link handler was found. Check that UU Remote is installed in this Android profile.",
+      "ko": "원격 제어 링크를 열 앱을 찾을 수 없습니다. 이 Android 사용자 프로필에 UU Remote가 설치되어 있는지 확인하세요.",
+      "zh": "找不到 UU 远控入口，请确认 UU 安装在当前手机用户下"
+    },
+    "Android에서 실행을 차단했습니다. Codex Bridge가 UU Remote를 열 수 있도록 허용하세요.": {
+      "en": "Android blocked the launch. Allow Codex Bridge to open UU Remote.",
+      "ko": "Android에서 실행을 차단했습니다. Codex Bridge가 UU Remote를 열 수 있도록 허용하세요.",
+      "zh": "系统阻止了应用跳转，请允许 Codex Bridge 打开 UU 远程"
+    },
+    "UU Remote 요청을 처리 중입니다.": {
+      "en": "A UU request is already in progress",
+      "ko": "UU Remote 요청을 처리 중입니다.",
+      "zh": "UU 请求正在处理中"
+    },
+    "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.": {
+      "en": "Install or update UU Remote to version 4.42.0 or later",
+      "ko": "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.",
+      "zh": "请安装或更新 UU 远程至 4.42.0 及以上版本"
+    },
+    "UU Remote를 열 수 없습니다.": {
+      "en": "Could not open UU Remote",
+      "ko": "UU Remote를 열 수 없습니다.",
+      "zh": "无法打开 UU 远程"
+    },
+    "기기가 연결되었습니다. 작은 화면 또는 원격 제어를 다시 선택하세요.": {
+      "en": "Device linked. Select picture-in-picture or remote control again.",
+      "ko": "기기가 연결되었습니다. 화면 속 화면 또는 원격 제어를 다시 선택하세요.",
+      "zh": "UU 设备已绑定，请再次选择小窗或远控"
+    },
+    "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.": {
+      "en": "Device linking did not finish. Check your account and device in UU Remote.",
+      "ko": "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.",
+      "zh": "UU 绑定未完成，请在 UU 中确认账号和设备"
+    },
+    "UU Remote 작은 화면이 열렸습니다.": {
+      "en": "UU picture-in-picture is open",
+      "ko": "UU Remote 화면 속 화면이 열렸습니다.",
+      "zh": "UU 小窗已开启"
+    },
+    "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.": {
+      "en": "The UU device is no longer available. Link it again.",
+      "ko": "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.",
+      "zh": "UU 设备已失效，请重新绑定"
+    },
+    "UU Remote 기기가 오프라인 상태입니다.": {
+      "en": "The UU device is offline",
+      "ko": "UU Remote 기기가 오프라인 상태입니다.",
+      "zh": "UU 设备离线"
+    },
+    "작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.": {
+      "en": "Picture-in-picture is unavailable. Use full-screen control.",
+      "ko": "화면 속 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.",
+      "zh": "当前设备不支持 UU 小窗，请使用全屏远控"
+    },
+    "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.": {
+      "en": "Could not open picture-in-picture. Check the device and try again.",
+      "ko": "화면 속 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.",
+      "zh": "UU 小窗未能开启，请检查设备或重试"
+    },
+    "DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요.": {
+      "en": "Paste the full link from your DSH client’s Mobile feature",
+      "ko": "DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요.",
+      "zh": "粘贴 DSH 客户端 Mobile 功能提供的完整链接"
+    },
+    "DSH Mobile에 연결하시겠습니까?": {
+      "en": "Connect to DSH Mobile?",
+      "ko": "DSH Mobile에 연결하시겠습니까?",
+      "zh": "连接 DSH Mobile？"
+    },
+    "\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다.": {
+      "en": "\nConfirm this is your DSH client. Its own mobile interface will open.",
+      "ko": "\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다.",
+      "zh": "\n请确认这是你自己的 DSH 客户端。将打开它自带的手机界面。"
+    },
+    "DSH Mobile 연결을 저장할 수 없습니다.": {
+      "en": "Could not save the DSH Mobile connection",
+      "ko": "DSH Mobile 연결을 저장할 수 없습니다.",
+      "zh": "无法保存 DSH Mobile 连接"
+    },
+    "연결 자격 증명을 사용할 수 없습니다. 이 연결을 제거하고 다시 추가하십시오.": {
+      "en": "Connection credentials are unavailable. Remove and add this connection again.",
+      "ko": "연결 인증 정보를 사용할 수 없습니다. 연결을 삭제한 뒤 다시 추가하세요.",
+      "zh": "连接凭据不可用，请移除后重新添加"
+    },
+    "연결 자격 증명을 사용할 수 없습니다.": {
+      "en": "Connection credentials unavailable",
+      "ko": "연결 인증 정보를 사용할 수 없습니다.",
+      "zh": "连接凭据不可用"
+    },
+    "Android 8의 브라우저에서 DSH Mobile을 엽니다. 인앱 액세스에는 Android 9 이상이 필요합니다.": {
+      "en": "On Android 8, open DSH Mobile in your browser. In-app access requires Android 9 or later.",
+      "ko": "Android 8에서는 브라우저로 DSH Mobile을 여세요. 앱에서 이용하려면 Android 9 이상이 필요합니다.",
+      "zh": "Android 8 请使用浏览器打开 DSH Mobile；App 内连接需要 Android 9 或更高版本。"
+    },
+    "연결에 실패했습니다. 다시 시도하려면 새로고침하세요.": {
+      "en": "Connection failed. Refresh to retry",
+      "ko": "연결에 실패했습니다. 다시 시도하려면 새로고침하세요.",
+      "zh": "连接失败，请刷新重试"
+    },
+    "잘못된 DSH Mobile 주소입니다.": {
+      "en": "Invalid DSH Mobile URL",
+      "ko": "잘못된 DSH Mobile 주소입니다.",
+      "zh": "DSH Mobile 地址无效"
+    },
+    "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요.": {
+      "en": "Use a full DSH Mobile HTTPS link, or an HTTP link on your local network.",
+      "ko": "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요.",
+      "zh": "请使用完整的 DSH Mobile HTTPS 链接，或局域网 HTTP 链接。"
+    },
+    "설정": {
+      "en": "Settings",
+      "ko": "설정",
+      "zh": "设置"
+    },
+    "뒤로": {
+      "en": "Back",
+      "ko": "뒤로",
+      "zh": "返回"
+    },
+    "테마": {
+      "en": "Theme",
+      "ko": "테마",
+      "zh": "主题"
+    },
+    "시스템 설정 따르기": {
+      "en": "System",
+      "ko": "시스템 설정 따르기",
+      "zh": "跟随系统"
+    },
+    "밝게": {
+      "en": "Light",
+      "ko": "밝게",
+      "zh": "浅色"
+    },
+    "어둡게": {
+      "en": "Dark",
+      "ko": "어둡게",
+      "zh": "深色"
+    },
+    "테마 안내": {
+      "en": "Theme information",
+      "ko": "테마 안내",
+      "zh": "主题功能说明"
+    },
+    "개발 중입니다. 테마 변경 사항은 현재 설정에만 적용됩니다.": {
+      "en": "In development. Theme changes currently apply to Settings only.",
+      "ko": "개발 중입니다. 테마 변경 사항은 현재 설정에만 적용됩니다.",
+      "zh": "待开发项，暂时只支持设置页主题切换"
+    },
+    "작업 알림": {
+      "en": "Task notifications",
+      "ko": "작업 알림",
+      "zh": "任务通知"
+    },
+    "알림 소스": {
+      "en": "Notification sources",
+      "ko": "알림 소스",
+      "zh": "通知来源"
+    },
+    "연결 중…": {
+      "en": "Connecting…",
+      "ko": "연결 중…",
+      "zh": "连接中…"
+    },
+    "현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요.": {
+      "en": "Current channel is unreachable. Choose another channel.",
+      "ko": "현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요.",
+      "zh": "当前信道不可达，请手动切换连接信道"
+    },
+    "이 컴퓨터 제거": {
+      "en": "Remove this computer",
+      "ko": "이 컴퓨터 제거",
+      "zh": "移除此电脑"
+    },
+    "이 컴퓨터 관리": {
+      "en": "Manage this computer",
+      "ko": "이 컴퓨터 관리",
+      "zh": "管理这台电脑"
+    },
+    "이 전화기에 대한 작업 알림을 선택하세요. 채팅 및 알림 받은 편지함은 계속 사용할 수 있습니다.": {
+      "en": "Choose task alerts for this phone. Chats and notification inboxes remain available.",
+      "ko": "이 휴대폰에서 받을 작업 알림을 선택하세요. 채팅과 알림 목록은 계속 사용할 수 있습니다.",
+      "zh": "仅控制这台手机的任务提醒，不影响聊天和通知收件箱。"
+    },
+    "저장된 컴퓨터 연결이 없습니다.": {
+      "en": "No saved computer connections",
+      "ko": "저장된 컴퓨터 연결이 없습니다.",
+      "zh": "尚未保存电脑连接"
+    },
+    "백그라운드 알림 정보": {
+      "en": "Background notification information",
+      "ko": "백그라운드 알림 정보",
+      "zh": "后台通知功能说明"
+    },
+    "백그라운드 알림은 계속 개선되고 있습니다. 이를 활성화하면 배터리 사용량이 증가하거나 장치가 과열될 수 있습니다.\n문제가 발생하거나 제안 사항이 있는 경우 문제 또는 PR를 제출해 주세요. 감사합니다!": {
+      "en": "Background notifications are still being improved. Enabling them may increase battery use or cause your device to heat up.\nIf you encounter a problem or have a suggestion, please submit an Issue or PR. Thank you!",
+      "ko": "백그라운드 알림은 계속 개선되고 있습니다. 이를 활성화하면 배터리 사용량이 증가하거나 장치가 과열될 수 있습니다.\n문제가 발생하거나 제안 사항이 있는 경우 문제 또는 PR을 제출해 주세요. 감사합니다!",
+      "zh": "后台通知仍在完善中，开启后可能增加耗电或发热。\n遇到问题或有改进建议，欢迎提交 Issue 或 PR。感谢支持！"
+    },
+    "켜짐": {
+      "en": "On",
+      "ko": "켜짐",
+      "zh": "已开启"
+    },
+    "꺼짐": {
+      "en": "Off",
+      "ko": "꺼짐",
+      "zh": "已关闭"
+    },
+    "시스템 권한": {
+      "en": "System permissions",
+      "ko": "시스템 권한",
+      "zh": "系统权限"
+    },
+    "알림 권한": {
+      "en": "Notification permission",
+      "ko": "알림 권한",
+      "zh": "通知权限"
+    },
+    "알림 허용": {
+      "en": "Allow notifications",
+      "ko": "알림 허용",
+      "zh": "前往授权"
+    },
+    "허용됨": {
+      "en": "Allowed",
+      "ko": "허용됨",
+      "zh": "已允许"
+    },
+    "조치 필요": {
+      "en": "Action needed",
+      "ko": "조치 필요",
+      "zh": "需处理"
+    },
+    "작업 및 백그라운드 알림 채널이 꺼져 있습니다.": {
+      "en": "Task and background notification channels are off",
+      "ko": "작업 및 백그라운드 알림 채널이 꺼져 있습니다.",
+      "zh": "任务提醒与后台运行频道已关闭"
+    },
+    "작업 알림 채널이 꺼져 있습니다": {
+      "en": "Task notification channel is off",
+      "ko": "작업 알림 채널이 꺼져 있습니다",
+      "zh": "任务提醒频道已关闭"
+    },
+    "백그라운드 알림 채널이 꺼져 있습니다": {
+      "en": "Background notification channel is off",
+      "ko": "백그라운드 알림 채널이 꺼져 있습니다",
+      "zh": "后台运行频道已关闭"
+    },
+    "백그라운드 설정": {
+      "en": "Background settings",
+      "ko": "백그라운드 설정",
+      "zh": "后台运行设置"
+    },
+    "앱 세부정보": {
+      "en": "App details",
+      "ko": "앱 세부정보",
+      "zh": "应用详情"
+    },
+    "배터리 최적화": {
+      "en": "Battery optimization",
+      "ko": "배터리 최적화",
+      "zh": "电池优化"
+    },
+    "최적화 제외": {
+      "en": "Exempt",
+      "ko": "최적화 제외",
+      "zh": "已豁免"
+    },
+    "사용 중": {
+      "en": "Enabled",
+      "ko": "사용 중",
+      "zh": "已启用"
+    },
+    "테스트 알림 보내기": {
+      "en": "Send test notification",
+      "ko": "테스트 알림 보내기",
+      "zh": "发送测试通知"
+    },
+    "10초 후": {
+      "en": "In 10 seconds",
+      "ko": "10초 후",
+      "zh": "10 秒后提醒"
+    },
+    "컴퓨터 연결": {
+      "en": "Computer connections",
+      "ko": "컴퓨터 연결",
+      "zh": "电脑连接"
+    },
+    "연결됨": {
+      "en": "Connected",
+      "ko": "연결됨",
+      "zh": "已连接"
+    },
+    "앱": {
+      "en": "App",
+      "ko": "앱",
+      "zh": "应用"
+    },
+    "시스템 설정에서 이 앱의 세부정보를 엽니다.": {
+      "en": "Open this app's details in system settings.",
+      "ko": "시스템 설정에서 이 앱의 세부정보를 엽니다.",
+      "zh": "请从系统设置打开本应用的详情页。"
+    },
+    "백그라운드 알림": {
+      "en": "Background notifications",
+      "ko": "백그라운드 알림",
+      "zh": "后台通知"
+    },
+    "백그라운드 알림 사용 중": {
+      "en": "Background notifications active",
+      "ko": "백그라운드 알림 사용 중",
+      "zh": "后台通知运行中"
+    },
+    "작업 알림 수신": {
+      "en": "Receiving task alerts",
+      "ko": "작업 알림 수신",
+      "zh": "正在接收任务提醒"
+    },
+    "재시도 중": {
+      "en": "Retrying",
+      "ko": "재시도 중",
+      "zh": "正在重试"
+    },
+    "다시 로그인하세요.": {
+      "en": "Please sign in again",
+      "ko": "다시 로그인하세요.",
+      "zh": "请重新登录"
+    },
+    "백그라운드 알림 일시중지": {
+      "en": "Pause background notifications",
+      "ko": "백그라운드 알림 일시중지",
+      "zh": "暂停后台通知"
+    },
+    "백그라운드 알림 활성화": {
+      "en": "Enable background notifications",
+      "ko": "백그라운드 알림 활성화",
+      "zh": "开启后台通知"
+    },
+    "백그라운드 알림 비활성화": {
+      "en": "Disable background notifications",
+      "ko": "백그라운드 알림 비활성화",
+      "zh": "关闭后台通知"
+    },
+    "완료 및 승인 알림은 각 컴퓨터의 알림 설정을 따릅니다.": {
+      "en": "Completion and approval alerts follow the notification settings on each computer.",
+      "ko": "완료 및 승인 알림은 각 컴퓨터의 알림 설정을 따릅니다.",
+      "zh": "任务完成和审批提醒沿用电脑端的通知设置。"
+    },
+    "다른 앱을 사용하거나 화면을 잠그는 동안 로그인된 컴퓨터로부터 경고를 받기 위해 지속적인 알림을 유지합니다. 해당 알림에서 일시중지하세요.": {
+      "en": "Keeps an ongoing notification to receive alerts from signed-in computers while using other apps or locking the screen. Pause from that notification.",
+      "ko": "다른 앱을 사용하거나 화면을 잠그는 동안 로그인된 컴퓨터로부터 경고를 받기 위해 지속적인 알림을 유지합니다. 해당 알림에서 일시중지하세요.",
+      "zh": "开启后显示常驻通知，切换应用或锁屏后继续接收已登录电脑的提醒。可从常驻通知暂停。"
+    },
+    "배터리 절약으로 인해 화면 잠금이 연장되는 동안 알림이 지연될 수 있습니다. 네트워크가 복구되면 최근 메시지가 수신됩니다.": {
+      "en": "Battery saving may delay alerts during extended screen lock. Recent messages are received when the network returns.",
+      "ko": "배터리 절약으로 인해 화면 잠금이 연장되는 동안 알림이 지연될 수 있습니다. 네트워크가 복구되면 최근 메시지가 수신됩니다.",
+      "zh": "长时间锁屏时，系统省电可能延后提醒；恢复网络后自动补收近期消息。"
+    },
+    "배터리 최적화 설정": {
+      "en": "Battery optimization settings",
+      "ko": "배터리 최적화 설정",
+      "zh": "电池优化设置"
+    },
+    "시스템 설정에서 이 앱의 배터리 사용 권한을 확인하세요.": {
+      "en": "Check battery usage permissions for this app in system settings.",
+      "ko": "시스템 설정에서 이 앱의 배터리 사용 권한을 확인하세요.",
+      "zh": "请在系统设置中查看此应用的电池使用权限。"
+    },
+    "백그라운드 알림을 시작할 수 없습니다. 앱을 다시 열고 다시 시도해 보세요.": {
+      "en": "Could not start background notifications. Reopen the app and retry.",
+      "ko": "백그라운드 알림을 시작할 수 없습니다. 앱을 다시 열고 다시 시도해 보세요.",
+      "zh": "后台通知启动失败，请重新打开 App 后再试。"
+    },
+    "읽지 않은 알림": {
+      "en": "Unread notifications",
+      "ko": "읽지 않은 알림",
+      "zh": "未读通知"
+    },
+    "상태 새로고침": {
+      "en": "Refresh status",
+      "ko": "상태 새로고침",
+      "zh": "刷新状态"
+    },
+    "최근 알림": {
+      "en": "Recent notifications",
+      "ko": "최근 알림",
+      "zh": "最近通知"
+    },
+    "조치가 요청되었습니다": {
+      "en": "Action requested",
+      "ko": "조치가 요청되었습니다",
+      "zh": "需要你处理"
+    },
+    "완료됨": {
+      "en": "Completed",
+      "ko": "완료됨",
+      "zh": "已运行完毕"
+    },
+    "여는 중…": {
+      "en": "Opening…",
+      "ko": "여는 중…",
+      "zh": "正在打开…"
+    },
+    "다운로드됨 · 열기 또는 저장": {
+      "en": "Downloaded · Open or save",
+      "ko": "다운로드됨 · 열기 또는 저장",
+      "zh": "下载完成，可打开或保存"
+    },
+    "파일을 열 수 없습니다. 다시 시도하거나 저장하세요.": {
+      "en": "Could not open the file. Retry or save it.",
+      "ko": "파일을 열 수 없습니다. 다시 시도하거나 저장하세요.",
+      "zh": "打开失败，请重试或保存文件"
+    },
+    "이 파일을 열 수 있는 앱이 없습니다.": {
+      "en": "No app is available to open this file.",
+      "ko": "이 파일을 열 수 있는 앱이 없습니다.",
+      "zh": "暂无可打开此文件的应用"
+    },
+    "선택한 파일이 수신되지 않았습니다. 파일을 다시 선택하세요.": {
+      "en": "No selected file was received. Choose the file again.",
+      "ko": "선택한 파일이 수신되지 않았습니다. 파일을 다시 선택하세요.",
+      "zh": "未收到所选文件，请重新选择。"
+    },
+    "선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.": {
+      "en": "Cannot read the selected file. Select it again using the system file picker.",
+      "ko": "선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.",
+      "zh": "无法读取所选文件，请从系统文件选择器重新选择。"
+    },
+    "이름 바꾸기": {
+      "en": "Rename",
+      "ko": "이름 바꾸기",
+      "zh": "重命名"
+    },
+    "컴퓨터 이름 바꾸기": {
+      "en": "Rename computer",
+      "ko": "컴퓨터 이름 바꾸기",
+      "zh": "重命名电脑"
+    },
+    "기본 이름을 복원하려면 비워 두세요.": {
+      "en": "Leave blank to restore the default name",
+      "ko": "기본 이름을 복원하려면 비워 두세요.",
+      "zh": "留空恢复默认名称"
+    },
+    "80자 이하로 사용하세요.": {
+      "en": "Use no more than 80 characters",
+      "ko": "80자 이하로 사용하세요.",
+      "zh": "名称最多 80 个字符"
+    },
+    "저장": {
+      "en": "Save",
+      "ko": "저장",
+      "zh": "保存"
+    },
+    "현재 다운로드를 먼저 완료하거나 취소하세요.": {
+      "en": "Finish or cancel the current download first",
+      "ko": "현재 다운로드를 먼저 완료하거나 취소하세요.",
+      "zh": "已有下载任务，请先完成或取消"
+    },
+    "다운로드 펼치기": {
+      "en": "Expand download",
+      "ko": "다운로드 펼치기",
+      "zh": "展开下载"
+    },
+    "다운로드 축소": {
+      "en": "Collapse download",
+      "ko": "다운로드 축소",
+      "zh": "收起下载"
+    },
+    "일시 중지": {
+      "en": "Pause",
+      "ko": "일시 중지",
+      "zh": "暂停"
+    },
+    "닫기": {
+      "en": "Close",
+      "ko": "닫기",
+      "zh": "关闭"
+    },
+    "다시 시작": {
+      "en": "Restart",
+      "ko": "다시 시작",
+      "zh": "重新下载"
+    },
+    "다운로드 완료": {
+      "en": "Download complete",
+      "ko": "다운로드 완료",
+      "zh": "下载完成"
+    },
+    "일시 중지됨": {
+      "en": "Paused",
+      "ko": "일시 중지됨",
+      "zh": "已暂停"
+    },
+    "다운로드가 중단되었습니다.": {
+      "en": "Download interrupted",
+      "ko": "다운로드가 중단되었습니다.",
+      "zh": "下载中断"
+    },
+    "일시중지 중…": {
+      "en": "Pausing…",
+      "ko": "일시중지 중…",
+      "zh": "正在暂停…"
+    },
+    "저장 중…": {
+      "en": "Saving…",
+      "ko": "저장 중…",
+      "zh": "正在保存…"
+    },
+    "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다.": {
+      "en": "This download is not an attachment from the current computer",
+      "ko": "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다.",
+      "zh": "下载地址不是当前电脑的附件"
+    },
+    "다운로드가 완료되지 않았습니다.": {
+      "en": "The download is not complete",
+      "ko": "다운로드가 완료되지 않았습니다.",
+      "zh": "下载尚未完成"
+    },
+    "로그인이 만료되었습니다. 컴퓨터에 다시 연결한 다음 다운로드를 계속하세요.": {
+      "en": "Sign-in expired. Reconnect to the computer, then continue the download.",
+      "ko": "로그인이 만료되었습니다. 컴퓨터에 다시 연결한 다음 다운로드를 계속하세요.",
+      "zh": "登录已失效，请重新连接电脑后继续下载"
+    },
+    "파일이 변경되었습니다. 다운로드를 다시 시작하세요.": {
+      "en": "The file has changed. Restart the download.",
+      "ko": "파일이 변경되었습니다. 다운로드를 다시 시작하세요.",
+      "zh": "文件已发生变化，请重新下载"
+    },
+    "게이트웨이가 잘못된 이어받기 정보를 반환했습니다. 다운로드를 다시 시작하세요.": {
+      "en": "The gateway returned invalid resume information. Restart the download.",
+      "ko": "게이트웨이가 잘못된 이어받기 정보를 반환했습니다. 다운로드를 다시 시작하세요.",
+      "zh": "网关返回的续传信息无效，请重新下载"
+    },
+    "이 게이트웨이는 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.": {
+      "en": "This gateway does not support resuming. Restart the download.",
+      "ko": "이 게이트웨이는 재개를 지원하지 않습니다. 다운로드를 다시 시작하세요.",
+      "zh": "当前网关不支持续传，请重新下载"
+    },
+    "작업 공간 파일이 다운로드 제한인 20 MB를 초과합니다.": {
+      "en": "Workspace file exceeds the 20 MB download limit",
+      "ko": "작업 공간 파일이 다운로드 제한인 20 MB를 초과합니다.",
+      "zh": "工作区文件超过 20 MB 下载限制"
+    },
+    "다운로드 크기가 응답과 일치하지 않습니다. 다운로드를 다시 시작하세요.": {
+      "en": "The download size does not match the response. Restart the download.",
+      "ko": "다운로드 크기가 응답과 일치하지 않습니다. 다운로드를 다시 시작하세요.",
+      "zh": "下载文件大小与响应不一致，请重新下载"
+    },
+    "다운로드가 중단되었습니다. 네트워크와 저장소를 확인한 후 다시 시도하세요.": {
+      "en": "Download interrupted. Check your network and storage, then retry.",
+      "ko": "다운로드가 중단되었습니다. 네트워크와 저장소를 확인한 후 다시 시도하세요.",
+      "zh": "下载中断，请检查网络和存储后重试"
+    },
+    "앱 업데이트": {
+      "en": "App updates",
+      "ko": "앱 업데이트",
+      "zh": "应用更新"
+    },
+    "업데이트를 직접 확인한 뒤 다운로드하고 설치합니다.": {
+      "en": "Check manually, then download and install after confirmation",
+      "ko": "업데이트를 직접 확인한 뒤 다운로드하고 설치합니다.",
+      "zh": "手动检查更新，确认后下载并安装"
+    },
+    "업데이트 확인": {
+      "en": "Check for updates",
+      "ko": "업데이트 확인",
+      "zh": "检查更新"
+    },
+    "업데이트 확인 중…": {
+      "en": "Checking for updates…",
+      "ko": "업데이트 확인 중…",
+      "zh": "正在检查更新…"
+    },
+    "사용할 수 있는 브라우저가 없습니다. 컴퓨터에서 GitHub 릴리스를 엽니다.": {
+      "en": "No browser is available. Open GitHub Releases on your computer.",
+      "ko": "사용할 수 있는 브라우저가 없습니다. 컴퓨터에서 GitHub 릴리스를 엽니다.",
+      "zh": "没有可用的浏览器，请在电脑上打开 GitHub Release。"
+    },
+    "업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다.": {
+      "en": "Could not check for updates. Check your network and retry, or open the releases page.",
+      "ko": "업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다.",
+      "zh": "检查失败，请检查网络后重试。也可以打开版本页面。"
+    },
+    "릴리스": {
+      "en": "Releases",
+      "ko": "릴리스",
+      "zh": "版本页面"
+    },
+    "이 채널의 최신 버전을 사용 중입니다.": {
+      "en": "You are up to date on this channel.",
+      "ko": "이 채널의 최신 버전을 사용 중입니다.",
+      "zh": "当前已是此通道最新版本。"
+    },
+    "업데이트 가능": {
+      "en": "Update available",
+      "ko": "업데이트 가능",
+      "zh": "发现新版本"
+    },
+    "이 버전 건너뛰기": {
+      "en": "Skip this version",
+      "ko": "이 버전 건너뛰기",
+      "zh": "跳过此版本"
+    },
+    "이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다": {
+      "en": "This version is skipped; you can still update manually",
+      "ko": "이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다",
+      "zh": "已跳过此版本，仍可手动更新"
+    },
+    "다운로드 후 시스템 안내에 따라 기존 앱을 삭제하지 않고 업데이트하세요. 저장된 컴퓨터와 로그인은 유지됩니다.": {
+      "en": "After downloading, follow the system prompts to update without uninstalling. Saved computers and sign-ins will be retained.",
+      "ko": "다운로드 후 시스템 안내에 따라 기존 앱을 삭제하지 않고 업데이트하세요. 저장된 컴퓨터와 로그인은 유지됩니다.",
+      "zh": "下载后按系统提示覆盖安装，不要先卸载。已保存的电脑与登录状态会保留。"
+    },
+    "나중에": {
+      "en": "Later",
+      "ko": "나중에",
+      "zh": "稍后"
+    },
+    "릴리스 노트": {
+      "en": "Release notes",
+      "ko": "릴리스 노트",
+      "zh": "更新说明"
+    },
+    "APK 다운로드": {
+      "en": "Download APK",
+      "ko": "APK 다운로드",
+      "zh": "下载 APK"
+    },
+    "다운로드 및 설치": {
+      "en": "Download and install",
+      "ko": "다운로드 및 설치",
+      "zh": "下载并安装"
+    },
+    "다운로드 방법을 선택하세요": {
+      "en": "Choose download method",
+      "ko": "다운로드 방법을 선택하세요",
+      "zh": "选择下载方式"
+    },
+    "휴대전화에서 다운로드": {
+      "en": "Download on phone",
+      "ko": "휴대전화에서 다운로드",
+      "zh": "手机下载"
+    },
+    "컴퓨터에 다운로드": {
+      "en": "Download on computer",
+      "ko": "컴퓨터에 다운로드",
+      "zh": "电脑下载"
+    },
+    "GitHub에서 직접 다운로드": {
+      "en": "Download directly from GitHub",
+      "ko": "GitHub에서 직접 다운로드",
+      "zh": "从 GitHub 直接下载到手机"
+    },
+    "GitHub에서 다운로드한 후 이 휴대전화로 전송하세요.": {
+      "en": "Download from GitHub, then transfer to this phone",
+      "ko": "GitHub에서 다운로드한 후 이 휴대전화로 전송하세요.",
+      "zh": "电脑从 GitHub 下载，再传到手机"
+    },
+    "다시 선택": {
+      "en": "Choose again",
+      "ko": "다시 선택",
+      "zh": "重新选择"
+    },
+    "설치": {
+      "en": "Install",
+      "ko": "설치",
+      "zh": "安装"
+    },
+    "GitHub 릴리스 열기": {
+      "en": "Open GitHub releases",
+      "ko": "GitHub 릴리스 열기",
+      "zh": "打开 GitHub 版本页"
+    },
+    "브라우저에서 APK 다운로드": {
+      "en": "Download APK in browser",
+      "ko": "브라우저에서 APK 다운로드",
+      "zh": "在浏览器中下载 APK"
+    },
+    "업데이트가 준비되었습니다. APK를 설치하거나 저장합니다.": {
+      "en": "Update ready. Install or save the APK.",
+      "ko": "업데이트가 준비되었습니다. APK를 설치하거나 저장합니다.",
+      "zh": "更新已就绪，可安装或保存 APK"
+    },
+    "업데이트를 복원하는 중입니다. 기다리세요.": {
+      "en": "Restoring the update. Please wait.",
+      "ko": "업데이트를 복원하는 중입니다. 기다리세요.",
+      "zh": "正在恢复更新，请稍候"
+    },
+    "보류 중인 업데이트가 더 이상 유효하지 않습니다. 업데이트를 다시 확인하세요.": {
+      "en": "The pending update is no longer valid. Check for updates again.",
+      "ko": "보류 중인 업데이트가 더 이상 유효하지 않습니다. 업데이트를 다시 확인하세요.",
+      "zh": "待安装更新已失效，请重新检查更新"
+    },
+    "보류 중인 업데이트를 유지할 수 없습니다. 다시 다운로드하세요.": {
+      "en": "Could not keep the pending update. Download it again.",
+      "ko": "보류 중인 업데이트를 유지할 수 없습니다. 다시 다운로드하세요.",
+      "zh": "无法保存待安装更新，请重新下载"
+    },
+    "업데이트 크기 또는 SHA-256 정보가 누락되었거나 잘못되었습니다. 릴리스 페이지를 열어 다운로드하세요.": {
+      "en": "Update size or SHA-256 information is missing or invalid. Open the releases page to download it.",
+      "ko": "업데이트 크기 또는 SHA-256 정보가 누락되었거나 잘못되었습니다. 릴리스 페이지를 열어 다운로드하세요.",
+      "zh": "更新缺少有效的大小或 SHA-256 校验信息，请打开版本页面下载。"
+    },
+    "업데이트 크기가 릴리스와 일치하지 않습니다. 다시 다운로드하세요.": {
+      "en": "The update size does not match the release. Download it again.",
+      "ko": "업데이트 크기가 릴리스와 일치하지 않습니다. 다시 다운로드하세요.",
+      "zh": "更新文件大小与发布信息不一致，请重新下载。"
+    },
+    "업데이트 확인에 실패했습니다. 다시 다운로드하세요.": {
+      "en": "Update verification failed. Download it again.",
+      "ko": "업데이트 확인에 실패했습니다. 다시 다운로드하세요.",
+      "zh": "更新文件校验失败，请重新下载。"
+    },
+    "업데이트가 지원되지 않는 주소로 리디렉션되었습니다. 다운로드가 취소되었습니다.": {
+      "en": "The update redirected to an unsupported address. Download cancelled.",
+      "ko": "업데이트가 지원되지 않는 주소로 리디렉션되었습니다. 다운로드가 취소되었습니다.",
+      "zh": "更新下载地址发生跳转，已取消。"
+    },
+    "업데이트 다운로드 중…": {
+      "en": "Downloading update…",
+      "ko": "업데이트 다운로드 중…",
+      "zh": "正在下载更新…"
+    },
+    "업데이트 다운로드가 거부되었습니다. 나중에 다시 시도하세요.": {
+      "en": "The update download was refused. Try again later.",
+      "ko": "업데이트 다운로드가 거부되었습니다. 나중에 다시 시도하세요.",
+      "zh": "更新下载被拒绝，请稍后重试"
+    },
+    "앱은 여기에서 APK를 다운로드하고 시스템 설치 프로그램을 엽니다. 저장된 컴퓨터와 로그인은 유지됩니다.": {
+      "en": "The app will download the APK here and open the system installer. Saved computers and sign-ins will be retained.",
+      "ko": "앱은 여기에서 APK를 다운로드하고 시스템 설치 프로그램을 엽니다. 저장된 컴퓨터와 로그인은 유지됩니다.",
+      "zh": "App 会在本机下载并打开系统安装器，已保存的电脑与登录状态会保留。"
+    },
+    "설치 권한을 열 수 없습니다. 시스템 설정에서 이 앱이 알 수 없는 앱을 설치하도록 허용하세요.": {
+      "en": "Could not open install permissions. Allow this app to install unknown apps in system settings.",
+      "ko": "설치 권한을 열 수 없습니다. 시스템 설정에서 이 앱이 알 수 없는 앱을 설치하도록 허용하세요.",
+      "zh": "无法打开安装权限设置，请在系统设置中允许此应用安装未知来源应用。"
+    },
+    "시스템 설정에서 이 앱이 알 수 없는 앱을 설치하도록 허용하세요.": {
+      "en": "Allow this app to install unknown apps in system settings.",
+      "ko": "시스템 설정에서 이 앱이 알 수 없는 앱을 설치하도록 허용하세요.",
+      "zh": "请在系统设置中允许此应用安装未知来源应用。"
+    },
+    "설치 프로그램을 준비할 수 없습니다. 업데이트를 다시 다운로드하세요.": {
+      "en": "Could not prepare the installer. Download the update again.",
+      "ko": "설치 프로그램을 준비할 수 없습니다. 업데이트를 다시 다운로드하세요.",
+      "zh": "安装包准备失败，请重新下载"
+    },
+    "시스템 설치 프로그램을 사용할 수 없습니다. APK를 저장하고 수동으로 설치하십시오.": {
+      "en": "No system installer is available. Save the APK and install it manually.",
+      "ko": "시스템 설치 프로그램을 사용할 수 없습니다. APK를 저장하고 수동으로 설치하십시오.",
+      "zh": "系统没有可用的安装器，请保存 APK 后手动安装"
+    },
+    "설치 프로그램을 열 수 없습니다. 다시 시도해 보세요.": {
+      "en": "Could not open the installer. Try again.",
+      "ko": "설치 프로그램을 열 수 없습니다. 다시 시도해 보세요.",
+      "zh": "打开安装器失败，请重试"
+    },
+    "업데이트 및 설치 가이드 보기": {
+      "en": "View update and installation guide",
+      "ko": "업데이트 및 설치 가이드 보기",
+      "zh": "查看新版与安装指引"
+    },
+    "iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.": {
+      "en": "The iOS app requires signing the new build with your own Apple account. Direct in-app installation is not available yet.",
+      "ko": "iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.",
+      "zh": "iOS App 需要使用自己的 Apple 账号重新签名安装，暂不支持 App 内直接覆盖更新。"
+    },
+    "Codex가 보조 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.": {
+      "en": "Codex could not complete the side chat operation. Check the model connection and runtime version.",
+      "ko": "Codex가 사이드 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.",
+      "zh": "Codex 未完成侧边聊天操作，请检查模型接入和运行时版本"
+    },
+    "임시 보조 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.": {
+      "en": "Too many temporary side chats. End unused chats or restart the gateway.",
+      "ko": "임시 사이드 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.",
+      "zh": "临时侧边聊天数量已达上限，请关闭不用的聊天；必要时重启网关"
+    },
+    "작업 디렉터리가 일치하지 않아 보조 채팅 생성이 취소되었습니다.": {
+      "en": "Side chat creation cancelled because the working directory did not match.",
+      "ko": "작업 디렉터리가 일치하지 않아 사이드 채팅 생성이 취소되었습니다.",
+      "zh": "侧边聊天工作目录不一致，已取消创建"
+    },
+    "보조 채팅이 종료되었거나 만료되었습니다.": {
+      "en": "Side chat closed or expired",
+      "ko": "사이드 채팅이 종료되었거나 만료되었습니다.",
+      "zh": "侧边聊天已关闭或失效"
+    },
+    "보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.": {
+      "en": "Side chat expired. End it and create a new one.",
+      "ko": "사이드 채팅이 만료되었습니다. 끝내고 새로 만드세요.",
+      "zh": "侧边聊天已失效，请关闭后新建"
+    },
+    "보조 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요.": {
+      "en": "Side chat failed. Check the model connection and try again.",
+      "ko": "사이드 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요.",
+      "zh": "侧边聊天执行失败，请检查模型接入后重试"
+    },
+    "작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.": {
+      "en": "Operation unconfirmed. Refresh the status before sending again.",
+      "ko": "작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.",
+      "zh": "侧边聊天操作结果未确认，请刷新状态，不要重复发送"
+    },
+    "모델 연결이 상위 연결과 일치하지 않아 보조 채팅 생성이 취소되었습니다.": {
+      "en": "Side chat creation cancelled because its model connection did not match the parent.",
+      "ko": "모델 연결이 상위 연결과 일치하지 않아 사이드 채팅 생성이 취소되었습니다.",
+      "zh": "侧边聊天的模型接入与主聊天不一致，已取消创建"
+    },
+    "보조 채팅 런타임 연결이 끊어졌습니다.": {
+      "en": "Side chat runtime disconnected",
+      "ko": "사이드 채팅 런타임 연결이 끊어졌습니다.",
+      "zh": "侧边聊天运行时已断开"
+    },
+    "다른 내용에 같은 메시지 ID를 다시 사용할 수 없습니다.": {
+      "en": "A message ID cannot be reused for different content",
+      "ko": "다른 내용에 같은 메시지 ID를 다시 사용할 수 없습니다.",
+      "zh": "同一消息标识不能用于不同内容"
+    },
+    "잘못된 보조 채팅 작업": {
+      "en": "Invalid side chat operation",
+      "ko": "잘못된 사이드 채팅 작업",
+      "zh": "无效侧边聊天操作"
+    },
+    "임시 브랜치를 확인할 수 없어 생성을 취소했습니다.": {
+      "en": "Could not verify the temporary branch. Creation cancelled.",
+      "ko": "임시 브랜치를 확인할 수 없어 생성을 취소했습니다.",
+      "zh": "无法确认临时分支，已取消创建"
+    },
+    "잘못된 모델 ID": {
+      "en": "Invalid model ID",
+      "ko": "잘못된 모델 ID",
+      "zh": "模型 ID 格式不正确"
+    },
+    "이 런타임은 임시 보조 채팅을 지원하지 않습니다. Codex를 업데이트하세요.": {
+      "en": "This runtime does not support temporary side chats. Update Codex.",
+      "ko": "이 런타임은 임시 사이드 채팅을 지원하지 않습니다. Codex를 업데이트하세요.",
+      "zh": "此 Codex 运行时不支持临时侧边聊天，请更新 Codex"
+    },
+    "보조 채팅이 종료되었거나 만료되었습니다. 이 탭을 새로고침하세요.": {
+      "en": "Side chat closed or expired. Refresh this tab.",
+      "ko": "사이드 채팅이 종료되었거나 만료되었습니다. 이 탭을 새로고침하세요.",
+      "zh": "此侧边聊天已关闭或已失效，请刷新标签"
+    },
+    "이 보조 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.": {
+      "en": "This side chat was ended. Reopen the tab to create another.",
+      "ko": "이 사이드 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.",
+      "zh": "此次创建的侧边聊天已关闭，请重新打开标签后新建"
+    },
+    "이 요청은 처리되었거나 만료되었습니다.": {
+      "en": "This request was handled or expired",
+      "ko": "이 요청은 처리되었거나 만료되었습니다.",
+      "zh": "此请求已处理或已失效"
+    },
+    "이 요청은 보조 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오.": {
+      "en": "This request is not supported in side chats. Stop this response.",
+      "ko": "이 요청은 사이드 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오.",
+      "zh": "此请求暂不支持在侧边聊天处理，请停止本次回复。"
+    },
+    "지원되지 않는 요청입니다. 이 응답을 중지하십시오.": {
+      "en": "Unsupported request. Stop this response.",
+      "ko": "지원되지 않는 요청입니다. 이 응답을 중지하십시오.",
+      "zh": "此请求暂不支持，请停止本次回复"
+    },
+    "보조 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.": {
+      "en": "Side chats currently support the gateway computer. SSH remote workspaces are not supported yet.",
+      "ko": "사이드 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.",
+      "zh": "此预览暂支持网关电脑上的聊天，SSH 远程工作区尚未接入侧边聊天"
+    },
+    "잘못된 승인 응답": {
+      "en": "Invalid approval response",
+      "ko": "잘못된 승인 응답",
+      "zh": "确认回复格式不正确"
+    },
+    "잘못된 승인 작업": {
+      "en": "Invalid approval action",
+      "ko": "잘못된 승인 작업",
+      "zh": "确认操作无效"
+    },
+    "응답을 기다리거나 보류 중인 요청을 먼저 처리하세요.": {
+      "en": "Wait for the response or handle the pending request first",
+      "ko": "응답을 기다리거나 보류 중인 요청을 먼저 처리하세요.",
+      "zh": "请先等待回复完成或处理确认请求"
+    },
+    "1~20,000자의 메시지를 입력하세요.": {
+      "en": "Enter a message of 1–20,000 characters",
+      "ko": "1~20,000자의 메시지를 입력하세요.",
+      "zh": "请输入 1–20000 字的消息"
+    },
+    "유효한 추론 강도를 선택하세요.": {
+      "en": "Choose a valid reasoning effort",
+      "ko": "유효한 추론 강도를 선택하세요.",
+      "zh": "请选择有效的推理强度"
+    },
+    "한 번 허용, 거부 또는 취소를 선택하세요.": {
+      "en": "Choose allow once, deny or cancel",
+      "ko": "한 번 허용, 거부 또는 취소를 선택하세요.",
+      "zh": "请选择本次允许、拒绝或取消"
+    },
+    "한 번 허용 또는 거부를 선택하세요.": {
+      "en": "Choose allow once or deny",
+      "ko": "한 번 허용 또는 거부를 선택하세요.",
+      "zh": "请选择本次允许或拒绝"
+    },
+    "이 모델은 선택한 추론 강도를 지원하지 않습니다.": {
+      "en": "This model does not support the selected reasoning effort",
+      "ko": "이 모델은 선택한 추론 강도를 지원하지 않습니다.",
+      "zh": "这个模型不支持所选推理强度"
+    },
+    "공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.": {
+      "en": "Public addresses require HTTPS. HTTP is only allowed on a local network.",
+      "ko": "공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.",
+      "zh": "公网地址必须使用 HTTPS；HTTP 仅限局域网"
+    },
+    "게이트웨이 주소에는 경로가 포함되어서는 안 됩니다.": {
+      "en": "Gateway addresses must not include a path",
+      "ko": "게이트웨이 주소에는 경로가 포함되어서는 안 됩니다.",
+      "zh": "网关地址不应包含路径"
+    },
+    "컴퓨터의 게이트웨이에 있는 주소 또는 QR 코드를 사용하세요.": {
+      "en": "Use the address or QR code from your computer’s gateway",
+      "ko": "컴퓨터의 게이트웨이에 있는 주소 또는 QR 코드를 사용하세요.",
+      "zh": "请使用电脑网关提供的地址或二维码"
+    },
+    "자격 증명이나 쿼리 매개변수 없이 전체 게이트웨이 주소를 입력하세요.": {
+      "en": "Enter a complete gateway address without credentials or query parameters",
+      "ko": "자격 증명이나 쿼리 매개변수 없이 전체 게이트웨이 주소를 입력하세요.",
+      "zh": "请填写完整网关地址，不含账号或参数"
+    },
+    "경로, 자격 증명 또는 매개 변수 없이 전체 HTTPS 게이트웨이 주소 또는 로컬 HTTP 주소를 입력하세요.": {
+      "en": "Enter a complete HTTPS gateway address, or a local HTTP address, without a path, credentials or parameters.",
+      "ko": "경로, 자격 증명 또는 매개 변수 없이 전체 HTTPS 게이트웨이 주소 또는 로컬 HTTP 주소를 입력하세요.",
+      "zh": "请填写完整的 HTTPS 网关地址，或局域网 HTTP 地址，不含路径、账号和参数。"
+    },
+    "확인 중…": {
+      "en": "Checking…",
+      "ko": "확인 중…",
+      "zh": "检查中…"
+    },
+    "온라인": {
+      "en": "Online",
+      "ko": "온라인",
+      "zh": "在线"
+    },
+    "연결할 수 없음": {
+      "en": "Unreachable",
+      "ko": "연결할 수 없음",
+      "zh": "暂不可达"
+    },
+    "종료하려면 뒤로를 다시 누르세요.": {
+      "en": "Press back again to exit",
+      "ko": "종료하려면 뒤로를 다시 누르세요.",
+      "zh": "再按一次返回退出 App"
+    },
+    "알림 받은 편지함": {
+      "en": "Notification inbox",
+      "ko": "알림함",
+      "zh": "通知收件箱"
+    },
+    "모바일 설정": {
+      "en": "Mobile settings",
+      "ko": "모바일 설정",
+      "zh": "手机设置"
+    },
+    "컴퓨터 목록으로 돌아가기": {
+      "en": "Back to computers",
+      "ko": "컴퓨터 목록으로 돌아가기",
+      "zh": "返回电脑列表"
+    },
+    "계정 및 연결": {
+      "en": "Accounts and connections",
+      "ko": "계정 및 연결",
+      "zh": "账号与接入"
+    },
+    "화면 설정": {
+      "en": "Appearance",
+      "ko": "화면 설정",
+      "zh": "外观与显示"
+    },
+    "하단 앱 아이콘 숨기기": {
+      "en": "Hide bottom app icons",
+      "ko": "하단 앱 아이콘 숨기기",
+      "zh": "隐藏底部 APP 图标"
+    },
+    "하단 앱 아이콘 표시": {
+      "en": "Show bottom app icons",
+      "ko": "하단 앱 아이콘 표시",
+      "zh": "显示底部 APP 图标"
+    },
+    "페이지 새로고침": {
+      "en": "Reload page",
+      "ko": "페이지 새로고침",
+      "zh": "刷新页面"
+    },
+    "확인": {
+      "en": "OK",
+      "ko": "확인",
+      "zh": "好"
+    },
+    "컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요.": {
+      "en": "Your computer’s work,\nalways with you.",
+      "ko": "컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요.",
+      "zh": "电脑上的工作，\n带在身边。"
+    },
+    "컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요.": {
+      "en": "Continue chats and view results while your computer does the work.",
+      "ko": "컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요.",
+      "zh": "继续聊天、查看结果，让电脑替你运行。"
+    },
+    "스캔하여 연결": {
+      "en": "Scan to connect",
+      "ko": "스캔하여 연결",
+      "zh": "扫码连接电脑"
+    },
+    "게이트웨이 주소를 입력하세요": {
+      "en": "Enter gateway address",
+      "ko": "게이트웨이 주소를 입력하세요",
+      "zh": "输入网关地址"
+    },
+    "내 컴퓨터": {
+      "en": "My computers",
+      "ko": "내 컴퓨터",
+      "zh": "我的电脑"
+    },
+    "아직 연결된 컴퓨터가 없습니다.": {
+      "en": "No computers connected yet",
+      "ko": "아직 연결된 컴퓨터가 없습니다.",
+      "zh": "还没有连接的电脑"
+    },
+    "컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요.": {
+      "en": "Open “Scan to sign in” on your computer’s gateway, then scan using the button above.",
+      "ko": "컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요.",
+      "zh": "在电脑网关中展开“扫码登录”，然后用上方按钮扫描。"
+    },
+    "연결 ": {
+      "en": "Connect ",
+      "ko": "연결 ",
+      "zh": "连接 "
+    },
+    "휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다.": {
+      "en": "Use HTTPS when away. Local addresses require the same network.",
+      "ko": "휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다.",
+      "zh": "外出使用 HTTPS 地址；局域网地址需要连接同一网络。"
+    },
+    "컴퓨터에 연결": {
+      "en": "Connect to computer",
+      "ko": "컴퓨터에 연결",
+      "zh": "连接电脑"
+    },
+    "컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요.": {
+      "en": "Paste the address shown by your computer’s gateway",
+      "ko": "컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요.",
+      "zh": "粘贴电脑网关提供的访问地址"
+    },
+    "계속": {
+      "en": "Continue",
+      "ko": "계속",
+      "zh": "继续"
+    },
+    "취소": {
+      "en": "Cancel",
+      "ko": "취소",
+      "zh": "取消"
+    },
+    "이 컴퓨터에 연결하시겠습니까?": {
+      "en": "Connect to this computer?",
+      "ko": "이 컴퓨터에 연결하시겠습니까?",
+      "zh": "连接到这台电脑？"
+    },
+    "\n 이것이 자신의 게이트웨이인지 확인하세요.": {
+      "en": "\nMake sure this is your own gateway.",
+      "ko": "\n 이것이 자신의 게이트웨이인지 확인하세요.",
+      "zh": "\n请确认这是你自己的网关。"
+    },
+    "연결": {
+      "en": "Connect",
+      "ko": "연결",
+      "zh": "连接"
+    },
+    "연결 중 ·": {
+      "en": "Connecting · ",
+      "ko": "연결 중 ·",
+      "zh": "正在连接 · "
+    },
+    "컴퓨터 및 채팅 옵션": {
+      "en": "Computer and chat options",
+      "ko": "컴퓨터 및 채팅 옵션",
+      "zh": "电脑与聊天选项"
+    },
+    "브라우저에서 외부 링크를 열까요? \n": {
+      "en": "Open external link in browser?\n",
+      "ko": "브라우저에서 외부 링크를 열까요? \n",
+      "zh": "在浏览器打开外部链接？\n"
+    },
+    "열기": {
+      "en": "Open",
+      "ko": "열기",
+      "zh": "打开"
+    },
+    "컴퓨터에 연결할 수 없습니다": {
+      "en": "Could not connect to this computer",
+      "ko": "컴퓨터에 연결할 수 없습니다",
+      "zh": "暂时无法连接电脑"
+    },
+    "게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요.": {
+      "en": "The gateway is unavailable. Check the computer and network, then retry or return to the computer list.",
+      "ko": "게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요.",
+      "zh": "网关暂时无法访问。请检查电脑和网络后重试，或返回电脑列表。"
+    },
+    "다시 시도": {
+      "en": "Retry",
+      "ko": "다시 시도",
+      "zh": "重试"
+    },
+    "사용 가능한 파일 선택기가 없습니다.": {
+      "en": "No file picker available",
+      "ko": "사용 가능한 파일 선택기가 없습니다.",
+      "zh": "没有可用的文件选择器"
+    },
+    "다운로드가 진행 중입니다. 기다리세요.": {
+      "en": "A download is in progress. Please wait.",
+      "ko": "다운로드가 진행 중입니다. 기다리세요.",
+      "zh": "已有下载进行中，请稍候"
+    },
+    "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다. 브라우저에서 열어보세요.": {
+      "en": "This download is not an attachment from the current computer. Open it in your browser.",
+      "ko": "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다. 브라우저에서 열어보세요.",
+      "zh": "此下载不是当前电脑的附件，请在浏览器中打开"
+    },
+    "다운로드 중…": {
+      "en": "Downloading…",
+      "ko": "다운로드 중…",
+      "zh": "正在下载…"
+    },
+    "파일을 저장할 앱이 없습니다.": {
+      "en": "No file saver available",
+      "ko": "파일을 저장할 앱이 없습니다.",
+      "zh": "没有可用的文件保存器"
+    },
+    "다운로드에 실패했습니다. 다시 시도해 보세요.": {
+      "en": "Download failed. Try again.",
+      "ko": "다운로드에 실패했습니다. 다시 시도해 보세요.",
+      "zh": "下载失败，请重试"
+    },
+    "파일이 저장되었습니다": {
+      "en": "File saved",
+      "ko": "파일이 저장되었습니다",
+      "zh": "文件已保存"
+    },
+    "저장할 수 없습니다. 다시 시도해 보세요.": {
+      "en": "Could not save. Try again.",
+      "ko": "저장할 수 없습니다. 다시 시도해 보세요.",
+      "zh": "保存失败，请重试"
+    },
+    "채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.": {
+      "en": "Scan and save the notification’s computer before opening the chat.",
+      "ko": "채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.",
+      "zh": "请先扫码保存通知对应的电脑，再打开聊天。"
+    },
+    "잘못된 알림 링크": {
+      "en": "Invalid notification link",
+      "ko": "잘못된 알림 링크",
+      "zh": "通知链接无效"
+    },
+    "완료": {
+      "en": "Done",
+      "ko": "완료",
+      "zh": "完成"
+    },
+    "먼저 컴퓨터에 연결하고 로그인하세요.": {
+      "en": "Connect and sign in to a computer first",
+      "ko": "먼저 컴퓨터에 연결하고 로그인하세요.",
+      "zh": "请先连接并登录电脑"
+    },
+    "알림 로드 중…": {
+      "en": "Loading notifications…",
+      "ko": "알림 로드 중…",
+      "zh": "正在读取通知…"
+    },
+    "데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.": {
+      "en": "Enable and save “Mobile app notification inbox” in the desktop Preview’s notification settings.",
+      "ko": "데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.",
+      "zh": "请在电脑 Preview 的手机通知中开启“手机 App 通知收件箱”并保存。"
+    },
+    "알림": {
+      "en": "Notifications",
+      "ko": "알림",
+      "zh": "通知"
+    },
+    "최근 작업 알림": {
+      "en": "Recent task notifications",
+      "ko": "최근 작업 알림",
+      "zh": "最近任务提醒"
+    },
+    "알림 지우기": {
+      "en": "Clear notifications",
+      "ko": "알림 지우기",
+      "zh": "清空通知"
+    },
+    "아직 알림이 없습니다": {
+      "en": "No notifications yet",
+      "ko": "아직 알림이 없습니다",
+      "zh": "暂无通知"
+    },
+    "여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요.": {
+      "en": "Enable chat notifications to see completed tasks and requests that need your attention here.",
+      "ko": "여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요.",
+      "zh": "在聊天中开启“提醒”，任务完成或需要你处理时，会记录在这里。"
+    },
+    "작업 알림 메시지": {
+      "en": "Task notification",
+      "ko": "작업 알림 메시지",
+      "zh": "任务提醒"
+    },
+    "채팅 보기 ↗": {
+      "en": "View chat  ↗",
+      "ko": "채팅 보기 ↗",
+      "zh": "查看聊天  ↗"
+    },
+    "잘못된 채팅 링크": {
+      "en": "Invalid chat link",
+      "ko": "잘못된 채팅 링크",
+      "zh": "聊天链接无效"
+    },
+    "시스템 푸시 활성화": {
+      "en": "Enable system push",
+      "ko": "시스템 푸시 활성화",
+      "zh": "启用系统后台推送"
+    },
+    "작업 알림 끄기": {
+      "en": "Turn off task notifications",
+      "ko": "작업 알림 끄기",
+      "zh": "关闭任务通知"
+    },
+    "작업 알림 켜기": {
+      "en": "Turn on task notifications",
+      "ko": "작업 알림 켜기",
+      "zh": "开启任务通知"
+    },
+    "앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요.": {
+      "en": "Receive new task alerts from saved computers while this app is open. Delivery after leaving the app or locking the screen is not guaranteed. Configure Bark or ntfy on your computer for external alerts.",
+      "ko": "앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요.",
+      "zh": "App 打开时提醒已连接电脑的新任务消息。离开 App 或锁屏后不保证通知；可在电脑端配置 Bark 或 ntfy。"
+    },
+    "로컬 알림 테스트": {
+      "en": "Test local notification",
+      "ko": "로컬 알림 테스트",
+      "zh": "测试本机通知"
+    },
+    "알림 권한을 확인하기 위해 10초 후에 나타납니다.": {
+      "en": "Appears in 10 seconds to check notification permissions.",
+      "ko": "알림 권한을 확인하기 위해 10초 후에 나타납니다.",
+      "zh": "10 秒后显示，用于检查手机的通知权限。"
+    },
+    "현재 컴퓨터": {
+      "en": "Current computer",
+      "ko": "현재 컴퓨터",
+      "zh": "当前电脑"
+    },
+    "선택한 컴퓨터가 없습니다.": {
+      "en": "No computer selected",
+      "ko": "선택한 컴퓨터가 없습니다.",
+      "zh": "尚未选择电脑"
+    },
+    "홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요.": {
+      "en": "Return home to scan or enter a gateway address.",
+      "ko": "홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요.",
+      "zh": "返回首页扫码或输入网关地址。"
+    },
+    "제거": {
+      "en": "Remove",
+      "ko": "제거",
+      "zh": "移除"
+    },
+    "시스템 푸시가 구성되지 않았습니다. 백그라운드 작업 알림에는 Firebase 또는 기기 공급업체의 푸시 서비스가 필요합니다.": {
+      "en": "System push is not configured. Background task alerts require Firebase or a device vendor’s push service.",
+      "ko": "시스템 푸시가 구성되지 않았습니다. 백그라운드 작업 알림에는 Firebase 또는 기기 공급업체의 푸시 서비스가 필요합니다.",
+      "zh": "此预览尚未配置系统推送项目。当前仅同步收件箱；配置 Firebase 或厂商推送后才能启用后台任务提醒。"
+    },
+    "모바일 알림 테스트": {
+      "en": "Mobile notification test",
+      "ko": "모바일 알림 테스트",
+      "zh": "手机通知测试"
+    },
+    "로컬 알림이 활성화되었습니다.": {
+      "en": "Local notifications are enabled",
+      "ko": "로컬 알림이 활성화되었습니다.",
+      "zh": "本机通知已开启"
+    },
+    "10초 후에 로컬 테스트 알림이 나타납니다. 앱을 종료해도 됩니다. 원격 푸시 전달을 확인하지는 않습니다.": {
+      "en": "A local test notification will appear in 10 seconds. You may leave the app. This does not verify remote push delivery.",
+      "ko": "10초 후에 로컬 테스트 알림이 나타납니다. 앱을 종료해도 됩니다. 원격 푸시 전달을 확인하지는 않습니다.",
+      "zh": "10 秒后显示本地测试通知，可以先返回桌面。此测试不代表远程推送已经接通。"
+    },
+    "이 컴퓨터를 제거하시겠습니까?": {
+      "en": "Remove this computer?",
+      "ko": "이 컴퓨터를 제거하시겠습니까?",
+      "zh": "移除这台电脑？"
+    },
+    "저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다.": {
+      "en": "Remove the saved connection and sign-in on this device. Chats on the computer are unaffected.",
+      "ko": "저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다.",
+      "zh": "清除本机保存的连接和登录状态，电脑上的聊天不受影响。"
+    },
+    "허가가 거부되었습니다. 연결하려면 주소를 붙여넣을 수 있습니다.": {
+      "en": "Permission denied. You can still paste an address to connect.",
+      "ko": "허가가 거부되었습니다. 연결하려면 주소를 붙여넣을 수 있습니다.",
+      "zh": "未获得权限，可继续粘贴地址使用。"
+    },
+    "푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.": {
+      "en": "Push registration failed. Check signing and network access.",
+      "ko": "푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.",
+      "zh": "系统推送注册失败，请检查推送签名与网络。"
+    },
+    "컴퓨터 및 알림": {
+      "en": "Computers and notifications",
+      "ko": "컴퓨터 및 알림",
+      "zh": "电脑与通知"
+    },
+    "다이나믹 아일랜드에서 이 채팅을 보여주세요": {
+      "en": "Show this chat in Dynamic Island",
+      "ko": "다이나믹 아일랜드에서 이 채팅을 보여주세요",
+      "zh": "在灵动岛显示此聊天"
+    },
+    "실시간 현황 종료": {
+      "en": "End Live Activity",
+      "ko": "실시간 현황 종료",
+      "zh": "结束灵动岛显示"
+    },
+    "먼저 이 알림을 받으려면 컴퓨터에 연결하세요.": {
+      "en": "Connect to the computer for this notification first.",
+      "ko": "먼저 이 알림을 받으려면 컴퓨터에 연결하세요.",
+      "zh": "请先连接通知对应的电脑。"
+    },
+    "먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.": {
+      "en": "Scan and save this notification’s computer first.",
+      "ko": "먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.",
+      "zh": "请先扫码保存通知对应的电脑。"
+    },
+    "브라우저에서 외부 링크를 열까요?": {
+      "en": "Open external link in browser?",
+      "ko": "브라우저에서 외부 링크를 열까요?",
+      "zh": "在浏览器打开外部链接？"
+    },
+    "연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.": {
+      "en": "Connection failed. Check the computer and address, then reload.",
+      "ko": "연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.",
+      "zh": "连接失败，请检查电脑和地址后刷新"
+    },
+    "다운로드에 실패했습니다. 로그인을 확인하고 다시 시도하세요.": {
+      "en": "Download failed. Check sign-in and try again.",
+      "ko": "다운로드에 실패했습니다. 로그인을 확인하고 다시 시도하세요.",
+      "zh": "下载失败，请检查登录状态后重试"
+    },
+    "첨부파일이 MB 다운로드 제한 50개를 초과했습니다.": {
+      "en": "Attachment exceeds the 50 MB download limit",
+      "ko": "첨부 파일이 다운로드 제한인 50MB를 초과했습니다.",
+      "zh": "附件超过 50 MB 下载限制"
+    },
+    "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.": {
+      "en": "Could not save the download. Check available storage.",
+      "ko": "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.",
+      "zh": "无法保存下载文件，请检查剩余空间"
+    },
+    "다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.": {
+      "en": "Download redirect blocked. Reopen the attachment from your computer.",
+      "ko": "다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.",
+      "zh": "下载地址发生跳转，已取消。请重新打开电脑附件。"
+    },
+    "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.": {
+      "en": "Download failed. Check your network and try again.",
+      "ko": "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.",
+      "zh": "下载失败，请检查网络后重试"
+    },
+    "먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.": {
+      "en": "Connect and sign in to your computer’s gateway first",
+      "ko": "먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.",
+      "zh": "请先连接并登录电脑网关"
+    },
+    "잘못된 컴퓨터 업데이트 주소": {
+      "en": "Invalid computer update address",
+      "ko": "잘못된 컴퓨터 업데이트 주소",
+      "zh": "电脑更新地址无效"
+    },
+    "컴퓨터의 업데이트 캐시가 만료되었습니다. 다시 다운로드하세요.": {
+      "en": "The computer's update cache expired. Download again.",
+      "ko": "컴퓨터의 업데이트 캐시가 만료되었습니다. 다시 다운로드하세요.",
+      "zh": "电脑更新缓存已过期，请重新下载"
+    },
+    "로그인이 변경되었습니다. 컴퓨터에 다시 연결하고 다시 확인해 보세요.": {
+      "en": "Sign-in changed. Reconnect to the computer and check again.",
+      "ko": "로그인이 변경되었습니다. 컴퓨터에 다시 연결하고 다시 확인해 보세요.",
+      "zh": "登录已变化，请重新连接电脑后检查更新"
+    },
+    "지원 업데이트를 활성화하려면 컴퓨터 게이트웨이를 업데이트하세요.": {
+      "en": "Update the computer gateway to enable assisted updates.",
+      "ko": "지원 업데이트를 활성화하려면 컴퓨터 게이트웨이를 업데이트하세요.",
+      "zh": "此网关暂不支持协助更新，请先更新电脑网关"
+    },
+    "컴퓨터 로그인이 만료되었습니다. 다시 연결하고 확인해 보세요.": {
+      "en": "Computer sign-in expired. Reconnect and check again.",
+      "ko": "컴퓨터 로그인이 만료되었습니다. 다시 연결하고 확인해 보세요.",
+      "zh": "电脑登录已失效，请重新连接电脑后检查更新"
+    },
+    "업데이트 주소가 리디렉션되었습니다. 컴퓨터에 다시 연결하십시오.": {
+      "en": "The update address redirected. Reconnect to the computer.",
+      "ko": "업데이트 주소가 리디렉션되었습니다. 컴퓨터에 다시 연결하십시오.",
+      "zh": "电脑更新地址发生跳转，请重新连接电脑"
+    },
+    "컴퓨터 지원 업데이트에 실패했습니다. 다시 시도해 보세요.": {
+      "en": "Computer-assisted update failed. Try again.",
+      "ko": "컴퓨터 지원 업데이트에 실패했습니다. 다시 시도해 보세요.",
+      "zh": "电脑协助更新失败，请重试"
+    },
+    "컴퓨터의 업데이트 응답이 너무 큽니다.": {
+      "en": "The computer's update response is too large.",
+      "ko": "컴퓨터의 업데이트 응답이 너무 큽니다.",
+      "zh": "电脑更新响应过大"
+    },
+    "컴퓨터의 업데이트 응답이 잘못되었습니다.": {
+      "en": "Invalid update response from the computer.",
+      "ko": "컴퓨터의 업데이트 응답이 잘못되었습니다.",
+      "zh": "电脑更新响应无效"
+    },
+    "컴퓨터의 릴리스 정보가 잘못되었습니다.": {
+      "en": "Invalid release information from the computer.",
+      "ko": "컴퓨터의 릴리스 정보가 잘못되었습니다.",
+      "zh": "电脑返回的更新信息无效"
+    },
+    "컴퓨터 다운로드에 실패했습니다. 다시 시도해 보세요.": {
+      "en": "The computer download failed. Try again.",
+      "ko": "컴퓨터 다운로드에 실패했습니다. 다시 시도해 보세요.",
+      "zh": "电脑下载失败，请重试"
+    },
+    "컴퓨터 다운로드 시간이 초과되었습니다. 나중에 다시 시도하세요.": {
+      "en": "The computer download timed out. Try again later.",
+      "ko": "컴퓨터 다운로드 시간이 초과되었습니다. 나중에 다시 시도하세요.",
+      "zh": "电脑下载超时，请稍后重试"
+    },
+    "업데이트 정보가 잘못되었습니다.": {
+      "en": "Invalid update information.",
+      "ko": "업데이트 정보가 잘못되었습니다.",
+      "zh": "更新信息无效"
+    },
+    "컴퓨터가 업데이트를 준비하고 있습니다. 기다리세요.": {
+      "en": "The computer is preparing the update. Please wait.",
+      "ko": "컴퓨터가 업데이트를 준비하고 있습니다. 기다리세요.",
+      "zh": "电脑正在准备更新，请稍候"
+    },
+    "컴퓨터를 통해 업데이트를 확인하는 중…": {
+      "en": "Checking for updates through your computer…",
+      "ko": "컴퓨터를 통해 업데이트를 확인하는 중…",
+      "zh": "正在通过电脑检查更新…"
+    },
+    "휴대폰이 GitHub에 연결할 수 없으며 컴퓨터가 업데이트 확인을 완료할 수 없습니다.": {
+      "en": "Your phone could not reach GitHub, and the computer could not complete the update check.",
+      "ko": "휴대폰이 GitHub에 연결할 수 없으며 컴퓨터가 업데이트 확인을 완료할 수 없습니다.",
+      "zh": "手机无法连接 GitHub，电脑协助更新也未成功。"
+    },
+    "컴퓨터 연결이 변경되었습니다. 업데이트를 다시 확인하세요.": {
+      "en": "The computer connection changed. Check for updates again.",
+      "ko": "컴퓨터 연결이 변경되었습니다. 업데이트를 다시 확인하세요.",
+      "zh": "电脑连接已变化，请重新检查更新"
+    },
+    "컴퓨터가 업데이트를 다운로드하는 중입니다…": {
+      "en": "Your computer is downloading the update…",
+      "ko": "컴퓨터가 업데이트를 다운로드하는 중입니다…",
+      "zh": "电脑正在下载更新…"
+    },
+    "컴퓨터를 통해 업데이트": {
+      "en": "Update through computer",
+      "ko": "컴퓨터를 통해 업데이트",
+      "zh": "通过电脑更新"
+    },
+    "컴퓨터에서 휴대전화로 전송하는 중…": {
+      "en": "Transferring from computer to phone…",
+      "ko": "컴퓨터에서 휴대전화로 전송하는 중…",
+      "zh": "正在从电脑传送到手机…"
+    },
+    "컴퓨터가 GitHub 릴리스를 가져올 수 없습니다. 네트워크를 확인하고 다시 시도하세요.": {
+      "en": "Your computer could not fetch GitHub releases. Check its network and try again.",
+      "ko": "컴퓨터가 GitHub 릴리스를 가져올 수 없습니다. 네트워크를 확인하고 다시 시도하세요.",
+      "zh": "电脑无法获取 GitHub 版本信息，请检查电脑网络后重试"
+    },
+    "컴퓨터 다운로드에 실패했습니다. 네트워크와 저장소를 확인한 후 다시 시도하세요.": {
+      "en": "The computer download failed. Check its network and storage, then try again.",
+      "ko": "컴퓨터 다운로드에 실패했습니다. 네트워크와 저장소를 확인한 후 다시 시도하세요.",
+      "zh": "电脑下载失败，请检查电脑网络和存储后重试"
+    },
+    "컴퓨터가 다른 업데이트를 다운로드하고 있습니다. 나중에 다시 시도하세요.": {
+      "en": "Your computer is downloading another update. Try again later.",
+      "ko": "컴퓨터가 다른 업데이트를 다운로드하고 있습니다. 나중에 다시 시도하세요.",
+      "zh": "电脑正在下载其他更新，请稍后重试"
+    },
+    "출시 세부정보가 변경되었거나 확인 데이터가 부족합니다. 업데이트를 다시 확인하세요.": {
+      "en": "Release details changed or lack verification data. Check for updates again.",
+      "ko": "출시 세부정보가 변경되었거나 확인 데이터가 부족합니다. 업데이트를 다시 확인하세요.",
+      "zh": "发布信息已变化或缺少校验信息，请重新检查更新"
+    },
+    "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.": {
+      "en": "Sign-in expired. Reconnect to the computer.",
+      "ko": "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.",
+      "zh": "登录已失效，请重新连接电脑"
+    },
+    "일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.": {
+      "en": "Use the matching desktop Preview and check the connection",
+      "ko": "일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.",
+      "zh": "请使用配套电脑 Preview，并检查连接"
+    },
+    "채팅 보기": {
+      "en": "View chat",
+      "ko": "채팅 보기",
+      "zh": "查看聊天"
+    },
+    "시스템 설정에서 알림을 허용하세요.": {
+      "en": "Allow notifications in system settings.",
+      "ko": "시스템 설정에서 알림을 허용하세요.",
+      "zh": "请在系统设置中允许通知。"
+    },
+    "라이브 활동에는 iOS 16.2 이상이 필요합니다.": {
+      "en": "Live Activities require iOS 16.2 or later.",
+      "ko": "라이브 활동에는 iOS 16.2 이상이 필요합니다.",
+      "zh": "实时活动需要 iOS 16.2 或更新版本。"
+    },
+    "먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.": {
+      "en": "Open a chat first, then choose to show it in Dynamic Island.",
+      "ko": "먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.",
+      "zh": "请先打开要跟踪的聊天，再选择灵动岛显示。"
+    },
+    "포그라운드 작업 알림": {
+      "en": "Foreground task notifications",
+      "ko": "포그라운드 작업 알림",
+      "zh": "前台任务提醒"
+    },
+    "Dynamic Island 및 잠금 화면": {
+      "en": "Dynamic Island and Lock Screen",
+      "ko": "Dynamic Island 및 잠금 화면",
+      "zh": "灵动岛与锁屏"
+    },
+    "현재 채팅 추적": {
+      "en": "Track current chat",
+      "ko": "현재 채팅 추적",
+      "zh": "跟踪当前聊天"
+    },
+    "컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요.": {
+      "en": "Choose a chat to track from the computer menu. Background status may be out of date; open the app to sync.",
+      "ko": "컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요.",
+      "zh": "从电脑菜单选择聊天跟踪。后台显示可能不是最新状态，打开 App 可继续同步。"
+    },
+    "실시간 현황 미리보기": {
+      "en": "Preview Live Activity",
+      "ko": "실시간 현황 미리보기",
+      "zh": "预览灵动岛"
+    },
+    "Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.": {
+      "en": "Apple push signing is not configured. Background alerts require a developer account and a gateway push service.",
+      "ko": "Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.",
+      "zh": "此预览尚未配置 Apple 推送签名。需要开发者账号和电脑端推送服务后才能启用后台任务提醒。"
+    },
+    "시스템 설정에서 Codex Bridge 알림을 허용합니다.": {
+      "en": "Allow Codex Bridge notifications in system settings.",
+      "ko": "시스템 설정에서 Codex Bridge 알림을 허용하세요.",
+      "zh": "请在系统设置允许 Codex Bridge 通知。"
+    },
+    "10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.": {
+      "en": "A local test notification will appear in 10 seconds. You may lock the screen. This does not verify remote push delivery.",
+      "ko": "10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.",
+      "zh": "10 秒后显示本地测试通知，可以先锁屏。此测试不代表远程推送已经接通。"
+    },
+    "테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.": {
+      "en": "Could not schedule the test. Check system notification settings.",
+      "ko": "테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.",
+      "zh": "测试通知未能创建，请检查系统通知设置。"
+    },
+    "카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.": {
+      "en": "Camera access denied. Paste the gateway address instead.",
+      "ko": "카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.",
+      "zh": "未获得相机权限，请粘贴网关地址。"
+    },
+    "스캔 취소": {
+      "en": "Cancel scan",
+      "ko": "스캔 취소",
+      "zh": "取消扫码"
+    }
+  },
+  "ios": {
+    "UU Remote 요청을 처리 중입니다.": {
+      "en": "A UU request is already in progress",
+      "ko": "UU Remote 요청을 처리 중입니다.",
+      "zh": "UU 请求正在处理中"
+    },
+    "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.": {
+      "en": "Install or update UU Remote to version 4.42.0 or later",
+      "ko": "UU Remote 4.42.0 이상을 설치하거나 해당 버전으로 업데이트하세요.",
+      "zh": "请安装或更新 UU 远程至 4.42.0 及以上版本"
+    },
+    "UU Remote를 열 수 없습니다.": {
+      "en": "Could not open UU Remote",
+      "ko": "UU Remote를 열 수 없습니다.",
+      "zh": "无法打开 UU 远程"
+    },
+    "기기가 연결되었습니다. 작은 화면 또는 원격 제어를 다시 선택하세요.": {
+      "en": "Device linked. Select picture-in-picture or remote control again.",
+      "ko": "기기가 연결되었습니다. 화면 속 화면 또는 원격 제어를 다시 선택하세요.",
+      "zh": "UU 设备已绑定，请再次选择小窗或远控"
+    },
+    "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.": {
+      "en": "Device linking did not finish. Check your account and device in UU Remote.",
+      "ko": "기기 연결이 완료되지 않았습니다. UU Remote에서 계정과 장치를 확인하세요.",
+      "zh": "UU 绑定未完成，请在 UU 中确认账号和设备"
+    },
+    "UU Remote 작은 화면이 열렸습니다.": {
+      "en": "UU picture-in-picture is open",
+      "ko": "UU Remote 화면 속 화면이 열렸습니다.",
+      "zh": "UU 小窗已开启"
+    },
+    "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.": {
+      "en": "The UU device is no longer available. Link it again.",
+      "ko": "UU Remote 기기를 더 이상 사용할 수 없습니다. 다시 연결하세요.",
+      "zh": "UU 设备已失效，请重新绑定"
+    },
+    "UU Remote 기기가 오프라인 상태입니다.": {
+      "en": "The UU device is offline",
+      "ko": "UU Remote 기기가 오프라인 상태입니다.",
+      "zh": "UU 设备离线"
+    },
+    "작은 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.": {
+      "en": "Picture-in-picture is unavailable. Use full-screen control.",
+      "ko": "화면 속 화면을 사용할 수 없습니다. 전체 화면 원격 제어를 사용하세요.",
+      "zh": "当前设备不支持 UU 小窗，请使用全屏远控"
+    },
+    "작은 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.": {
+      "en": "Could not open picture-in-picture. Check the device and try again.",
+      "ko": "화면 속 화면을 열 수 없습니다. 기기를 확인한 뒤 다시 시도하세요.",
+      "zh": "UU 小窗未能开启，请检查设备或重试"
+    },
+    "이 기기에서는 카메라를 사용할 수 없습니다": {
+      "en": "Camera is unavailable on this device",
+      "ko": "이 기기에서는 카메라를 사용할 수 없습니다",
+      "zh": "此设备无法使用相机"
+    },
+    "DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요.": {
+      "en": "Paste the full link from your DSH client’s Mobile feature",
+      "ko": "DSH 클라이언트의 모바일 기능에서 전체 링크를 붙여넣으세요.",
+      "zh": "粘贴 DSH 客户端 Mobile 功能提供的完整链接"
+    },
+    "DSH Mobile에 연결하시겠습니까?": {
+      "en": "Connect to DSH Mobile?",
+      "ko": "DSH Mobile에 연결하시겠습니까?",
+      "zh": "连接 DSH Mobile？"
+    },
+    "\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다.": {
+      "en": "\nConfirm this is your DSH client. Its own mobile interface will open.",
+      "ko": "\n 이것이 DSH 클라이언트인지 확인하세요. 자체 모바일 인터페이스가 열립니다.",
+      "zh": "\n请确认这是你自己的 DSH 客户端。将打开它自带的手机界面。"
+    },
+    "DSH Mobile 연결을 저장할 수 없습니다.": {
+      "en": "Could not save the DSH Mobile connection",
+      "ko": "DSH Mobile 연결을 저장할 수 없습니다.",
+      "zh": "无法保存 DSH Mobile 连接"
+    },
+    "연결 자격 증명을 사용할 수 없습니다. 이 연결을 제거하고 다시 추가하십시오.": {
+      "en": "Connection credentials are unavailable. Remove and add this connection again.",
+      "ko": "연결 인증 정보를 사용할 수 없습니다. 연결을 삭제한 뒤 다시 추가하세요.",
+      "zh": "连接凭据不可用，请移除后重新添加"
+    },
+    "연결 자격 증명을 사용할 수 없습니다.": {
+      "en": "Connection credentials unavailable",
+      "ko": "연결 인증 정보를 사용할 수 없습니다.",
+      "zh": "连接凭据不可用"
+    },
+    "Android 8의 브라우저에서 DSH Mobile을 엽니다. 인앱 액세스에는 Android 9 이상이 필요합니다.": {
+      "en": "On Android 8, open DSH Mobile in your browser. In-app access requires Android 9 or later.",
+      "ko": "Android 8에서는 브라우저로 DSH Mobile을 여세요. 앱에서 이용하려면 Android 9 이상이 필요합니다.",
+      "zh": "Android 8 请使用浏览器打开 DSH Mobile；App 内连接需要 Android 9 或更高版本。"
+    },
+    "연결에 실패했습니다. 다시 시도하려면 새로고침하세요.": {
+      "en": "Connection failed. Refresh to retry",
+      "ko": "연결에 실패했습니다. 다시 시도하려면 새로고침하세요.",
+      "zh": "连接失败，请刷新重试"
+    },
+    "잘못된 DSH Mobile 주소입니다.": {
+      "en": "Invalid DSH Mobile URL",
+      "ko": "잘못된 DSH Mobile 주소입니다.",
+      "zh": "DSH Mobile 地址无效"
+    },
+    "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요.": {
+      "en": "Use a full DSH Mobile HTTPS link, or an HTTP link on your local network.",
+      "ko": "전체 DSH Mobile HTTPS 링크나 로컬 네트워크의 HTTP 링크를 사용하세요.",
+      "zh": "请使用完整的 DSH Mobile HTTPS 链接，或局域网 HTTP 链接。"
+    },
+    "알림 소스": {
+      "en": "Notification sources",
+      "ko": "알림 소스",
+      "zh": "通知来源"
+    },
+    "연결 중…": {
+      "en": "Connecting…",
+      "ko": "연결 중…",
+      "zh": "正在连接…"
+    },
+    "현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요.": {
+      "en": "Current channel is unreachable. Choose another channel.",
+      "ko": "현재 채널에 접속할 수 없습니다. 다른 채널을 선택하세요.",
+      "zh": "当前信道不可达，请手动切换连接信道"
+    },
+    "이 컴퓨터 제거": {
+      "en": "Remove this computer",
+      "ko": "이 컴퓨터 제거",
+      "zh": "移除此电脑"
+    },
+    "이 컴퓨터 관리": {
+      "en": "Manage this computer",
+      "ko": "이 컴퓨터 관리",
+      "zh": "管理这台电脑"
+    },
+    "이 전화기에 대한 작업 알림을 선택하세요. 채팅 및 알림 받은 편지함은 계속 사용할 수 있습니다.": {
+      "en": "Choose task alerts for this phone. Chats and notification inboxes remain available.",
+      "ko": "이 휴대폰에서 받을 작업 알림을 선택하세요. 채팅과 알림 목록은 계속 사용할 수 있습니다.",
+      "zh": "仅控制这台手机的任务提醒，不影响聊天和通知收件箱。"
+    },
+    "저장된 컴퓨터 연결이 없습니다.": {
+      "en": "No saved computer connections",
+      "ko": "저장된 컴퓨터 연결이 없습니다.",
+      "zh": "尚未保存电脑连接"
+    },
+    "테마": {
+      "en": "Theme",
+      "ko": "테마",
+      "zh": "主题"
+    },
+    "시스템 설정 따르기": {
+      "en": "System",
+      "ko": "시스템 설정 따르기",
+      "zh": "跟随系统"
+    },
+    "밝게": {
+      "en": "Light",
+      "ko": "밝게",
+      "zh": "浅色"
+    },
+    "어둡게": {
+      "en": "Dark",
+      "ko": "어둡게",
+      "zh": "深色"
+    },
+    "일시 중지됨": {
+      "en": "Paused",
+      "ko": "일시 중지됨",
+      "zh": "已暂停"
+    },
+    "다운로드가 완료되지 않았습니다": {
+      "en": "Download incomplete",
+      "ko": "다운로드가 완료되지 않았습니다",
+      "zh": "下载未完成"
+    },
+    "다운로드됨 · 열기 또는 저장": {
+      "en": "Downloaded · open or save",
+      "ko": "다운로드됨 · 열기 또는 저장",
+      "zh": "下载完成，可打开或保存"
+    },
+    "이 파일을 열 수 있는 앱이 없습니다.": {
+      "en": "No app is available to open this file.",
+      "ko": "이 파일을 열 수 있는 앱이 없습니다.",
+      "zh": "暂无可打开此文件的应用"
+    },
+    "저장됨": {
+      "en": "Saved",
+      "ko": "저장됨",
+      "zh": "已保存"
+    },
+    "취소됨": {
+      "en": "Cancelled",
+      "ko": "취소됨",
+      "zh": "已取消"
+    },
+    "다운로드 펼치기": {
+      "en": "Expand download",
+      "ko": "다운로드 펼치기",
+      "zh": "展开下载"
+    },
+    "다운로드 축소": {
+      "en": "Collapse download",
+      "ko": "다운로드 축소",
+      "zh": "收起下载"
+    },
+    "일시 중지": {
+      "en": "Pause",
+      "ko": "일시 중지",
+      "zh": "暂停"
+    },
+    "재개": {
+      "en": "Resume",
+      "ko": "재개",
+      "zh": "继续下载"
+    },
+    "다시 시작": {
+      "en": "Restart",
+      "ko": "다시 시작",
+      "zh": "重新下载"
+    },
+    "파일에 저장": {
+      "en": "Save to Files",
+      "ko": "파일에 저장",
+      "zh": "保存到文件"
+    },
+    "다운로드 취소": {
+      "en": "Cancel download",
+      "ko": "다운로드 취소",
+      "zh": "取消下载"
+    },
+    "닫기": {
+      "en": "Close",
+      "ko": "닫기",
+      "zh": "关闭"
+    },
+    "이 서버는 다운로드를 재개할 수 없습니다. 다운로드를 다시 시작하세요.": {
+      "en": "This server cannot resume downloads. Restart the download.",
+      "ko": "이 서버는 다운로드를 재개할 수 없습니다. 다운로드를 다시 시작하세요.",
+      "zh": "当前服务器不支持续传，请重新下载"
+    },
+    "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.": {
+      "en": "Invalid download response. Restart the download.",
+      "ko": "다운로드 응답이 잘못되었습니다. 다운로드를 다시 시작하세요.",
+      "zh": "下载响应格式不正确，请重新下载"
+    },
+    "파일이 변경되었습니다. 다운로드를 다시 시작하세요.": {
+      "en": "The file changed. Restart the download.",
+      "ko": "파일이 변경되었습니다. 다운로드를 다시 시작하세요.",
+      "zh": "文件已变化，请重新下载"
+    },
+    "다운로드를 안전하게 재개하려면 게이트웨이를 업데이트하세요.": {
+      "en": "Update the gateway to resume downloads safely.",
+      "ko": "다운로드를 안전하게 재개하려면 게이트웨이를 업데이트하세요.",
+      "zh": "网关不支持安全续传，请更新网关后重试"
+    },
+    "파일이 변경되었거나 서버가 파일을 재개할 수 없습니다. 다운로드를 다시 시작하세요.": {
+      "en": "The file changed or the server cannot resume it. Restart the download.",
+      "ko": "파일이 변경되었거나 서버가 파일을 재개할 수 없습니다. 다운로드를 다시 시작하세요.",
+      "zh": "文件已变化或服务器不支持续传，请重新下载"
+    },
+    "다운로드가 중단되었습니다. 재개할 수 있습니다.": {
+      "en": "Download interrupted. You can resume it.",
+      "ko": "다운로드가 중단되었습니다. 재개할 수 있습니다.",
+      "zh": "下载中断，可继续下载"
+    },
+    "컴퓨터를 일시적으로 사용할 수 없습니다. 다운로드를 재개할 수 있습니다.": {
+      "en": "Computer temporarily unavailable. You can resume the download.",
+      "ko": "컴퓨터를 일시적으로 사용할 수 없습니다. 다운로드를 재개할 수 있습니다.",
+      "zh": "电脑暂时不可用，可继续下载"
+    },
+    "선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.": {
+      "en": "Cannot read the selected file. Select it again using the system file picker.",
+      "ko": "선택한 파일을 읽을 수 없습니다. 시스템 파일 선택기를 사용하여 다시 선택하십시오.",
+      "zh": "无法读取所选文件，请从系统文件选择器重新选择。"
+    },
+    "읽지 않은 알림": {
+      "en": "Unread notifications",
+      "ko": "읽지 않은 알림",
+      "zh": "未读通知"
+    },
+    "상태 새로고침": {
+      "en": "Refresh status",
+      "ko": "상태 새로고침",
+      "zh": "刷新状态"
+    },
+    "최근 알림": {
+      "en": "Recent notifications",
+      "ko": "최근 알림",
+      "zh": "最近通知"
+    },
+    "조치가 요청되었습니다": {
+      "en": "Action requested",
+      "ko": "조치가 요청되었습니다",
+      "zh": "需要你处理"
+    },
+    "완료됨": {
+      "en": "Completed",
+      "ko": "완료됨",
+      "zh": "已运行完毕"
+    },
+    "이름 바꾸기": {
+      "en": "Rename",
+      "ko": "이름 바꾸기",
+      "zh": "重命名"
+    },
+    "컴퓨터 이름 바꾸기": {
+      "en": "Rename computer",
+      "ko": "컴퓨터 이름 바꾸기",
+      "zh": "重命名电脑"
+    },
+    "기본 이름을 복원하려면 비워 두세요.": {
+      "en": "Leave blank to restore the default name",
+      "ko": "기본 이름을 복원하려면 비워 두세요.",
+      "zh": "留空恢复默认名称"
+    },
+    "80자 이하로 사용하세요.": {
+      "en": "Use no more than 80 characters",
+      "ko": "80자 이하로 사용하세요.",
+      "zh": "名称最多 80 个字符"
+    },
+    "저장": {
+      "en": "Save",
+      "ko": "저장",
+      "zh": "保存"
+    },
+    "Codex가 보조 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.": {
+      "en": "Codex could not complete the side chat operation. Check the model connection and runtime version.",
+      "ko": "Codex가 사이드 채팅 작업을 완료할 수 없습니다. 모델 연결 및 런타임 버전을 확인하세요.",
+      "zh": "Codex 未完成侧边聊天操作，请检查模型接入和运行时版本"
+    },
+    "임시 보조 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.": {
+      "en": "Too many temporary side chats. End unused chats or restart the gateway.",
+      "ko": "임시 사이드 채팅이 너무 많습니다. 사용하지 않는 채팅을 종료하거나 게이트웨이를 다시 시작하세요.",
+      "zh": "临时侧边聊天数量已达上限，请关闭不用的聊天；必要时重启网关"
+    },
+    "작업 디렉터리가 일치하지 않아 보조 채팅 생성이 취소되었습니다.": {
+      "en": "Side chat creation cancelled because the working directory did not match.",
+      "ko": "작업 디렉터리가 일치하지 않아 사이드 채팅 생성이 취소되었습니다.",
+      "zh": "侧边聊天工作目录不一致，已取消创建"
+    },
+    "보조 채팅이 종료되었거나 만료되었습니다.": {
+      "en": "Side chat closed or expired",
+      "ko": "사이드 채팅이 종료되었거나 만료되었습니다.",
+      "zh": "侧边聊天已关闭或失效"
+    },
+    "보조 채팅이 만료되었습니다. 끝내고 새로 만드세요.": {
+      "en": "Side chat expired. End it and create a new one.",
+      "ko": "사이드 채팅이 만료되었습니다. 끝내고 새로 만드세요.",
+      "zh": "侧边聊天已失效，请关闭后新建"
+    },
+    "보조 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요.": {
+      "en": "Side chat failed. Check the model connection and try again.",
+      "ko": "사이드 채팅이 실패했습니다. 모델 연결을 확인하고 다시 시도해 보세요.",
+      "zh": "侧边聊天执行失败，请检查模型接入后重试"
+    },
+    "작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.": {
+      "en": "Operation unconfirmed. Refresh the status before sending again.",
+      "ko": "작동이 확인되지 않았습니다. 다시 보내기 전에 상태를 새로 고치세요.",
+      "zh": "侧边聊天操作结果未确认，请刷新状态，不要重复发送"
+    },
+    "모델 연결이 상위 연결과 일치하지 않아 보조 채팅 생성이 취소되었습니다.": {
+      "en": "Side chat creation cancelled because its model connection did not match the parent.",
+      "ko": "모델 연결이 상위 연결과 일치하지 않아 사이드 채팅 생성이 취소되었습니다.",
+      "zh": "侧边聊天的模型接入与主聊天不一致，已取消创建"
+    },
+    "보조 채팅 런타임 연결이 끊어졌습니다.": {
+      "en": "Side chat runtime disconnected",
+      "ko": "사이드 채팅 런타임 연결이 끊어졌습니다.",
+      "zh": "侧边聊天运行时已断开"
+    },
+    "다른 내용에 같은 메시지 ID를 다시 사용할 수 없습니다.": {
+      "en": "A message ID cannot be reused for different content",
+      "ko": "다른 내용에 같은 메시지 ID를 다시 사용할 수 없습니다.",
+      "zh": "同一消息标识不能用于不同内容"
+    },
+    "잘못된 보조 채팅 작업": {
+      "en": "Invalid side chat operation",
+      "ko": "잘못된 사이드 채팅 작업",
+      "zh": "无效侧边聊天操作"
+    },
+    "임시 브랜치를 확인할 수 없어 생성을 취소했습니다.": {
+      "en": "Could not verify the temporary branch. Creation cancelled.",
+      "ko": "임시 브랜치를 확인할 수 없어 생성을 취소했습니다.",
+      "zh": "无法确认临时分支，已取消创建"
+    },
+    "잘못된 모델 ID": {
+      "en": "Invalid model ID",
+      "ko": "잘못된 모델 ID",
+      "zh": "模型 ID 格式不正确"
+    },
+    "이 런타임은 임시 보조 채팅을 지원하지 않습니다. Codex를 업데이트하세요.": {
+      "en": "This runtime does not support temporary side chats. Update Codex.",
+      "ko": "이 런타임은 임시 사이드 채팅을 지원하지 않습니다. Codex를 업데이트하세요.",
+      "zh": "此 Codex 运行时不支持临时侧边聊天，请更新 Codex"
+    },
+    "보조 채팅이 종료되었거나 만료되었습니다. 이 탭을 새로고침하세요.": {
+      "en": "Side chat closed or expired. Refresh this tab.",
+      "ko": "사이드 채팅이 종료되었거나 만료되었습니다. 이 탭을 새로고침하세요.",
+      "zh": "此侧边聊天已关闭或已失效，请刷新标签"
+    },
+    "이 보조 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.": {
+      "en": "This side chat was ended. Reopen the tab to create another.",
+      "ko": "이 사이드 채팅이 종료되었습니다. 다른 탭을 만들려면 탭을 다시 여세요.",
+      "zh": "此次创建的侧边聊天已关闭，请重新打开标签后新建"
+    },
+    "이 요청은 처리되었거나 만료되었습니다.": {
+      "en": "This request was handled or expired",
+      "ko": "이 요청은 처리되었거나 만료되었습니다.",
+      "zh": "此请求已处理或已失效"
+    },
+    "이 요청은 보조 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오.": {
+      "en": "This request is not supported in side chats. Stop this response.",
+      "ko": "이 요청은 사이드 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오.",
+      "zh": "此请求暂不支持在侧边聊天处理，请停止本次回复。"
+    },
+    "지원되지 않는 요청입니다. 이 응답을 중지하십시오.": {
+      "en": "Unsupported request. Stop this response.",
+      "ko": "지원되지 않는 요청입니다. 이 응답을 중지하십시오.",
+      "zh": "此请求暂不支持，请停止本次回复"
+    },
+    "보조 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.": {
+      "en": "Side chats currently support the gateway computer. SSH remote workspaces are not supported yet.",
+      "ko": "사이드 채팅은 현재 게이트웨이 컴퓨터를 지원합니다. SSH 원격 작업 공간은 아직 지원되지 않습니다.",
+      "zh": "此预览暂支持网关电脑上的聊天，SSH 远程工作区尚未接入侧边聊天"
+    },
+    "잘못된 승인 응답": {
+      "en": "Invalid approval response",
+      "ko": "잘못된 승인 응답",
+      "zh": "确认回复格式不正确"
+    },
+    "잘못된 승인 작업": {
+      "en": "Invalid approval action",
+      "ko": "잘못된 승인 작업",
+      "zh": "确认操作无效"
+    },
+    "응답을 기다리거나 보류 중인 요청을 먼저 처리하세요.": {
+      "en": "Wait for the response or handle the pending request first",
+      "ko": "응답을 기다리거나 보류 중인 요청을 먼저 처리하세요.",
+      "zh": "请先等待回复完成或处理确认请求"
+    },
+    "1~20,000자의 메시지를 입력하세요.": {
+      "en": "Enter a message of 1–20,000 characters",
+      "ko": "1~20,000자의 메시지를 입력하세요.",
+      "zh": "请输入 1–20000 字的消息"
+    },
+    "유효한 추론 강도를 선택하세요.": {
+      "en": "Choose a valid reasoning effort",
+      "ko": "유효한 추론 강도를 선택하세요.",
+      "zh": "请选择有效的推理强度"
+    },
+    "한 번 허용, 거부 또는 취소를 선택하세요.": {
+      "en": "Choose allow once, deny or cancel",
+      "ko": "한 번 허용, 거부 또는 취소를 선택하세요.",
+      "zh": "请选择本次允许、拒绝或取消"
+    },
+    "한 번 허용 또는 거부를 선택하세요.": {
+      "en": "Choose allow once or deny",
+      "ko": "한 번 허용 또는 거부를 선택하세요.",
+      "zh": "请选择本次允许或拒绝"
+    },
+    "이 모델은 선택한 추론 강도를 지원하지 않습니다.": {
+      "en": "This model does not support the selected reasoning effort",
+      "ko": "이 모델은 선택한 추론 강도를 지원하지 않습니다.",
+      "zh": "这个模型不支持所选推理强度"
+    },
+    "공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.": {
+      "en": "Public addresses require HTTPS. HTTP is only allowed on a local network.",
+      "ko": "공개 주소에는 HTTPS가 필요합니다. HTTP는 로컬 네트워크에서만 허용됩니다.",
+      "zh": "公网地址必须使用 HTTPS；HTTP 仅限局域网"
+    },
+    "게이트웨이 주소에는 경로가 포함되어서는 안 됩니다.": {
+      "en": "Gateway addresses must not include a path",
+      "ko": "게이트웨이 주소에는 경로가 포함되어서는 안 됩니다.",
+      "zh": "网关地址不应包含路径"
+    },
+    "컴퓨터의 게이트웨이에 있는 주소 또는 QR 코드를 사용하세요.": {
+      "en": "Use the address or QR code from your computer’s gateway",
+      "ko": "컴퓨터의 게이트웨이에 있는 주소 또는 QR 코드를 사용하세요.",
+      "zh": "请使用电脑网关提供的地址或二维码"
+    },
+    "자격 증명이나 쿼리 매개변수 없이 전체 게이트웨이 주소를 입력하세요.": {
+      "en": "Enter a complete gateway address without credentials or query parameters",
+      "ko": "자격 증명이나 쿼리 매개변수 없이 전체 게이트웨이 주소를 입력하세요.",
+      "zh": "请填写完整网关地址，不含账号或参数"
+    },
+    "경로, 자격 증명 또는 매개 변수 없이 전체 HTTPS 게이트웨이 주소 또는 로컬 HTTP 주소를 입력하세요.": {
+      "en": "Enter a complete HTTPS gateway address, or a local HTTP address, without a path, credentials or parameters.",
+      "ko": "경로, 자격 증명 또는 매개 변수 없이 전체 HTTPS 게이트웨이 주소 또는 로컬 HTTP 주소를 입력하세요.",
+      "zh": "请填写完整的 HTTPS 网关地址，或局域网 HTTP 地址，不含路径、账号和参数。"
+    },
+    "알림 받은 편지함": {
+      "en": "Notification inbox",
+      "ko": "알림함",
+      "zh": "通知收件箱"
+    },
+    "모바일 설정": {
+      "en": "Mobile settings",
+      "ko": "모바일 설정",
+      "zh": "手机设置"
+    },
+    "앱 업데이트": {
+      "en": "App updates",
+      "ko": "앱 업데이트",
+      "zh": "应用更新"
+    },
+    "수동 업데이트 확인, 자동 설치 없음": {
+      "en": "Manual update checks, no automatic installation",
+      "ko": "수동 업데이트 확인, 자동 설치 없음",
+      "zh": "手动检查更新，不会自动安装"
+    },
+    "업데이트 확인": {
+      "en": "Check for updates",
+      "ko": "업데이트 확인",
+      "zh": "检查更新"
+    },
+    "업데이트 확인 중…": {
+      "en": "Checking for updates…",
+      "ko": "업데이트 확인 중…",
+      "zh": "正在检查更新…"
+    },
+    "사용할 수 있는 브라우저가 없습니다. 컴퓨터에서 GitHub 릴리스를 엽니다.": {
+      "en": "No browser is available. Open GitHub Releases on your computer.",
+      "ko": "사용할 수 있는 브라우저가 없습니다. 컴퓨터에서 GitHub 릴리스를 엽니다.",
+      "zh": "没有可用的浏览器，请在电脑上打开 GitHub Release。"
+    },
+    "업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다.": {
+      "en": "Could not check for updates. Check your network and retry, or open the releases page.",
+      "ko": "업데이트를 확인할 수 없습니다. 네트워크를 확인하고 다시 시도하거나 릴리스 페이지를 엽니다.",
+      "zh": "检查失败，请检查网络后重试。也可以打开版本页面。"
+    },
+    "릴리스": {
+      "en": "Releases",
+      "ko": "릴리스",
+      "zh": "版本页面"
+    },
+    "이 채널의 최신 버전을 사용 중입니다.": {
+      "en": "You are up to date on this channel.",
+      "ko": "이 채널의 최신 버전을 사용 중입니다.",
+      "zh": "当前已是此通道最新版本。"
+    },
+    "업데이트 가능": {
+      "en": "Update available",
+      "ko": "업데이트 가능",
+      "zh": "发现新版本"
+    },
+    "이 버전 건너뛰기": {
+      "en": "Skip this version",
+      "ko": "이 버전 건너뛰기",
+      "zh": "跳过此版本"
+    },
+    "이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다": {
+      "en": "This version is skipped; you can still update manually",
+      "ko": "이 버전은 건너뛰었습니다. 여전히 수동으로 업데이트할 수 있습니다",
+      "zh": "已跳过此版本，仍可手动更新"
+    },
+    "다운로드 후 시스템 안내에 따라 기존 앱을 삭제하지 않고 업데이트하세요. 저장된 컴퓨터와 로그인은 유지됩니다.": {
+      "en": "After downloading, follow the system prompts to update without uninstalling. Saved computers and sign-ins will be retained.",
+      "ko": "다운로드 후 시스템 안내에 따라 기존 앱을 삭제하지 않고 업데이트하세요. 저장된 컴퓨터와 로그인은 유지됩니다.",
+      "zh": "下载后按系统提示覆盖安装，不要先卸载。已保存的电脑与登录状态会保留。"
+    },
+    "나중에": {
+      "en": "Later",
+      "ko": "나중에",
+      "zh": "稍后"
+    },
+    "릴리스 노트": {
+      "en": "Release notes",
+      "ko": "릴리스 노트",
+      "zh": "更新说明"
+    },
+    "APK 다운로드": {
+      "en": "Download APK",
+      "ko": "APK 다운로드",
+      "zh": "下载 APK"
+    },
+    "업데이트 및 설치 가이드 보기": {
+      "en": "View update and installation guide",
+      "ko": "업데이트 및 설치 가이드 보기",
+      "zh": "查看新版与安装指引"
+    },
+    "iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.": {
+      "en": "The iOS app requires signing the new build with your own Apple account. Direct in-app installation is not available yet.",
+      "ko": "iOS 앱을 사용하려면 자신의 Apple 계정으로 새 빌드에 서명해야 합니다. 직접 인앱 설치는 아직 사용할 수 없습니다.",
+      "zh": "iOS App 需要使用自己的 Apple 账号重新签名安装，暂不支持 App 内直接覆盖更新。"
+    },
+    "컴퓨터 목록으로 돌아가기": {
+      "en": "Back to computers",
+      "ko": "컴퓨터 목록으로 돌아가기",
+      "zh": "返回电脑列表"
+    },
+    "컴퓨터에 연결할 수 없습니다": {
+      "en": "Can’t reach the computer",
+      "ko": "컴퓨터에 연결할 수 없습니다",
+      "zh": "暂时无法连接电脑"
+    },
+    "게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요.": {
+      "en": "The gateway is temporarily unreachable. Check your computer and network, then retry or go back to your computers.",
+      "ko": "게이트웨이에 일시적으로 연결할 수 없습니다. 컴퓨터와 네트워크를 확인한 후 다시 시도하거나 컴퓨터로 돌아가세요.",
+      "zh": "网关暂时无法访问。请检查电脑和网络后重试，或返回电脑列表。"
+    },
+    "다시 시도": {
+      "en": "Try again",
+      "ko": "다시 시도",
+      "zh": "重试"
+    },
+    "화면 설정": {
+      "en": "Appearance",
+      "ko": "화면 설정",
+      "zh": "外观与显示"
+    },
+    "하단 앱 아이콘 숨기기": {
+      "en": "Hide bottom app icons",
+      "ko": "하단 앱 아이콘 숨기기",
+      "zh": "隐藏底部 APP 图标"
+    },
+    "하단 앱 아이콘 표시": {
+      "en": "Show bottom app icons",
+      "ko": "하단 앱 아이콘 표시",
+      "zh": "显示底部 APP 图标"
+    },
+    "페이지 새로고침": {
+      "en": "Reload page",
+      "ko": "페이지 새로고침",
+      "zh": "刷新页面"
+    },
+    "확인": {
+      "en": "OK",
+      "ko": "확인",
+      "zh": "好"
+    },
+    "컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요.": {
+      "en": "Your computer’s work,\nalways with you.",
+      "ko": "컴퓨터에서 하던 작업을\n언제 어디서나 이어가세요.",
+      "zh": "电脑上的工作，\n带在身边。"
+    },
+    "컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요.": {
+      "en": "Continue chats and view results while your computer does the work.",
+      "ko": "컴퓨터가 작업을 수행하는 동안 채팅을 계속하고 결과를 확인하세요.",
+      "zh": "继续聊天、查看结果，让电脑替你运行。"
+    },
+    "스캔하여 연결": {
+      "en": "Scan to connect",
+      "ko": "스캔하여 연결",
+      "zh": "扫码连接电脑"
+    },
+    "게이트웨이 주소를 입력하세요": {
+      "en": "Enter gateway address",
+      "ko": "게이트웨이 주소를 입력하세요",
+      "zh": "输入网关地址"
+    },
+    "내 컴퓨터": {
+      "en": "My computers",
+      "ko": "내 컴퓨터",
+      "zh": "我的电脑"
+    },
+    "계정 및 연결": {
+      "en": "Accounts & connections",
+      "ko": "계정 및 연결",
+      "zh": "账号与接入"
+    },
+    "아직 연결된 컴퓨터가 없습니다.": {
+      "en": "No computers connected yet",
+      "ko": "아직 연결된 컴퓨터가 없습니다.",
+      "zh": "还没有连接的电脑"
+    },
+    "컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요.": {
+      "en": "Open “Scan to sign in” on your computer’s gateway, then scan using the button above.",
+      "ko": "컴퓨터의 게이트웨이에서 “스캔하여 로그인”을 연 다음 위의 버튼을 사용하여 스캔하세요.",
+      "zh": "在电脑网关中展开“扫码登录”，然后用上方按钮扫描。"
+    },
+    "연결 ": {
+      "en": "Connect ",
+      "ko": "연결 ",
+      "zh": "连接 "
+    },
+    "휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다.": {
+      "en": "Use HTTPS when away. Local addresses require the same network.",
+      "ko": "휴대폰 접속에는 HTTPS 주소를 사용하세요. 로컬 주소는 같은 네트워크에서만 사용할 수 있습니다.",
+      "zh": "外出使用 HTTPS 地址；局域网地址需要连接同一网络。"
+    },
+    "컴퓨터에 연결": {
+      "en": "Connect to computer",
+      "ko": "컴퓨터에 연결",
+      "zh": "连接电脑"
+    },
+    "컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요.": {
+      "en": "Paste the address shown by your computer’s gateway",
+      "ko": "컴퓨터의 게이트웨이에 표시된 주소를 붙여넣으세요.",
+      "zh": "粘贴电脑网关提供的访问地址"
+    },
+    "계속": {
+      "en": "Continue",
+      "ko": "계속",
+      "zh": "继续"
+    },
+    "취소": {
+      "en": "Cancel",
+      "ko": "취소",
+      "zh": "取消"
+    },
+    "이 컴퓨터에 연결하시겠습니까?": {
+      "en": "Connect to this computer?",
+      "ko": "이 컴퓨터에 연결하시겠습니까?",
+      "zh": "连接到这台电脑？"
+    },
+    "\n 이것이 자신의 게이트웨이인지 확인하세요.": {
+      "en": "\nMake sure this is your own gateway.",
+      "ko": "\n 이것이 자신의 게이트웨이인지 확인하세요.",
+      "zh": "\n请确认这是你自己的网关。"
+    },
+    "연결": {
+      "en": "Connect",
+      "ko": "연결",
+      "zh": "连接"
+    },
+    "연결 중 ·": {
+      "en": "Connecting · ",
+      "ko": "연결 중 ·",
+      "zh": "正在连接 · "
+    },
+    "컴퓨터 및 채팅 옵션": {
+      "en": "Computer and chat options",
+      "ko": "컴퓨터 및 채팅 옵션",
+      "zh": "电脑与聊天选项"
+    },
+    "브라우저에서 외부 링크를 열까요? \n": {
+      "en": "Open external link in browser?\n",
+      "ko": "브라우저에서 외부 링크를 열까요? \n",
+      "zh": "在浏览器打开外部链接？\n"
+    },
+    "열기": {
+      "en": "Open",
+      "ko": "열기",
+      "zh": "打开"
+    },
+    "연결에 실패했습니다. 더보기 메뉴에서 새로고침하세요.": {
+      "en": "Connection failed. Reload from the More menu.",
+      "ko": "연결에 실패했습니다. 더보기 메뉴에서 새로고침하세요.",
+      "zh": "连接失败，请在更多菜单中刷新"
+    },
+    "사용 가능한 파일 선택기가 없습니다.": {
+      "en": "No file picker available",
+      "ko": "사용 가능한 파일 선택기가 없습니다.",
+      "zh": "没有可用的文件选择器"
+    },
+    "다운로드가 진행 중입니다. 기다리세요.": {
+      "en": "A download is in progress. Please wait.",
+      "ko": "다운로드가 진행 중입니다. 기다리세요.",
+      "zh": "已有下载进行中，请稍候"
+    },
+    "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다. 브라우저에서 열어보세요.": {
+      "en": "This download is not an attachment from the current computer. Open it in your browser.",
+      "ko": "이 다운로드는 현재 컴퓨터의 첨부 파일이 아닙니다. 브라우저에서 열어보세요.",
+      "zh": "此下载不是当前电脑的附件，请在浏览器中打开"
+    },
+    "다운로드 중…": {
+      "en": "Downloading…",
+      "ko": "다운로드 중…",
+      "zh": "正在下载…"
+    },
+    "파일을 저장할 앱이 없습니다.": {
+      "en": "No file saver available",
+      "ko": "파일을 저장할 앱이 없습니다.",
+      "zh": "没有可用的文件保存器"
+    },
+    "다운로드에 실패했습니다. 다시 시도해 보세요.": {
+      "en": "Download failed. Try again.",
+      "ko": "다운로드에 실패했습니다. 다시 시도해 보세요.",
+      "zh": "下载失败，请重试"
+    },
+    "파일이 저장되었습니다": {
+      "en": "File saved",
+      "ko": "파일이 저장되었습니다",
+      "zh": "文件已保存"
+    },
+    "저장할 수 없습니다. 다시 시도해 보세요.": {
+      "en": "Could not save. Try again.",
+      "ko": "저장할 수 없습니다. 다시 시도해 보세요.",
+      "zh": "保存失败，请重试"
+    },
+    "채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.": {
+      "en": "Scan and save the notification’s computer before opening the chat.",
+      "ko": "채팅을 열기 전에 알림의 컴퓨터를 스캔하고 저장하세요.",
+      "zh": "请先扫码保存通知对应的电脑，再打开聊天。"
+    },
+    "잘못된 알림 링크": {
+      "en": "Invalid notification link",
+      "ko": "잘못된 알림 링크",
+      "zh": "通知链接无效"
+    },
+    "완료": {
+      "en": "Done",
+      "ko": "완료",
+      "zh": "完成"
+    },
+    "먼저 컴퓨터에 연결하고 로그인하세요.": {
+      "en": "Connect and sign in to a computer first",
+      "ko": "먼저 컴퓨터에 연결하고 로그인하세요.",
+      "zh": "请先连接并登录电脑"
+    },
+    "알림 로드 중…": {
+      "en": "Loading notifications…",
+      "ko": "알림 로드 중…",
+      "zh": "正在读取通知…"
+    },
+    "데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.": {
+      "en": "Enable and save “Mobile app notification inbox” in the desktop Preview’s notification settings.",
+      "ko": "데스크톱 미리보기의 알림 설정에서 ’모바일 앱 알림 받은 편지함’을 활성화하고 저장하세요.",
+      "zh": "请在电脑 Preview 的手机通知中开启“手机 App 通知收件箱”并保存。"
+    },
+    "알림": {
+      "en": "Notifications",
+      "ko": "알림",
+      "zh": "通知"
+    },
+    "최근 작업 알림": {
+      "en": "Recent task notifications",
+      "ko": "최근 작업 알림",
+      "zh": "最近任务提醒"
+    },
+    "알림 지우기": {
+      "en": "Clear notifications",
+      "ko": "알림 지우기",
+      "zh": "清空通知"
+    },
+    "아직 알림이 없습니다": {
+      "en": "No notifications yet",
+      "ko": "아직 알림이 없습니다",
+      "zh": "暂无通知"
+    },
+    "여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요.": {
+      "en": "Enable chat notifications to see completed tasks and requests that need your attention here.",
+      "ko": "여기에서 주의가 필요한 완료된 작업과 요청을 보려면 채팅 알림을 활성화하세요.",
+      "zh": "在聊天中开启“提醒”，任务完成或需要你处理时，会记录在这里。"
+    },
+    "작업 알림": {
+      "en": "Task notification",
+      "ko": "작업 알림",
+      "zh": "任务提醒"
+    },
+    "채팅 보기 ↗": {
+      "en": "View chat  ↗",
+      "ko": "채팅 보기 ↗",
+      "zh": "查看聊天  ↗"
+    },
+    "잘못된 채팅 링크": {
+      "en": "Invalid chat link",
+      "ko": "잘못된 채팅 링크",
+      "zh": "聊天链接无效"
+    },
+    "설정": {
+      "en": "Settings",
+      "ko": "설정",
+      "zh": "设置"
+    },
+    "시스템 푸시 활성화": {
+      "en": "Enable system push",
+      "ko": "시스템 푸시 활성화",
+      "zh": "启用系统后台推送"
+    },
+    "작업 알림 끄기": {
+      "en": "Turn off task notifications",
+      "ko": "작업 알림 끄기",
+      "zh": "关闭任务通知"
+    },
+    "작업 알림 켜기": {
+      "en": "Turn on task notifications",
+      "ko": "작업 알림 켜기",
+      "zh": "开启任务通知"
+    },
+    "앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요.": {
+      "en": "Receive new task alerts from saved computers while this app is open. Delivery after leaving the app or locking the screen is not guaranteed. Configure Bark or ntfy on your computer for external alerts.",
+      "ko": "앱이 열려 있는 동안 저장된 컴퓨터에서 새 작업 알림을 받습니다. 앱을 나가거나 화면을 잠근 뒤에는 알림 수신이 보장되지 않습니다. 외부 알림이 필요하면 컴퓨터에서 Bark 또는 ntfy를 설정하세요.",
+      "zh": "App 打开时提醒已连接电脑的新任务消息。离开 App 或锁屏后不保证通知；可在电脑端配置 Bark 或 ntfy。"
+    },
+    "로컬 알림 테스트": {
+      "en": "Test local notification",
+      "ko": "로컬 알림 테스트",
+      "zh": "测试本机通知"
+    },
+    "알림 권한을 확인하기 위해 10초 후에 나타납니다.": {
+      "en": "Appears in 10 seconds to check notification permissions.",
+      "ko": "알림 권한을 확인하기 위해 10초 후에 나타납니다.",
+      "zh": "10 秒后显示，用于检查手机的通知权限。"
+    },
+    "현재 컴퓨터": {
+      "en": "Current computer",
+      "ko": "현재 컴퓨터",
+      "zh": "当前电脑"
+    },
+    "선택한 컴퓨터가 없습니다.": {
+      "en": "No computer selected",
+      "ko": "선택한 컴퓨터가 없습니다.",
+      "zh": "尚未选择电脑"
+    },
+    "홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요.": {
+      "en": "Return home to scan or enter a gateway address.",
+      "ko": "홈으로 돌아가 게이트웨이 QR 코드를 스캔하거나 주소를 입력하세요.",
+      "zh": "返回首页扫码或输入网关地址。"
+    },
+    "제거": {
+      "en": "Remove",
+      "ko": "제거",
+      "zh": "移除"
+    },
+    "시스템 푸시가 구성되지 않았습니다. 백그라운드 작업 알림에는 Firebase 또는 기기 공급업체의 푸시 서비스가 필요합니다.": {
+      "en": "System push is not configured. Background task alerts require Firebase or a device vendor’s push service.",
+      "ko": "시스템 푸시가 구성되지 않았습니다. 백그라운드 작업 알림에는 Firebase 또는 기기 공급업체의 푸시 서비스가 필요합니다.",
+      "zh": "此预览尚未配置系统推送项目。当前仅同步收件箱；配置 Firebase 或厂商推送后才能启用后台任务提醒。"
+    },
+    "모바일 알림 테스트": {
+      "en": "Mobile notification test",
+      "ko": "모바일 알림 테스트",
+      "zh": "手机通知测试"
+    },
+    "로컬 알림이 활성화되었습니다.": {
+      "en": "Local notifications are enabled",
+      "ko": "로컬 알림이 활성화되었습니다.",
+      "zh": "本机通知已开启"
+    },
+    "10초 후에 로컬 테스트 알림이 나타납니다. 앱을 종료해도 됩니다. 원격 푸시 전달을 확인하지는 않습니다.": {
+      "en": "A local test notification will appear in 10 seconds. You may leave the app. This does not verify remote push delivery.",
+      "ko": "10초 후에 로컬 테스트 알림이 나타납니다. 앱을 종료해도 됩니다. 원격 푸시 전달을 확인하지는 않습니다.",
+      "zh": "10 秒后显示本地测试通知，可以先返回桌面。此测试不代表远程推送已经接通。"
+    },
+    "이 컴퓨터를 제거하시겠습니까?": {
+      "en": "Remove this computer?",
+      "ko": "이 컴퓨터를 제거하시겠습니까?",
+      "zh": "移除这台电脑？"
+    },
+    "저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다.": {
+      "en": "Remove the saved connection and sign-in on this device. Chats on the computer are unaffected.",
+      "ko": "저장된 연결을 삭제하고 이 기기에 로그인하세요. 컴퓨터의 채팅은 영향을 받지 않습니다.",
+      "zh": "清除本机保存的连接和登录状态，电脑上的聊天不受影响。"
+    },
+    "허가가 거부되었습니다. 연결하려면 주소를 붙여넣을 수 있습니다.": {
+      "en": "Permission denied. You can still paste an address to connect.",
+      "ko": "허가가 거부되었습니다. 연결하려면 주소를 붙여넣을 수 있습니다.",
+      "zh": "未获得权限，可继续粘贴地址使用。"
+    },
+    "푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.": {
+      "en": "Push registration failed. Check signing and network access.",
+      "ko": "푸시 등록에 실패했습니다. 서명 및 네트워크 액세스를 확인하세요.",
+      "zh": "系统推送注册失败，请检查推送签名与网络。"
+    },
+    "컴퓨터 및 알림": {
+      "en": "Computers and notifications",
+      "ko": "컴퓨터 및 알림",
+      "zh": "电脑与通知"
+    },
+    "다이나믹 아일랜드에서 이 채팅을 보여주세요": {
+      "en": "Show this chat in Dynamic Island",
+      "ko": "다이나믹 아일랜드에서 이 채팅을 보여주세요",
+      "zh": "在灵动岛显示此聊天"
+    },
+    "실시간 현황 종료": {
+      "en": "End Live Activity",
+      "ko": "실시간 현황 종료",
+      "zh": "结束灵动岛显示"
+    },
+    "먼저 이 알림을 받으려면 컴퓨터에 연결하세요.": {
+      "en": "Connect to the computer for this notification first.",
+      "ko": "먼저 이 알림을 받으려면 컴퓨터에 연결하세요.",
+      "zh": "请先连接通知对应的电脑。"
+    },
+    "먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.": {
+      "en": "Scan and save this notification’s computer first.",
+      "ko": "먼저 이 알림의 컴퓨터를 스캔하고 저장하세요.",
+      "zh": "请先扫码保存通知对应的电脑。"
+    },
+    "브라우저에서 외부 링크를 열까요?": {
+      "en": "Open external link in browser?",
+      "ko": "브라우저에서 외부 링크를 열까요?",
+      "zh": "在浏览器打开外部链接？"
+    },
+    "연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.": {
+      "en": "Connection failed. Check the computer and address, then reload.",
+      "ko": "연결에 실패했습니다. 컴퓨터와 주소를 확인한 후 다시 로드하세요.",
+      "zh": "连接失败，请检查电脑和地址后刷新"
+    },
+    "다운로드에 실패했습니다. 로그인을 확인하고 다시 시도하세요.": {
+      "en": "Download failed. Check sign-in and try again.",
+      "ko": "다운로드에 실패했습니다. 로그인을 확인하고 다시 시도하세요.",
+      "zh": "下载失败，请检查登录状态后重试"
+    },
+    "첨부파일이 MB 다운로드 제한 50개를 초과했습니다.": {
+      "en": "Attachment exceeds the 50 MB download limit",
+      "ko": "첨부 파일이 다운로드 제한인 50MB를 초과했습니다.",
+      "zh": "附件超过 50 MB 下载限制"
+    },
+    "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.": {
+      "en": "Could not save the download. Check available storage.",
+      "ko": "다운로드를 저장할 수 없습니다. 사용 가능한 저장 공간을 확인하세요.",
+      "zh": "无法保存下载文件，请检查剩余空间"
+    },
+    "다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.": {
+      "en": "Download redirect blocked. Reopen the attachment from your computer.",
+      "ko": "다운로드 리디렉션이 차단되었습니다. 컴퓨터에서 첨부 파일을 다시 엽니다.",
+      "zh": "下载地址发生跳转，已取消。请重新打开电脑附件。"
+    },
+    "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.": {
+      "en": "Download failed. Check your network and try again.",
+      "ko": "다운로드에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.",
+      "zh": "下载失败，请检查网络后重试"
+    },
+    "먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.": {
+      "en": "Connect and sign in to your computer’s gateway first",
+      "ko": "먼저 컴퓨터의 게이트웨이에 연결하고 로그인하세요.",
+      "zh": "请先连接并登录电脑网关"
+    },
+    "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.": {
+      "en": "Sign-in expired. Reconnect to the computer.",
+      "ko": "로그인이 만료되었습니다. 컴퓨터에 다시 연결하십시오.",
+      "zh": "登录已失效，请重新连接电脑"
+    },
+    "일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.": {
+      "en": "Use the matching desktop Preview and check the connection",
+      "ko": "일치하는 데스크톱 미리보기를 사용하고 연결을 확인하세요.",
+      "zh": "请使用配套电脑 Preview，并检查连接"
+    },
+    "채팅 보기": {
+      "en": "View chat",
+      "ko": "채팅 보기",
+      "zh": "查看聊天"
+    },
+    "시스템 설정에서 알림을 허용하세요.": {
+      "en": "Allow notifications in system settings.",
+      "ko": "시스템 설정에서 알림을 허용하세요.",
+      "zh": "请在系统设置中允许通知。"
+    },
+    "라이브 활동에는 iOS 16.2 이상이 필요합니다.": {
+      "en": "Live Activities require iOS 16.2 or later.",
+      "ko": "라이브 활동에는 iOS 16.2 이상이 필요합니다.",
+      "zh": "实时活动需要 iOS 16.2 或更新版本。"
+    },
+    "먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.": {
+      "en": "Open a chat first, then choose to show it in Dynamic Island.",
+      "ko": "먼저 채팅을 연 다음 Dynamic Island에 표시하도록 선택하세요.",
+      "zh": "请先打开要跟踪的聊天，再选择灵动岛显示。"
+    },
+    "포그라운드 작업 알림": {
+      "en": "Foreground task notifications",
+      "ko": "포그라운드 작업 알림",
+      "zh": "前台任务提醒"
+    },
+    "Dynamic Island 및 잠금 화면": {
+      "en": "Dynamic Island and Lock Screen",
+      "ko": "Dynamic Island 및 잠금 화면",
+      "zh": "灵动岛与锁屏"
+    },
+    "현재 채팅 추적": {
+      "en": "Track current chat",
+      "ko": "현재 채팅 추적",
+      "zh": "跟踪当前聊天"
+    },
+    "컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요.": {
+      "en": "Choose a chat to track from the computer menu. Background status may be out of date; open the app to sync.",
+      "ko": "컴퓨터 메뉴에서 추적할 채팅을 선택하세요. 배경 상태가 최신이 아닐 수 있습니다. 앱을 열어 동기화하세요.",
+      "zh": "从电脑菜单选择聊天跟踪。后台显示可能不是最新状态，打开 App 可继续同步。"
+    },
+    "실시간 현황 미리보기": {
+      "en": "Preview Live Activity",
+      "ko": "실시간 현황 미리보기",
+      "zh": "预览灵动岛"
+    },
+    "Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.": {
+      "en": "Apple push signing is not configured. Background alerts require a developer account and a gateway push service.",
+      "ko": "Apple 푸시 서명이 구성되지 않았습니다. 백그라운드 알림에는 개발자 계정과 게이트웨이 푸시 서비스가 필요합니다.",
+      "zh": "此预览尚未配置 Apple 推送签名。需要开发者账号和电脑端推送服务后才能启用后台任务提醒。"
+    },
+    "시스템 설정에서 Codex Bridge 알림을 허용합니다.": {
+      "en": "Allow Codex Bridge notifications in system settings.",
+      "ko": "시스템 설정에서 Codex Bridge 알림을 허용하세요.",
+      "zh": "请在系统设置允许 Codex Bridge 通知。"
+    },
+    "10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.": {
+      "en": "A local test notification will appear in 10 seconds. You may lock the screen. This does not verify remote push delivery.",
+      "ko": "10초 후에 로컬 테스트 알림이 나타납니다. 화면을 잠글 수 있습니다. 원격 푸시 전달을 확인하지는 않습니다.",
+      "zh": "10 秒后显示本地测试通知，可以先锁屏。此测试不代表远程推送已经接通。"
+    },
+    "테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.": {
+      "en": "Could not schedule the test. Check system notification settings.",
+      "ko": "테스트를 예약할 수 없습니다. 시스템 알림 설정을 확인하세요.",
+      "zh": "测试通知未能创建，请检查系统通知设置。"
+    },
+    "카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.": {
+      "en": "Camera access denied. Paste the gateway address instead.",
+      "ko": "카메라 액세스가 거부되었습니다. 대신 게이트웨이 주소를 붙여넣으세요.",
+      "zh": "未获得相机权限，请粘贴网关地址。"
+    },
+    "확인 중…": {
+      "en": "Checking…",
+      "ko": "확인 중…",
+      "zh": "检查中…"
+    },
+    "온라인": {
+      "en": "Online",
+      "ko": "온라인",
+      "zh": "在线"
+    },
+    "연결할 수 없음": {
+      "en": "Unreachable",
+      "ko": "연결할 수 없음",
+      "zh": "暂不可达"
+    },
+    "스캔 취소": {
+      "en": "Cancel scan",
+      "ko": "스캔 취소",
+      "zh": "取消扫码"
+    },
+    "컴퓨터 게이트웨이에서 제공한 전체 HTTPS 주소 또는 LAN HTTP 주소를 입력하세요. 사용자 정보나 쿼리 매개변수는 사용할 수 없습니다.": {
+      "en": "Enter the full HTTPS or local HTTP URL from your computer gateway. Credentials and query parameters are not allowed.",
+      "ko": "컴퓨터 게이트웨이에서 제공한 전체 HTTPS 주소 또는 LAN HTTP 주소를 입력하세요. 사용자 정보나 쿼리 매개변수는 사용할 수 없습니다.",
+      "zh": "输入电脑网关提供的完整 HTTPS 地址或局域网 HTTP 地址，不允许包含凭据或查询参数。"
+    },
+    "실행 중": {
+      "en": "Running",
+      "ko": "실행 중",
+      "zh": "运行中"
+    },
+    "응답을 기다리는 중": {
+      "en": "Waiting for you",
+      "ko": "응답을 기다리는 중",
+      "zh": "等待你的回复"
+    },
+    "응답 완료": {
+      "en": "Turn completed",
+      "ko": "응답 완료",
+      "zh": "回复完成"
+    },
+    "앱을 열어 동기화하세요": {
+      "en": "Open app to sync",
+      "ko": "앱을 열어 동기화하세요",
+      "zh": "打开应用以同步"
+    },
+    "연결 끊김": {
+      "en": "Disconnected",
+      "ko": "연결 끊김",
+      "zh": "连接已断开"
+    },
+    "연결됨": {
+      "en": "Connected",
+      "ko": "연결됨",
+      "zh": "已连接"
+    }
+  }
+}

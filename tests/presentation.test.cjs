@@ -17,9 +17,8 @@ test('invalid or older saved appearance values keep the page readable',()=>{
   assert.equal(normalize({}).showToolImages,true);
   assert.equal(normalize({showToolImages:'false'}).showToolImages,true);
   assert.equal(normalize({showToolImages:false}).showToolImages,false);
-  assert.equal(normalize({}).expandReasoning,true);
-  assert.equal(normalize({expandReasoning:false}).expandReasoning,false);
-  assert.equal(normalize({expandReasoning:'false'}).expandReasoning,true);
+  for(const expandReasoning of [true,false,'false'])assert.deepEqual(normalize({expandReasoning}),defaults);
+  assert.equal(Object.hasOwn(normalize({expandReasoning:true}),'expandReasoning'),false);
 });
 
 function luminance(hex){

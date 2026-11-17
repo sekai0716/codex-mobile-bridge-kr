@@ -1576,8 +1576,8 @@ class HttpTests(unittest.TestCase):
     def test_gateway_language_updates_without_restart_and_before_login(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as folder:
             self.server.ui_language_path = Path(folder) / 'ui-language.json'
-            self.assertEqual(self.request('GET', '/api/auth')[2]['uiLanguage'], 'ko')
-            for value, expected in [('{"language":"en"}', 'en'), ('{"language":"ko"}', 'ko'), ('broken', 'ko')]:
+            self.assertIsNone(self.request('GET', '/api/auth')[2]['uiLanguage'])
+            for value, expected in [('{"language":"en"}', 'en'), ('{"language":"ko"}', 'ko'), ('{"language":"zh"}', 'zh'), ('broken', None)]:
                 self.server.ui_language_path.write_text(value)
                 status, _, data = self.request('GET', '/api/auth')
                 self.assertEqual(status, 200)

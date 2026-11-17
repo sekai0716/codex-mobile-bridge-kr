@@ -393,16 +393,42 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
     history = state.get("turnHistory", {}).get("history", {})
     settings = state.get('latestThreadSettings') or {}
     tier = settings if 'serviceTier' in settings else (turns[-1].get('params') or {}) if turns else {}
+    reasoning_line, reasoning_turn_id = latest_reasoning_line(state)
     return {"id": state.get("id", state.get("sessionId")), "title": state.get("title") or "이름없는 채팅",
             "cwd": state.get("cwd"), "model": state.get("latestModel"), "provider": state.get("modelProvider"), "effort": state.get("latestReasoningEffort") or (state.get("latestThreadSettings") or {}).get("effort"),
             "connected": connected, "status": state.get("threadRuntimeStatus", {}).get("type", "idle"),
             "permissionMode": permission_mode(state),
             "contextUsage": context_usage(state),
+            "reasoningSummary": reasoning_line, "reasoningTurnId": reasoning_turn_id,
             "collaborationMode": (state.get("latestCollaborationMode") or {}).get("mode"),
             **({'serviceTier': tier['serviceTier']} if 'serviceTier' in tier else {}),
             "goal": copy.deepcopy(state.get("threadGoal") or state.get("completedThreadGoal")),
             "turns": result, "requests": pending_requests(state), "historyWindowMore": window_more,
             "historyComplete": history.get("isComplete", state.get("turnsPagination", {}).get("hasLoadedOldest", True))}
+
+
+def latest_reasoning_line(state):
+    """현재 진행 중인 turn의 요약에서 마지막 비어 있지 않은 줄만 반환한다."""
+    turns = ordered_turns(state)
+    turn = turns[-1] if turns else {}
+    turn_id = turn.get('turnId') or turn.get('id')
+    if turn.get('status') != 'inProgress':
+        return None, turn_id
+    for item in reversed(items_array(turn.get('items', []))):
+        if item.get('type') != 'reasoning':
+            continue
+        summary = item.get('summary')
+        if not isinstance(summary, list):
+            continue
+        for part in reversed(summary):
+            text = (part if isinstance(part, str) else part.get('text')
+                    if isinstance(part, dict) and part.get('type') in ('summary_text', 'summaryText') else None)
+            if isinstance(text, str):
+                line = next((value.strip() for value in reversed(text.splitlines()) if value.strip()), None)
+                if line:
+                    return line, turn_id
+    # 빈 summary는 content의 추론 본문으로 대체하지 않는다.
+    return None, turn_id
 
 
 def pending_requests(state):

@@ -28,16 +28,16 @@ test('CLI creation picker offers existing and custom folders with an accurate ac
   assert.equal($('new-chat-submit').textContent,'Create and open');
   assert.equal($('new-chat-project').children.some(option=>option.value==='__directory__'),true);
 });
-function node(){return {dataset:{},setAttribute(){},addEventListener(){},hidden:false,disabled:false,value:'',textContent:'',title:'',children:[],scrollTop:0,classList:{toggle(){}},append(...parts){this.children.push(...parts);},replaceChildren(...parts){this.children=parts;},querySelector(){return node();}};}
+function node(){return {dataset:{},setAttribute(){},addEventListener(){},hidden:false,disabled:false,value:'',textContent:'',title:'',children:[],scrollTop:0,classList:{toggle(){},add(){}},append(...parts){this.children.push(...parts);},replaceChildren(...parts){this.children=parts;},querySelector(){return node();}};}
 function fixture(){
   const nodes=new Map();const $=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};
   const ctx={CliConnectionsPanel:class{},api:async()=>{},contextCompacting:new Set(),uuid:()=>"fixture-id",toast(){},window:{},SessionMenu:class{bind(){}},pinRow:row=>row,$ ,state:null,reconnectFailure:null,listRows:[],availableSources:[],listRenderStamp:'',listComplete:false,listReadFinished:false,listHasMore:false,currentId:'a',currentHost:'local',sending:false,catalogStarted:false,catalogLoads:0,startCatalog(){ctx.catalogLoads++;},selectedSkills:new Set(),invalidSkills:new Set(),renderSkillPills(){},BridgeI18n:{locale:()=> 'en-US'},t:key=>({'이 컴퓨터':'This computer','기타 소스':'Other source','저장된 기록':'History','다시 연결':'Reconnect','계속 채팅':'Continue chat'}[key]||key),localStorage:{getItem:()=>null,setItem(){}},dateText:()=> 'today',el:(tag,cls='',value='')=>Object.assign(node(),{tag,cls,textContent:value,dataset:{}}),renderActivity(){},contextUsageControl:{update(){}},fastModeControl:{sync(){}},visibleChat:()=>false,sessionActivity:{read(){}},attachments:{ready:()=>true},workModes:{render(view){ctx.modesView=view;}},workbench:{current:{},setAttachedParent(){}},chatTimeline:{refreshActions(){}},renderApprovals(rows){ctx.approvals=rows;},renderQueue(){},approvalStamp:'',chatKey:()=> 'local|a'};
   ctx.sendModes={render(){}};
-  ctx.renderFastModeToggle=()=>{};
+  ctx.renderFastModeToggle=()=>{};ctx.renderAccountUsage=()=>{};
   ctx.chatOpenGeneration=0;ctx.modelCatalogGeneration=0;ctx.setTimeout=fn=>fn();ctx.chatTimeline.abort={signal:{aborted:false}};
   ctx.document={createElement:()=>node(),querySelectorAll:()=>[]};ctx.BridgeI18n.language=()=> 'en-US';ctx.BridgeI18n.t=ctx.t;
   vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/features/chat/activity.js'),'utf8'),ctx);
-  vm.runInContext(accessCode+capabilitiesCode+listCode+stateCode+extract('function scheduleCatalog(){','function startCatalog(){'),ctx);
+  vm.runInContext(extract('function renderCodexProgress(',"document.addEventListener('bridge-appearance-change'")+accessCode+capabilitiesCode+listCode+stateCode+extract('function scheduleCatalog(){','function startCatalog(){'),ctx);
   return {ctx,$,nodes};
 }
 const cli={source:'cli',runtime:null,readOnly:true,canSend:false,canInterrupt:false,canApprove:false,canReconnect:false};

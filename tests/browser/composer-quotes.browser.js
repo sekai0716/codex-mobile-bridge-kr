@@ -10,7 +10,7 @@ window.runComposerQuoteLayoutChecks=async function(Quotes=ComposerQuotes){
   check(!!original,provider+' production composer exists');
   const marker=document.createComment('composer test');original.replaceWith(marker);
   const form=original.cloneNode(true);form.querySelectorAll('.composer-quotes,.composer-quote-actions,.composer-quote-selection').forEach(node=>node.remove());
-  const tools=form.querySelector('.composer-tools');for(const button of tools.children)button.hidden=false;
+  const tools=form.querySelector('.composer-tools');for(const button of [...tools.children,...tools.querySelectorAll('button')])button.hidden=false;
   const reminder=tools.querySelector('#notify-button');if(reminder)reminder.textContent='알림이 켜져 있습니다';
   const permission=tools.querySelector('#permissions-button')||tools.children[2];permission.textContent='나를 위한 승인';
   const model=tools.querySelector('#model-name,.ds-model-name');model.textContent=provider==='codex'?'gpt-6-astra':'Claude Opus 4.6';
@@ -25,8 +25,8 @@ window.runComposerQuoteLayoutChecks=async function(Quotes=ComposerQuotes){
    const text=messages.querySelector('.message-body').firstChild,range=document.createRange(),selection=getSelection();range.setStart(text,0);range.setEnd(text,13);selection.removeAllRanges();selection.addRange(range);quotes.capture();
    check(!quotes.action.hidden&&quotes.root.hidden,provider+' selection action does not create an empty preview row');
    const actionBox=quotes.action.getBoundingClientRect(),contextBox=tools.querySelector('.context-usage').getBoundingClientRect(),toggleBox=tools.querySelector('.composer-toggle').getBoundingClientRect();
-   check(Math.abs(toggleBox.top-contextBox.top)<3,provider+' collapse button stays on original toolbar row');
-   if(tools.clientWidth>720)check(quotes.action.previousElementSibling===tools.querySelector('.context-usage')&&Math.abs(actionBox.top-contextBox.top)<2&&actionBox.left>=contextBox.right,provider+' wide action stays beside context usage');
+   check(Math.abs(toggleBox.top-tools.firstElementChild.getBoundingClientRect().top)<3,provider+' collapse button stays on original toolbar row');
+   if(tools.clientWidth>720)check(quotes.action.previousElementSibling===(tools.querySelector('.composer-context-group')||tools.querySelector('.context-usage'))&&Math.abs(actionBox.top-contextBox.top)<2&&actionBox.left>=contextBox.right,provider+' wide action stays beside context usage '+JSON.stringify({toolbar:tools.clientWidth,previous:quotes.action.previousElementSibling?.className,actionTop:actionBox.top,actionLeft:actionBox.left,contextTop:contextBox.top,contextRight:contextBox.right}));
    else check(actionBox.top>=tools.getBoundingClientRect().bottom&&actionBox.width<tools.clientWidth&&actionBox.height<40,provider+' narrow action occupies one compact row without moving toolbar controls');
    check(actionBox.right<=innerWidth,provider+' action fits viewport');
    const originalStyle=form.style.cssText,selectedAction=quotes.action,selectedSnapshot=quotes.snapshot;
@@ -34,7 +34,7 @@ window.runComposerQuoteLayoutChecks=async function(Quotes=ComposerQuotes){
    check(document.activeElement===selectedAction&&quotes.snapshot?.text===selectedSnapshot.text&&input.value==='Existing draft',provider+' same-mode pane resize preserves quote focus selection and draft');
    if(innerWidth>=1000){
     form.style.width='700px';await settle();check(quotes.action.parentElement===quotes.selectionRow&&!quotes.selectionRow.hidden,provider+' narrower pane moves action into compact slot');
-    form.style.width='900px';await settle();check(quotes.action.previousElementSibling===tools.querySelector('.context-usage')&&quotes.selectionRow.hidden,provider+' wider pane restores action beside context usage');
+    form.style.width='900px';await settle();check(quotes.action.previousElementSibling===(tools.querySelector('.composer-context-group')||tools.querySelector('.context-usage'))&&quotes.selectionRow.hidden,provider+' wider pane restores action beside context usage');
     check(quotes.action===selectedAction&&quotes.snapshot?.text===selectedSnapshot.text&&input.value==='Existing draft'&&!quotes.quotes.length,provider+' mode crossing preserves selection identity and draft without adding quotes');
    }
    form.style.cssText=originalStyle;await settle();

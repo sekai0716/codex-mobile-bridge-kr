@@ -36,7 +36,8 @@ async function runChatReadingStateChecks(){
       viewport=container=view.messages;
     }
     try{
-      const positions={thought:210,tool:330};
+      check(!getNode('thought').isConnected||getNode('thought').hidden,provider+' reasoning is absent from the visible timeline');
+      const positions={tool:330};
       for(const id of Object.keys(positions))getNode(id).open=true;
       await frame();await frame();
       for(const [id,top] of Object.entries(positions)){
@@ -44,12 +45,12 @@ async function runChatReadingStateChecks(){
         check(body.scrollTop===top,provider+' '+id+' is independently scrollable');
       }
       viewport.scrollTop=140;await frame();
-      const outerTop=viewport.scrollTop,original=getNode('thought');
+      const outerTop=viewport.scrollTop,original=getNode('tool');
       const mutations=[];const observer=new MutationObserver(records=>mutations.push(...records));observer.observe(container,{childList:true});
       for(let i=0;i<3;i++)apply(rows);
       await frame();observer.disconnect();
       check(!mutations.length,provider+' unchanged refresh does not detach any message');
-      check(getNode('thought')===original,provider+' unchanged message identity is stable');
+      check(getNode('tool')===original,provider+' unchanged message identity is stable');
       check(Math.abs(viewport.scrollTop-outerTop)<2,provider+' unchanged refresh retains outer reading position');
       const retained=label=>{for(const [id,top] of Object.entries(positions)){
         const node=getNode(id);check(node.open&&node.querySelector('.activity-body').scrollTop===top,provider+' '+label+' retains '+id+' expansion and inner position');
@@ -60,18 +61,18 @@ async function runChatReadingStateChecks(){
       rows=rows.map(message=>message.id==='tool'?{...message,order:.5}:message).sort((a,b)=>a.order-b.order);
       apply(rows);await frame();await frame();retained('reordering rows');
       if(view){rows=rows.filter(message=>message.id!=='before');apply(rows);await frame();retained('removing a different row');}
-      rows=rows.map(message=>message.id==='thought'?{...message,text:message.text+'\nNew thought line',version:'v2'}:message);
-      apply(rows);await frame();await frame();retained('growing an expanded summary');
-      check(getNode('thought').textContent.includes('New thought line'),provider+' updated summary is rendered');
+      rows=rows.map(message=>message.id==='tool'?{...message,text:message.text+'\nNew activity line',version:'v2'}:message);
+      apply(rows);await frame();await frame();retained('growing an expanded activity');
+      check(getNode('tool').textContent.includes('New activity line'),provider+' updated activity is rendered');
       if(view){
         view.applyDetail({...detail(rows),files:[{id:'new-file',path:'example.md',reference:'example.md'}]});
       }else{
-        rows=rows.map(message=>message.id==='thought'?{...message,status:'completed'}:message);apply(rows);
+        rows=rows.map(message=>message.id==='tool'?{...message,status:'completed'}:message);apply(rows);
       }
       await frame();await frame();retained('metadata refresh');
-      rows=rows.map(message=>message.id==='thought'?{...message,text:'Short summary',version:'v3'}:message);
+      rows=rows.map(message=>message.id==='tool'?{...message,text:'Short activity',version:'v3'}:message);
       apply(rows);await frame();await frame();
-      check(getNode('thought').open&&getNode('thought').querySelector('.activity-body').scrollTop===0,provider+' shrinking summary clamps to its actual range');
+      check(getNode('tool').open&&getNode('tool').querySelector('.activity-body').scrollTop===0,provider+' shrinking activity clamps to its actual range');
       if(view){view.prepareChat('different-chat');apply(rows);}else apply(rows,true);
       await frame();check(!getNode('tool').open&&getNode('tool').querySelector('.activity-body').scrollTop===0,provider+' new conversation does not inherit expansion or scroll');
     }finally{view?.clear();timeline?.dispose();root.remove();}

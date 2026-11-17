@@ -1,7 +1,7 @@
 'use strict';
 // Appearance is local to this browser; no desktop or account settings are changed.
 const ChatAppearance=(()=>{
-  const defaults={theme:'system',accent:'#4664ed',fontSize:16,codeSize:13,density:'standard',showReasoning:true,expandReasoning:true,showProcess:true,showToolImages:true,showActivity:true,showComputer:true,showPushplus:true,showAccounts:true,showFileThumbnails:true};
+  const defaults={theme:'system',accent:'#4664ed',fontSize:16,codeSize:13,density:'standard',showReasoning:true,showProcess:true,showToolImages:true,showActivity:true,showComputer:true,showPushplus:true,showAccounts:true,showFileThumbnails:true};
   function normalize(value={}){
     if(!value||typeof value!=='object')value={};
     return {theme:['system','light','dark'].includes(value.theme)?value.theme:defaults.theme,
@@ -10,7 +10,6 @@ const ChatAppearance=(()=>{
       codeSize:Number.isInteger(value.codeSize)&&value.codeSize>=8&&value.codeSize<=28?value.codeSize:defaults.codeSize,
       density:['compact','standard','relaxed'].includes(value.density)?value.density:defaults.density,
       showReasoning:typeof value.showReasoning==='boolean'?value.showReasoning:defaults.showReasoning,
-      expandReasoning:typeof value.expandReasoning==='boolean'?value.expandReasoning:defaults.expandReasoning,
       showProcess:typeof value.showProcess==='boolean'?value.showProcess:defaults.showProcess,
       showToolImages:typeof value.showToolImages==='boolean'?value.showToolImages:defaults.showToolImages,
       showPushplus:typeof value.showPushplus==='boolean'?value.showPushplus:defaults.showPushplus,
@@ -62,7 +61,6 @@ if(typeof document!=='undefined')(()=>{
     window.BridgeWorkbench?.setThumbnails(settings.showFileThumbnails);
     get('appearance-pushplus').checked=settings.showPushplus;get('appearance-accounts').checked=settings.showAccounts;
     root.dataset.showReasoning=String(settings.showReasoning);root.dataset.showProcess=String(settings.showProcess);
-    root.dataset.expandReasoning=String(settings.expandReasoning);get('appearance-expand-reasoning').checked=settings.expandReasoning;
     root.dataset.showToolImages=String(settings.showToolImages);
     get('appearance-tool-images').checked=settings.showToolImages;
     if(typeof chatTimeline!=='undefined')chatTimeline?.setVisibility(settings);
@@ -78,7 +76,7 @@ if(typeof document!=='undefined')(()=>{
     get('appearance-activity').checked=settings.showActivity;get('appearance-reasoning').checked=settings.showReasoning;get('appearance-process').checked=settings.showProcess;
     document.querySelectorAll('[data-accent]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.accent===settings.accent.toLowerCase())));
   }
-  function change(values){preserveReading(()=>{settings=ChatAppearance.normalize({...settings,...values});apply();save();if(Object.hasOwn(values,'theme'))document.dispatchEvent(new CustomEvent('bridge-theme-change',{detail:{theme:settings.theme}}));});}
+  function change(values){preserveReading(()=>{settings=ChatAppearance.normalize({...settings,...values});apply();save();document.dispatchEvent(new CustomEvent('bridge-appearance-change'));if(Object.hasOwn(values,'theme'))document.dispatchEvent(new CustomEvent('bridge-theme-change',{detail:{theme:settings.theme}}));});}
   function nativeTheme(){
     const value=window.BridgeNativeTheme;
     if(!value||!['system','light','dark'].includes(value.theme)||typeof value.dark!=='boolean')return;
@@ -117,7 +115,6 @@ if(typeof document!=='undefined')(()=>{
   get('appearance-code').oninput=()=>change({codeSize:Number(get('appearance-code').value)});
   get('appearance-density').onchange=()=>change({density:get('appearance-density').value});
   get('appearance-reasoning').onchange=()=>change({showReasoning:get('appearance-reasoning').checked});
-  get('appearance-expand-reasoning').onchange=()=>change({expandReasoning:get('appearance-expand-reasoning').checked});
   get('appearance-computer').onchange=()=>change({showComputer:get('appearance-computer').checked});
   get('appearance-activity').onchange=()=>change({showActivity:get('appearance-activity').checked});
   get('appearance-file-thumbnails').onchange=()=>change({showFileThumbnails:get('appearance-file-thumbnails').checked});

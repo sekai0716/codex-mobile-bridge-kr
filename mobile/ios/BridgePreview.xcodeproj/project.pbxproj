@@ -18,6 +18,8 @@ B00000000000000000000017 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXBuildFile section */
+FA7100000000000000000002 /* MobileLocaleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7100000000000000000001; };
+FA7100000000000000000003 /* MobileLocaleData.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = FA7100000000000000000001; };
 FA6000000000000000000001 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = FA6000000000000000000002; };
 FA6000000000000000000003 /* NOTICE in Resources */ = {isa = PBXBuildFile; fileRef = FA6000000000000000000004; };
 F50000000000000000000003 = {isa = PBXBuildFile; fileRef = F50000000000000000000002; };
@@ -61,6 +63,7 @@ F40000000000000000000013 = {isa = PBXBuildFile; fileRef = F100000000000000000000
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+FA7100000000000000000001 /* MobileLocaleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileLocaleData.swift; sourceTree = "<group>"; };
 FA6000000000000000000002 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = ../../LICENSE; sourceTree = SOURCE_ROOT; };
 FA6000000000000000000004 /* NOTICE */ = {isa = PBXFileReference; lastKnownFileType = text; path = ../../NOTICE; sourceTree = SOURCE_ROOT; };
 F50000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DshMobile.swift; sourceTree = "<group>"; };
@@ -136,6 +139,7 @@ B00000000000000000000004, F40000000000000000000004,
 				F50000000000000000000000,
                 F50000000000000000000002,
                 A00000000000000000000020 /* App.swift */,
+                FA7100000000000000000001 /* MobileLocaleData.swift */,
                 DD1130000000000000000001 /* UURemote.swift */,
 E00000000000000000000001 /* WebScripts.swift */,
 D00000000000000000000001,
@@ -246,6 +250,7 @@ F40000000000000000000016 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147
 				F50000000000000000000001,
                 F50000000000000000000003,
                 A00000000000000000000030 /* App.swift in Sources */,
+                FA7100000000000000000002 /* MobileLocaleData.swift in Sources */,
                 DD1130000000000000000002 /* UURemote.swift in Sources */,
 E00000000000000000000002 /* WebScripts.swift in Sources */,
 D00000000000000000000002,
@@ -256,7 +261,7 @@ F30000000000000000000001, F4000000000000000000000A,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-B00000000000000000000015 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B0000000000000000000000C, B0000000000000000000000D,); runOnlyForDeploymentPostprocessing = 0; };
+B00000000000000000000015 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B0000000000000000000000C, B0000000000000000000000D,FA7100000000000000000003,); runOnlyForDeploymentPostprocessing = 0; };
 F40000000000000000000015 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (F4000000000000000000000C,F4000000000000000000000D,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 

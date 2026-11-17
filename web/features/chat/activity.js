@@ -11,7 +11,7 @@ function renderChatMessageTime(container,value,now=new Date()){
   const locale=typeof BridgeI18n==='undefined'?'ko-KR':BridgeI18n.locale();
   const clock=[date.getHours(),date.getMinutes()].map(n=>String(n).padStart(2,'0')).join(':');
   const sameYear=date.getFullYear()===now.getFullYear(),sameDay=sameYear&&date.getMonth()===now.getMonth()&&date.getDate()===now.getDate();
-  const prefix=sameDay?'':(/^ko/.test(locale)?`${sameYear?'':date.getFullYear()+'년도'}${date.getMonth()+1}달${date.getDate()}낮`:new Intl.DateTimeFormat(locale,{...(sameYear?{}:{year:'numeric'}),month:'numeric',day:'numeric'}).format(date))+' ';
+  const prefix=sameDay?'':new Intl.DateTimeFormat(locale,{...(sameYear?{}:{year:'numeric'}),month:'numeric',day:'numeric'}).format(date)+' ';
   const time=document.createElement('time');time.className='message-time';time.dateTime=date.toISOString();time.textContent=prefix+clock;
   time.title=new Intl.DateTimeFormat(locale,{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'short'}).format(date);
   time.setAttribute('aria-label',time.title);container.append(time);
@@ -72,13 +72,31 @@ function syncChatMessageNodes(container,nodes){
   for(const [node,state] of reading)restoreChatActivityState(node,state);
 }
 // All chat surfaces render native task evidence through this shared indicator.
-function renderChatProgress(node,{agentName='',active=false,waiting=false,blocked=false,connected=true,fresh=true}={}){
+function chatLastNonEmptyLine(value){return typeof value==='string'?value.split(/[\r\n\u2028\u2029]+/).map(line=>line.trim()).filter(Boolean).at(-1)||'':'';}
+function chatLatestReasoning(messages=[]){
+  for(let index=messages.length-1;index>=0;index--){const message=messages[index];if(message.role==='user')break;if(message.role==='reasoning'||message.kind==='reasoning'){const line=chatLastNonEmptyLine(message.text);if(line)return line;}}
+  return '';
+}
+function chatActivityLabel(row){
+  const t=BridgeI18n.t,kind=row.kind||row.type,auto=kind==='autoContextCompaction';
+  if(kind!=='contextCompaction'&&!auto)return t(row.title||kind)+(row.status==='inProgress'?t('· 진행중'):'');
+  const status=row.status||(row.turnStatus==='completed'?'completed':null);
+  const key=status==='inProgress'?(auto?'Automatically compacting context':'Compacting context'):status==='completed'?(auto?'Context automatically compacted':'Context compacted'):status==='failed'?'Context compaction failed':status==='interrupted'?'Context compaction interrupted':auto?'Automatic context compaction':'Context compaction';
+  return t(key);
+}
+function renderChatProgress(node,{agentName='',active=false,waiting=false,blocked=false,connected=true,fresh=true,reasoningSummary='',reasoningScope=''}={}){
   const state=!connected||!fresh?'unknown':waiting?'waiting':active?'working':blocked?'blocked':'idle';
-  const text={unknown:'실행 상태를 일시적으로 사용할 수 없습니다.',waiting:'귀하의 확인을 기다리고 있습니다',blocked:'작업이 차단되었습니다. 공지를 확인해주세요.',working:'일하고 있는…',idle:''}[state];
+  const text={unknown:'실행 상태를 일시적으로 사용할 수 없습니다.',waiting:'귀하의 확인을 기다리고 있습니다',blocked:'작업이 차단되었습니다. 공지를 확인해주세요.',working:'Thinking',idle:''}[state];
   node.hidden=state==='idle';node.dataset.state=state;node.setAttribute('role','status');node.setAttribute('aria-live','polite');
-  const key=JSON.stringify([state,agentName,BridgeI18n.language()]);if(node.dataset.progress===key)return state;node.dataset.progress=key;
+  node.classList.add('chat-progress');
+  if(node._reasoningScope!==reasoningScope||!active||!connected||!fresh){node._reasoningLine='';node._reasoningScope=reasoningScope;}
+  const incoming=chatLastNonEmptyLine(reasoningSummary);if(incoming&&active&&connected&&fresh)node._reasoningLine=incoming;
+  const summary=state==='working'&&document.documentElement?.dataset?.showReasoning!=='false'?node._reasoningLine||'':'';
+  const key=JSON.stringify([state,agentName,summary,BridgeI18n.language()]);if(node.dataset.progress===key)return state;node.dataset.progress=key;
   node.replaceChildren();if(state==='working'){const dot=document.createElement('i');dot.setAttribute('aria-hidden','true');node.append(dot);}
-  const label=document.createElement('span');label.textContent=[agentName,BridgeI18n.t(text)].filter(Boolean).join(' ');node.append(label);return state;
+  const label=document.createElement('span');label.className='chat-progress-label';label.textContent=[agentName,BridgeI18n.t(text)].filter(Boolean).join(' ');node.append(label);
+  if(summary){const line=document.createElement('span');line.className='chat-progress-summary';line.textContent='ㆍ'+summary;line.title=summary;node.append(line);}
+  return state;
 }
 class SessionActivity {
   constructor({storage=localStorage,key='bridge-session-activity'}={}){this.storage=storage;this.key=key;try{this.rows=JSON.parse(storage.getItem(key)||'{}');}catch{this.rows={};}}

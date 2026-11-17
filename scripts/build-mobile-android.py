@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+subprocess.run([sys.executable, str(ROOT/'scripts/generate-mobile-locales.py'), '--check'], check=True)
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--output-dir', type=Path, default=ROOT/'dist/mobile-preview')
 parser.add_argument('--keystore', type=Path, required=True)

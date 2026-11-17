@@ -44,7 +44,7 @@ async function fixture({missing='',auth='anonymous',hash='',language='ko',pairPe
   require('./fixtures/codex-entry-predicates.cjs')(context);
   const run=file=>vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
   if(missing!=='bootstrap')run('web/shared/bootstrap.js');
-  const dependencies=['web/hosts/environment.js','web/hosts/browser-navigation.js','web/shared/i18n.js','web/features/chat/list-sync.js','web/features/accounts/account.js','web/features/accounts/api-editor.js','web/features/accounts/accounts.js','web/features/chat/modes.js','web/features/chat/attachments.js','web/features/chat/activity.js','web/features/chat/fast-mode.js','web/features/chat/message-actions.js','web/features/chat/permissions.js','web/features/chat/composer-commands.js'];
+  const dependencies=['web/hosts/environment.js','web/hosts/browser-navigation.js','web/shared/locales/en.js','web/shared/locales/ko-KR.js','web/shared/locales/zh-CN.js','web/shared/locales/legacy.js','web/shared/i18n.js','web/features/chat/list-sync.js','web/features/accounts/account.js','web/features/accounts/api-editor.js','web/features/accounts/accounts.js','web/features/chat/modes.js','web/features/chat/attachments.js','web/features/chat/activity.js','web/features/chat/fast-mode.js','web/features/chat/message-actions.js','web/features/chat/permissions.js','web/features/chat/account-usage.js','web/features/chat/composer-commands.js'];
   for(const file of dependencies){if(file.endsWith('/'+missing+'.js'))continue;run(file);}
   try{run('web/shell/app.js');}catch(e){error=e;dispatch('error',{target:window,filename:'https://gateway.test/app.js',error:e,message:e.message});}
   await new Promise(setImmediate);
@@ -65,14 +65,14 @@ test('missing dependency fails in the real synchronous app chain before auth and
   for(const missing of ['i18n','activity']){
     const ui=await fixture({missing});assert.ok(ui.error);assert.equal(ui.requests.length,0);
     assert.equal(ui.nodes.get('login').hidden,true);assert.equal(ui.nodes.get('app').hidden,true);
-    assert.equal(ui.nodes.get('bootstrap-status').hidden,false);assert.match(ui.nodes.get('bootstrap-message').textContent,/페이지 구성 요소/);
+    assert.equal(ui.nodes.get('bootstrap-status').hidden,false);assert.match(ui.nodes.get('bootstrap-message').textContent,/화면 구성요소/);
   }
 });
 
 test('auth hard deadline reports failure without submitting writes',async()=>{
   const ui=await fixture({auth:'pending'});ui.timeout();ui.timeout();
   assert.deepEqual(ui.requests,['/api/auth']);assert.equal(ui.writes.length,0);assert.equal(ui.nodes.get('login').hidden,true);
-  assert.match(ui.nodes.get('bootstrap-message').textContent,/게이트웨이가 응답할 때까지 기다리는 데 오랜 시간이 걸립니다\. 네트워크와 컴퓨터 게이트웨이를 확인하고 다시 로드하세요\.。/);
+  assert.match(ui.nodes.get('bootstrap-message').textContent,/게이트웨이 응답이 지연되고 있습니다\. 네트워크와 PC 게이트웨이를 확인한 뒤 새로고침하세요\./);
   ui.nodes.get('bootstrap-retry').onclick();assert.equal(ui.reloads,1);assert.equal(ui.location.href,'https://gateway.test/?view=phone');
 });
 
@@ -88,7 +88,7 @@ test('startup diagnostics show script path and error type without URL secrets or
   ui.dispatch('error',{target:ui.window,filename:'https://gateway.test/app.js?token=private-query#private-fragment',lineno:17,
     error:{name:'TypeError',message:'private-exception-text'},message:'private-event-text'});
   const text=ui.nodes.get('bootstrap-diagnostics').textContent;
-  assert.match(text,/진단 시작/);assert.match(text,/TypeError @ \/app\.js:17/);assert.match(text,/auth/);
+  assert.match(text,/시작 진단/);assert.match(text,/TypeError @ \/app\.js:17/);assert.match(text,/auth/);
   assert.doesNotMatch(text,/private-|gateway\.test/);
 });
 
@@ -153,7 +153,7 @@ test('manual retry preserves an unsubmitted pairing fragment after app.js has al
 test('unknown pairing writes are not replayed by reload and instead request a new scan',async()=>{
   const ui=await fixture({hash:'#pair=submitted-token',pairPending:true});ui.timeout();
   assert.equal(ui.location.hash,'');assert.equal(ui.writes.length,1);assert.equal(ui.writes[0].url,'/api/pair');
-  assert.match(ui.nodes.get('bootstrap-message').textContent,/새 페어링 코드를 다시 스캔하세요./);
+  assert.match(ui.nodes.get('bootstrap-message').textContent,/새 페어링 코드를 스캔하세요\./);
   ui.nodes.get('bootstrap-retry').onclick();assert.equal(ui.location.hash,'');assert.equal(ui.writes.length,1);assert.equal(ui.reloads,1);
 });
 

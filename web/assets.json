@@ -41,7 +41,7 @@
   "/list-sync.js": "features/chat/list-sync.js",
   "/message-actions.js": "features/chat/message-actions.js",
   "/modes.js": "features/chat/modes.js",
-  "/permissions.js": "features/chat/permissions.js",
+  "/permissions.js": ["features/chat/permissions.js", "features/chat/account-usage.js"],
   "/timeline.js": "features/chat/timeline.js",
   "/account.css": "features/accounts/account.css",
   "/account.js": "features/accounts/account.js",
@@ -89,7 +89,13 @@
   "/code-syntax.js": "shared/code-syntax.js",
   "/vendor/prism/source-view.min.js": "vendor/prism/source-view.min.js",
   "/presentation.js": "features/settings/presentation.js",
-  "/i18n.js": "shared/i18n.js",
+  "/i18n.js": [
+    "shared/locales/en.js",
+    "shared/locales/ko-KR.js",
+    "shared/locales/zh-CN.js",
+    "shared/locales/legacy.js",
+    "shared/i18n.js"
+  ],
   "/markdown.js": [
     "shared/mermaid-renderer.js",
     "shared/mermaid-viewer.js",

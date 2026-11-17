@@ -8,7 +8,7 @@ async function prepare(page){
   await page.evaluate(async()=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
-    const fixture=window.sendControlsFixture={writes:[],settingsWrites:[],queueWrites:[],uploadWrites:[],edits:[],managedQueue:[],details:[],reply:'accepted'};
+    const fixture=window.sendControlsFixture={writes:[],quotaReads:[],settingsWrites:[],queueWrites:[],uploadWrites:[],edits:[],managedQueue:[],details:[],reply:'accepted'};
     fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',draftAccountIdentity:'c'.repeat(64),permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
     fixture.reason={key:'reason',order:1,role:'activity',kind:'reasoning',title:'추론 요약',text:'추론 요약의 앞부분',truncated:true,version:1};
     fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령을 실행하다',text:'명령 출력',truncated:false,version:1},...(fixture.extraRows||[])]});
@@ -38,6 +38,7 @@ async function prepare(page){
         const finish=()=>{fixture.meta={...fixture.meta,serviceTier:body.fastMode?'priority':'default'};return response({applied:true,confirmed:true,serviceTier:fixture.meta.serviceTier});};
         return fixture.holdSettings?new Promise(resolve=>fixture.finishSettings=()=>resolve(finish())):finish();
       }
+      if(path.pathname==='/api/account'){fixture.quotaReads.push(path.search);return response({visible:true,limits:[{id:'codex',name:'Codex',windows:[{windowDurationMins:300,remainingPercent:0,resetsAt:1800000000},{windowDurationMins:10080,remainingPercent:75,resetsAt:1800500000}]}]});}
       if(path.pathname.endsWith('/notifications'))return response({available:false});
       return original(url,options);
     };
@@ -164,54 +165,65 @@ test('native activity headings and permissions use requested Korean and switch b
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
 });
 
-test('reasoning default expansion can be switched off, persisted and switched on',async({page})=>{
+test('reasoning uses the last nonempty line beside Thinking and never renders timeline items',async({page},testInfo)=>{
   await prepare(page);
-  const reason=page.locator('#messages [data-key=reason]'),toggle=page.locator('#appearance-expand-reasoning');
-  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
-  await expect(toggle).toBeChecked();await toggle.uncheck();
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('bridge-appearance')).expandReasoning)).toBe(false);
-  await page.evaluate(()=>document.getElementById('appearance-dialog').close());
-  await expect(reason).not.toHaveAttribute('open','');
-  await prepare(page);await expect(reason).not.toHaveAttribute('open','');
-  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
-  await expect(toggle).not.toBeChecked();await toggle.check();
-  await page.evaluate(()=>document.getElementById('appearance-dialog').close());
-  await expect(reason).toHaveAttribute('open','');
-  await reason.locator('summary').click();
-  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
-  await toggle.uncheck();await toggle.check();
-  await page.evaluate(()=>document.getElementById('appearance-dialog').close());
-  await expect(reason).not.toHaveAttribute('open','');
+  const working=page.locator('#working');
+  await expect(page.locator('#appearance-expand-reasoning')).toHaveCount(0);
+  await expect(page.locator('#messages [data-key=reason]')).toHaveCount(0);
+  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningTurnId:'first',reasoningSummary:'첫 번째 줄\n마지막 요약 한 줄\n  '}));
+  await expect(working).toHaveText('Codex 생각 중ㆍ마지막 요약 한 줄');
+  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningSummary:' \n'}));
+  await expect(working).toHaveText('Codex 생각 중ㆍ마지막 요약 한 줄');
+  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningSummary:'한 줄로만 표시해야 하는 긴 요약입니다. '.repeat(40)}));
+  for(const width of [320,390,1280]){
+    await page.setViewportSize({width,height:844});
+    const summary=working.locator('.chat-progress-summary');
+    expect(await summary.evaluate(n=>({nowrap:getComputedStyle(n).whiteSpace,overflow:getComputedStyle(n).textOverflow,lines:n.getBoundingClientRect().height/parseFloat(getComputedStyle(n).lineHeight)}))).toMatchObject({nowrap:'nowrap',overflow:'ellipsis'});
+    expect(await summary.evaluate(n=>{const range=document.createRange();range.selectNodeContents(n);const tops=[...range.getClientRects()].map(r=>r.top);return Math.max(...tops)-Math.min(...tops);})).toBeLessThan(3);
+    expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
+    await page.screenshot({path:testInfo.outputPath(`reasoning-one-line-${width}.png`)});
+  }
+  await page.evaluate(()=>{const n=document.getElementById('appearance-reasoning');n.checked=false;n.onchange();});
+  await expect(working).toHaveText('Codex 생각 중');
+  await page.evaluate(()=>{const n=document.getElementById('appearance-reasoning');n.checked=true;n.onchange();sendControlsFixture.update('active',{reasoningTurnId:'second',reasoningSummary:''});});
+  await expect(working).toHaveText('Codex 생각 중');
+  await page.evaluate(()=>sendControlsFixture.update('idle'));await expect(working).toBeHidden();
+  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(0);
 });
 
-test('reasoning starts expanded, preserves manual collapse and bounds detail loading',async({page})=>{
+test('compaction states and locale selections work in Korean, English and Chinese',async({page})=>{
   await prepare(page);
-  const reason=page.locator('#messages [data-key=reason]'),tool=page.locator('#messages [data-key=tool]');
-  await expect(reason).toHaveAttribute('open','');await expect(tool).not.toHaveAttribute('open','');
-  await expect(reason.locator('pre')).toHaveText('추론 요약 전체 내용');
-  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(1);
-  await reason.locator('summary').click();await expect(reason).not.toHaveAttribute('open','');
-  await page.evaluate(()=>{
-    const f=sendControlsFixture;f.reason={...f.reason,text:'갱신된 요약 앞부분',version:2};
-    chatTimeline.apply({...f.page(),sequence:2});
-  });
-  await expect(reason).not.toHaveAttribute('open','');
-  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(1);
-  await reason.locator('summary').click();await expect(reason.locator('pre')).toHaveText('추론 요약 전체 내용');
-  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(2);
-  await page.evaluate(()=>{
-    const f=sendControlsFixture;chatTimeline.setVisibility({showReasoning:false});
-    chatTimeline.apply({...f.page(),sequence:3,rows:[{...f.reason,key:'hidden-reason',order:3}]});
-  });
-  await expect(page.locator('#messages [data-key=hidden-reason]')).toBeHidden();
-  // 숨겨진 추론이나 잘리지 않은 요약은 기본 펼침만으로 상세 요청을 늘리지 않는다.
-  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(2);
-  await page.evaluate(()=>{
-    const f=sendControlsFixture;chatTimeline.setVisibility({showReasoning:true});
-    chatTimeline.apply({...f.page(),sequence:4,rows:[{...f.reason,key:'short-reason',order:4,truncated:false,text:'짧은 요약'}]});
-  });
-  await expect(page.locator('#messages [data-key=short-reason]')).toHaveAttribute('open','');
-  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(2);
+  await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'compact',order:3,role:'activity',kind:'contextCompaction',title:'contextCompaction',status:'completed',text:'',version:1},{key:'autocompact',order:4,role:'activity',kind:'autoContextCompaction',title:'autoContextCompaction',status:'inProgress',text:'',version:1}];chatTimeline.apply({...f.page(),sequence:2});});
+  const languages=[['ko','압축됨','자동 압축 중','메시지를 입력하세요'],['en','Context compacted','Automatically compacting context','Message…'],['zh','上下文已压缩','正在自动压缩上下文','输入消息…']];
+  for(const [language,compact,auto,placeholder]of languages){
+    await page.evaluate(language=>{BridgeI18n.setLanguage(language);BridgeI18n.apply();chatTimeline.relabel();},language);
+    await expect(page.locator('#messages [data-key=compact] summary')).toHaveText(compact);
+    await expect(page.locator('#messages [data-key=autocompact] summary')).toHaveText(auto);
+    await expect(page.locator('#message')).toHaveAttribute('placeholder',placeholder);
+  }
+  await page.route('**/api/auth',async route=>{const response=await route.fetch(),data=await response.json();data.uiLanguage=null;await route.fulfill({response,json:data});});
+  await prepare(page);expect(await page.evaluate(()=>BridgeI18n.language())).toBe('zh');
+  await page.evaluate(()=>{BridgeI18n.setLanguage('zh-CN');BridgeI18n.apply();});
+  expect(await page.evaluate(()=>localStorage.getItem('bridge-language'))).toBe('zh');
+  await expect(page.locator('#appearance-language')).toHaveValue('zh');
+});
+
+test('account quota sits next to context, preserves zero and exposes refresh and reset times',async({page},testInfo)=>{
+  await prepare(page);const quota=page.locator('#composer .account-usage');
+  await expect(quota).toContainText('0%');await expect(quota).toContainText('75%');
+  for(const width of [320,390,1280]){
+    await page.setViewportSize({width,height:844});
+    const q=await quota.boundingBox(),c=await page.locator('#composer .context-usage').boundingBox();
+    expect(q.x).toBeGreaterThanOrEqual(c.x+c.width);expect(Math.abs(q.y+q.height/2-c.y-c.height/2)).toBeLessThan(4);
+    expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
+    await page.screenshot({path:testInfo.outputPath(`quota-${width}.png`)});
+  }
+  const initial=await page.evaluate(()=>sendControlsFixture.quotaReads.length);await quota.click();const dialog=page.locator('.account-usage-dialog');
+  await expect(dialog).toContainText('재설정 시간:');await dialog.getByRole('button',{name:'사용 한도 새로고침'}).click();
+  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.quotaReads.length)).toBe(initial+1);
+  expect(await page.evaluate(()=>sendControlsFixture.quotaReads.at(-1))).toContain('cached=0');
+  await dialog.getByRole('button',{name:'닫기',exact:true}).click();
+  await page.evaluate(()=>{currentHost='wsl:fixture';sendControlsFixture.update('active');});await expect(quota).toBeHidden();
 });
 
 test('Fast lightning toggles next to context without changing model, effort or drafts',async({page},testInfo)=>{

@@ -105,5 +105,14 @@ body:has(#app:not([hidden]))>.phone-header{display:none}
 .list-actions .appearance-button{width:40px;height:44px;flex:none}
 
 .context-usage{display:inline-flex;align-items:center;justify-content:center;flex:none;padding:7px;min-width:32px}
+.chat-progress{display:flex;align-items:center;min-width:0;max-width:100%;overflow:hidden;white-space:nowrap}
+.chat-progress-label{flex:none;white-space:nowrap}
+.chat-progress-summary{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-tools:has(>.composer-context-group){flex-wrap:wrap}
+.composer-context-group{display:inline-flex;flex:0 1 15rem;align-items:center;gap:3px;min-width:7rem;max-width:100%}
+.composer-context-group>.fast-mode-toggle{flex:none}
+.account-usage{display:block;flex:1;min-width:0;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.chat-progress>i{flex:none}
+@media(max-width:720px){.composer-context-group{order:2;flex-basis:100%;max-width:15rem}.composer-tools:has(>.composer-context-group)>.composer-toggle{order:1;margin-inline-start:auto}}
 .context-usage-ring{display:block;width:17px;height:17px;border-radius:50%;background:conic-gradient(var(--green) var(--context-percent,0%),var(--line) 0);mask:radial-gradient(circle,transparent 46%,#000 50%);-webkit-mask:radial-gradient(circle,transparent 46%,#000 50%)}
 .context-usage-ring.unknown{background:none;border:2px dashed var(--muted);width:13px;height:13px;mask:none;-webkit-mask:none;opacity:.65}

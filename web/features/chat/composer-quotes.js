@@ -10,15 +10,16 @@ class ComposerQuotes {
     this.action.textContent=translate('선택한 텍스트 인용');
     const context=input.closest('.composer')?.querySelector('.composer-tools .context-usage');
     if(context){
-      const tools=context.parentElement;
+      const tools=context.closest?.('.composer-tools')||context.parentElement;
+      const anchor=context.closest?.('.composer-context-group')||context;
       this.selectionRow=doc.createElement('div');this.selectionRow.className='composer-quote-actions';this.selectionRow.hidden=true;tools.after(this.selectionRow);
-      context.after(this.action);
+      anchor.after(this.action);
       // Measure the real pane: wrapping all toolbar controls can strand the
       // collapse button on a third row, especially with longer model labels.
       this.layoutObserver=new ResizeObserver(()=>{
         if(!tools.clientWidth)return;
         if(tools.clientWidth<=720){if(this.action.parentElement!==this.selectionRow)this.selectionRow.append(this.action);}
-        else if(this.action.previousElementSibling!==context)context.after(this.action);
+        else if(this.action.previousElementSibling!==anchor)anchor.after(this.action);
         this.visibility();
       });
       this.layoutObserver.observe(tools);

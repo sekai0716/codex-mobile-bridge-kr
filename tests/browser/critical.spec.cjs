@@ -4,6 +4,7 @@ const {readFileSync} = require('node:fs');
 const path = require('node:path');
 
 test.beforeEach(async ({context, request, baseURL}) => {
+  await context.addInitScript(()=>{if(!localStorage.getItem('bridge-language'))localStorage.setItem('bridge-language','ko');});
   // Even a test failure must never fall through to a real client or upstream API.
   await context.route('**/*', route => new URL(route.request().url()).origin === baseURL
     ? route.continue() : route.abort());
