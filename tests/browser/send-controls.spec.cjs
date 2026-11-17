@@ -196,7 +196,7 @@ test('reasoning uses the last nonempty line beside Thinking and never renders ti
 test('compaction states and locale selections work in Korean, English and Chinese',async({page})=>{
   await prepare(page);
   await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'compact',order:3,role:'activity',kind:'contextCompaction',title:'contextCompaction',status:'completed',text:'',version:1},{key:'autocompact',order:4,role:'activity',kind:'autoContextCompaction',title:'autoContextCompaction',status:'inProgress',text:'',version:1}];chatTimeline.apply({...f.page(),sequence:2});});
-  const languages=[['ko','압축됨','자동 압축 중','메시지를 입력하세요'],['en','Context compacted','Automatically compacting context','Message…'],['zh','上下文已压缩','正在自动压缩上下文','输入消息…']];
+  const languages=[['ko','컨텍스트 압축됨','컨텍스트 자동 압축 중','메시지를 입력하세요'],['en','Context compacted','Automatically compacting context','Message…'],['zh','上下文已压缩','正在自动压缩上下文','输入消息…']];
   for(const [language,compact,auto,placeholder]of languages){
     await page.evaluate(language=>{BridgeI18n.setLanguage(language);BridgeI18n.apply();chatTimeline.relabel();},language);
     await expect(page.locator('#messages [data-key=compact] summary')).toHaveText(compact);
@@ -208,6 +208,36 @@ test('compaction states and locale selections work in Korean, English and Chines
   await page.evaluate(()=>{BridgeI18n.setLanguage('zh-CN');BridgeI18n.apply();});
   expect(await page.evaluate(()=>localStorage.getItem('bridge-language'))).toBe('zh');
   await expect(page.locator('#appearance-language')).toHaveValue('zh');
+});
+
+test('native compaction source and completed update the same activity before its turn ends',async({page},testInfo)=>{
+  await prepare(page);
+  await page.evaluate(()=>{
+    const f=sendControlsFixture;
+    f.extraRows=[{key:'native-compact',order:3,role:'activity',kind:'contextCompaction',title:'contextCompaction',source:'automatic',completed:false,turnStatus:'completed',text:'',version:1}];
+    chatTimeline.apply({...f.page(),sequence:2});
+    window.nativeCompactionKeys=[...chatTimeline.rows.keys()];
+  });
+  const heading=page.locator('#messages [data-key=native-compact] summary');
+  await expect(heading).toHaveText('컨텍스트 자동 압축 중');
+  await testInfo.attach('native-automatic-compaction',{body:await page.screenshot(),contentType:'image/png'});
+  await page.evaluate(()=>{
+    const f=sendControlsFixture;f.extraRows[0]={...f.extraRows[0],source:'manual',version:2};chatTimeline.apply({...f.page(),sequence:3});
+  });
+  await expect(heading).toHaveText('컨텍스트 압축 중');
+  await page.evaluate(()=>{
+    const f=sendControlsFixture;f.extraRows[0]={...f.extraRows[0],source:'automatic',completed:true,turnStatus:'inProgress',version:3};chatTimeline.apply({...f.page(),sequence:4});
+  });
+  for(const [lang,label]of [['ko','컨텍스트 압축됨'],['en','Context compacted'],['zh','上下文已压缩']]){
+    await page.evaluate(lang=>{BridgeI18n.setLanguage(lang);chatTimeline.relabel();},lang);
+    await expect(heading).toHaveText(label);
+  }
+  await page.evaluate(()=>{BridgeI18n.setLanguage('ko');chatTimeline.relabel();});
+  await expect(heading).toHaveText('컨텍스트 압축됨');
+  await expect(page.locator('#messages [data-key=native-compact]')).toHaveCount(1);
+  expect(await page.evaluate(()=>[...chatTimeline.rows.keys()])).toEqual(await page.evaluate(()=>window.nativeCompactionKeys));
+  expect(await page.evaluate(()=>sendControlsFixture.details.length)).toBe(0);
+  await testInfo.attach('native-completed-compaction',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 test('account quota keeps all toolbar buttons on one row and exposes refresh and reset times',async({page},testInfo)=>{

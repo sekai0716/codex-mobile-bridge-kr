@@ -235,6 +235,14 @@ def normalize_item(item, *, image_cache=None):
         row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
         row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
+    elif kind in ('contextCompaction', 'autoContextCompaction'):
+        row.update(role='activity', title=kind, text=json.dumps(item, ensure_ascii=False, indent=2))
+        # 원본 압축 항목은 status 대신 source와 completed를 사용한다.
+        # 명시적인 False를 누락 값으로 바꾸거나 turn의 완료 상태로 덮지 않는다.
+        if item.get('source') in ('automatic', 'manual'):
+            row['source'] = item['source']
+        if isinstance(item.get('completed'), bool):
+            row['completed'] = item['completed']
     elif kind == 'automaticApprovalReview':
         row.update(role='activity', title='Automatic approval review', text=item.get('rationale') or '',
                    approvalReview={key: value for key, value in approval_review_record(item).items() if key in ('id', 'status', 'riskLevel')},

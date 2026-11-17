@@ -211,13 +211,17 @@ function chatActivityCaption(row){
   return BridgeI18n.t(row.title||row.kind||row.type);
 }
 function chatActivityLabel(row){
-  const t=BridgeI18n.t,kind=row.kind||row.type,auto=kind==='autoContextCompaction';
-  if(kind!=='contextCompaction'&&!auto){
+  const t=BridgeI18n.t,kind=row.kind||row.type;
+  if(kind!=='contextCompaction'&&kind!=='autoContextCompaction'){
     if(kind==='automaticApprovalReview')return chatActivityCaption(row)+chatActivityStateSuffix(row);
     return chatActivityCaption(row)+(chatToolKinds.has(kind)?chatActivityStateSuffix(row):row.status==='inProgress'?t('· 진행중'):'');
   }
-  const status=row.status||(row.turnStatus==='completed'?'completed':null);
-  const key=status==='inProgress'?(auto?'Automatically compacting context':'Compacting context'):status==='completed'?(auto?'Context automatically compacted':'Context compacted'):status==='failed'?'Context compaction failed':status==='interrupted'?'Context compaction interrupted':auto?'Automatic context compaction':'Context compaction';
+  // 실제 source와 완료 플래그를 우선한다. 예전 기록에만 종류·status를 사용하며
+  // completed:false를 turn의 완료만으로 압축 완료로 표시하지 않는다.
+  const auto=row.source==='automatic'||row.source!=='manual'&&kind==='autoContextCompaction';
+  let status=row.status||(row.turnStatus==='completed'?'completed':null);
+  if(typeof row.completed==='boolean'&&!['failed','interrupted'].includes(row.status))status=row.completed?'completed':'inProgress';
+  const key=status==='inProgress'?(auto?'Automatically compacting context':'Compacting context'):status==='completed'?'Context compacted':status==='failed'?'Context compaction failed':status==='interrupted'?'Context compaction interrupted':auto?'Automatic context compaction':'Context compaction';
   return t(key);
 }
 function renderChatProgress(node,{agentName='',active=false,waiting=false,blocked=false,connected=true,fresh=true,reasoningSummary='',reasoningScope=''}={}){
