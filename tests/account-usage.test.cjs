@@ -13,7 +13,7 @@ const limits=(remaining=0)=>({visible:true,limits:[{id:'codex',name:'Codex',wind
 
 test('remaining quota preserves zero, uses the cached read and opens read-only reset details',async()=>{
   const calls=[],ui=fixture(async(s,force)=>{calls.push({s,force});return limits();});ui.update(scope('first'));await tick();
-  assert.match(ui.button.textContent,/5시간 0%|5 시간 0%/);assert.match(ui.button.textContent,/주간 75%/);assert.match(ui.button.title,/남/);
+  assert.equal(ui.button.textContent,'0%·75%');assert.match(ui.button.title,/5시간|5 시간/);assert.match(ui.button.title,/주간/);assert.match(ui.button.title,/남/);
   for(let i=0;i<5;i++)ui.update(scope('first'));await tick();assert.equal(calls.length,1);assert.equal(calls[0].force,false);
   ui.open();const all=n=>[n,...n.children.flatMap(all)];assert.ok(all(ui.dialog).some(n=>n.textContent?.startsWith('재설정 시간:')));
   assert.equal(all(ui.dialog).filter(n=>n.tag==='button').length,2);await ui.refresh(true);assert.equal(calls[1].force,true);

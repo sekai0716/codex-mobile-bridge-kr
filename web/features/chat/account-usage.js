@@ -35,7 +35,10 @@ class AccountUsageControl {
     const t=BridgeI18n.t,limits=this.value?.visible?this.value.limits||[]:[];
     const bucket=limits.find(row=>row.id==='codex')||(limits.length===1?limits[0]:null);
     const windows=(bucket?.windows||[]).filter(row=>Number.isFinite(row.remainingPercent));
-    this.button.textContent=windows.length?windows.slice(0,2).map(row=>this.duration(row.windowDurationMins)+' '+Math.round(row.remainingPercent)+'%').join(' · '):t('Account usage limits')+' —';
+    // 도구줄은 작게 유지한다. 한도 하나는 기간을 표시하고 두 개는 수치만 나란히 둔다.
+    // 각 기간의 전체 이름은 접근성 설명과 클릭해서 여는 상세창에서 제공한다.
+    const shown=windows.slice(0,2);
+    this.button.textContent=shown.length?(shown.length===1?this.duration(shown[0].windowDurationMins)+' ':'')+shown.map(row=>Math.round(row.remainingPercent)+'%').join('·'):'—';
     this.button.title=t(this.loading?'Checking account limits…':this.error?'Account limits unavailable':'Remaining account limits');
     if(windows.length)this.button.title+=' · '+windows.map(row=>this.duration(row.windowDurationMins)+' '+t('{percent}% remaining').replace('{percent}',Math.round(row.remainingPercent))).join(' · ');
     this.button.setAttribute('aria-label',this.button.title);

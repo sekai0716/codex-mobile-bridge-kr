@@ -72,7 +72,8 @@ function syncChatMessageNodes(container,nodes){
   for(const [node,state] of reading)restoreChatActivityState(node,state);
 }
 // All chat surfaces render native task evidence through this shared indicator.
-function chatLastNonEmptyLine(value){return typeof value==='string'?value.split(/[\r\n\u2028\u2029]+/).map(line=>line.trim()).filter(Boolean).at(-1)||'':'';}
+// 일반 텍스트 상태줄에서는 굵게 구분자만 지운 뒤 마지막 유효 줄을 선택한다.
+function chatLastNonEmptyLine(value){return typeof value==='string'?value.split(/[\r\n\u2028\u2029]+/).map(line=>line.replaceAll('**','').trim()).filter(Boolean).at(-1)||'':'';}
 function chatLatestReasoning(messages=[]){
   for(let index=messages.length-1;index>=0;index--){const message=messages[index];if(message.role==='user')break;if(message.role==='reasoning'||message.kind==='reasoning'){const line=chatLastNonEmptyLine(message.text);if(line)return line;}}
   return '';

@@ -38,7 +38,7 @@ async function prepare(page){
         const finish=()=>{fixture.meta={...fixture.meta,serviceTier:body.fastMode?'priority':'default'};return response({applied:true,confirmed:true,serviceTier:fixture.meta.serviceTier});};
         return fixture.holdSettings?new Promise(resolve=>fixture.finishSettings=()=>resolve(finish())):finish();
       }
-      if(path.pathname==='/api/account'){fixture.quotaReads.push(path.search);return response({visible:true,limits:[{id:'codex',name:'Codex',windows:[{windowDurationMins:300,remainingPercent:0,resetsAt:1800000000},{windowDurationMins:10080,remainingPercent:75,resetsAt:1800500000}]}]});}
+      if(path.pathname==='/api/account'){fixture.quotaReads.push(path.search);return response({visible:true,limits:[{id:'codex',name:'Codex',windows:fixture.quotaWindows||[{windowDurationMins:300,remainingPercent:0,resetsAt:1800000000},{windowDurationMins:10080,remainingPercent:75,resetsAt:1800500000}]}]});}
       if(path.pathname.endsWith('/notifications'))return response({available:false});
       return original(url,options);
     };
@@ -170,9 +170,11 @@ test('reasoning uses the last nonempty line beside Thinking and never renders ti
   const working=page.locator('#working');
   await expect(page.locator('#appearance-expand-reasoning')).toHaveCount(0);
   await expect(page.locator('#messages [data-key=reason]')).toHaveCount(0);
-  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningTurnId:'first',reasoningSummary:'첫 번째 줄\n마지막 요약 한 줄\n  '}));
+  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningTurnId:'first',reasoningSummary:'첫 번째 줄\n**마지막 요약 한 줄**\n  '}));
   await expect(working).toHaveText('Codex 생각 중ㆍ마지막 요약 한 줄');
   await page.evaluate(()=>sendControlsFixture.update('active',{reasoningSummary:' \n'}));
+  await expect(working).toHaveText('Codex 생각 중ㆍ마지막 요약 한 줄');
+  await page.evaluate(()=>sendControlsFixture.update('active',{reasoningSummary:'**\n  '}));
   await expect(working).toHaveText('Codex 생각 중ㆍ마지막 요약 한 줄');
   await page.evaluate(()=>sendControlsFixture.update('active',{reasoningSummary:'한 줄로만 표시해야 하는 긴 요약입니다. '.repeat(40)}));
   for(const width of [320,390,1280]){
@@ -208,15 +210,35 @@ test('compaction states and locale selections work in Korean, English and Chines
   await expect(page.locator('#appearance-language')).toHaveValue('zh');
 });
 
-test('account quota sits next to context, preserves zero and exposes refresh and reset times',async({page},testInfo)=>{
+test('account quota keeps all toolbar buttons on one row and exposes refresh and reset times',async({page},testInfo)=>{
   await prepare(page);const quota=page.locator('#composer .account-usage');
   await expect(quota).toContainText('0%');await expect(quota).toContainText('75%');
-  for(const width of [320,390,1280]){
+  for(const width of [320,390,430,1280]){
     await page.setViewportSize({width,height:844});
     const q=await quota.boundingBox(),c=await page.locator('#composer .context-usage').boundingBox();
     expect(q.x).toBeGreaterThanOrEqual(c.x+c.width);expect(Math.abs(q.y+q.height/2-c.y-c.height/2)).toBeLessThan(4);
+    const controls=await page.locator('#composer .composer-tools').evaluate(node=>[...node.querySelectorAll('button')].filter(n=>!n.hidden&&n.getBoundingClientRect().width).map(n=>{const r=n.getBoundingClientRect();return {id:n.id,width:r.width,y:r.top+r.height/2};}));
+    expect(Math.max(...controls.map(n=>n.y))-Math.min(...controls.map(n=>n.y))).toBeLessThan(4);
+    for(const control of controls)expect(control.width,control.id+' remains usable').toBeGreaterThanOrEqual(24);
     expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`quota-${width}.png`)});
+  }
+  await page.evaluate(async()=>{sendControlsFixture.quotaWindows=[{windowDurationMins:10080,remainingPercent:75,resetsAt:1800500000}];await accountUsageControl.refresh(true);});
+  await expect(quota).toHaveText('주간 75%');
+  await page.setViewportSize({width:320,height:844});
+  const weekly=await quota.boundingBox(),model=await page.locator('#model-button').boundingBox();
+  expect(Math.abs(weekly.y+weekly.height/2-model.y-model.height/2)).toBeLessThan(4);
+  expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
+  await page.screenshot({path:testInfo.outputPath('weekly-only-320.png')});
+  for(const windows of [
+    [{windowDurationMins:300,remainingPercent:100,resetsAt:1800000000},{windowDurationMins:10080,remainingPercent:100,resetsAt:1800500000}],
+    [{windowDurationMins:10080,remainingPercent:100,resetsAt:1800500000}],
+  ]){
+    await page.evaluate(async windows=>{sendControlsFixture.quotaWindows=windows;await accountUsageControl.refresh(true);},windows);
+    await expect(quota).toContainText('100%');
+    const ys=await page.locator('#composer .composer-tools').evaluate(node=>[...node.querySelectorAll('button')].filter(n=>!n.hidden).map(n=>{const r=n.getBoundingClientRect();return r.top+r.height/2;}));
+    expect(Math.max(...ys)-Math.min(...ys)).toBeLessThan(4);
+    expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
   }
   const initial=await page.evaluate(()=>sendControlsFixture.quotaReads.length);await quota.click();const dialog=page.locator('.account-usage-dialog');
   await expect(dialog).toContainText('재설정 시간:');await dialog.getByRole('button',{name:'사용 한도 새로고침'}).click();
@@ -224,6 +246,20 @@ test('account quota sits next to context, preserves zero and exposes refresh and
   expect(await page.evaluate(()=>sendControlsFixture.quotaReads.at(-1))).toContain('cached=0');
   await dialog.getByRole('button',{name:'닫기',exact:true}).click();
   await page.evaluate(()=>{currentHost='wsl:fixture';sendControlsFixture.update('active');});await expect(quota).toBeHidden();
+});
+
+test('settings keep translation keys and edits when returning from Chinese to Korean or English',async({page})=>{
+  await prepare(page);await page.locator('#message').fill('언어를 바꿔도 남길 초안');
+  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
+  const title=page.locator('#appearance-heading'),select=page.locator('#appearance-language');
+  for(const [language,expected] of [['zh','设置'],['ko','설정'],['en','Settings'],['zh','设置'],['ko','설정']]){
+    await select.selectOption(language);await expect(title).toHaveText(expected);await expect(title).toHaveAttribute('data-i18n','설정');
+    expect(await page.evaluate(()=>BridgeI18n.language())).toBe(language);
+    await expect(page.locator('#appearance-dialog [data-i18n="테마"]')).toHaveText({ko:'테마',en:'Theme',zh:'主题'}[language]);
+  }
+  await page.locator('#appearance-dialog .picker-head [data-close=appearance-dialog]').click();
+  await expect(page.locator('#message')).toHaveValue('언어를 바꿔도 남길 초안');
+  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());await expect(title).toHaveText('설정');
 });
 
 test('Fast lightning toggles next to context without changing model, effort or drafts',async({page},testInfo)=>{
