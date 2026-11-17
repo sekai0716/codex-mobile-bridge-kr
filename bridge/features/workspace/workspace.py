@@ -126,12 +126,15 @@ def display_absolute_path(path):
 
 
 class Workspace:
-    def __init__(self, root):
+    def __init__(self, root, *, directory_fd=None):
         if not root or not Path(root).is_absolute():
             raise ValueError('이 채팅은 프로젝트 디렉터리와 연결되지 않았습니다.')
         self.root = Path(root).resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError('프로젝트 디렉터리를 사용할 수 없습니다.')
+        self.directory_fd = directory_fd
+        if directory_fd is not None and not os.path.samestat(os.fstat(directory_fd), self.root.stat()):
+            raise PermissionError('프로젝트 디렉터리가 변경되었습니다. 다시 선택하세요.')
 
     @staticmethod
     def parts(path):
@@ -147,7 +150,7 @@ class Workspace:
         # On POSIX, walk using directory handles so a renamed/replaced symlink
         # cannot redirect an in-flight read or upload outside the project.
         if os.open in os.supports_dir_fd and hasattr(os, 'O_NOFOLLOW'):
-            fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            fd = os.dup(self.directory_fd) if self.directory_fd is not None else os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             try:
                 for part in parts:
                     nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
@@ -411,8 +414,9 @@ class Workspace:
 
 class GitWorkspace:
     """Project Git inspection and explicitly requested local Git operations."""
-    def __init__(self, workspace):
+    def __init__(self, workspace, *, directory_fd=None):
         self.workspace = workspace
+        self.directory_fd = directory_fd
         self.environment = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
         self.environment.update(GIT_OPTIONAL_LOCKS='0', GIT_TERMINAL_PROMPT='0', GIT_NO_LAZY_FETCH='1', LC_ALL='C')
         self.command = ['git', '--no-pager', '--no-optional-locks', '--literal-pathspecs',
@@ -429,7 +433,12 @@ class GitWorkspace:
         source = tempfile.TemporaryFile(dir=self.gitdir) if message is not None else None
         if source: source.write(message.encode('utf-8')); source.seek(0)
         try:
-            process = subprocess.Popen((self.write_command if write else self.command) + args, cwd=self.workspace.root, env=self.environment,
+            # 선택한 하위 폴더는 검증한 핸들을 작업 위치로 사용한다.
+            # 검증 뒤 링크가 바뀌어도 다른 저장소에서 명령을 실행하지 않는다.
+            options = {'cwd': self.workspace.root}
+            if self.directory_fd is not None:
+                options = {'cwd': '/dev/fd/' + str(self.directory_fd), 'pass_fds': (self.directory_fd,)}
+            process = subprocess.Popen((self.write_command if write else self.command) + args, **options, env=self.environment,
                                        stdin=source if source else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
             raise ValueError('이 컴퓨터나 SSH 서버가 설치되지 않았습니다 Git') from None
@@ -483,7 +492,8 @@ class GitWorkspace:
                             'index': xy[0], 'worktree': xy[1], 'conflict': kind == 'u', 'untracked': kind == '?', 'submodule': submodule})
         entries.sort(key=lambda entry: entry['path'].casefold())
         counts = headers.get('branch.ab', '').split()
-        fingerprint = hashlib.sha256(raw)
+        # 같은 커밋·색인을 가진 복제본 사이에서도 확인용 버전을 재사용하지 않는다.
+        fingerprint = hashlib.sha256(os.fsencode(self.workspace.root) + b'\0' + raw)
         for name in ('index', 'HEAD', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'):
             try: fingerprint.update((self.gitdir / name).read_bytes())
             except FileNotFoundError: pass
@@ -754,18 +764,63 @@ def host_operation(root, action, params, history_path=None):
     return result
 
 
+@contextmanager
+def git_project(workspace, repository=''):
+    """채팅 폴더 아래의 선택한 Git 작업 위치를 한 요청 동안 고정한다."""
+    parts = workspace.parts(repository)
+    if '.git' in parts:
+        raise PermissionError('Git 저장소의 작업 폴더를 선택하세요.')
+    with workspace.directory(parts) as (directory, fd):
+        selected = Workspace(directory, directory_fd=fd)
+        if not selected.root.is_relative_to(workspace.root):
+            raise PermissionError('현재 프로젝트 안의 Git 저장소를 선택하세요.')
+        yield GitWorkspace(selected, directory_fd=fd)
+
+
+def git_repositories(workspace):
+    """현재 프로젝트와 바로 아래의 실제 저장소·워크트리를 선택 목록으로 제공한다."""
+    candidates = ['']
+    with workspace.directory([]) as (directory, fd):
+        with os.scandir(fd if fd is not None else directory) as entries:
+            for entry in entries:
+                try:
+                    if not entry.is_dir(follow_symlinks=False) or _windows_reparse_point(directory / entry.name):
+                        continue
+                    workspace.parts(entry.name)
+                    with workspace.directory([entry.name]) as (child, child_fd):
+                        marker = os.stat('.git', dir_fd=child_fd, follow_symlinks=False) if child_fd is not None else (child / '.git').lstat()
+                        if stat.S_ISDIR(marker.st_mode) or stat.S_ISREG(marker.st_mode):
+                            candidates.append(entry.name)
+                except (OSError, ValueError):
+                    continue
+    repositories = []
+    for relative in sorted(candidates, key=lambda value: (bool(value), value.casefold(), value)):
+        with git_project(workspace, relative) as project:
+            code, top, truncated = project.run(['rev-parse', '--show-toplevel'])
+            if code or truncated:
+                continue
+            repositories.append({'path': relative, 'name': project.workspace.root.name,
+                                 'root': str(project.workspace.root),
+                                 'repository': Path(os.fsdecode(top.rstrip(b'\n'))).name})
+    return {'repositories': repositories, 'project': str(workspace.root)}
+
+
 def operate(root, action, params, history_path=None):
     try:
         if params.get('scope') == 'host':
             return host_operation(root, action, params, history_path)
         workspace = Workspace(root)
-        if action == 'git-status': return GitWorkspace(workspace).status()
-        if action == 'git-diff': return GitWorkspace(workspace).diff(**params)
-        if action == 'git-history': return GitWorkspace(workspace).history(**params)
-        if action == 'git-commit': return GitWorkspace(workspace).commit_detail(**params)
-        if action == 'git-history-diff': return GitWorkspace(workspace).historical_diff(**params)
-        if action == 'git-branches': return GitWorkspace(workspace).branches()
-        if action == 'git-action': return GitWorkspace(workspace).mutate(**params)
+        if action == 'git-repositories': return git_repositories(workspace)
+        if action in ('git-status', 'git-diff', 'git-history', 'git-commit', 'git-history-diff', 'git-branches', 'git-action'):
+            options = dict(params)
+            with git_project(workspace, options.pop('repository', '')) as project:
+                if action == 'git-status': return project.status()
+                if action == 'git-diff': return project.diff(**options)
+                if action == 'git-history': return project.history(**options)
+                if action == 'git-commit': return project.commit_detail(**options)
+                if action == 'git-history-diff': return project.historical_diff(**options)
+                if action == 'git-branches': return project.branches()
+                if action == 'git-action': return project.mutate(**options)
         if action == 'list': return workspace.listing(**params)
         if action == 'info': return workspace.info(params['path'])
         if action == 'references': return workspace.references(params['references'])

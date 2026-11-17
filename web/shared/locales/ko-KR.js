@@ -2,6 +2,8 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Git repository": "Git 저장소",
+  "No Git repository was found in this project.": "이 작업 폴더에서 Git 저장소를 찾지 못했습니다.",
   "Ran commands": "명령을 실행함",
   "Edited files": "파일 변경",
   "Searched the web": "웹 검색",

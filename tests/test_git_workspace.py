@@ -3,6 +3,7 @@ import io
 import http.client
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,7 +11,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from bridge.features.workspace.workspace import Workspace, GitWorkspace, operate, MAX_PREVIEW
+from bridge.features.workspace.workspace import Workspace, GitWorkspace, git_project, operate, MAX_PREVIEW
 from bridge.app.service import Bridge
 from bridge.clients.codex.remote import RemoteStore
 import test_bridge as support
@@ -33,6 +34,66 @@ class GitWorkspaceTests(unittest.TestCase):
     def baseline(self):
         (self.root / 'hello.txt').write_text('first\nsecond\n')
         self.git('add', '.'); self.git('commit', '-qm', 'fixture baseline')
+
+    def test_repository_picker_uses_selected_checkout_for_status_history_and_diff(self):
+        self.baseline()
+        second = self.root.parent / 'second'
+        shutil.copytree(self.root, second)
+        parent = self.root.parent
+        self.assertFalse(operate(parent, 'git-status', {})['available'])
+        repositories = operate(parent, 'git-repositories', {})['repositories']
+        self.assertEqual([row['path'] for row in repositories], ['project', 'second'])
+        (self.root / 'hello.txt').write_text('first repository changed\n')
+        (second / 'hello.txt').write_text('second repository changed\n')
+        for selected, expected in [('project', 'first repository changed'), ('second', 'second repository changed')]:
+            state = operate(parent, 'git-status', {'repository': selected})
+            self.assertTrue(state['available']); self.assertEqual(state['project'], selected)
+            self.assertEqual([row['path'] for row in state['entries']], ['hello.txt'])
+            diff = operate(parent, 'git-diff', {'repository': selected, 'path': 'hello.txt', 'section': 'unstaged'})
+            self.assertIn('+' + expected, diff['text'])
+            history = operate(parent, 'git-history', {'repository': selected})
+            detail = operate(parent, 'git-commit', {'repository': selected, 'revision': history['commits'][0]['id']})
+            self.assertEqual(detail['message'].strip(), 'fixture baseline')
+        before_second = GitWorkspace(Workspace(second)).status()
+        state = operate(parent, 'git-status', {'repository': 'project'})
+        operate(parent, 'git-action', {'repository': 'project', 'action': 'stage-all', 'version': state['version']})
+        self.assertEqual(operate(parent, 'git-status', {'repository': 'project'})['entries'][0]['index'], 'M')
+        self.assertEqual(GitWorkspace(Workspace(second)).status(), before_second)
+
+    def test_repository_versions_cannot_be_replayed_against_an_identical_checkout(self):
+        self.baseline()
+        second = self.root.parent / 'second'; shutil.copytree(self.root, second)
+        parent = self.root.parent
+        first = operate(parent, 'git-status', {'repository': 'project'})
+        other = operate(parent, 'git-status', {'repository': 'second'})
+        self.assertNotEqual(first['version'], other['version'])
+        with self.assertRaises(ValueError):
+            operate(parent, 'git-action', {'repository': 'second', 'action': 'stage-all', 'version': first['version']})
+        self.assertEqual(operate(parent, 'git-status', {'repository': 'second'})['entries'], [])
+
+    def test_repository_selection_rejects_escape_metadata_and_symlink_targets(self):
+        self.baseline(); parent = self.root.parent
+        outside = parent / 'outside'; outside.mkdir()
+        (outside / 'private.txt').write_text('private')
+        (parent / 'linked').symlink_to(outside, target_is_directory=True)
+        self.assertEqual([row['path'] for row in operate(parent, 'git-repositories', {})['repositories']], ['project'])
+        for selected in ['../outside', str(outside), 'project/.git', 'linked', 'project/../outside']:
+            with self.subTest(selected=selected), self.assertRaises((ValueError, PermissionError, OSError)):
+                operate(parent, 'git-status', {'repository': selected})
+
+    @unittest.skipUnless(os.name == 'posix', 'directory handles are a POSIX boundary')
+    def test_selected_git_directory_stays_bound_when_its_path_is_replaced(self):
+        self.baseline(); parent = self.root.parent
+        outside = parent / 'outside'; outside.mkdir(); (outside / 'hello.txt').write_text('outside private bytes')
+        held = parent / 'held'
+        with git_project(Workspace(parent), 'project') as selected:
+            self.root.rename(held)
+            self.root.symlink_to(outside, target_is_directory=True)
+            try:
+                self.assertEqual(selected.run(['show', 'HEAD:hello.txt'])[1], b'first\nsecond\n')
+                self.assertEqual(selected.working('hello.txt'), b'first\nsecond\n')
+            finally:
+                self.root.unlink(); held.rename(self.root)
 
     def test_unborn_clean_and_detached(self):
         self.assertEqual(self.status()['commit'], '(initial)')
@@ -275,6 +336,11 @@ class GitHttpTests(unittest.TestCase):
         self.assertEqual(self.calls[-1][2], {'path': 'a.txt', 'section': 'staged'})
         self.assertEqual(self.request('POST', self.path + 'git-diff', {}, auth)[0], 405)
         self.assertEqual(self.request('GET', self.path + 'git-status?host=wrong', headers=auth)[0], 404)
+        self.assertEqual(self.request('GET', self.path + 'git-repositories', headers=auth)[0], 200)
+        self.assertEqual(self.calls[-1][1:], ('git-repositories', {}))
+        for action in ['git-status', 'git-branches', 'git-history', 'git-commit', 'git-history-diff', 'git-diff']:
+            self.assertEqual(self.request('GET', self.path + action + '?repository=nested%2Frepo', headers=auth)[0], 200)
+            self.assertEqual(self.calls[-1][2]['repository'], 'nested/repo')
         connection = http.client.HTTPConnection('127.0.0.1', self.port)
         connection.request('GET', '/git-panel.js'); response = connection.getresponse()
         self.assertEqual(response.status, 200); self.assertIn(b'class GitPanel', response.read()); connection.close()
@@ -289,3 +355,5 @@ class GitHttpTests(unittest.TestCase):
         self.assertEqual(self.request('POST', target, {'action':'stage','version':'fixture','path':'a.txt'}, auth)[0], 200)
         self.assertEqual(self.calls[-1][1], 'git-action')
         self.assertEqual(self.request('POST', target, {'action':'stage','version':'fixture','root':'/outside'}, auth)[0], 400)
+        self.assertEqual(self.request('POST', target, {'action':'stage','version':'fixture','repository':'nested/repo','path':'a.txt'}, auth)[0], 200)
+        self.assertEqual(self.calls[-1][2]['repository'], 'nested/repo')

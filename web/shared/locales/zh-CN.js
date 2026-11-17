@@ -2,6 +2,8 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Git repository": "Git 仓库",
+  "No Git repository was found in this project.": "在此项目中未找到 Git 仓库。",
   "Ran commands": "已运行命令",
   "Edited files": "文件变更",
   "Searched the web": "网页搜索",

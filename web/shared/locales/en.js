@@ -2,6 +2,8 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Git repository": "Git repository",
+  "No Git repository was found in this project.": "No Git repository was found in this project.",
   "Ran commands": "Ran commands",
   "Edited files": "Edited files",
   "Searched the web": "Searched the web",

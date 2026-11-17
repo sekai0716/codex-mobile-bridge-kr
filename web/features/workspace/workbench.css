@@ -1,3 +1,5 @@
+.wb-git-repository{flex:none;display:block;width:calc(100% - 40px);max-width:520px;min-height:38px;margin:0 20px 10px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:13px}
+@media(max-width:720px){.wb-git-repository{width:calc(100% - 24px);margin-inline:12px}}
 .workbench-tabs{display:flex;align-items:center;gap:4px;padding:4px 16px;border-bottom:1px solid var(--line);min-height:44px;flex:none;background:var(--page)}
 .wb-tabs{display:flex;gap:5px;overflow-x:auto;min-width:0;flex:1;scrollbar-width:thin}
 .workbench-tabs button{border:0;background:transparent;color:var(--muted);min-height:36px;border-radius:8px;font-size:13px}

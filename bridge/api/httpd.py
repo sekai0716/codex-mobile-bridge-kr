@@ -1267,7 +1267,7 @@ class Handler(BaseHTTPRequestHandler):
                 identifier = query.get('id', [''])[0]
                 return self.output(200, bridge.terminal(terminal_match[1], owner, ('poll' if query.get('mode') == ['pty'] else 'read') if identifier else 'info',
                                    {'id': identifier, 'after': int(query.get('after', ['0'])[0]), 'waitMs': int(query.get('waitMs', ['0'])[0])}))
-            workspace_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/workspace(?:/(info|preview|download|upload|git-status|git-diff|git-history|git-commit|git-history-diff|git-branches|git-action))?", path)
+            workspace_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/workspace(?:/(info|preview|download|upload|git-repositories|git-status|git-diff|git-history|git-commit|git-history-diff|git-branches|git-action))?", path)
             if workspace_match:
                 thread_id, operation = workspace_match.groups()
                 relative = query.get('path', [''])[0]
@@ -1279,7 +1279,7 @@ class Handler(BaseHTTPRequestHandler):
                 if write:
                     if operation == 'git-action':
                         body = self.read_json()
-                        if set(body) - {'action', 'version', 'path', 'branch', 'message'} or not {'action', 'version'} <= set(body):
+                        if set(body) - {'action', 'version', 'path', 'branch', 'message', 'repository'} or not {'action', 'version'} <= set(body):
                             raise ValueError('Git 잘못된 작업 요청')
                         return self.output(200, bridge.workspace(thread_id, operation, body))
                     if operation != 'upload': return self.output(405, {'error': '이 파일 작업은 지원되지 않습니다'})
@@ -1291,16 +1291,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self.output(200, bridge.workspace(thread_id, 'upload', {'path': relative, 'encoded': base64.b64encode(content).decode()}))
                 if operation == 'upload': return self.output(405, {'error': '업로드 작업을 사용해 주세요'})
                 if operation == 'git-action': return self.output(405, {'error': 'Git 운영 요구 사항 POST 묻다'})
+                repository = {'repository': query.get('repository', [''])[0]} if 'repository' in query else {}
+                if operation == 'git-repositories': return self.output(200, bridge.workspace(thread_id, operation, {}))
                 if operation == 'git-history':
-                    return self.output(200, bridge.workspace(thread_id, operation, {'limit': int(query.get('limit', ['40'])[0]), 'ref': query.get('ref', ['all'])[0]}))
+                    return self.output(200, bridge.workspace(thread_id, operation, {**repository, 'limit': int(query.get('limit', ['40'])[0]), 'ref': query.get('ref', ['all'])[0]}))
                 if operation == 'git-commit':
-                    return self.output(200, bridge.workspace(thread_id, operation, {'revision': query.get('revision', [''])[0]}))
+                    return self.output(200, bridge.workspace(thread_id, operation, {**repository, 'revision': query.get('revision', [''])[0]}))
                 if operation == 'git-history-diff':
-                    return self.output(200, bridge.workspace(thread_id, operation, {'revision': query.get('revision', [''])[0], 'path': relative}))
-                if operation == 'git-branches': return self.output(200, bridge.workspace(thread_id, operation, {}))
-                if operation == 'git-status': return self.output(200, bridge.workspace(thread_id, operation, {}))
+                    return self.output(200, bridge.workspace(thread_id, operation, {**repository, 'revision': query.get('revision', [''])[0], 'path': relative}))
+                if operation == 'git-branches': return self.output(200, bridge.workspace(thread_id, operation, repository))
+                if operation == 'git-status': return self.output(200, bridge.workspace(thread_id, operation, repository))
                 if operation == 'git-diff':
-                    return self.output(200, bridge.workspace(thread_id, operation, {'path': relative, 'section': query.get('section', ['unstaged'])[0]}))
+                    return self.output(200, bridge.workspace(thread_id, operation, {**repository, 'path': relative, 'section': query.get('section', ['unstaged'])[0]}))
                 if operation is None:
                     return self.output(200, bridge.workspace(thread_id, 'list', {**scope, 'path': relative, 'hidden': query.get('hidden') == ['true'],
                         'search': query.get('search', [''])[0], 'offset': int(query.get('offset', ['0'])[0])}))
