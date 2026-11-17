@@ -336,7 +336,7 @@ class Accounts:
         return result
 
     def desktop_runtime_status(self):
-        supported = sys.platform in ('darwin', 'win32') and getattr(self.bridge, 'host', 'local') == 'local'
+        supported = sys.platform in ('darwin', 'linux', 'win32') and getattr(self.bridge, 'host', 'local') == 'local'
         result = {'supported': supported, 'configured': False, 'preparation': dict(self.desktop_preparation)}
         if supported:
             from bridge.clients.codex.desktop_runtime import settings
@@ -961,7 +961,7 @@ class Accounts:
     def desktop_runtime_lifecycle(self):
         # Lock even before initialization has saved settings: another gateway
         # may be between its idle audit and the first shared configuration write.
-        if sys.platform in ('darwin', 'win32') and getattr(self.bridge, 'host', 'local') == 'local':
+        if sys.platform in ('darwin', 'linux', 'win32') and getattr(self.bridge, 'host', 'local') == 'local':
             from bridge.clients.codex.desktop_runtime import initialization_lock
             return initialization_lock(self.home)
         return nullcontext()
@@ -1031,7 +1031,7 @@ class Accounts:
             return self.public()
 
     def initialize_desktop_runtime(self, value):
-        if sys.platform not in ('darwin', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
+        if sys.platform not in ('darwin', 'linux', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
             raise ValueError("이 항목은 Codex 네이티브 연결 초기화를 지원하지 않습니다.")
         required = {'action', 'confirmed', 'tasksConfirmed', 'requestId'}
         if (set(value) - {'acknowledgeUnavailable'} != required or value.get('confirmed') is not True
@@ -1078,7 +1078,7 @@ class Accounts:
         Waiting does not change account state or hold a gate between attempts.
         Once a lifecycle write starts, a failure requires explicit recovery.
         """
-        if sys.platform not in ('darwin', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
+        if sys.platform not in ('darwin', 'linux', 'win32') or getattr(self.bridge, 'host', 'local') != 'local':
             return False
         if not self.gate.acquire(timeout=0):
             self.desktop_preparation = {'state': 'waiting', 'reason': '현재 작업이 끝날 때까지 기다린 후 기본 사이드 채팅을 자동으로 준비합니다.'}
@@ -1102,6 +1102,9 @@ class Accounts:
         if sys.platform == 'win32':
             from bridge.platforms.windows.codex_daemon_env import read_process_environment
             from bridge.platforms.windows.desktop import commands
+        elif sys.platform == 'linux':
+            from bridge.platforms.linux.codex_daemon_env import read_process_environment
+            from bridge.platforms.linux.desktop import commands
         else:
             from bridge.platforms.macos.codex_daemon_env import read_process_environment
             from bridge.platforms.macos.desktop import commands
@@ -1117,9 +1120,12 @@ class Accounts:
                 raise ValueError("Codex 데스크탑 프로세스 ID가 변경되었습니다. 연결을 다시 초기화하십시오.")
             launch_commands = commands(main) if main else {}
             for pid, identity in identities.items():
-                record = ({'processStartTime': str(identity['created'])} if sys.platform == 'win32' else
-                          {'processIdentity': {'uniqueId': identity['birth'][0], 'startSeconds': identity['started'][0],
-                                               'startMicroseconds': identity['started'][1]}})
+                if sys.platform == 'linux':
+                    record = {'processIdentity': {key: identity[key] for key in ('bootId', 'startTicks')}}
+                else:
+                    record = ({'processStartTime': str(identity['created'])} if sys.platform == 'win32' else
+                              {'processIdentity': {'uniqueId': identity['birth'][0], 'startSeconds': identity['started'][0],
+                                                   'startMicroseconds': identity['started'][1]}})
                 environment, _ = read_process_environment(pid, record, app.executable,
                     ('CODEX_HOME', 'CODEX_SQLITE_HOME', 'CODEX_ELECTRON_USER_DATA_PATH', 'HOME', 'USERPROFILE'))
                 user_home = environment.get('USERPROFILE' if sys.platform == 'win32' else 'HOME') or Path.home()
@@ -1308,7 +1314,7 @@ class Accounts:
             try:
                 stream = connect_stream(self.bridge.ipc.path, timeout=.5)
             except OSError:
-                if sys.platform == 'darwin' and getattr(self.bridge, 'host', 'local') == 'local':
+                if sys.platform in ('darwin', 'linux') and getattr(self.bridge, 'host', 'local') == 'local':
                     from bridge.clients.codex.desktop_runtime import wait_stopped
                     wait_stopped(self.home)
                 return

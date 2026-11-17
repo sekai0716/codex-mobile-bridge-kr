@@ -232,9 +232,11 @@ class DesktopRuntimeTests(unittest.TestCase):
     def test_reparented_native_child_still_blocks_another_writer(self):
         identity = {'pid': 123, 'parent': 122, 'birth': [1, 2], 'started': [3, 4],
                     'image': '/native/CodexCLI.app/codex', 'uid': 501, 'ruid': 501}
-        with patch.object(runtime, 'process_identity', return_value={**identity, 'parent': 1}):
+        with patch.object(runtime.sys, 'platform', 'darwin'), \
+             patch.object(runtime, 'process_identity', return_value={**identity, 'parent': 1}):
             self.assertTrue(runtime.runtime_alive(identity))
-        with patch.object(runtime, 'process_identity', return_value={**identity, 'birth': [9, 10]}):
+        with patch.object(runtime.sys, 'platform', 'darwin'), \
+             patch.object(runtime, 'process_identity', return_value={**identity, 'birth': [9, 10]}):
             self.assertFalse(runtime.runtime_alive(identity))
 
     def test_starting_reservation_blocks_unknown_or_execed_child(self):
@@ -243,7 +245,8 @@ class DesktopRuntimeTests(unittest.TestCase):
         identity = {'pid': 123, 'birth': [1, 2], 'started': [3, 4],
                     'image': '/bin/sh', 'uid': 501, 'ruid': 501}
         record = {'ready': False, 'runtime': identity}
-        with patch.object(runtime, 'process_identity', return_value={**identity, 'image': '/native/codex', 'birth': [1, 3]}):
+        with patch.object(runtime.sys, 'platform', 'darwin'), \
+             patch.object(runtime, 'process_identity', return_value={**identity, 'image': '/native/codex', 'birth': [1, 3]}):
             with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."): runtime.require_inactive(record)
         with patch.object(runtime, 'process_identity', side_effect=ProcessLookupError):
             runtime.require_inactive(record)
@@ -298,19 +301,20 @@ class MetadataRoutingTests(unittest.TestCase):
             with self.assertRaises(CreationError) as failure: self.call(operation)
             self.assertNotIsInstance(failure.exception, CreationUnavailable)
 
-    def test_uninitialized_mac_desktop_refuses_before_starting_another_writer(self):
-        with patch.object(runtime.sys, 'platform', 'darwin'), \
-             patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
-             patch.object(runtime, 'connect', return_value=None), \
-             patch('bridge.features.sessions.create._runtime_operation') as spawn:
-            operation = Mock()
-            with self.assertRaisesRegex(CreationUnavailable, "기본\\ 사이드\\ 채팅\\ 연결이\\ 준비되기를\\ 기다리고\\ 있습니다\\.\\ 데스크톱\\ 작업이\\ 완료되고\\ 유휴\\ 상태가\\ 확인되면\\ 자동으로\\ 완료됩니다\\.\\ 계정\\ 관리에서\\ 준비\\ 상태를\\ 확인할\\ 수도\\ 있습니다\\.\\ 사이드\\ 채팅이\\ 아직\\ 생성되지\\ 않았습니다"):
-                self.call(operation, require_shared=True)
-            operation.assert_not_called()
-            spawn.assert_not_called()
+    def test_uninitialized_posix_desktop_refuses_before_starting_another_writer(self):
+        for platform in ('darwin', 'linux'):
+            with self.subTest(platform=platform), patch.object(runtime.sys, 'platform', platform), \
+                 patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
+                 patch.object(runtime, 'connect', return_value=None), \
+                 patch('bridge.features.sessions.create._runtime_operation') as spawn:
+                operation = Mock()
+                with self.assertRaises(CreationUnavailable):
+                    self.call(operation, require_shared=True)
+                operation.assert_not_called()
+                spawn.assert_not_called()
 
     def test_unconfigured_other_platform_retains_existing_metadata_runtime(self):
-        with patch.object(runtime.sys, 'platform', 'linux'), \
+        with patch.object(runtime.sys, 'platform', 'freebsd'), \
              patch.object(runtime, 'connect', return_value=None), \
              patch('bridge.features.sessions.create._runtime_operation', return_value='native') as spawn:
             self.assertEqual(self.call(Mock(), require_shared=True), 'native')

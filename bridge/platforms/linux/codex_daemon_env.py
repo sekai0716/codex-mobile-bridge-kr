@@ -1,7 +1,37 @@
-"""Read selected initial variables from a verified same-user Linux daemon."""
+"""Verify Linux process generations and read selected launch variables."""
 
 import os
 from pathlib import Path
+
+
+def desktop_process_identity(pid):
+    """공유 Desktop 연결을 현재 Linux 프로세스 세대와 실제 UID에 묶는다."""
+    root = Path('/proc') / str(pid)
+
+    def snapshot():
+        raw = (root / 'stat').read_text(encoding='ascii')
+        fields = raw.rpartition(')')[2].split()
+        if not raw.startswith(f'{pid} (') or len(fields) < 20:
+            raise OSError('Desktop process identity unavailable')
+        uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
+                    if line.startswith('Uid:'))
+        zombie = fields[0] == 'Z'
+        return {'pid': pid, 'parent': int(fields[1]), 'uid': int(uids[1]), 'ruid': int(uids[0]),
+                'image': '' if zombie else str((root / 'exe').resolve(strict=True)),
+                'startTicks': int(fields[19]), 'zombie': zombie}
+
+    try:
+        before = snapshot()
+        boot = Path('/proc/sys/kernel/random/boot_id').read_text(encoding='ascii').strip()
+        after = snapshot()
+    except FileNotFoundError:
+        if not root.exists():
+            raise ProcessLookupError('Desktop process exited') from None
+        raise
+    # PID 재사용, exec 또는 재부모화가 관찰 도중 발생하면 혼합된 신원을 반환하지 않는다.
+    if before != after or not boot:
+        raise OSError('Desktop process changed during inspection')
+    return {**after, 'bootId': boot}
 
 
 def _identity(pid):
@@ -16,7 +46,7 @@ def _identity(pid):
     return (int(fields[19]), tuple(int(uid) for uid in uids), str(image))
 
 
-def read_process_environment(pid, record, executable, names, record_path):
+def read_process_environment(pid, record, executable, names, record_path=None):
     before = _identity(pid)
     if (before[1][0] != os.getuid() or before[1][1] != os.geteuid() or
             before[2] != str(Path(executable).resolve())):

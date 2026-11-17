@@ -3084,7 +3084,7 @@ class DesktopSessions:
                         raise ValueError('이 시스템은 지원하지 않습니다 Claude 데스크톱 연결')
                 elif provider == 'codex' and not descriptor['installed'] and row.get('cliAvailable'):
                     pass  # CLI-only access starts its runtime on an explicit chat operation.
-                elif (provider == 'codex' and accounts and sys.platform in ('darwin', 'win32')
+                elif (provider == 'codex' and accounts and sys.platform in ('darwin', 'linux', 'win32')
                       and getattr(self.bridge, 'host', 'local') == 'local'):
                     self._prepare_codex_runtime(descriptor)
                 else:

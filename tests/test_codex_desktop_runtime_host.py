@@ -79,7 +79,8 @@ class AdapterLifecycleTests(unittest.TestCase):
         current = {**record['runtime'], 'image': '/fixture/CodexCLI.app/codex',
                    'parent': 1, 'birth': [1, 2], 'started': [3, 4], 'uid': 501, 'ruid': 501}
         record['runtime'].update({key: current[key] for key in ('birth', 'started', 'uid', 'ruid')})
-        with patch.object(runtime, 'process_identity', return_value=current):
+        with patch.object(runtime.sys, 'platform', 'darwin'), \
+             patch.object(runtime, 'process_identity', return_value=current):
             with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."):
                 runtime.require_inactive(record)
 

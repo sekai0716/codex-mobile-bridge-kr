@@ -187,7 +187,7 @@ def record_preparation(home, request_id, *, complete=False):
 
 def configure(home, application, cli):
     """Called only after the lifecycle owner has verified idle and normal exit."""
-    if sys.platform not in ('darwin', 'win32'):
+    if sys.platform not in ('darwin', 'linux', 'win32'):
         raise ValueError('이 시스템은 아직 검증되지 않았습니다. Codex 공유 액세스')
     # GUI exit precedes the adapter's cooperative proxy/native shutdown.
     with exclusive_lock(home, 'runtime', timeout=35):
@@ -257,7 +257,7 @@ def validate_runtime(cli):
 
 
 def launch_environment(home, application):
-    value = settings(home) if sys.platform in ('darwin', 'win32') else None
+    value = settings(home) if sys.platform in ('darwin', 'linux', 'win32') else None
     if value is None:
         return {}
     if value['application'] != os.path.normcase(str(Path(application).resolve())):
@@ -281,8 +281,12 @@ def process_identity(pid):
     if sys.platform == 'win32':
         from bridge.platforms.windows.zcode_pipe import _identity
         return _identity(pid, parent=True)
-    from bridge.platforms.macos.force_exit import Native
-    value = Native().identity(pid)
+    if sys.platform == 'linux':
+        from bridge.platforms.linux.codex_daemon_env import desktop_process_identity
+        value = desktop_process_identity(pid)
+    else:
+        from bridge.platforms.macos.force_exit import Native
+        value = Native().identity(pid)
     if value['uid'] != os.getuid() or value['ruid'] != os.getuid() or value['zombie']:
         raise ValueError('공유 런타임 프로세스 ID를 확인할 수 없습니다.')
     return {key: (list(item) if isinstance(item, tuple) else item) for key, item in value.items()}
@@ -299,9 +303,11 @@ def runtime_alive(identity):
         current = process_identity(identity['pid'])
     except ProcessLookupError:
         return False
-    # If an adapter exits before native shutdown completes, macOS reparents the
-    # child. A changed parent alone never permits starting a second writer.
-    keys = ('pid', 'created', 'session', 'image') if sys.platform == 'win32' else ('pid', 'birth', 'started', 'image', 'uid', 'ruid')
+    # 어댑터가 먼저 종료되어 자식의 부모 PID가 바뀌어도 원래 writer는 계속 살아 있을 수 있다.
+    if sys.platform == 'linux':
+        keys = ('pid', 'bootId', 'startTicks', 'image', 'uid', 'ruid')
+    else:
+        keys = ('pid', 'created', 'session', 'image') if sys.platform == 'win32' else ('pid', 'birth', 'started', 'image', 'uid', 'ruid')
     return all(current[key] == identity[key] for key in keys)
 
 
@@ -320,9 +326,14 @@ def require_inactive(record):
         else:
             # A native shell launcher may exec its bundled binary before the
             # handshake; the process generation remains the same across exec.
-            alive = (current['birth'][0] == identity['birth'][0] and
-                     all(current[key] == identity[key]
-                         for key in ('pid', 'started', 'uid', 'ruid')))
+            if sys.platform == 'linux':
+                # Linux의 부팅 ID와 start_ticks는 exec 및 재부모화 후에도 유지된다.
+                alive = all(current[key] == identity[key]
+                            for key in ('pid', 'bootId', 'startTicks', 'uid', 'ruid'))
+            else:
+                alive = (current['birth'][0] == identity['birth'][0] and
+                         all(current[key] == identity[key]
+                             for key in ('pid', 'started', 'uid', 'ruid')))
     if alive:
         raise ValueError('원래 공유 런타임이 종료되지 않았습니다. 나중에 다시 확인하세요.')
 
@@ -330,7 +341,7 @@ def require_inactive(record):
 def connect(home, cli):
     """None means never configured; configured but unavailable must fail closed."""
     try:
-        value = settings(home) if sys.platform in ('darwin', 'win32') else None
+        value = settings(home) if sys.platform in ('darwin', 'linux', 'win32') else None
         if value is None:
             return None
         record = _read(directory(home) / 'active.json')

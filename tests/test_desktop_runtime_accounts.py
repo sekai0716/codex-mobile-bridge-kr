@@ -262,7 +262,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
             self.manager.control(self.value)
         self.assertFalse(self.manager.desktop_runtime_status()['supported'])
         self.bridge.host = 'local'
-        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')):
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='freebsd')):
             with self.assertRaisesRegex(ValueError, "이\\ 항목은\\ Codex\\ 네이티브\\ 연결\\ 초기화를\\ 지원하지\\ 않습니다\\."):
                 self.manager.control(self.value)
         self.mocks['stop'].assert_not_called()
@@ -608,10 +608,39 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         with self.manager.desktop_runtime_lifecycle():
             pass
         self.bridge.host = 'local'
-        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')):
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='freebsd')):
             with self.manager.desktop_runtime_lifecycle():
                 pass
         self.mocks['initialize_lock'].assert_not_called()
+
+    def test_linux_initialization_verifies_native_launch_generation(self):
+        self.identity.update(bootId='fixture-boot', startTicks=12345)
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
+             patch('bridge.platforms.linux.codex_daemon_env.read_process_environment',
+                   return_value=({'CODEX_HOME': str(self.home)}, None)) as environment, \
+             patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
+            self.assertTrue(self.manager.desktop_runtime_status()['supported'])
+            self.run_initialization()
+        self.assertEqual(self.manager.state['phase'], 'complete')
+        record = environment.call_args.args[1]
+        self.assertEqual(record, {'processIdentity': {'bootId': 'fixture-boot', 'startTicks': 12345}})
+        self.mocks['environment'].assert_not_called()
+        self.mocks['stop'].assert_called_once()
+        self.mocks['configure'].assert_called_once()
+        self.app.start.assert_called_once()
+
+    def test_linux_busy_desktop_is_not_restarted_or_configured(self):
+        self.identity.update(bootId='fixture-boot', startTicks=12345)
+        self.bridge.assert_desktop_idle.side_effect = ValueError('Desktop is busy')
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
+             patch('bridge.platforms.linux.codex_daemon_env.read_process_environment',
+                   return_value=({'CODEX_HOME': str(self.home)}, None)), \
+             patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
+            self.run_initialization()
+        self.assertEqual(self.manager.state['phase'], 'failed')
+        self.mocks['stop'].assert_not_called()
+        self.mocks['configure'].assert_not_called()
+        self.app.start.assert_not_called()
 
     def test_native_runtime_exit_is_awaited_only_after_ipc_disconnect(self):
         order = []

@@ -137,6 +137,21 @@ directory. Do not use the macOS/Windows directory-swap updater for Linux.
 
 ## Source Mode and Desktop IPC
 
+Local Codex Desktop uses the same opt-in shared-runtime adapter as macOS and
+Windows for persistent side chats. When the connection is not prepared, Bridge
+waits for a verified idle desktop, then normally restarts it with a private Unix
+socket. Existing shared connections are reused without restarting Codex. Busy
+or unknown task states postpone preparation; failed or uncertain writes are
+never replayed through a separate app-server. The original App keeps execution
+ownership, account, model provider, permissions, and working directory.
+
+The Linux connection verifies process generations using the boot ID, process
+start ticks, real/effective UID, executable, and parent relationships. Socket
+directories remain private (`700`) and sockets remain private (`600`). A network
+listener is not added. This path was exercised with native Codex
+`0.169.0-alpha.11.1` in an isolated Desktop fixture; that fixture does not replace
+acceptance of the real desktop restart and mobile interaction.
+
 Source mode needs Python 3.9+ but not npm or Electron:
 
 ```sh

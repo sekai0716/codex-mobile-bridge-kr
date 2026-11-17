@@ -3342,7 +3342,7 @@ class Bridge:
         from bridge.features.sessions.create import _runtime_operation
         with ExitStack() as locks:
             try:
-                if self.host == 'local' and sys.platform in ('darwin', 'win32'):
+                if self.host == 'local' and sys.platform in ('darwin', 'linux', 'win32'):
                     # Every gateway using this home must finish its metadata
                     # transaction before initialization may quit the original App.
                     locks.enter_context(initialization_lock(self.codex_home))
@@ -3351,7 +3351,7 @@ class Bridge:
                 # Only connection/identity checks have run; no metadata write was sent.
                 raise CreationUnavailable(str(exc)) from exc
             if client is None:
-                if require_shared and self.host == 'local' and sys.platform in ('darwin', 'win32'):
+                if require_shared and self.host == 'local' and sys.platform in ('darwin', 'linux', 'win32'):
                     raise CreationUnavailable('기본 사이드 채팅 연결이 준비되기를 기다리고 있습니다. 데스크톱 작업이 완료되고 유휴 상태가 확인되면 자동으로 완료됩니다. 계정 관리에서 준비 상태를 확인할 수도 있습니다. 사이드 채팅이 아직 생성되지 않았습니다')
                 return _runtime_operation(self.catalog_reader.executable, self.codex_home, cwd, operation,
                                           failure_message=failure_message, **_runtime_scope(self.host))
