@@ -2,6 +2,18 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Auto-review in progress": "자동 검토 중",
+  "Auto-review denied": "거부됨",
+  "Auto-review stopped": "검토 중단됨",
+  "Auto-review timed out": "검토 시간 초과",
+  "Review status unavailable": "검토 상태 확인 불가",
+  "Tool running": "실행 중",
+  "Tool succeeded": "실행 완료",
+  "Tool completed": "실행 종료",
+  "Tool failed": "실행 실패",
+  "Tool interrupted": "중지됨",
+  "Tool declined": "거부됨",
+  "Tool request": "도구 요청",
   "Git repository": "Git 저장소",
   "No Git repository was found in this project.": "이 작업 폴더에서 Git 저장소를 찾지 못했습니다.",
   "Ran commands": "명령을 실행함",

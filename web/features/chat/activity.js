@@ -78,14 +78,13 @@ function syncChatMessageNodes(container,nodes){
 // 원본 종류와 turn 경계로만 묶는다. 번역된 제목이나 명령 내용으로
 // 종류를 추측하지 않으며, 이미지와 확인이 필요한 항목은 독립 행이다.
 function chatActivityGroupKind(row){
-  if(!['activity','fileChanges'].includes(row.role)||row.attachments?.length||['denied','declined'].includes(row.status))return null;
+  if(!['activity','fileChanges'].includes(row.role)||row.attachments?.length||['denied','declined'].includes(row.status)||row.approvalReview?.status==='denied')return null;
   if(row.role==='fileChanges')return 'files';
   switch(row.kind){
     case 'commandExecution':return 'commands';
     case 'fileChange':case 'FileChange':case 'fileChanges':return 'files';
     case 'webSearch':return 'web';
     case 'mcpToolCall':case 'dynamicToolCall':case 'storedToolEvent':return 'tools';
-    case 'automaticApprovalReview':return row.status==='inProgress'?'review':null;
     default:return null;
   }
 }
@@ -93,7 +92,7 @@ function groupChatActivityRows(rows){
   const units=[];let pending=[];
   const flush=()=>{if(pending.length){units.push({kind:pending.length>1?'group':'standalone',rows:pending});pending=[];}};
   for(const row of rows){
-    if(row.kind==='reasoning')continue;
+    if(row.kind==='reasoning'||row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))continue;
     if(!chatActivityGroupKind(row)){flush();units.push({kind:'standalone',rows:[row]});continue;}
     if(pending.length&&pending[0].turnId!==row.turnId)flush();
     pending.push(row);
@@ -138,7 +137,8 @@ class ChatActivityGroups {
       const visible=items.filter(({node})=>!node.hidden),labels={commands:'Ran commands',files:'Edited files',web:'Searched the web',tools:'Tool activity',review:'Automatic approval review'};
       const types=[...new Set(visible.map(({row})=>chatActivityGroupKind(row)))];
       const active=visible.some(({row})=>row.status==='inProgress');
-      const text=types.map(kind=>BridgeI18n.t(labels[kind])).join(' · ')+(active?BridgeI18n.t('· 진행중'):'');
+      const reviewing=visible.some(({row})=>row.approvalReview?.status==='inProgress');
+      const text=types.map(kind=>BridgeI18n.t(labels[kind])).join(' · ')+(reviewing?'ㆍ'+BridgeI18n.t('Auto-review in progress'):active?BridgeI18n.t('· 진행중'):'');
       if(group.label.textContent!==text)group.label.textContent=text;
       group.summary.title=text;group.count.textContent=String(visible.length);
       group.count.title=BridgeI18n.t('{count} activities').replace('{count}',visible.length);
@@ -152,9 +152,10 @@ class ChatActivityGroups {
       if(row.kind!=='commandExecution')continue;
       const heading=node.firstElementChild,nested=members.has(row.key),first=chatCommandFirstLine(row);
       node.classList.toggle('grouped-command',nested);
-      const text=nested&&first?first:chatActivityLabel(row);
+      const command=first&&(nested||row.approvalReview)?first:'';
+      const text=command?command+chatActivityStateSuffix(row):chatActivityLabel(row);
       if(heading.textContent!==text)heading.textContent=text;
-      heading.title=nested?first:'';
+      decorateChatActivity(node,row,heading,command);
     }
     syncChatMessageNodes(container,nodes);
     // 분할·병합 중 다른 컨테이너로 옮긴 행도 새 레이아웃에서 복원한다.
@@ -169,9 +170,52 @@ function chatLatestReasoning(messages=[]){
   for(let index=messages.length-1;index>=0;index--){const message=messages[index];if(message.role==='user')break;if(message.role==='reasoning'||message.kind==='reasoning'){const line=chatLastNonEmptyLine(message.text);if(line)return line;}}
   return '';
 }
+const chatReviewLabels={inProgress:'Auto-review in progress',denied:'Auto-review denied',aborted:'Auto-review stopped',timedOut:'Auto-review timed out',unknown:'Review status unavailable'};
+const chatExecutionLabels={running:'Tool running',succeeded:'Tool succeeded',completed:'Tool completed',failed:'Tool failed',interrupted:'Tool interrupted',declined:'Tool declined'};
+const chatToolKinds=new Set(['commandExecution','fileChange','FileChange','mcpToolCall','dynamicToolCall','storedToolEvent']);
+// 검토 통과는 실행 성공의 증거가 아니다. 실행 중/실패/중단은 원본
+// 도구 상태로 판단하고, 성공 표시는 종료 코드 0 또는 명시적 success만 쓴다.
+function chatToolExecutionState(row){
+  if(!chatToolKinds.has(row.kind))return '';
+  if(['declined','denied'].includes(row.status))return 'declined';
+  if(['interrupted','cancelled'].includes(row.status))return 'interrupted';
+  if(row.status==='failed'||row.success===false||Number.isInteger(row.exitCode)&&row.exitCode!==0)return 'failed';
+  if(row.status==='inProgress')return 'running';
+  if(row.exitCode===0||row.success===true)return 'succeeded';
+  return row.status==='completed'?'completed':'';
+}
+function chatActivityStateSuffix(row){
+  const review=row.approvalReview?.status,result=chatToolExecutionState(row),labels=[];
+  if(review&&review!=='approved')labels.push(BridgeI18n.t(chatReviewLabels[review]||chatReviewLabels.unknown));
+  if(!['inProgress','denied'].includes(review)&&['running','failed','interrupted','declined'].includes(result))labels.push(BridgeI18n.t(chatExecutionLabels[result]));
+  return labels.length?'ㆍ'+labels.join('ㆍ'):'';
+}
+function decorateChatActivity(node,row,heading,command=''){
+  const result=chatToolExecutionState(row),label=result&&!(row.approvalReview?.status==='inProgress'&&result==='running')?BridgeI18n.t(chatExecutionLabels[result]):'';
+  node.dataset.execution=result;node.dataset.review=row.approvalReview?.status||'';
+  // 긴 명령은 본문 부분만 줄여서 검토·실패 상태가 말줄임에 가려지지 않게 한다.
+  if(chatToolKinds.has(row.kind)||row.kind==='automaticApprovalReview'){
+    const caption=command||chatActivityCaption(row),suffix=chatActivityStateSuffix(row),signature=JSON.stringify([caption,suffix]);
+    node.classList.add('tool-state');node.classList.toggle('command-caption',!!command);
+    if(heading.dataset.caption!==signature||!heading.firstElementChild?.classList.contains('activity-caption')){
+      const text=document.createElement('span'),state=document.createElement('span');text.className='activity-caption';state.className='activity-state';
+      text.textContent=caption;state.textContent=suffix;state.hidden=!suffix;heading.replaceChildren(text,state);heading.dataset.caption=signature;
+    }
+  }
+  heading.title=[command,label].filter(Boolean).join(' · ');
+  heading.setAttribute('aria-label',heading.textContent+(['succeeded','completed'].includes(result)?' · '+label:''));
+}
+function chatActivityCaption(row){
+  if(row.kind==='automaticApprovalReview')return typeof row.reviewActionLabel==='string'&&row.reviewActionLabel.trim()?row.reviewActionLabel.split(/[\r\n]/,1)[0]:BridgeI18n.t('Tool request');
+  if(['mcpToolCall','dynamicToolCall','storedToolEvent'].includes(row.kind)&&typeof row.title==='string')return row.title;
+  return BridgeI18n.t(row.title||row.kind||row.type);
+}
 function chatActivityLabel(row){
   const t=BridgeI18n.t,kind=row.kind||row.type,auto=kind==='autoContextCompaction';
-  if(kind!=='contextCompaction'&&!auto)return t(row.title||kind)+(row.status==='inProgress'?t('· 진행중'):'');
+  if(kind!=='contextCompaction'&&!auto){
+    if(kind==='automaticApprovalReview')return chatActivityCaption(row)+chatActivityStateSuffix(row);
+    return chatActivityCaption(row)+(chatToolKinds.has(kind)?chatActivityStateSuffix(row):row.status==='inProgress'?t('· 진행중'):'');
+  }
   const status=row.status||(row.turnStatus==='completed'?'completed':null);
   const key=status==='inProgress'?(auto?'Automatically compacting context':'Compacting context'):status==='completed'?(auto?'Context automatically compacted':'Context compacted'):status==='failed'?'Context compaction failed':status==='interrupted'?'Context compaction interrupted':auto?'Automatic context compaction':'Context compaction';
   return t(key);

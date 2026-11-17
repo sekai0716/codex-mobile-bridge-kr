@@ -81,13 +81,23 @@ class Timeline:
                 text = message.get('text') or ''
                 if message.get('output'):
                     text += '\n\n' + message['output']
+                preview = text
+                # 원본 검토 내역도 기존 상세 본문의 분할 조회로 읽는다.
+                # 검토 이유가 길어도 첫 화면의 메타데이터에 함께 싣지 않는다.
+                if message.get('approvalReviews'):
+                    text += '\n\n' + json.dumps({'automaticApprovalReviews': message['approvalReviews']}, ensure_ascii=False, indent=2)
                 activity = message['role'] in ('activity', 'fileChanges')
                 attachments = [{k: str(a[k])[:4096 if k == 'path' else 300] for k in ('type', 'name', 'path', 'desktopId') if k in a}
                                for a in (message.get('attachments') or [])[:20]]
-                version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary')])).hexdigest()[:24]
-                row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId') if k in message}
+                version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
+                                                 message.get('approvalReview'), message.get('reviewLinked'),
+                                                 message.get('status'), message.get('exitCode'), message.get('success')])).hexdigest()[:24]
+                row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
+                                             'approvalReview', 'reviewLinked') if k in message}
+                if isinstance(message.get('reviewActionLabel'), str):
+                    row['reviewActionLabel'] = message['reviewActionLabel'][:180].split('\n', 1)[0]
                 row.update(key=key, turnId=turn['id'], order=len(rows), version=version,
-                           text=text[:180 if activity else TEXT_PREVIEW],
+                           text=preview[:180 if activity else TEXT_PREVIEW],
                            truncated=(activity and bool(text)) or len(text) > TEXT_PREVIEW, turnStatus=turn.get('status'),
                            editable=turn.get('actionable', True) and first_user and message.get('kind') == 'userMessage',
                            forkable=turn.get('actionable', True) and message['role'] == 'assistant' and message.get('phase') != 'commentary' and turn.get('status') == 'completed')

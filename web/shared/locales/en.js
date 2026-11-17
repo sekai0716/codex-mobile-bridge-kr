@@ -2,6 +2,18 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Auto-review in progress": "Auto-review in progress",
+  "Auto-review denied": "Denied",
+  "Auto-review stopped": "Auto-review stopped",
+  "Auto-review timed out": "Auto-review timed out",
+  "Review status unavailable": "Review status unavailable",
+  "Tool running": "Running",
+  "Tool succeeded": "Succeeded",
+  "Tool completed": "Finished",
+  "Tool failed": "Failed",
+  "Tool interrupted": "Stopped",
+  "Tool declined": "Declined",
+  "Tool request": "Tool request",
   "Git repository": "Git repository",
   "No Git repository was found in this project.": "No Git repository was found in this project.",
   "Ran commands": "Ran commands",

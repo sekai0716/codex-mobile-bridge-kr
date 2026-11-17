@@ -71,6 +71,7 @@ class ChatTimeline {
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
   rowVisible(row){
     if(row.role==='user'||row.role==='error')return true;
+    if(row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))return false;
     if(row.kind==='reasoning')return false;
     if(row.role==='activity'||row.phase==='commentary')return this.showProcess;
     return true;
@@ -198,7 +199,7 @@ class ChatTimeline {
   }
   syncRows(ordered=[...this.rows.values()].map(entry=>entry.row).sort((a,b)=>a.order-b.order)){
     this.activityGroups??=new ChatActivityGroups();
-    this.activityGroups.sync(this.container,ordered.filter(row=>row.kind!=='reasoning').map(row=>({row,node:this.nodes.get(row.key).node})));
+    this.activityGroups.sync(this.container,ordered.filter(row=>row.kind!=='reasoning'&&!(row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))).map(row=>({row,node:this.nodes.get(row.key).node})));
   }
   renderRow(row,open){
     const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&row.attachments?.some(item=>item.type==='toolImage');
@@ -208,6 +209,7 @@ class ChatTimeline {
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
     heading.textContent=activity?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
+    if(activity&&!row.fileSummary)decorateChatActivity(node,row,heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
       heading.replaceChildren();
@@ -327,6 +329,7 @@ class ChatTimeline {
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
       if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');}
       else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      if(heading&&row.role==='activity')decorateChatActivity(node,row,heading);
       const more=node.querySelector('.detail-more');
       if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'더 많은 텍스트 로드':'전체 콘텐츠 표시');
       const attachment=node.querySelector('.timeline-attachments small.muted');

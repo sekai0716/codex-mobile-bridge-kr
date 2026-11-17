@@ -2,6 +2,18 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Auto-review in progress": "正在自动审查",
+  "Auto-review denied": "已拒绝",
+  "Auto-review stopped": "自动审查已停止",
+  "Auto-review timed out": "自动审查超时",
+  "Review status unavailable": "无法确认审查状态",
+  "Tool running": "正在执行",
+  "Tool succeeded": "执行成功",
+  "Tool completed": "执行结束",
+  "Tool failed": "执行失败",
+  "Tool interrupted": "已停止",
+  "Tool declined": "已拒绝",
+  "Tool request": "工具请求",
   "Git repository": "Git 仓库",
   "No Git repository was found in this project.": "在此项目中未找到 Git 仓库。",
   "Ran commands": "已运行命令",

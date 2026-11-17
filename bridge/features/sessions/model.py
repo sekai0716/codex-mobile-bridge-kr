@@ -153,6 +153,37 @@ def user_display_text(text):
     return text[boundary:].strip("\r\n")
 
 
+REVIEW_TOOL_KINDS = {'commandExecution', 'fileChange', 'FileChange', 'mcpToolCall', 'dynamicToolCall'}
+
+
+def approval_review_record(item, turn_status=None):
+    """원본 검토 상태를 실행 결과와 분리하고, 중단된 turn의 진행 상태를 정리한다."""
+    status = item.get('status') or 'unknown'
+    if not isinstance(status, str) or status not in ('inProgress', 'approved', 'denied', 'aborted', 'timedOut'):
+        status = 'unknown'
+    if status == 'inProgress' and turn_status == 'interrupted':
+        status = 'aborted'
+    return {'id': item.get('id'), 'status': status,
+            **{key: item[key] for key in ('rationale', 'riskLevel', 'userAuthorization', 'startedAtMs', 'completedAtMs')
+               if isinstance(item.get(key), (str, int, float)) and not isinstance(item[key], bool)}}
+
+
+def review_action_label(action):
+    """대상 도구가 아직 로드되지 않았을 때 원본 action으로 요청을 식별한다."""
+    if not isinstance(action, dict):
+        return ''
+    kind = action.get('type')
+    if kind == 'command':
+        return action.get('command', '')
+    if kind == 'execve':
+        return ' '.join(str(value) for value in [action.get('program', ''), *(action.get('argv') or [])])
+    if kind == 'mcpToolCall':
+        return ' · '.join(str(value) for value in (action.get('server'), action.get('toolName')) if value)
+    if kind == 'applyPatch':
+        return ', '.join(str(value) for value in action.get('files', []))
+    return str(action.get('reason') or action.get('target') or '')
+
+
 def normalize_item(item, *, image_cache=None):
     kind = item.get("type", "unknown")
     row = {"id": item.get("id"), "kind": kind, "status": item.get("status")}
@@ -204,6 +235,10 @@ def normalize_item(item, *, image_cache=None):
         row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
         row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
+    elif kind == 'automaticApprovalReview':
+        row.update(role='activity', title='Automatic approval review', text=item.get('rationale') or '',
+                   approvalReview={key: value for key, value in approval_review_record(item).items() if key in ('id', 'status', 'riskLevel')},
+                   reviewActionLabel=review_action_label(item.get('action')))
     elif kind in ("fileChange", "FileChange"):
         row.update(role="activity", title="파일 변경", text="\n\n".join(c["path"] + "\n" + c["diff"] for c in native_file_changes([item])))
     elif kind in ("mcpToolCall", "dynamicToolCall"):
@@ -216,6 +251,8 @@ def normalize_item(item, *, image_cache=None):
         else:
             output, images = extract(source)
         row.update(role="activity", title=" · ".join(str(x) for x in (item.get("server"), item.get("tool", item.get("toolName"))) if x), text=json.dumps(item.get("arguments", {}), ensure_ascii=False, indent=2), output=json.dumps(output, ensure_ascii=False, indent=2))
+        if isinstance(item.get('success'), bool):
+            row['success'] = item['success']
         if images:
             row['attachments'] = images
     elif kind == "error":
@@ -317,6 +354,20 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
         authoritative_diff = isinstance(turn.get('diff'), str) and turn['diff'].startswith('diff --git ')
         omitted = skip
         skip = 0
+        # 전체 본문을 정규화하지 않고 ID와 검토 메타데이터만 색인한다.
+        # 같은 turn의 고유한 대상 ID에만 연결하며 제목·명령 문자열은 사용하지 않는다.
+        tool_counts, reviews = {}, {}
+        for native in items:
+            if native.get('type') in REVIEW_TOOL_KINDS:
+                identifier = native.get('id')
+                if isinstance(identifier, str) and identifier:
+                    tool_counts[identifier] = tool_counts.get(identifier, 0) + 1
+            elif native.get('type') == 'automaticApprovalReview':
+                target = native.get('targetItemId')
+                if isinstance(target, str) and target and native.get('turnId') in (None, turn.get('turnId')):
+                    records = reviews.setdefault(target, {})
+                    records[native.get('id') or str(len(records))] = approval_review_record(native, turn.get('status'))
+        visible_tools = {item['id'] for item in items[omitted:] if item.get('type') in REVIEW_TOOL_KINDS and isinstance(item.get('id'), str)}
         occurrences = {}
         prefix_ordinals = {}
         preceding_calls = {}
@@ -359,6 +410,17 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
                 continue
             else:
                 message = normalize_item(item, image_cache=image_cache)
+            identifier = item.get('id')
+            if kind in REVIEW_TOOL_KINDS and tool_counts.get(identifier) == 1 and identifier in reviews:
+                records = list(reviews[identifier].values())
+                message['approvalReviews'] = records
+                message['approvalReview'] = {key: value for key, value in records[-1].items() if key in ('id', 'status', 'riskLevel')}
+            elif kind == 'automaticApprovalReview':
+                message['approvalReview'] = {key: value for key, value in approval_review_record(item, turn.get('status')).items() if key in ('id', 'status', 'riskLevel')}
+                target = item.get('targetItemId')
+                message['reviewLinked'] = (isinstance(target, str) and target in visible_tools
+                                           and tool_counts.get(target) == 1
+                                           and item.get('turnId') in (None, turn.get('turnId')))
             first_user = (item.get('id') == turn['_firstUserItemId']
                           if '_firstUserItemId' in turn else id(item) == first_user_id)
             if message['role'] == 'user' and message.get('timestamp') is None and first_user and started_at is not None:

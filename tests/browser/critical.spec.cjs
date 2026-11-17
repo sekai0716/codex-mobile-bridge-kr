@@ -326,6 +326,7 @@ for (const [name, file, invoke] of [
   ['chat history, list entry and scroll position', 'desktop-history', 'runDesktopHistoryBrowserChecks'],
   ['shared chat reading state across refreshes', 'chat-reading-state', 'runChatReadingStateChecks'],
   ['Codex activity groups retain command details, boundaries and reading state', 'chat-reading-state', 'runChatActivityGroupChecks'],
+  ['Codex tool review badges track native target and execution states', 'chat-reading-state', 'runToolReviewStatusChecks'],
   ['Git repository selection routes changes and history to the selected checkout', 'git-panel-ui', 'runGitRepositorySelectionChecks'],
   ['account-scoped drafts and late send acknowledgement', 'persistent-drafts', 'runPersistentDraftTests'],
   ['API form labels, layout and upstream model selection', 'api-form', 'runApiFormBrowserChecks'],
@@ -339,7 +340,7 @@ for (const [name, file, invoke] of [
     const result = await page.evaluate(name => globalThis[name](), invoke);
     expect(Array.isArray(result) ? result.length : result.passed).toBeGreaterThan(0);
     if(invoke==='runChatActivityGroupChecks')await testInfo.attach('activity-groups',{body:await page.screenshot(),contentType:'image/png'});
-    if(invoke==='runGitRepositorySelectionChecks')await testInfo.attach(invoke,{body:await page.screenshot(),contentType:'image/png'});
+    if(invoke==='runToolReviewStatusChecks'||invoke==='runGitRepositorySelectionChecks')await testInfo.attach(invoke,{body:await page.screenshot(),contentType:'image/png'});
     await testInfo.attach('checks', {body: JSON.stringify(result), contentType: 'application/json'});
   });
 }

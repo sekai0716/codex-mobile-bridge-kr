@@ -1,5 +1,13 @@
 .timeline-row.activity{margin:0 0 12px}
 .activity{margin:0}.activity summary{padding:2px 0}
+.activity.tool-state>summary{display:flex;align-items:center;min-width:0;min-height:30px;line-height:30px;list-style:none;cursor:pointer}
+.activity.tool-state>summary::-webkit-details-marker{display:none}
+.activity.tool-state>summary::before{content:"";flex:none;width:0;height:0;border-block:4px solid transparent;border-inline-start:6px solid currentColor;margin-inline-end:6px}
+.activity.tool-state[open]>summary::before{transform:rotate(90deg)}
+.activity-caption{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.activity-state{flex:none;white-space:nowrap}
+.activity.command-caption .activity-caption{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.activity[data-execution=failed]>summary,.activity[data-review=denied]>summary{color:var(--warning-text)}
+.activity[data-execution=succeeded]>summary::after{content:"";display:inline-block;width:8px;height:5px;margin:0 5px 3px 8px;border-left:1.5px solid var(--green);border-bottom:1.5px solid var(--green);transform:rotate(-45deg)}
 .activity-group{min-width:0;margin:0 0 12px;color:var(--muted);font-size:13px}
 .activity-group>summary{min-height:32px;line-height:32px;cursor:pointer;white-space:nowrap;list-style-position:inside}
 .activity-group-label{display:inline-block;max-width:calc(100% - 60px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}

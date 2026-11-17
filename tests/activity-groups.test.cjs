@@ -21,7 +21,8 @@ test('images, approvals, errors and unknown activities remain separate and split
     tool('permission','permissionRequest'),{key:'error',role:'error'},tool('other','futureTool')]){
     assert.deepEqual(shape([tool('before'),boundary,tool('after')]),[['standalone',['before']],['standalone',[boundary.key]],['standalone',['after']]],boundary.key);
   }
-  assert.deepEqual(shape([tool('a'),tool('review','automaticApprovalReview',{status:'inProgress'}),tool('b')]),[['group',['a','review','b']]]);
+  assert.deepEqual(shape([tool('a'),tool('review','automaticApprovalReview',{status:'inProgress'}),tool('b')]),[['standalone',['a']],['standalone',['review']],['standalone',['b']]]);
+  assert.deepEqual(shape([tool('a'),tool('review','automaticApprovalReview',{reviewLinked:true}),tool('b')]),[['group',['a','b']]]);
   assert.deepEqual(shape([tool('a'),{key:'summary',role:'fileChanges',kind:'fileChanges',turnId:'turn-a'}]),[['group',['a','summary']]]);
   assert.deepEqual(shape([]),[]);
 });

@@ -80,6 +80,56 @@ async function runChatReadingStateChecks(){
   return {width:innerWidth,passed:checks.length,checks};
 }
 
+// 원본 ID 연결 메타데이터를 사용하는 실제 타임라인에서 표시 전환을 검사한다.
+async function runToolReviewStatusChecks(){
+  await BridgeFeatures.load('chat');
+  const checks=[],check=(value,label)=>{if(!value)throw Error(label);checks.push(label);},frame=()=>new Promise(requestAnimationFrame);
+  const until=async fn=>{const end=performance.now()+3000;while(!fn()){if(performance.now()>end)throw Error('Review fixture did not settle');await frame();}};
+  const root=document.createElement('div');root.id='tool-review-fixture';root.style.cssText='position:fixed;inset:16px;z-index:30;background:var(--page);padding:8px;overflow:auto;box-sizing:border-box';document.body.append(root);
+  const viewport=document.createElement('div'),container=document.createElement('div'),older=document.createElement('button'),newer=document.createElement('button');viewport.style.cssText='height:100%;max-width:760px;margin:auto;overflow:auto';viewport.append(container);root.append(viewport,older,newer);
+  const command='git status --short '+('long-argument '.repeat(30));let sequence=0,reads=0,writes=0;
+  let current={key:'tool-a',order:1,turnId:'turn-a',kind:'commandExecution',role:'activity',title:'명령을 실행하다',text:command,truncated:true,status:'inProgress',version:'v1',approvalReview:{id:'review-a',status:'inProgress'}};
+  const review={key:'review-a',order:2,turnId:'turn-a',kind:'automaticApprovalReview',role:'activity',reviewLinked:true,approvalReview:{id:'review-a',status:'inProgress'},version:'v1',text:'review rationale'};
+  const companion={key:'tool-b',order:3,turnId:'turn-a',kind:'mcpToolCall',role:'activity',title:'functions.read',text:'{}',status:'completed',success:true,version:'v1'};
+  const timeline=new ChatTimeline({url:action=>'/review-fixture/'+action+'?',elements:{viewport,container,older,newer},renderMeta(){},renderText:(node,text)=>node.textContent=text,status(){},request:async(url,body)=>{
+    if(body!==undefined){writes++;throw Error('Unexpected write');}if(!url.includes('/detail'))throw Error('Unexpected read');reads++;
+    return {version:current.version,offset:0,next:null,text:current.text+'\n\n{"automaticApprovalReviews":[{"status":"denied","rationale":"Requires explicit authorization"}]}',files:[]};
+  }});
+  const node=()=>timeline.nodes.get('tool-a').node,heading=()=>node().firstElementChild;
+  const apply=()=>{const reset=sequence===0;timeline.apply({epoch:'review-ui',sequence:++sequence,rows:[
+    {key:'progress',order:0,role:'assistant',kind:'agentMessage',phase:'commentary',text:'검토 중인 도구와 실행 결과를 확인하고 있습니다.',version:'v1'},current,{...review,approvalReview:current.approvalReview},companion,
+  ],meta:{requests:[]},files:[],hasMore:false},reset);};
+  const language=BridgeI18n.language();
+  try{
+    BridgeI18n.setLanguage('ko');apply();await frame();
+    const group=container.querySelector('.activity-group');group.firstElementChild.click();await frame();await frame();
+    check(!container.querySelector('[data-key="review-a"]')&&heading().querySelector('.activity-state').textContent==='ㆍ자동 검토 중','review progress is attached to its tool without a duplicate timeline row');
+    check(reads===0&&writes===0,'rendering a review or opening its group does not fetch output or approve an action');
+    root.style.width='320px';await frame();
+    const caption=heading().querySelector('.activity-caption'),badge=heading().querySelector('.activity-state');
+    check(caption.scrollWidth>caption.clientWidth&&badge.getBoundingClientRect().right<=heading().getBoundingClientRect().right+1&&badge.getBoundingClientRect().width>20,'a long command truncates its caption while leaving review status visible at 320px');
+    check(heading().getBoundingClientRect().height<=31,'tool and review status remain on one line');root.style.width='';
+    current={...current,status:undefined,version:'v2',approvalReview:{id:'review-a',status:'approved'}};apply();await frame();
+    check(heading().querySelector('.activity-state').hidden&&!heading().textContent.includes('자동 검토'),'approval removes the review badge and retains the tool caption');
+    check(node().dataset.execution==='','review approval does not invent execution success');
+    current={...current,status:'inProgress',version:'v3'};apply();await frame();check(heading().textContent.endsWith('ㆍ실행 중'),'actual execution progress appears independently after approval');
+    current={...current,status:'completed',exitCode:0,version:'v4'};apply();await frame();
+    check(node().dataset.execution==='succeeded'&&heading().querySelector('.activity-state').hidden&&heading().getAttribute('aria-label').includes('실행 완료'),'exit code zero shows successful execution without an approval label');
+    current={...current,exitCode:2,version:'v5'};apply();await frame();check(heading().textContent.endsWith('ㆍ실행 실패')&&node().dataset.execution==='failed','an approved command can still fail during execution');
+    current={...current,status:'declined',exitCode:null,version:'v6',approvalReview:{id:'review-a',status:'denied'}};apply();await frame();
+    check(node().parentNode===container&&heading().textContent.endsWith('ㆍ거부됨'),'denial remains visible on the real tool outside collapsed groups');
+    heading().click();await until(()=>reads===1&&node().querySelector('.activity-body').textContent.includes('Requires explicit authorization'));
+    check(!container.querySelector('[data-key="review-a"]')&&reads===1&&writes===0,'denial reason is available through the existing paged detail read without an approval write');
+    for(const [lang,label]of [['en','Denied'],['zh','已拒绝'],['ko','거부됨']]){
+      BridgeI18n.setLanguage(lang);timeline.relabel();check(heading().querySelector('.activity-state').textContent==='ㆍ'+label&&heading().querySelector('.activity-caption').textContent===command.trim(),'review badge follows '+lang+' while literal command text is retained');
+    }
+    current={...current,status:'interrupted',version:'v7',approvalReview:{id:'review-a',status:'aborted'}};apply();await frame();check(heading().textContent.includes('검토 중단됨')&&heading().textContent.includes('중지됨'),'interrupted review and tool execution are distinguished');
+    current={...current,status:undefined,version:'v8',approvalReview:{id:'review-a',status:'timedOut'}};apply();await frame();check(heading().textContent.endsWith('ㆍ검토 시간 초과'),'a review timeout is not presented as approval or execution success');
+    current={...current,status:'declined',version:'v9',approvalReview:{id:'review-a',status:'denied'}};apply();await frame();
+    return {width:innerWidth,passed:checks.length,checks};
+  }finally{BridgeI18n.setLanguage(language);timeline.dispose();}
+}
+
 // 실제 타임라인·CSS를 사용하고 명령 실행 없이 메모리의 상세 응답만 읽는다.
 async function runChatActivityGroupChecks(){
   await BridgeFeatures.load('chat');
@@ -160,7 +210,8 @@ async function runChatActivityGroupChecks(){
     }
     root.style.width='320px';viewport.scrollTop=0;await frame();
     const heading=node('cmd2').firstElementChild,rect=heading.getBoundingClientRect();
-    check(getComputedStyle(heading).whiteSpace==='nowrap'&&rect.height<=31&&heading.scrollWidth>heading.clientWidth,'long command labels stay on one truncated line at 320px');
+    const commandCaption=heading.querySelector('.activity-caption');
+    check(getComputedStyle(heading).whiteSpace==='nowrap'&&rect.height<=31&&commandCaption.scrollWidth>commandCaption.clientWidth,'long command labels stay on one truncated line at 320px');
     check(container.scrollWidth<=container.clientWidth+1,'activity groups do not overflow the narrow conversation');
     // 기존 묶음의 첫 키보다 앞에 기록이 붙은 뒤 설명이 중간에 나타나도
     // 두 묶음의 키와 펼침 상태가 서로 섞이지 않아야 한다.
