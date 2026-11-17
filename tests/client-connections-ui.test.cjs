@@ -532,7 +532,7 @@ test('ZCode management shares its mode picker and refreshes official state only 
  client.connectionMode='official-remote';ui.panel.renderClients();assert.equal(modes.querySelector('[data-connection-mode="official-remote"]').attributes['aria-pressed'],'true');
  await section.querySelectorAll('button').find(button=>button.textContent==='상태 새로고침').onclick();
  assert.equal(guide.open,true,'A status refresh preserves the user-opened instructions');
- assert.equal(input.value,'https://zcode.z.ai/pair?fixture=edited');assert.match(text(),/연결 설정에 저장되지 않은 변경사항이 있습니다\./);assert.equal(section.querySelector('[data-official-action="connect"]').disabled,true);
+ assert.equal(input.value,'https://zcode.z.ai/pair?fixture=edited');assert.match(text(),/연결 설정에 저장되지 않은 변경 사항이 있습니다\./);assert.equal(section.querySelector('[data-official-action="connect"]').disabled,true);
 });
 
 test('official settings save independently and connect through the shared client mode action',async()=>{

@@ -152,14 +152,14 @@ test('native activity headings and permissions use requested Korean and switch b
   await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'steer-event',order:3,role:'activity',kind:'steered',title:'steered',text:'unchanged tool output',version:1},{key:'approval-event',order:4,role:'activity',kind:'automaticApprovalReview',title:'automaticApprovalReview',text:'unchanged tool output',version:1}];chatTimeline.apply({...f.page(),sequence:2});f.update('active');});
   await expect(page.locator('#working')).toHaveText('Codex 생각 중');
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('스티어링함');
-  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동검토중');
+  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동 검토 중');
   await page.evaluate(()=>{BridgeI18n.setLanguage('en');BridgeI18n.apply();chatTimeline.relabel();});
   await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('Ran a command');
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('Steered');
   await expect(page.locator('#localized-folder-fixture')).toHaveText('Folder');
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
   await page.evaluate(()=>{BridgeI18n.setLanguage('ko');BridgeI18n.apply();chatTimeline.relabel();});
-  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동검토중');
+  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동 검토 중');
   await expect(page.locator('#localized-folder-fixture')).toHaveText('폴더');
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
 });

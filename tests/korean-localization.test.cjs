@@ -30,7 +30,7 @@ test('phone help preserves long-term pairing separately from web sign-in expiry'
 });
 
 test('requested Korean labels keep original keys and English meanings',()=>{
- const ui=i18n(),labels={'명령을 실행하다':'명령을 실행함','승인해 주세요':'나 대신 승인','Codex 일하고 있는':'Codex 생각 중','Codex가 작동 중입니다…':'Codex 생각 중',steered:'스티어링함',automaticApprovalReview:'자동검토중','보조 채팅':'사이드 채팅','단말기':'터미널','상담원이 채팅 이름을 지정할 수 있도록 비워 두세요.':'비워 두면 에이전트가 채팅 이름을 자동으로 정합니다.'};
+ const ui=i18n(),labels={'명령을 실행하다':'명령을 실행함','승인해 주세요':'나 대신 승인','Codex 일하고 있는':'Codex 생각 중','Codex가 작동 중입니다…':'Codex 생각 중',steered:'스티어링함',automaticApprovalReview:'자동 검토 중','보조 채팅':'사이드 채팅','단말기':'터미널','상담원이 채팅 이름을 지정할 수 있도록 비워 두세요.':'비워 두면 에이전트가 채팅 이름을 자동으로 정합니다.'};
  for(const [key,value] of Object.entries(labels)){assert.equal(ui.t(key),value,key);assert.ok(ui.source(value),value);ui.setLanguage('en');assert.equal(ui.t(key),ui.dictionary[key]);ui.setLanguage('ko');}
  for(const value of ['echo "단말기"','user-supplied side chat text','file://project/보조 채팅.txt','constructor','__proto__'])assert.equal(ui.t(value),value);
 });
