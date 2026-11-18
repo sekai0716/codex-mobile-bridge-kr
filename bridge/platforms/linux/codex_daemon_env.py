@@ -16,8 +16,20 @@ def desktop_process_identity(pid):
         uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
                     if line.startswith('Uid:'))
         zombie = fields[0] == 'Z'
+        image = ''
+        if not zombie:
+            executable = root / 'exe'
+            try:
+                image = str(executable.resolve(strict=True))
+            except FileNotFoundError:
+                # 패키지 갱신 후에도 기존 프로세스는 삭제된 inode를 실행한다.
+                # 커널 링크와 실제 링크 수를 함께 확인한다. PID·부팅·시작 시각 검증은 그대로 적용된다.
+                target = os.readlink(executable)
+                if not os.path.isabs(target) or not target.endswith(' (deleted)') or executable.stat().st_nlink != 0:
+                    raise
+                image = target.removesuffix(' (deleted)')
         return {'pid': pid, 'parent': int(fields[1]), 'uid': int(uids[1]), 'ruid': int(uids[0]),
-                'image': '' if zombie else str((root / 'exe').resolve(strict=True)),
+                'image': image,
                 'startTicks': int(fields[19]), 'zombie': zombie}
 
     try:

@@ -2,6 +2,8 @@
 import json
 import os
 import socket
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -19,6 +21,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux /proc identity and Unix transport')
 class LinuxDesktopRuntimeTests(unittest.TestCase):
+    def test_package_replacement_keeps_the_running_process_generation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            executable=Path(folder)/'sleep'
+            shutil.copy2(shutil.which('sleep'),executable)
+            with subprocess.Popen([str(executable),'30']) as process:
+                try:
+                    before=runtime.process_identity(process.pid)
+                    executable.unlink()
+                    shutil.copy2(shutil.which('true'),executable)
+                    self.assertEqual(runtime.process_identity(process.pid),before)
+                finally:
+                    process.terminate()
+
+    def test_gateway_exit_only_allows_the_same_desktop_app_to_be_adopted_by_init(self):
+        app = runtime.process_identity(os.getpid())
+        record = {'app': app, 'adapter': {**app, 'pid': 20, 'parent': app['pid']},
+                  'runtime': {**app, 'pid': 21, 'parent': 20}}
+        current = {row['pid']: row.copy() for row in record.values()}
+        current[app['pid']]['parent'] = 1
+        with patch.object(runtime, 'process_identity', side_effect=current.__getitem__):
+            runtime._verify_shared_processes(record)
+            current[20]['parent'] = 1
+            with self.assertRaises(ValueError):
+                runtime._verify_shared_processes(record)
+            current[20] = record['adapter']
+            current[app['pid']]['startTicks'] += 1
+            with self.assertRaises(ValueError):
+                runtime._verify_shared_processes(record)
+
     def test_live_generation_uses_boot_ticks_and_real_effective_uids(self):
         identity = runtime.process_identity(os.getpid())
         self.assertEqual(identity['parent'], os.getppid())

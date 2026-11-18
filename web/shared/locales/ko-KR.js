@@ -2,6 +2,22 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Subagent created": "하위 에이전트 생성됨",
+  "{name} agent created": "{name} 에이전트 생성됨",
+  "Message this agent": "이 에이전트에게 메시지 보내기",
+  "Agent connected": "실시간 연결됨",
+  "Agent working live": "실시간 · 작업 중",
+  "Showing recent agent activity": "최근 작업 기록을 표시합니다.",
+  "Agent message declined": "에이전트가 메시지를 받지 못했습니다. 현재 상태를 확인하세요.",
+  "Agent message delivery unknown": "전송 결과를 확인할 수 없습니다. 에이전트 대화를 확인하세요.",
+  "Edited {filename}": "{filename} 수정됨",
+  "Open file": "파일 열기",
+  "No diff available": "표시할 변경 내용이 없습니다.",
+  "Load more diff": "변경 내용 더 보기",
+  "Show {count} more files": "파일 {count}개 더 보기",
+  "Collapse files": "파일 접기",
+  "하위 에이전트의 원본 연결을 확인할 수 없습니다.": "하위 에이전트의 원본 연결을 확인할 수 없습니다.",
+  "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.": "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.",
   "Auto-review in progress": "자동 검토 중",
   "Auto-review denied": "거부됨",
   "Auto-review stopped": "검토 중단됨",

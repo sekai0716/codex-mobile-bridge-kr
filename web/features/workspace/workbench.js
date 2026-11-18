@@ -409,13 +409,16 @@ class Workbench {
     }
     this.select('git');
   }
-  agents() {
+  agents(agent=null,parentId=this.current?.id) {
     const session=this.current;if(!session)return;
-    if(!session.files.some(tab=>tab.id==='agents')) {
-      const tab={id:'agents',name:BridgeI18n.t('하위 에이전트'),body:this.node('div','wb-agents')};
-      session.files.push(tab);tab.agents=new AgentsPanel(this,session,tab);
+    const id=parentId===session.id?'agents':'agents:'+parentId;
+    let tab=session.files.find(tab=>tab.id===id);
+    if(!tab) {
+      tab={id,name:BridgeI18n.t('하위 에이전트'),body:this.node('div','wb-agents')};
+      session.files.push(tab);tab.agents=new AgentsPanel(this,session,tab,parentId);
     }
-    this.select('agents');
+    this.select(id);
+    if(agent)tab.agents.show({...agent,title:agent.nickname||agent.taskName||BridgeI18n.t('하위 에이전트')});
   }
   sideChat() {
     const session=this.current;if(!session||session.access?.canUseSideChat===false)return;

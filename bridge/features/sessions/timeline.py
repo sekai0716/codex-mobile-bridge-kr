@@ -24,6 +24,8 @@ class Timeline:
         self.rows = []
         self.order_origin = 0
         self.details = {}
+        self.file_patches = {}
+        self.file_revision = 0
         self.positions = {}
         self.versions = OrderedDict()
         self.meta = {}
@@ -37,6 +39,7 @@ class Timeline:
             return
         activation_ids = set(view.get('goalActivationIds') or ())
         entries = []
+        created_agents = {}
         for turn in view['turns']:
             occurrences = {}
             first_user = next((m for m in turn['messages'] if m['role'] == 'user'), None)
@@ -46,6 +49,21 @@ class Timeline:
                 identity = (turn['id'], message.get('id'), message.get('kind'))
                 ordinal = message.get('_timelineOrdinal', occurrences.get(identity, 0))
                 occurrences[identity] = ordinal + 1
+                if message.get('spawnedAgents'):
+                    # 같은 생성을 여러 프로토콜 항목으로 받아도 자식 ID 하나에 한 행을 유지한다.
+                    for agent in message['spawnedAgents']:
+                        child = agent['id']
+                        if child in created_agents:
+                            prior = created_agents[child]
+                            for field in ('nickname', 'taskName'):
+                                if not prior.get(field) and agent.get(field):
+                                    prior[field] = agent[field]
+                            continue
+                        created_agents[child] = dict(agent)
+                        creation = {'role': 'activity', 'kind': 'subAgentCreated', 'agent': created_agents[child],
+                                    '_sourceIdentity': identity + (ordinal,)}
+                        entries.append(((None, child, 'subAgentCreated', 0), turn, creation, False))
+                    continue
                 entries.append((identity + (ordinal,), turn, message, message.get('_firstUser', message is first_user)))
             if turn.get('status') == 'completed' and turn.get('fileChanges'):
                 changes = turn['fileChanges']
@@ -53,7 +71,8 @@ class Timeline:
                 removed = sum(change['removed'] for change in changes)
                 summary = {'id': 'native-file-changes', 'kind': 'fileChanges', 'role': 'fileChanges',
                            'fileSummary': {'count': len(changes), 'added': added, 'removed': removed, 'basis': turn.get('fileChangesBasis', 'recorded'),
-                                           'files': [{k: c[k] for k in ('path', 'added', 'removed')} for c in changes]},
+                                           'files': [{**{k: c[k] for k in ('path', 'added', 'removed')},
+                                                      'hasDiff': bool(c.get('diff'))} for c in changes]},
                            'text': ''}
                 entries.append(((turn['id'], summary['id'], summary['kind'], 0), turn, summary, False))
             if turn.get('error'):
@@ -70,9 +89,9 @@ class Timeline:
         self.window_anchor = entries[start][0] if start < len(entries) else None
         # A tool call carried only to interpret a recent result must not expand
         # the next source read to every intervening historical item.
-        self.source_anchor = next((entry[0] for entry in entries[start:]
+        self.source_anchor = next((entry[2].get('_sourceIdentity', entry[0]) for entry in entries[start:]
                                    if entry[2] is not None and entry[2].get('kind') != 'fileChanges' and not entry[2].get('_historyCarry')), None)
-        rows, details = [], {}
+        rows, details, file_patches = [], {}, {}
         for identity, turn, message, first_user in entries[start:]:
             if message is not None:
                 base = hashlib.sha256(encoded(identity[:3])).hexdigest()[:24]
@@ -89,12 +108,24 @@ class Timeline:
                 activity = message['role'] in ('activity', 'fileChanges')
                 attachments = [{k: str(a[k])[:4096 if k == 'path' else 300] for k in ('type', 'name', 'path', 'desktopId') if k in a}
                                for a in (message.get('attachments') or [])[:20]]
+                revision = None
+                if message.get('fileSummary'):
+                    # 원본 문자열 참조만 보관한다. 같은 줄 수라도 내용이 바뀌면 이전 diff 페이지를 무효화한다.
+                    patches = tuple(c.get('diff') or '' for c in turn['fileChanges'])
+                    previous = self.file_patches.get(key)
+                    if previous and patches == previous[1]:
+                        revision = previous[0]
+                    else:
+                        self.file_revision += 1
+                        revision = self.file_revision
+                    file_patches[key] = (revision, patches)
                 version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
+                                                 revision, message.get('agent'),
                                                  message.get('approvalReview'), message.get('reviewLinked'),
                                                  message.get('status'), message.get('exitCode'), message.get('success'),
                                                  message.get('source'), message.get('completed')])).hexdigest()[:24]
                 row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
-                                             'approvalReview', 'reviewLinked', 'source', 'completed') if k in message}
+                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent') if k in message}
                 if isinstance(message.get('reviewActionLabel'), str):
                     row['reviewActionLabel'] = message['reviewActionLabel'][:180].split('\n', 1)[0]
                 row.update(key=key, turnId=turn['id'], order=len(rows), version=version,
@@ -139,7 +170,7 @@ class Timeline:
         for index, row in enumerate(rows):
             row['order'] = self.order_origin + index
         self.sequence = view['sequence']
-        self.rows, self.details = rows, details
+        self.rows, self.details, self.file_patches = rows, details, file_patches
         self.positions = {row['key']: i for i, row in enumerate(rows)}
         self.meta = {k: v for k, v in view.items() if k != 'turns'}
         self.meta['latestUserTurnId'] = next((t['id'] for t in reversed(view['turns'])
@@ -188,13 +219,25 @@ class Timeline:
             return {**self.page(), 'reset': True}
         return {'epoch': self.epoch, 'sequence': self.sequence, 'rows': rows, 'meta': self.meta}
 
-    def detail(self, cursor, offset=0, version=None):
+    def detail(self, cursor, offset=0, version=None, file_index=None):
         position = self.position(cursor)
         if position is None:
             raise ValueError('내용이 업데이트되었습니다. 채팅을 다시 열어주세요.')
         row = self.rows[position]
-        text = self.details[row['key']]
+        if file_index is None:
+            text = self.details[row['key']]
+        else:
+            # 경로를 입력받아 파일을 여는 대신 표시된 턴·버전 안의 파일 번호로만 조회한다.
+            patches = self.file_patches.get(row['key'])
+            if not patches or type(file_index) is not int or not 0 <= file_index < len(patches[1]) or version != row['version']:
+                raise ValueError('메시지가 변경되었습니다. 다시 열어보세요.')
+            text = patches[1][file_index]
         offset = max(0, min(offset, len(text))) if version == row['version'] else 0
         end = min(len(text), offset + DETAIL_CHARS)
+        if file_index is not None and end < len(text):
+            newline = text.rfind('\n', offset, end)
+            if newline >= offset:
+                end = newline + 1
         return {'key': row['key'], 'version': row['version'], 'text': text[offset:end],
+                **({'fileIndex': file_index} if file_index is not None else {}),
                 'offset': offset, 'next': end if end < len(text) else None}

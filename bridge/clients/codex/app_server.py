@@ -154,9 +154,12 @@ class CodexAppServer:
                 self.close()
                 raise
 
-    def _send(self, message):
+    def _send(self, message, expected_process=None):
         with self.write_lock:
-            transport = self.transport
+            with self.lock:
+                if expected_process is not None and self.process is not expected_process:
+                    raise AppServerRequestNotSent('Codex runtime connection changed before sending')
+                transport = self.transport
             if transport is None:
                 raise AppServerUnavailable('Codex app-server connection is closed')
             try:
@@ -164,7 +167,7 @@ class CodexAppServer:
             except (OSError, ValueError) as exc:
                 raise AppServerUnknownResult('Codex runtime connection failed; request result is unknown') from exc
 
-    def request(self, method, params=None, timeout=15, replay_safe=False):
+    def request(self, method, params=None, timeout=15, replay_safe=False, *, expected_process=None):
         """Send one RPC. A failed write or lost response is never retried here."""
         with self.lock:
             request_id = self.next_id
@@ -172,7 +175,7 @@ class CodexAppServer:
             future = Future()
             self.pending[request_id] = future
         try:
-            self._send({'id': request_id, 'method': method, 'params': params or {}})
+            self._send({'id': request_id, 'method': method, 'params': params or {}}, expected_process)
             try:
                 response = future.result(timeout=timeout)
             except TimeoutError as exc:

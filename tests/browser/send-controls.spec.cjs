@@ -5,6 +5,7 @@ const {test,expect}=require('@playwright/test');
 async function prepare(page){
   await page.goto('/?case=session-menu');
   await expect(page.locator('#bootstrap-status')).toBeHidden();
+  await page.waitForFunction(()=>typeof openChat==='function');
   await page.evaluate(async()=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
@@ -50,6 +51,78 @@ async function prepare(page){
 test.beforeEach(async({context,request,baseURL})=>{
   await context.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
   expect(await(await request.get('/__fixture_health')).json()).toEqual({fixture:'cmb-browser-regression'});
+});
+
+test('subagent creation links with matching names open and message only the selected child',async({page})=>{
+  await prepare(page);
+  await page.evaluate(()=>{
+    const f=sendControlsFixture,original=window.fetch;
+    const ids=['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'];
+    f.children=ids;f.agentWrites=[];f.liveText='진행 기록';
+    window.fetch=async(url,options={})=>{
+      const path=new URL(url,location.origin),reply=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+      if(!path.pathname.includes('/subagents'))return original(url,options);
+      const target=path.searchParams.get('id');
+      if(path.pathname.endsWith('/send')){
+        const body=JSON.parse(options.body);f.agentWrites.push({path:path.pathname,target,body});
+        return reply({id:body.id,status:'accepted'});
+      }
+      if(!target)return reply({agents:ids.map(id=>({id,parentId:f.meta.id,nickname:'Ada',title:'fixture',path:''}))});
+      return reply({id:target,live:true,control:{generation:'owner-1',canSend:true,status:'active',activeTurnId:'current-'+target},
+        historyComplete:true,turns:[{id:'turn',messages:[{id:'m',role:'assistant',text:target+' '+f.liveText}]}]});
+    };
+    f.extraRows=ids.map((id,i)=>({key:'child-'+id,kind:'subAgentCreated',role:'activity',agent:{id,nickname:'',taskName:'task'+i},order:3+i,version:'v1'}));
+    chatTimeline.apply(f.page(),true);
+  });
+  const buttons=page.getByRole('button',{name:'Ada 에이전트 생성됨',exact:true});
+  await expect(buttons).toHaveCount(2);await page.locator('#message').fill('부모 초안');
+  for(const n of [0,1]){
+    await buttons.nth(n).click();
+    const id=await page.evaluate(n=>sendControlsFixture.children[n],n),view=page.locator('.wb-agent-view');
+    await expect(view.locator('.message-body')).toContainText(id);
+    if(n===1){
+      await view.getByRole('textbox').fill('자식에게만 전송');
+      await page.evaluate(()=>sendControlsFixture.liveText='추가된 실시간 응답');
+      await expect(view.locator('.message-body')).toContainText('추가된 실시간 응답');
+      await expect(view.getByRole('textbox')).toHaveValue('자식에게만 전송');
+      await view.getByRole('button',{name:'보내기',exact:true}).click();await expect(view.getByRole('textbox')).toHaveValue('');
+      const [sent]=await page.evaluate(()=>sendControlsFixture.agentWrites);
+      expect(sent.target).toBe(id);expect(sent.body.expectedTurnId).toBe('current-'+id);
+      expect(sent.path).toBe('/api/sessions/11111111-1111-4111-8111-111111111111/subagents/send');
+    }
+    await page.locator('.wb-float-close').click();await page.getByRole('tab',{name:'채팅',exact:true}).click();
+  }
+  await expect(page.locator('#message')).toHaveValue('부모 초안');
+  await page.evaluate(()=>chatTimeline.apply(sendControlsFixture.page(),true));await expect(buttons).toHaveCount(2);
+});
+
+test('completed edit card shows only the selected file diff and continues its line numbers',async({page})=>{
+  await prepare(page);
+  await page.evaluate(()=>{
+    const f=sendControlsFixture,original=window.fetch;f.patchReads=[];
+    window.fetch=async(url,options)=>{
+      const path=new URL(url,location.origin);if(!path.searchParams.has('file'))return original(url,options);
+      const file=Number(path.searchParams.get('file')),offset=Number(path.searchParams.get('offset'));
+      const first='@@ -3 +8,2 @@\n-old\n+새',data={fileIndex:file,key:'footer',version:'patch',offset,
+        text:offset?' 줄\n+<b>literal</b>\n':first,next:offset?null:[...first].length};
+      f.patchReads.push({file,offset});return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+    };
+    const files=['src/one.js','src/two.js','a','b'].map(path=>({path,added:2,removed:1,hasDiff:true}));
+    f.extraRows=[{key:'footer',order:4,turnId:'t',role:'fileChanges',kind:'fileChanges',version:'patch',fileSummary:{count:4,added:8,removed:4,basis:'recorded',files}}];
+    chatTimeline.apply(f.page(),true);
+  });
+  const card=page.locator('.edited-files-card');await card.locator(':scope > summary').click();
+  expect(await page.evaluate(()=>sendControlsFixture.patchReads.length)).toBe(0);
+  await expect(card.getByText('파일 1개 더 보기')).toBeVisible();await card.getByText('파일 1개 더 보기').click();
+  const file=card.locator('.turn-diff-file').nth(1);await file.locator('summary').click();
+  await expect(file.locator('.removed code')).toHaveText('-old');
+  await expect(file.locator('.removed .wb-diff-number')).toHaveText('3');
+  await file.getByRole('button',{name:'변경 내용 더 보기'}).click();
+  await expect(file.locator('.added code')).toHaveText(['+새 줄','+<b>literal</b>']);
+  await expect(file.locator('.added .wb-diff-number')).toHaveText(['8','9']);
+  await expect(file.getByRole('button',{name:'파일 열기'})).toBeVisible();
+  expect(await page.evaluate(()=>sendControlsFixture.patchReads.map(x=>x.file))).toEqual([1,1]);
+  expect(await card.evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
 });
 test.afterEach(async({page})=>{await page.evaluate(()=>chatTimeline?.dispose()).catch(()=>{});});
 

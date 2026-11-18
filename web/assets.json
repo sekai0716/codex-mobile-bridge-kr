@@ -42,7 +42,7 @@
   "/message-actions.js": "features/chat/message-actions.js",
   "/modes.js": "features/chat/modes.js",
   "/permissions.js": ["features/chat/permissions.js", "features/chat/account-usage.js"],
-  "/timeline.js": "features/chat/timeline.js",
+  "/timeline.js": ["features/chat/turn-diff.js", "features/chat/timeline.js"],
   "/account.css": "features/accounts/account.css",
   "/account.js": "features/accounts/account.js",
   "/accounts.js": ["features/accounts/api-editor.js", "features/accounts/accounts.js"],

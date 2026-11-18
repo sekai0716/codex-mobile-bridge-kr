@@ -338,6 +338,18 @@ def require_inactive(record):
         raise ValueError('원래 공유 런타임이 종료되지 않았습니다. 나중에 다시 확인하세요.')
 
 
+def _verify_shared_processes(record):
+    for kind in ('app', 'adapter', 'runtime'):
+        saved = record[kind]
+        current = process_identity(saved['pid'])
+        # Linux reparents the desktop app to init when its Bridge launcher exits.
+        # The adapter and runtime must still have their original direct parents.
+        if sys.platform == 'linux' and kind == 'app' and current.get('parent') == 1:
+            current = {**current, 'parent': saved['parent']}
+        if current != saved:
+            raise ValueError('Shared runtime generation changed')
+
+
 def connect(home, cli):
     """None means never configured; configured but unavailable must fail closed."""
     try:
@@ -352,9 +364,7 @@ def connect(home, cli):
                 record['adapter']['parent'] != record['app']['pid'] or
                 record['runtime']['parent'] != record['adapter']['pid']):
             raise ValueError('Shared runtime owner mismatch')
-        for kind in ('app', 'adapter', 'runtime'):
-            if process_identity(record[kind]['pid']) != record[kind]:
-                raise ValueError('Shared runtime generation changed')
+        _verify_shared_processes(record)
         if sys.platform == 'win32':
             from bridge.clients.codex.desktop_runtime_windows import MetadataClient
             client = MetadataClient(directory(home), record)
@@ -369,11 +379,10 @@ def connect(home, cli):
             result = client.connect()
             if Path(result['codexHome']).resolve() != Path(home).resolve():
                 raise ValueError('Shared runtime configuration changed')
-            for kind in ('app', 'adapter', 'runtime'):
-                if process_identity(record[kind]['pid']) != record[kind]:
-                    raise ValueError('Shared runtime generation changed during handshake')
+            _verify_shared_processes(record)
             if verified_socket(expected) != endpoint_identity:
                 raise ValueError('Shared runtime socket changed during handshake')
+            client.desktop_generation = record['generation']
             return client
         except Exception:
             client.close()

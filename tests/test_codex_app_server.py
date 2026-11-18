@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 from bridge.clients.codex.app_server import (
-    AppServerReadTimeout, AppServerUnknownResult, AppServerUnsupported, CodexAppServer)
+    AppServerReadTimeout, AppServerRequestNotSent, AppServerUnknownResult, AppServerUnsupported, CodexAppServer)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -187,6 +187,15 @@ class AppServerTests(unittest.TestCase):
         with self.assertRaises(Exception):
             self.client.connect()
         self.assertEqual(self.processes, [])
+
+    def test_pinned_write_never_goes_to_a_replacement_proxy(self):
+        self.client.connect()
+        original = self.client.process
+        self.client.close()
+        self.client.connect()
+        with self.assertRaises(AppServerRequestNotSent):
+            self.client.request('turn/start', {'threadId': 'child'}, expected_process=original)
+        self.assertFalse(any(item.get('method') == 'turn/start' for item in self.client.process.seen))
 
     def test_old_reader_does_not_read_or_dispatch_from_new_connection(self):
         class QueuedTransport:

@@ -752,8 +752,8 @@ class SessionStore:
                     if len(result) >= 128: break
         return {'agents': result, 'limited': len(result) >= 128}
 
-    def subagent_history(self, thread_id, agent_id):
-        self.get(thread_id)
+    def subagent_metadata(self, thread_id, agent_id):
+        parent = self.get(thread_id)
         with self._connect() as conn:
             current = agent_id; seen = set(); target = None
             while current != thread_id:
@@ -766,7 +766,13 @@ class SessionStore:
                 current = self._agent_source(meta).get('parent_thread_id')
                 if not current: raise KeyError('하위 에이전트는 이 채팅에 속하지 않습니다.')
         if target is None: raise KeyError('하위 에이전트를 선택하세요.')
-        return self._history(agent_id, target, 10)
+        if not self._rollout_in_home(Path(target['rollout_path']).resolve()):
+            raise ValueError('하위 에이전트의 기록 경로가 올바르지 않습니다.')
+        return {**target, 'rootOrigin': parent['origin'], 'rootId': thread_id,
+                'parentId': self._agent_source(target)['parent_thread_id']}
+
+    def subagent_history(self, thread_id, agent_id):
+        return self._history(agent_id, self.subagent_metadata(thread_id, agent_id), 10)
 
     def _history(self, thread_id, meta, turn_limit=None):
         path = Path(meta["rollout_path"])
@@ -815,6 +821,19 @@ class SessionStore:
                     current["status"] = "completed" if payload["type"] == "task_complete" else "interrupted"
             elif record.get("type") == "event_msg" and payload.get("type") == "item_completed":
                 item = payload.get("item", {})
+                # 저장된 원본 항목은 IPC와 다른 대소문자·필드명을 쓴다. 현재 부모와 턴에 속한 생성만 복원한다.
+                if (isinstance(item, dict) and current is not None and payload.get('thread_id') == thread_id
+                        and payload.get('turn_id') == current.get('turnId')):
+                    if item.get('type') == 'SubAgentActivity' and item.get('kind') == 'started':
+                        items.append({'type': 'subAgentActivity', 'id': item.get('id'), 'kind': 'started',
+                                      'agentThreadId': item.get('agent_thread_id'), 'agentPath': item.get('agent_path')})
+                    elif item.get('type') == 'CollabAgentToolCall' and item.get('tool') == 'spawn_agent':
+                        receivers = item.get('receiver_agents')
+                        items.append({'type': 'collabAgentToolCall', 'id': item.get('id'), 'tool': 'spawnAgent',
+                                      'status': item.get('status'), 'senderThreadId': item.get('sender_thread_id'),
+                                      'receiverThreadIds': item.get('receiver_thread_ids'), 'receiverAgents': [
+                                          {'threadId': agent.get('thread_id'), 'agentNickname': agent.get('agent_nickname')}
+                                          for agent in (receivers if isinstance(receivers, list) else ()) if isinstance(agent, dict)]})
                 if (isinstance(item, dict) and item.get('type') == 'UserMessage' and current is not None and
                         payload.get('thread_id') == thread_id and payload.get('turn_id') == current.get('turnId')):
                     # The response_item supplies display text; this separate

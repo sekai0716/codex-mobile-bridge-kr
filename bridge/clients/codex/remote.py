@@ -213,6 +213,9 @@ class RemoteStore:
     def subagent_history(self, thread_id, agent_id):
         return self.call('subagent_history', {'thread_id': thread_id, 'agent_id': agent_id})
 
+    def subagent_metadata(self, thread_id, agent_id):
+        return self.call('subagent_metadata', {'thread_id': thread_id, 'agent_id': agent_id})
+
     def recencies(self, identifiers):
         return self.call('recencies', {'identifiers': identifiers})
 

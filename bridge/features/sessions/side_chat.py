@@ -276,7 +276,7 @@ class SideChat:
             self.sequence += 1
             self.condition.notify_all()
 
-    def view(self):
+    def view(self, *, include_file_diffs=False):
         with self.lock:
             result = normalize_state(self.state, self.ready and not self.closed and not self.error,
                                      image_cache=TOOL_IMAGE_CACHE)
@@ -305,7 +305,7 @@ class SideChat:
                     request['supported'] = False
                     request['params'] = {'message': "이 요청은 보조 채팅에서 지원되지 않습니다. 이 응답을 중지하십시오."}
             # Side-chat screenshots have no preview route; omit their descriptors.
-            return {**result, 'sequence': self.sequence, 'turns': public_turns(result['turns'], image_previews=False), 'parentId': self.parent, 'error': self.error,
+            return {**result, 'sequence': self.sequence, 'turns': public_turns(result['turns'], image_previews=False, include_file_diffs=include_file_diffs), 'parentId': self.parent, 'error': self.error,
                     'submissions': [{'id': k, 'status': v['status'], 'text': v['text'], 'mode': v.get('mode', 'send'), 'workMode': v.get('workMode', 'default'), 'attachments': v.get('attachments', []), 'error': v.get('error')} for k, v in self.submissions.items()]}
 
     def settings(self, model, effort, catalog):

@@ -79,6 +79,7 @@ function syncChatMessageNodes(container,nodes){
 // 종류를 추측하지 않으며, 이미지와 확인이 필요한 항목은 독립 행이다.
 function chatActivityGroupKind(row){
   if(!['activity','fileChanges'].includes(row.role)||row.attachments?.length||['denied','declined'].includes(row.status)||row.approvalReview?.status==='denied')return null;
+  if(row.fileSummary)return null;
   if(row.role==='fileChanges')return 'files';
   switch(row.kind){
     case 'commandExecution':return 'commands';

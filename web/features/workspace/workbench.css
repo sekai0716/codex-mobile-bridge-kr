@@ -177,6 +177,9 @@
 .wb-preview-content .html-preview-frame iframe{zoom:var(--wb-file-preview-zoom,1)}
 
 .attachment-menu{position:fixed;inset:auto;margin:0;padding:4px 0;width:max-content;max-width:calc(100vw - 16px);border:1px solid var(--line);border-radius:14px;background:var(--page);color:var(--text);box-shadow:0 8px 32px #0003}
+.wb-agent-view{display:flex;flex:1;min-height:0;flex-direction:column}
+.wb-agent-compose{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;padding:8px 12px;border-top:1px solid var(--line)}
+.wb-agent-compose textarea{min-width:0;max-height:6em;resize:vertical}.wb-agent-feedback{grid-column:1/-1;color:var(--muted)}.wb-agent-feedback:empty{display:none}
 .attachment-menu:focus{outline:none}
 .attachment-menu::backdrop{background:transparent}.attachment-menu .plain{display:block;width:100%;padding:14px 18px;min-height:48px;text-align:left;border:0;border-radius:0;color:var(--text);font-size:15px}.attachment-menu .plain+button{border-top:1px solid var(--line)}.attachment-menu .plain:hover{background:var(--surface)}
 .host-file-picker[open]{display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;height:min(680px,85dvh)}.host-file-picker>.picker-head,.host-file-picker>.wb-path,.host-file-picker>.wb-toolbar,.host-file-picker>.wb-search,.host-file-picker>.muted{flex:none}.host-file-picker>.wb-file-list{min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}.host-file-picker>.wb-search{margin:12px 0}.host-file-picker>.wb-path{overflow-wrap:anywhere;max-height:4em;overflow:auto}

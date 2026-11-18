@@ -1,7 +1,9 @@
 'use strict';
 const timelineText=source=>typeof BridgeI18n==='undefined'?source:BridgeI18n.t(source);
 const timelineActivityHeading=row=>typeof chatActivityLabel==='function'?chatActivityLabel(row):timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):'');
-const fileChangeLabel=row=>timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
+const fileChangeLabel=row=>row.fileSummary?.files.length===1
+  ?timelineText('Edited {filename}').replace('{filename}',()=>row.fileSummary.files[0].path.split(/[\\/]/).pop())
+  :timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
 const recentTimelinePages=new Map();
 function timelineFilePath(path,cwd){
   if(typeof path!=='string'||!path||typeof cwd!=='string'||!cwd||/[\0\r\n]/.test(path))throw Error(timelineText('이 파일 경로를 찾을 수 없습니다.'));
@@ -35,6 +37,7 @@ class ChatTimeline {
     this.older=elements.older||document.getElementById('older');
     this.newer=elements.newer||document.getElementById('newer');
     this.abort=new AbortController();this.rows=new Map();this.nodes=new Map();this.details=new Map();
+    this.agentNames=new Map();
     this.activityGroups=new ChatActivityGroups(summary=>{
       this.following=false;this.anchor={key:summary.dataset.key,offset:summary.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
     });
@@ -183,6 +186,7 @@ class ChatTimeline {
     }
     const ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
     this.syncRows(ordered);
+    if(!cached)this.resolveAgentNames(ordered);
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
     if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
@@ -201,7 +205,39 @@ class ChatTimeline {
     this.activityGroups??=new ChatActivityGroups();
     this.activityGroups.sync(this.container,ordered.filter(row=>row.kind!=='reasoning'&&!(row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))).map(row=>({row,node:this.nodes.get(row.key).node})));
   }
+  agentName(agent){return agent.nickname||this.agentNames.get(agent.id)||agent.taskName||'';}
+  agentLabel(agent){
+    const name=this.agentName(agent);
+    return name?timelineText('{name} agent created').replace('{name}',()=>name):timelineText('Subagent created');
+  }
+  async resolveAgentNames(rows){
+    // 일부 원본 생성 항목은 ID만 제공한다. 부모의 읽기 전용 목록으로 표시 이름을 한꺼번에 보완한다.
+    if(!this.onAgent||this.meta?.temporary||this.loadingAgentNames)return;
+    const missing=rows.map(row=>row.agent).filter(agent=>agent&&!agent.nickname&&!this.agentNames.has(agent.id));
+    if(!missing.length)return;
+    for(const agent of missing)this.agentNames.set(agent.id,'');
+    this.loadingAgentNames=true;
+    try{
+      const result=await this.read('subagents');
+      if(this.abort.signal.aborted)return;
+      for(const agent of result.agents||[]){
+        if(this.agentNames.has(agent.id))this.agentNames.set(agent.id,agent.nickname||agent.path?.split('/').pop()||'');
+      }
+      for(const [key,{row}] of this.rows)if(row.agent)this.nodes.get(key).node.textContent=this.agentLabel(row.agent);
+    }catch{/* 목록이 아직 저장되지 않았어도 ID로 해당 기록을 직접 열 수 있다. */}
+    finally{
+      this.loadingAgentNames=false;
+      if(!this.abort.signal.aborted)this.resolveAgentNames([...this.rows.values()].map(entry=>entry.row));
+    }
+  }
   renderRow(row,open){
+    if(row.kind==='subAgentCreated'&&row.agent){
+      const enabled=this.onAgent&&!this.meta?.temporary;
+      const node=document.createElement(enabled?'button':'div');node.className='subagent-created timeline-row';
+      node.textContent=this.agentLabel(row.agent);
+      if(enabled){node.type='button';node.onclick=()=>this.onAgent({...row.agent,nickname:this.agentName(row.agent)});}
+      return node;
+    }
     const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&row.attachments?.some(item=>item.type==='toolImage');
     const node=document.createElement(activity&&!toolImages?'details':'div');
     node.className=toolImages?'tool-images timeline-row':activity?'activity timeline-row':'message timeline-row '+row.role;
@@ -223,15 +259,27 @@ class ChatTimeline {
       }
       heading.append(stats);
       const list=document.createElement('ul');list.className='edited-files-list';
-      for(const file of row.fileSummary.files){
+      for(const [index,file] of row.fileSummary.files.entries()){
+        if(typeof file.hasDiff==='boolean'){
+          list.append(renderTurnDiffFile(this,row,file,index,content));
+          continue;
+        }
         const item=document.createElement('li'),path=document.createElement(this.onFile?'button':'span'),counts=document.createElement('span');
         if(this.onFile){path.type='button';path.onclick=()=>this.onFile(file.path);}
         path.textContent=file.path;path.className='edited-files-path';counts.textContent='+'+file.added+' −'+file.removed;counts.className='edited-files-stats';item.append(path,counts);list.append(item);
         if(this.onFile)path.classList.add('plain');
       }
       content.append(list);
-      // File cards expand the supplied summary only, including old cached rows
-      // which may still advertise a patch body. Never request their details.
+      if(row.fileSummary.files.length>3&&row.fileSummary.files.some(file=>typeof file.hasDiff==='boolean')){
+        const toggle=document.createElement('button');toggle.type='button';toggle.className='plain turn-diff-action turn-diff-files-toggle';
+        const show=expanded=>{
+          [...list.children].forEach((item,index)=>item.hidden=!expanded&&index>=3);
+          toggle.setAttribute('aria-expanded',String(expanded));
+          toggle.textContent=expanded?timelineText('Collapse files'):timelineText('Show {count} more files').replace('{count}',row.fileSummary.files.length-3);
+        };
+        show(false);toggle.onclick=()=>show(toggle.getAttribute('aria-expanded')!=='true');content.append(toggle);
+      }
+      // 구버전 요약에는 파일별 본문 주소가 없다. 일반 메시지 상세로 대체하지 않는다.
       content.open=!!open;
       return node;
     }
@@ -326,8 +374,15 @@ class ChatTimeline {
     this.historyStatus();
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key)?.row;if(!row)continue;
+      if(row.kind==='subAgentCreated'&&row.agent){entry.node.textContent=this.agentLabel(row.agent);continue;}
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
-      if(row.fileSummary){const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');}
+      if(row.fileSummary){
+        const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);
+        const basis=node.querySelector('.edited-files-basis');if(basis)basis.textContent=timelineText('기록된 편집 내용');
+        const toggle=node.querySelector('.turn-diff-files-toggle');
+        if(toggle)toggle.textContent=toggle.getAttribute('aria-expanded')==='true'?timelineText('Collapse files'):timelineText('Show {count} more files').replace('{count}',row.fileSummary.files.length-3);
+        for(const element of node.querySelectorAll('[data-i18n]'))element.textContent=timelineText(element.dataset.i18n);
+      }
       else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       if(heading&&row.role==='activity')decorateChatActivity(node,row,heading);
       const more=node.querySelector('.detail-more');

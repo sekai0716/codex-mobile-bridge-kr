@@ -2,6 +2,22 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Subagent created": "已创建子智能体",
+  "{name} agent created": "已创建智能体 {name}",
+  "Message this agent": "给此智能体发消息",
+  "Agent connected": "已实时连接",
+  "Agent working live": "实时 · 正在工作",
+  "Showing recent agent activity": "显示最近的工作记录。",
+  "Agent message declined": "智能体未接受消息，请检查当前状态。",
+  "Agent message delivery unknown": "无法确认消息是否送达，请查看智能体对话。",
+  "Edited {filename}": "已编辑 {filename}",
+  "Open file": "打开文件",
+  "No diff available": "没有可显示的差异。",
+  "Load more diff": "加载更多差异",
+  "Show {count} more files": "再显示 {count} 个文件",
+  "Collapse files": "收起文件",
+  "하위 에이전트의 원본 연결을 확인할 수 없습니다.": "无法确认子智能体的原始连接。",
+  "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.": "子智能体状态已更改。请检查当前任务后重发。",
   "Auto-review in progress": "正在自动审查",
   "Auto-review denied": "已拒绝",
   "Auto-review stopped": "自动审查已停止",

@@ -664,6 +664,9 @@ class WslSessionTests(unittest.TestCase):
                          [{'threadId': self.identifier, 'excludeTurns': True}])
         self.assertEqual(self.entry.send(self.identifier, 'synthetic input', identifier, work_mode='default'), result)
         self.assertEqual(sum(m == 'turn/start' for m, _ in self.entry.server.calls), 1)
+        session = self.entry.session(self.identifier, attach=False)
+        with session.condition:
+            self.assertTrue(session.condition.wait_for(lambda: not session.refreshing, timeout=3))
 
     def test_fresh_not_loaded_evidence_blocks_even_when_display_says_connected(self):
         session = self.entry.session(self.identifier)

@@ -22,6 +22,7 @@ from bridge.features.sessions import linux_permissions
 from bridge.features.accounts.draft_identity import draft_identity
 from bridge.features.sessions.model import normalize_state, normalize_request, computer_use_approval
 from bridge.features.sessions.timeline import Timeline
+from bridge.features.sessions.subagent_chat import SubagentChat
 from bridge.features.sessions.store import StoreUnavailable
 from bridge.features.sessions.archive import ArchiveCommands
 from bridge.features.sessions.organization_commands import OrganizationCommands
@@ -133,6 +134,7 @@ class WslEntry(WslFeatures):
         self.creations_path = self.data_dir / 'creations.json'
         self.creations = json.loads(self.creations_path.read_text(encoding='utf-8')) if self.creations_path.exists() else {}
         self.store = WslStore(self)
+        self.agent_chats = SubagentChat(self.store, self.data_dir, self._agent_connection, private_json)
         from bridge.features.sessions.cli_scope import CliScope
         from bridge.features.sessions.cli_maintenance import CliMaintenance
         from bridge.clients.codex.linux_control import LinuxCliControl, shared_cli_probe
@@ -554,6 +556,8 @@ class WslEntry(WslFeatures):
                 session.timeline.update(snapshot)
             if mode == 'detail':
                 result = session.timeline.detail(**options)
+                if 'fileIndex' in result:
+                    return {**result, 'files': []}
                 messages = [{'role': 'assistant', 'text': session.timeline.details[result['key']]}]
             else:
                 result = session.timeline.changes(**options) if mode == 'changes' else session.timeline.page(**options)
@@ -1591,13 +1595,29 @@ class WslEntry(WslFeatures):
         self.store.get(identifier)
         raise KeyError('프로젝트 파일 패널에서 액세스하세요. WSL 파일')
 
-    def subagents(self, identifier, agent_id=None):
+    @contextmanager
+    def _agent_connection(self, meta, *, write):
+        runtime = self.runtime(allow_start=False)
+        if write:
+            self._check_account_route(runtime, {'id': meta['id'], 'cwd': meta.get('cwd'), 'modelProvider': meta.get('model_provider')})
+        yield runtime.request, self.generation
+
+    @_entry_write
+    def send_subagent(self, identifier, agent_id, body):
+        return self.agent_chats.send(identifier, agent_id, body)
+
+    def subagents(self, identifier, agent_id=None, *, live=False):
         self.store.get(identifier)
         if agent_id is None:
             return self.store.subagents(identifier)
         uuid.UUID(agent_id)
+        if live:
+            try:
+                return self.agent_chats.view(identifier, agent_id)
+            except (IPCError, OSError, ValueError):
+                pass
         view = normalize_state(self.store.subagent_history(identifier, agent_id), False)
-        return {'id': agent_id, 'title': view['title'], 'turns': view['turns'],
+        return {'id': agent_id, 'title': view['title'], 'turns': SubagentChat.conversation_turns(view),
                 'historyComplete': view['historyComplete'], 'saved': True}
 
     @staticmethod

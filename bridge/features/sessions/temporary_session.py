@@ -25,9 +25,9 @@ class TemporarySession:
             raise ValueError('임시 사이드 채팅이 종료되었습니다. 메인 채팅으로 돌아가주세요.')
         return self.chat
 
-    def view(self, identifier, **options):
+    def view(self, identifier, *, include_file_diffs=False, **options):
         chat = self.session(identifier)
-        value = chat.view()
+        value = chat.view(include_file_diffs=include_file_diffs)
         value['submissions'] = [{**row, 'attachments': [item['name'] for item in row['attachments']]}
                                 for row in value['submissions'] if row['status'] in ('queued', 'unknown')]
         writable = value['connected']
@@ -44,7 +44,7 @@ class TemporarySession:
     def timeline_read(self, identifier, mode='page', **options):
         chat = self.session(identifier)
         with chat.condition:
-            view = self.view(identifier)
+            view = self.view(identifier, include_file_diffs=True)
             # The standard timeline expects preview descriptors, not raw uploads.
             for turn in view['turns']:
                 turn['actionable'] = False
@@ -54,6 +54,8 @@ class TemporarySession:
             chat.timeline.update(view)
             result = (chat.timeline.detail(**options) if mode == 'detail' else
                       chat.timeline.changes(**options) if mode == 'changes' else chat.timeline.page(**options))
+            if 'fileIndex' in result:
+                return {**result, 'files': []}
             if mode != 'detail':
                 # Reuse the same upload preview endpoint as the ordinary composer.
                 uploads = {t['id']: next((m.get('attachments', []) for m in t['messages'] if m['role'] == 'user'), [])

@@ -44,6 +44,15 @@ class TimelineTests(unittest.TestCase):
         changes = normalize_state(state)['turns'][0]['fileChanges']
         self.assertEqual([(c['path'], c['added'], c['removed']) for c in changes], [('a.py', 1, 1)])
         self.assertEqual(normalize_state(state)['turns'][0]['fileChangesBasis'],'net')
+        session=LiveSession('chat')
+        with session.condition:
+            session.set_history(state)
+            public=session.view()
+            self.assertNotIn('diff',public['turns'][0]['fileChanges'][0])
+            session.timeline.update(session.timeline_view())
+            footer=session.timeline.rows[-1]
+            detail=session.timeline.detail(session.timeline.cursor(footer['key']),version=footer['version'],file_index=0)
+            self.assertEqual(detail['text'],state['turns'][0]['diff'])
 
     def test_native_file_changes_deduplicate_ids_and_parse_paths(self):
         from bridge.features.sessions.model import native_file_changes, native_turn_file_changes
@@ -58,7 +67,7 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual([(c['path'],c['added'],c['removed']) for c in changes],
                          [('space name.py',1,1),('deleted.py',0,1),('new name.py',0,0)])
 
-    def test_native_file_footer_ignores_large_patch_bodies_and_versions_only_summary(self):
+    def test_file_footer_pages_only_the_selected_patch_and_invalidates_stale_content(self):
         class PatchMustNotBeRead(dict):
             def __getitem__(self, key):
                 if key == 'diff':
@@ -77,9 +86,20 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(detail['text'],'')
         self.assertIsNone(detail['next'])
         version=footer['version']
+        cursor=timeline.cursor(footer['key'])
+        first=timeline.detail(cursor, version=version, file_index=0)
+        second=timeline.detail(cursor, first['next'], version, file_index=0)
+        self.assertEqual(first['fileIndex'],0)
+        self.assertEqual(first['text']+second['text'], change.get('diff')[:second['next']])
+        self.assertLessEqual(len(first['text']),DETAIL_CHARS)
+        for invalid in (-1,1):
+            with self.assertRaises(ValueError):timeline.detail(cursor, version=version, file_index=invalid)
         change['diff']='DIFFERENT_PRIVATE_PATCH'
         source['sequence']=2;timeline.update(source)
-        self.assertEqual(timeline.rows[-1]['version'],version)
+        self.assertNotEqual(timeline.rows[-1]['version'],version)
+        with self.assertRaises(ValueError):timeline.detail(cursor, first['next'],version,file_index=0)
+        version=timeline.rows[-1]['version']
+        self.assertEqual(timeline.detail(cursor, version=version,file_index=0)['text'],'DIFFERENT_PRIVATE_PATCH')
         change['added']=100001;source['sequence']=3;timeline.update(source)
         self.assertNotEqual(timeline.rows[-1]['version'],version)
 

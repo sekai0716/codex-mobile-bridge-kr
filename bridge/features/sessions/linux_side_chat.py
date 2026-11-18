@@ -18,9 +18,9 @@ class LinuxSideChat(SideChat):
         super().__init__(executable, home, *args, **kwargs)
         self.permission_condition = threading.Condition(self.lock)
 
-    def view(self):
+    def view(self, *, include_file_diffs=False):
         with self.lock:
-            return {**super().view(), 'linuxPermissionChecks': True, 'permissionMode': current_mode(self.state)}
+            return {**super().view(include_file_diffs=include_file_diffs), 'linuxPermissionChecks': True, 'permissionMode': current_mode(self.state)}
 
     def _event(self, message):
         condition = getattr(self, 'permission_condition', None)

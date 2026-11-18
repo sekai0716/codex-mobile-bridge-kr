@@ -139,8 +139,8 @@ def extract_tool_images(output, *, remember=None):
     return walk(output), images
 
 
-def public_turns(turns, *, image_previews=True):
-    """Hide private image bytes and patch metadata from presentation responses."""
+def public_turns(turns, *, image_previews=True, include_file_diffs=False):
+    """일반 응답의 패치 본문을 제외한다. 내부 타임라인만 파일별 상세 조회용 참조를 보관한다."""
     def message(row):
         attachments = row.get('attachments')
         if not isinstance(attachments, list) or not any(
@@ -160,7 +160,7 @@ def public_turns(turns, *, image_previews=True):
         changes = turn.get('fileChanges')
         if 'diff' in turn or isinstance(changes, list):
             clean = {key: value for key, value in turn.items() if key != 'diff'}
-            if isinstance(changes, list):
+            if isinstance(changes, list) and not include_file_diffs:
                 clean['fileChanges'] = [{key: change[key] for key in ('path', 'added', 'removed') if key in change}
                                         for change in changes]
             clean['messages'] = messages

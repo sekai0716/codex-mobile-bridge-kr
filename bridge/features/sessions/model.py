@@ -184,7 +184,40 @@ def review_action_label(action):
     return str(action.get('reason') or action.get('target') or '')
 
 
-def normalize_item(item, *, image_cache=None):
+def spawned_agents(item, parent_id):
+    """원본 생성 완료 증거에서 ID와 표시 이름만 추출한다. 실행·대기·후속 알림은 생성이 아니다."""
+    kind = item.get('type')
+    names = {}
+    if kind == 'subAgentActivity' and item.get('kind') == 'started':
+        targets = [item.get('agentThreadId')]
+        path = item.get('agentPath')
+        fallback = path.rsplit('/', 1)[-1] if isinstance(path, str) else ''
+    elif (kind == 'collabAgentToolCall' and item.get('tool') == 'spawnAgent' and item.get('status') == 'completed'
+          and (not parent_id or item.get('senderThreadId') in (None, parent_id))):
+        fallback = ''
+        targets = item.get('receiverThreadIds') or []
+        # 데스크톱은 수신 스레드를 객체로 보강하고, 저장 기록은 닉네임만 보관할 수 있다.
+        for field in ('receiverAgents', 'receiverThreads'):
+            receivers = item.get(field)
+            for receiver in receivers if isinstance(receivers, list) else ():
+                if not isinstance(receiver, dict) or not isinstance(receiver.get('threadId'), str):
+                    continue
+                thread = receiver.get('thread')
+                names[receiver['threadId']] = receiver.get('agentNickname') or (
+                    thread.get('agentNickname') if isinstance(thread, dict) else None) or names.get(receiver['threadId'])
+        if not targets:
+            targets = list(names)
+    else:
+        return []
+    agents = []
+    for target in targets if isinstance(targets, list) else []:
+        if isinstance(target, str) and re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', target) and target != parent_id:
+            nickname = names.get(target)
+            agents.append({'id': target, 'nickname': nickname[:160] if isinstance(nickname, str) else '', 'taskName': fallback[:160]})
+    return agents
+
+
+def normalize_item(item, *, image_cache=None, parent_id=None):
     kind = item.get("type", "unknown")
     row = {"id": item.get("id"), "kind": kind, "status": item.get("status")}
     if item.get("timestamp") is not None:
@@ -235,6 +268,8 @@ def normalize_item(item, *, image_cache=None):
         row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
         row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
+    elif kind in ('subAgentActivity', 'collabAgentToolCall') and (created := spawned_agents(item, parent_id)):
+        row.update(role='activity', title='Subagent created', text='', spawnedAgents=created)
     elif kind in ('contextCompaction', 'autoContextCompaction'):
         row.update(role='activity', title=kind, text=json.dumps(item, ensure_ascii=False, indent=2))
         # 원본 압축 항목은 status 대신 source와 completed를 사용한다.
@@ -417,7 +452,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
                     calls[item['call_id']].pop('attachments', None)
                 continue
             else:
-                message = normalize_item(item, image_cache=image_cache)
+                message = normalize_item(item, image_cache=image_cache, parent_id=state.get('id', state.get('sessionId')))
             identifier = item.get('id')
             if kind in REVIEW_TOOL_KINDS and tool_counts.get(identifier) == 1 and identifier in reviews:
                 records = list(reviews[identifier].values())

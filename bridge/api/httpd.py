@@ -1250,10 +1250,16 @@ class Handler(BaseHTTPRequestHandler):
                          not re.fullmatch(r'/api/sessions/[0-9a-f-]{36}/files/[a-f0-9]{64}', path))):
                     raise ValueError('임시 사이드 채팅은 이 작업을 지원하지 않습니다. 기본 채팅으로 돌아가세요.')
                 bridge = TemporarySession(bridge, temporary)
-            agent_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/subagents", path)
+            agent_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/subagents(?:/(send))?", path)
             if agent_match:
+                agent_id = query.get('id', [None])[0]
+                if agent_match[2]:
+                    if not write: return self.output(405, {'error': '메시지 전송에는 POST가 필요합니다.'})
+                    if not agent_id: raise ValueError('하위 에이전트를 선택하세요.')
+                    return self.output(200, bridge.send_subagent(agent_match[1], agent_id, self.read_json()))
                 if write: return self.output(405, {'error': '하위 에이전트 패널에는 기존 작업만 표시됩니다.'})
-                return self.output(200, bridge.subagents(agent_match[1], query.get('id', [None])[0]))
+                return self.output(200, bridge.subagents(agent_match[1], agent_id,
+                                                        **({'live': True} if agent_id and query.get('live') == ['1'] else {})))
             terminal_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/terminal", path)
             if terminal_match:
                 if self.server.auth.config.get('mode') == 'none':
@@ -1407,7 +1413,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.output(200, bridge.timeline_read(thread_id, limit=int(query.get('limit', ['20'])[0]), before=query.get('before', [None])[0]))
                 if action == 'detail':
                     return self.output(200, bridge.timeline_read(thread_id, 'detail', cursor=query.get('key', [''])[0],
-                                                               offset=int(query.get('offset', ['0'])[0]), version=query.get('version', [None])[0]))
+                                                               offset=int(query.get('offset', ['0'])[0]), version=query.get('version', [None])[0],
+                                                               **({'file_index': int(query['file'][0])} if 'file' in query else {})))
                 if action == 'changes':
                     return self.changes(bridge, thread_id, int(query.get('after', ['-1'])[0]),
                                         query.get('epoch', [''])[0], query.get('start', [''])[0])

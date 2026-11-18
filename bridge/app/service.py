@@ -1,5 +1,5 @@
 import copy
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 import hashlib
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, TimeoutError as FutureTimeoutError, wait
 import json
@@ -60,6 +60,7 @@ from bridge.features.sessions.question_skips import QuestionSkips
 from bridge.features.sessions.organization import organization as native_organization
 from bridge.features.sessions.projects import Projects
 from bridge.features.sessions.timeline import Timeline
+from bridge.features.sessions.subagent_chat import SubagentChat
 from bridge.features.sessions.tool_images import TOOL_IMAGE_CACHE, public_turns
 from bridge.features.accounts.account import Account
 from bridge.features.accounts.accounts import Accounts, operation
@@ -173,7 +174,7 @@ class LiveSession:
                 if found:
                     self.timeline_limit = max(self.timeline_limit, after)
             if self.timeline_source is None or self.timeline_source_limit != self.timeline_limit:
-                self.timeline_source = self.view(item_limit=self.timeline_limit)
+                self.timeline_source = self.view(item_limit=self.timeline_limit, include_file_diffs=True)
                 self.timeline_source_limit = self.timeline_limit
             return dict(self.timeline_source)
 
@@ -196,7 +197,7 @@ class LiveSession:
         requests = pending_requests(self.state or {})
         return self.question_skips.project(self.id, requests) if self.question_skips else requests
 
-    def view(self, *, item_limit=None):
+    def view(self, *, item_limit=None, include_file_diffs=False):
         with self.condition:
             source = (self.state if self.connected else self.history_state or self.state) or {"id": self.id}
             result = normalize_state(source, self.connected,
@@ -262,7 +263,7 @@ class LiveSession:
             }
             self.tool_images_sequence = self.sequence
             # Base64 stays in the private index; state, polls and SSE carry ids only.
-            result['turns'] = public_turns(result['turns'])
+            result['turns'] = public_turns(result['turns'], include_file_diffs=include_file_diffs)
             return result
 
     def tool_image(self, image_id):
@@ -347,6 +348,7 @@ class Bridge:
         self.lock = threading.RLock()
         self.reconnect_pending = {}
         self.ipc = DesktopIPC(ipc_path or ipc_endpoint(codex_home), self._event, self._disconnected)
+        self.agent_chats = SubagentChat(self.store, self.data_dir, self._agent_connection, private_json)
         self.side_chats = SideChats(codex_bin, self.codex_home, self.data_dir, self.native_host,
                                    executable_getter=executable_getter, **_runtime_scope(host))
         self.closed = threading.Event()
@@ -4495,15 +4497,53 @@ class Bridge:
         if 'error' in result: raise ValueError(result['error'])
         return result['value']
 
-    def subagents(self, thread_id, agent_id=None):
+    @contextmanager
+    def _agent_connection(self, meta, *, write):
+        """부모의 기존 실행 연결만 사용한다. 조회로 스레드를 시작하거나 재개하지 않는다."""
+        if meta['rootOrigin'] == 'cli':
+            cli, root = self.cli_sessions, meta['rootId']
+            cli._require_joined(root)
+            if write:
+                cli._check_joined_identity(root)
+                self._verify_cli_submission_account(self.session(root, attach=False, background=True))
+            with cli.lock:
+                process, token = cli.joined.get(root), (cli.metadata.get(root) or {}).get('connectionToken')
+            if not token or process is None:
+                raise AppServerUnavailable('하위 에이전트의 원본 연결을 확인할 수 없습니다.')
+            def request(method, params):
+                return cli.client.request(method, params, expected_process=process)
+            yield request, token
+            return
+        if self.host != 'local' or sys.platform not in ('linux', 'darwin') or meta['rootOrigin'] != 'desktop':
+            raise AppServerUnavailable('하위 에이전트의 원본 연결을 확인할 수 없습니다.')
+        from bridge.clients.codex.desktop_runtime import connect, initialization_lock
+        with initialization_lock(self.codex_home):
+            client = connect(self.codex_home, self.catalog_reader.executable)
+            if client is None:
+                raise AppServerUnavailable('하위 에이전트의 원본 연결을 확인할 수 없습니다.')
+            try:
+                yield client.request, client.desktop_generation
+            finally:
+                client.close()
+
+    @operation
+    def send_subagent(self, thread_id, agent_id, body):
+        return self.agent_chats.send(thread_id, agent_id, body)
+
+    def subagents(self, thread_id, agent_id=None, *, live=False):
         uuid.UUID(thread_id)
         if not agent_id: return self.store.subagents(thread_id)
         uuid.UUID(agent_id)
+        if live and self.observation_enabled():
+            try:
+                return self.agent_chats.view(thread_id, agent_id)
+            except (AppServerError, IPCError, OSError, ValueError):
+                pass  # 저장 기록도 부모 관계를 독립적으로 확인한다.
         state = self.store.subagent_history(thread_id, agent_id)
         view = normalize_state(state, False, image_cache=TOOL_IMAGE_CACHE)
         # Saved logs are evidence of the last recorded state, not a live heartbeat.
         # Subagent screenshots have no preview route; omit their descriptors.
-        return {'id': agent_id, 'title': view['title'], 'turns': public_turns(view['turns'], image_previews=False),
+        return {'id': agent_id, 'title': view['title'], 'turns': SubagentChat.conversation_turns(view),
                 'historyComplete': view['historyComplete'], 'saved': True}
 
     @operation(entry_only=True)
@@ -4715,6 +4755,8 @@ class Bridge:
             self._merge_submission_attachments(session, projection.rows)
             if mode == 'detail':
                 result = projection.detail(**options)
+                if 'fileIndex' in result:
+                    return {**result, 'files': []}
                 file_items = [{'type': 'agentMessage', 'text': projection.details[result['key']]}]
             else:
                 result = projection.changes(**options) if mode == 'changes' else projection.page(**options)
