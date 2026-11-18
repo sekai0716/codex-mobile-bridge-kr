@@ -190,7 +190,7 @@ class Workbench {
     this.current.chatId = id;
     this.current.cwd = cwd;
     this.current.scroll = this.current.chatScroll?.get(id) || 0;
-    if (id !== rootId && !this.current.files.some(tab => tab.chatId === id)) this.current.files.push({id:'child:'+id, chatId:id, name:title||BridgeI18n.t('보조 채팅'), body:this.node('div')});
+    if (id !== rootId) this.sideChatTab(this.current,{id,title});
     this.current.active = id === rootId ? 'chat' : 'child:'+id;
     this.paint();
   }
@@ -200,7 +200,7 @@ class Workbench {
     if (!provider || this.locateState?.session.provider === provider) this.cancelLocate();
     if (this.previewFullscreen && (!provider || this.previewFullscreen.session.provider === provider)) this.closePreviewFullscreen();
     const visible=!provider||this.current?.provider===provider;
-    if(visible){this.stopThumbnails();this.uploadController?.abort();}
+    if(visible){this.stopThumbnails();this.uploadController?.abort();this.activeAgentChat?.setVisible(false);this.activeAgentChat=null;}
     for(const [key,session] of this.sessions)if(!provider||session.provider===provider){for(const tab of session.files){tab.controller?.abort();tab.pdf?.dispose();tab.html?.dispose();tab.markdown?.dispose();tab.fileFont?.dispose();tab.git?.dispose();tab.terminal?.dispose();tab.agents?.dispose();tab.sideChat?.dispose();}this.sessions.delete(key);}
     if(visible){this.current=null;this.chat.classList.remove('workbench-active','wb-split');this.endDrag();this.panel.replaceChildren();this.panel.hidden=true;this.tabs.replaceChildren();}
   }
@@ -219,7 +219,7 @@ class Workbench {
   select(id) {
     if (!this.current) return;
     const target = id === 'chat' ? this.current.id : this.current.files.find(tab => tab.id === id)?.chatId;
-    if (target && target !== (this.current.chatId || this.current.id)) return this.openChat(target, this.current.host);
+    if (target && target !== (this.current.chatId || this.current.id)) return this.openChat(target, this.current.host, id==='chat'?undefined:this.current);
     if(id!=='terminal')this.current.files.find(tab=>tab.id==='terminal')?.terminal?.clearCompletion?.();
     if (id !== 'files') this.cancelLocate();
     if (this.previewFullscreen && this.previewFullscreen.tab.id !== id) this.closePreviewFullscreen();
@@ -228,29 +228,42 @@ class Workbench {
     if(id==='sidechat')this.current.files.find(tab=>tab.id==='sidechat')?.sideChat?.load();
     if (id === 'chat') { const session = this.current; requestAnimationFrame(() => { if (session === this.current && session.active === 'chat') this.chat.querySelector('.timeline').scrollTop = session.scroll; }); }
   }
-  paint() {
-    const session = this.current; if (!session) return;
-    const restoreMain=this.chat.classList.contains('workbench-active')&&!this.isFileVisible;
-    for (const node of this.panel.querySelectorAll('.wb-file-list,.wb-preview-content,.wb-git-list,.wb-git-diff,.wb-branch-list,.wb-side-messages')) this.scrollPositions.set(node, node.scrollTop);
-    for (const stage of this.panel.querySelectorAll('.wb-pdf-stage,.wb-source-body')) this.scrollPositions.set(stage, {top:stage.scrollTop, left:stage.scrollLeft});
-    this.splitEligible=this.canSplit();
+  paintTabs(session){
+    const focused=document.activeElement,focusTab=focused?.closest?.('.wb-tab'),scroll=this.tabs.scrollLeft;
+    const restoreFocus=focusTab&&this.tabs.contains(focusTab),wasClose=restoreFocus&&focused===focusTab.lastElementChild&&focusTab.children.length>1;
     this.tabs.replaceChildren();
     for (const tab of [{id: 'chat', name: BridgeI18n.t('채팅')}, ...session.files]) {
       const group = this.node('div', 'wb-tab');group.dataset.tab=tab.id; group.classList.toggle('selected', this.splitMode ? [session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat',session.splitTab].includes(tab.id) : session.active === tab.id);
-      const select = this.button(tab.name, () => this.select(tab.id)); if(tab.id.startsWith('file:'))this.raw(select); select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(this.splitMode?[session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat',session.splitTab].includes(tab.id):session.active===tab.id));
+      const select = this.button(tab.name, () => this.select(tab.id)); if(tab.id.startsWith('file:')||tab.agent||tab.chatId)this.raw(select); select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(this.splitMode?[session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat',session.splitTab].includes(tab.id):session.active===tab.id));
       group.append(select);
       group.draggable=this.splitEligible&&tab.id!=='chat'&&!tab.chatId;
       group.ondragstart=event=>{if(!group.draggable){event.preventDefault();return;}this.dragTab=tab.id;event.dataTransfer.setData('text/plain',tab.id);event.dataTransfer.effectAllowed='move';this.layout.classList.add('wb-dragging');};
       group.ondragend=()=>this.endDrag();
       if (tab.id !== 'chat') group.append(this.button('×', () => this.close(tab.id), BridgeI18n.t('닫기')));
       this.tabs.append(group);
+      if(restoreFocus&&group.dataset.tab===focusTab.dataset.tab)(wasClose?group.lastElementChild:select).focus({preventScroll:true});
     }
+    this.tabs.scrollLeft=scroll;
+  }
+  paint() {
+    const session = this.current; if (!session) return;
+    const restoreMain=this.chat.classList.contains('workbench-active')&&!this.isFileVisible;
+    for (const node of this.panel.querySelectorAll('.wb-file-list,.wb-preview-content,.wb-git-list,.wb-git-diff,.wb-branch-list,.wb-side-messages')) this.scrollPositions.set(node, node.scrollTop);
+    for (const stage of this.panel.querySelectorAll('.wb-pdf-stage,.wb-source-body')) this.scrollPositions.set(stage, {top:stage.scrollTop, left:stage.scrollLeft});
+    this.splitEligible=this.canSplit();
+    this.paintTabs(session);
     this.chat.classList.toggle('workbench-active', this.isFileVisible); this.panel.hidden = !this.isFileVisible&&!this.splitMode;
     this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitMode&&(session.active==='chat'||session.active.startsWith('child:'));
     const splitLabel=this.splitMode?'분할 보기 종료':'분할 보기로 열기';this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
     const active = session.files.find(t => !t.chatId && t.id === (this.splitMode?session.splitTab:session.active));
     // Keep the visible tool mounted across resizing (including its focus and scroll).
     if(this.panel.firstElementChild!==active?.body)this.panel.replaceChildren(...(active?[active.body]:[]));
+    if(active?.agent&&!active.agentChat)active.agentChat=new AgentChat(this,session,active);
+    if(this.activeAgentChat!==active?.agentChat){
+      this.activeAgentChat?.setVisible(false);
+      this.activeAgentChat=active?.agentChat;
+      this.activeAgentChat?.setVisible(true);
+    }
     if (active) {
       for (const node of active.body.querySelectorAll('.wb-file-list,.wb-preview-content,.wb-git-list,.wb-git-diff,.wb-branch-list,.wb-side-messages')) node.scrollTop = this.scrollPositions.get(node) || 0;
       for (const stage of active.body.querySelectorAll('.wb-pdf-stage,.wb-source-body')) { const position=this.scrollPositions.get(stage); if(position){stage.scrollTop=position.top;stage.scrollLeft=position.left;} }
@@ -280,10 +293,16 @@ class Workbench {
     if (id === 'files') this.cancelLocate();
     if (this.previewFullscreen?.tab === session.files[index]) this.closePreviewFullscreen();
     if (!session.files[index] || session.files[index].id !== id) return;
+    if(session.files[index].agent){
+      (session.dismissedAgents??=new Set()).add(id);session.files[index].agentChat?.dispose();
+    }
     session.files[index].controller?.abort(); session.files[index].pdf?.dispose(); session.files[index].html?.dispose(); session.files[index].markdown?.dispose(); session.files[index].fileFont?.dispose(); session.files[index].git?.dispose(); session.files[index].terminal?.dispose(); session.files[index].agents?.dispose(); session.files[index].sideChat?.dispose(); session.files.splice(index, 1);
-    if(session.splitTab===id)session.splitTab=(session.files[index]||session.files[index-1])?.id||null;
+    if(session.splitTab===id)session.splitTab=(session.files.slice(index).find(t=>!t.chatId)||session.files.slice(0,index).reverse().find(t=>!t.chatId))?.id||null;
     const wasActive=session.active===id;
-    if(wasActive)session.active=session.splitTab||(session.files.some(t=>t.id==='files')?'files':'chat');
+    if(wasActive){
+      const chatTab=session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat';
+      session.active=session.splitTab||(id.startsWith('agent:')?chatTab:session.files.some(t=>t.id==='files')?'files':'chat');
+    }
     if (this.current !== session) return;
     if (wasActive) this.select(session.active); else this.paint();
   }
@@ -411,6 +430,12 @@ class Workbench {
   }
   agents(agent=null,parentId=this.current?.id) {
     const session=this.current;if(!session)return;
+    if(agent){
+      const id='agent:'+agent.id;
+      session.dismissedAgents?.delete(id);this.updateAgentTabs(parentId,[agent]);
+      if(session.files.some(tab=>tab.id===id))this.select(id);
+      return;
+    }
     const id=parentId===session.id?'agents':'agents:'+parentId;
     let tab=session.files.find(tab=>tab.id===id);
     if(!tab) {
@@ -418,7 +443,38 @@ class Workbench {
       session.files.push(tab);tab.agents=new AgentsPanel(this,session,tab,parentId);
     }
     this.select(id);
-    if(agent)tab.agents.show({...agent,title:agent.nickname||agent.taskName||BridgeI18n.t('하위 에이전트')});
+  }
+  updateAgentTabs(parentId,agents,directory=null){
+    const session=this.current;
+    if(!session||session.provider&&session.provider!=='codex')return;
+    if(parentId===session.chatId&&session.access?.canUseSideChat===false)return;
+    let previous;
+    if(directory){
+      const snapshots=session.agentDirectories??=new Map();
+      previous=snapshots.get(parentId);
+      snapshots.set(parentId,new Set(directory.agents.map(agent=>agent.id)));
+      const index=session.files.find(tab=>tab.agents?.parentId===parentId);
+      index?.agents.renderAgents(directory);
+    }
+    let changed=false;
+    for(const agent of agents){
+      if(!agent.id)continue;
+      const id='agent:'+agent.id,tab=session.files.find(item=>item.id===id);
+      const name=agent.nickname||agent.path?.split('/').filter(Boolean).pop()||agent.taskName||agent.title;
+      if(tab){
+        if(name&&name!==tab.name){tab.name=name;changed=true;}
+      }else if(!session.dismissedAgents?.has(id)&&(!directory||previous&&!previous.has(agent.id)&&!agent.archived)){
+        session.files.push({id,agent,parentId,name:name||BridgeI18n.t('하위 에이전트'),body:this.node('div','wb-agent-view')});
+        changed=true;
+      }
+    }
+    if(changed)this.paintTabs(session);
+  }
+  sideChatTab(session,chat){
+    let tab=session.files.find(item=>item.chatId===chat.id);
+    if(!tab){tab={id:'child:'+chat.id,chatId:chat.id,name:BridgeI18n.t('보조 채팅'),body:this.node('div')};session.files.push(tab);}
+    if(chat.title)tab.name=chat.title;
+    return tab;
   }
   sideChat() {
     const session=this.current;if(!session||session.access?.canUseSideChat===false)return;

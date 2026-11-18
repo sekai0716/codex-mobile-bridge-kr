@@ -26,7 +26,7 @@ test('unavailable, cross-host and cyclic parents never create a child workspace'
  }
 });
 function routeController(overrides={}){
- const source=fs.readFileSync('web/shell/app.js','utf8'),start=source.indexOf('async function openChat(id,host="local")'),end=source.indexOf('  messageActions.dialog.close();workbench.open',start);
+ const source=fs.readFileSync('web/shell/app.js','utf8'),start=source.indexOf('async function openChat('),end=source.indexOf('  messageActions.dialog.close();workbench.open',start);
  const c=vm.createContext({clientNavigation:{provider:'codex'},sharedSessionMenu:null,messageActions:{pending:false},chatOpenGeneration:0,currentId:'parent',currentHost:'local',chatTimeline:{abort:{signal:{aborted:false}}},workbench:{current:{id:'parent',chatId:'parent'},select(){}},listRows:[],api:async()=>({meta:{}}),sessionUrl:id=>id,toast(){},t:x=>x,$:()=>({classList:{add(){}}}),window:{BridgePresentation:{openChat(){}}},browserNavigation:{sync(){}},reportVisibleChat(){},...overrides});
  vm.runInContext(source.slice(start,end)+'return route;}',c);return c;
 }
@@ -38,6 +38,14 @@ test('selecting the current parent cancels a pending child notification route',a
 test('a known ordinary chat opens without waiting for a metadata request',async()=>{
  let reads=0;const c=routeController({currentId:'other',listRows:[{id:'parent',host:'local',cwd:'/project'}],api:async()=>{reads++;throw Error('offline');}});
  const route=await c.openChat('parent','local');assert.equal(route.rootId,'parent');assert.equal(route.cwd,'/project');assert.equal(reads,0);
+});
+
+test('a side chat from the native directory retains its tab while timeline metadata catches up',async()=>{
+ const workspace={id:'parent',cwd:'/parent',host:'local',files:[{chatId:'child'}]};
+ const c=routeController({currentId:'parent',listRows:[{id:'child',host:'local'}],workbench:{
+   current:workspace,resolveChat:async()=>({rootId:'child',title:'Side chat'})}});
+ const route=await c.openChat('child','local',workspace);
+ assert.equal(route.rootId,'parent');assert.equal(route.cwd,'/parent');assert.equal(route.title,'Side chat');
 });
 
 test('switching provider cancels a pending child route',async()=>{

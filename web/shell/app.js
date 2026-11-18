@@ -950,7 +950,7 @@ $('work-mode').addEventListener('change',()=>{codexDraftTouched=true;saveDraft()
 
 let catalogStarted=false;
 let chatOpenGeneration=0;
-async function openChat(id,host="local"){
+async function openChat(id,host="local",sideWorkspace=null){
   sharedSessionMenu?.close();
   if(messageActions.pending&&messageActions.dialog.open)return;
   const openGeneration=++chatOpenGeneration,routeProvider=clientNavigation.provider;
@@ -959,7 +959,12 @@ async function openChat(id,host="local"){
   }
   let route, routeAccess;
   const known=listRows.find(row=>row.id===id&&row.host===host);
-  try {route=known&&!known.attachedParentId?{rootId:id,cwd:known.cwd}:await workbench.resolveChat(id,host,async target=>{const meta=(await api(sessionUrl(target,'timeline',host)+'&limit=1')).meta;if(target===id)routeAccess=meta.access;return meta;});}
+  try {
+    route=known&&!known.attachedParentId&&!sideWorkspace?{rootId:id,cwd:known.cwd}:await workbench.resolveChat(id,host,async target=>{const meta=(await api(sessionUrl(target,'timeline',host)+'&limit=1')).meta;if(target===id)routeAccess=meta.access;return meta;});
+    // A just-created child can reach the timeline before its attached-parent metadata.
+    if(sideWorkspace===workbench.current&&sideWorkspace?.host===host&&route.rootId===id&&sideWorkspace.files.some(tab=>tab.chatId===id))
+      route={...route,rootId:sideWorkspace.id,cwd:sideWorkspace.cwd};
+  }
   catch(error) {if(openGeneration===chatOpenGeneration)toast(t(error.message));return;}
   if(openGeneration!==chatOpenGeneration||clientNavigation.provider!==routeProvider)return;
   messageActions.dialog.close();workbench.open(id,host,route);saveDraft();chatTimeline?.dispose();codexQuotes?.reset();currentId=id;currentHost=host;refreshEntryAccounts();codexDraftScope=null;codexDraftTouched=false;state=null;catalogStarted=false;workbench.current.access=sessionAccess(listRows.find(row=>row.id===id&&row.host===host)?.access);contextUsageControl.update(null);accountUsageControl.update(null);renderFastModeToggle();workModes.open(chatKey(id,host));$('send-mode').value='auto';attachments.open(chatKey(id,host));modelCatalogGeneration++;catalogData={models:null,skills:null};catalogResults={models:null,skills:null};catalogTasks={models:null,skills:null};skillIndex=new Map();skillTotal=0;skillPages=[];skillQuery={q:'',offset:0,limit:200};invalidSkills=new Set();skillRequest++;modelRequest++;modelTarget=null;fastModeControl.reset();$('model-dialog').close();notificationState={available:false,watching:false,notifyOnCompletion:false};notificationRequest++;$('notify-dialog').close();try{selectedSkills=new Set(JSON.parse(!draftGateway?sessionStorage.getItem('skills:'+chatKey(id,host))||'[]':'[]'));}catch{selectedSkills=new Set();}renderSkillPills();approvalStamp='';submittedRequestIds.clear();$('messages').replaceChildren();$('approvals').replaceChildren();$('queued').replaceChildren();$('message').value=!draftGateway?sessionStorage.getItem('draft:'+chatKey(id,host))||'':'';$('send-error').textContent='';$('chat-title').textContent=t('연결 중…');$('status').textContent=t('연결 중');$('welcome').hidden=true;$('chat').hidden=false;$('app').classList.add('chat-open');$('send').disabled=true;if(!browserNavigation.sync({provider:'codex',id,host}))history.replaceState(null,'','#'+id+'~'+encodeURIComponent(host));document.querySelectorAll('.session').forEach(n=>n.classList.toggle('selected',n.dataset.id===id&&n.dataset.host===host));const opening=workbench.current;
@@ -969,6 +974,16 @@ const timeline=chatTimeline=new ChatTimeline({cacheKey:listIdentity?JSON.stringi
   timeline.onAgent=agent=>{
     if(currentId===id&&currentHost===host&&workbench.current===opening&&!timeline.abort.signal.aborted&&!state?.temporary)
       workbench.agents(agent,id);
+  };
+  const agentTabScope=()=>currentId===id&&currentHost===host&&workbench.current===opening&&!timeline.abort.signal.aborted;
+  timeline.agentTabsVisible=()=>agentTabScope()&&$('app').classList.contains('chat-open');
+  timeline.onAgentTabs=(agents,directory)=>{
+    if(agentTabScope()&&!state?.temporary)
+      workbench.updateAgentTabs(id,agents,directory);
+  };
+  if(id!==opening.id)timeline.readWorkspaceAgents=async()=>{
+    const directory=await api(sessionUrl(opening.id,'subagents',host),undefined,timeline.abort.signal);
+    if(agentTabScope()&&Array.isArray(directory.agents))workbench.updateAgentTabs(opening.id,directory.agents,directory);
   };
   reconnectFailure=null;
   window.BridgePresentation?.openChat();

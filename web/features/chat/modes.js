@@ -1,5 +1,90 @@
 'use strict';
 
+// Keep the native selects as the source of values, labels and availability.
+// A desktop menu can open above the composer even at the bottom of the window.
+function installComposerModeMenu(){
+  const desktop=()=>document.documentElement.hasAttribute('data-chat-width')&&!BridgeLayout.isCompactViewport();
+  const menu=document.createElement('div');
+  menu.id='composer-mode-options';menu.className='composer-mode-options';menu.setAttribute('role','listbox');
+  let select,stamp;
+  const observer=new MutationObserver(()=>{if(select)render();});
+  function close(focus=false){
+    if(!select)return;
+    const trigger=select;select=null;observer.disconnect();menu.remove();
+    trigger.removeAttribute('aria-expanded');trigger.removeAttribute('aria-controls');
+    if(focus)trigger.focus({preventScroll:true});
+  }
+  function position(){
+    if(!select)return;
+    const rect=select.getBoundingClientRect();
+    if(!desktop()||!rect.height||select.disabled){close();return;}
+    menu.style.maxHeight=Math.max(1,rect.top-12)+'px';
+    menu.style.minWidth=Math.min(innerWidth-16,rect.width)+'px';
+    menu.style.bottom=Math.max(4,innerHeight-rect.top+4)+'px';
+    menu.style.left=Math.max(8,Math.min(rect.left,innerWidth-8-menu.offsetWidth))+'px';
+  }
+  function render(){
+    if(select.disabled||select.hidden){close();return;}
+    const options=Array.from(select.options).filter(option=>!option.hidden);
+    const next=JSON.stringify(options.map(option=>[option.value,option.label,option.disabled,option.selected]));
+    if(stamp===next)return;
+    const previous=document.activeElement?.dataset.value;
+    stamp=next;menu.replaceChildren();
+    for(const option of options){
+      const item=document.createElement('button');item.type='button';item.tabIndex=-1;
+      item.setAttribute('role','option');item.setAttribute('aria-selected',String(option.selected));
+      item.dataset.value=option.value;item.disabled=option.disabled;item.textContent=option.label;
+      item.onclick=()=>{
+        if(!select||select.disabled||option.disabled||option.hidden||!select.contains(option))return;
+        const trigger=select,changed=trigger.value!==option.value;
+        trigger.value=option.value;close(true);
+        if(changed){trigger.dispatchEvent(new Event('input',{bubbles:true}));trigger.dispatchEvent(new Event('change',{bubbles:true}));}
+      };
+      menu.append(item);
+    }
+    position();
+    const enabled=Array.from(menu.querySelectorAll('button:enabled'));
+    (enabled.find(item=>item.dataset.value===previous)||enabled.find(item=>item.getAttribute('aria-selected')==='true')||enabled[0])?.focus({preventScroll:true});
+  }
+  function open(trigger){
+    if(trigger===select){close(true);return;}
+    close();select=trigger;stamp=null;
+    menu.setAttribute('aria-label',trigger.getAttribute('aria-label')||trigger.title);
+    trigger.setAttribute('aria-controls',menu.id);trigger.setAttribute('aria-expanded','true');
+    document.body.append(menu);render();
+    if(select)observer.observe(select,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['disabled','hidden','label','selected']});
+  }
+  const isTrigger=target=>target.matches?.('.compose-bottom > select')&&!target.disabled&&desktop();
+  document.addEventListener('pointerdown',event=>{
+    if(event.button===0&&isTrigger(event.target)){
+      event.preventDefault();open(event.target);
+    }else if(select&&!menu.contains(event.target))close();
+  });
+  document.addEventListener('mousedown',event=>{if(event.button===0&&isTrigger(event.target))event.preventDefault();});
+  document.addEventListener('click',event=>{
+    if(!isTrigger(event.target))return;
+    event.preventDefault();
+    if(event.detail===0)open(event.target);
+  });
+  document.addEventListener('keydown',event=>{
+    if(isTrigger(event.target)&&['ArrowDown','ArrowUp',' ','Enter','F4'].includes(event.key)){
+      event.preventDefault();open(event.target);return;
+    }
+    if(!select||!menu.contains(event.target))return;
+    if(event.key==='Escape'){event.preventDefault();close(true);return;}
+    if(event.key==='Tab'){close(true);return;}
+    if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+    event.preventDefault();
+    const enabled=Array.from(menu.querySelectorAll('button:enabled')),index=enabled.indexOf(event.target);
+    const target=event.key==='Home'?0:event.key==='End'?enabled.length-1:index+(event.key==='ArrowDown'?1:-1);
+    enabled[Math.max(0,Math.min(enabled.length-1,target))]?.focus();
+  });
+  document.addEventListener('focusin',event=>{if(select&&event.target!==select&&!menu.contains(event.target))close();});
+  window.addEventListener('resize',position);
+  window.addEventListener('scroll',event=>{if(select&&!menu.contains(event.target))position();},true);
+}
+if(typeof window!=='undefined'&&window.PointerEvent&&typeof MutationObserver==='function')installComposerModeMenu();
+
 // 화면의 기본 동작만 상태에 따라 바꾸고, 서버에는 기존 전송 모드만 보낸다.
 function resolveComposerSendMode(selection,view,queueAllowed=true) {
   if(selection!=='auto')return selection;

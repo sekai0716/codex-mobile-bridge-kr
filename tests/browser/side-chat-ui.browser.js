@@ -26,6 +26,7 @@ async function runSideChatTests(){
   check(!panel.tab.body.querySelector('textarea,form'),'Directory does not maintain a duplicate chat stack');
   panel.list.querySelector('button').click();
   check(opened[0].id===child&&opened[0].host==='local','Selecting a child enters the standard full chat route with its native identity');
+  check(wb.tabs.querySelector('[data-tab="child:'+child+'"] [role=tab]').textContent==='네이티브 사이드 채팅','The child has its own named tab before timeline navigation completes');
   panel.list.querySelector('[aria-label="채팅 메뉴"]').click();
   check(menus[0].id===child&&menus[0].attachedParentId===parent,'Child lifecycle uses the shared native session menu');
   await panel.create();await panel.create();
@@ -50,6 +51,7 @@ async function runSideChatTests(){
   panel=wb.current.files.find(t=>t.id==='sidechat').sideChat;
   await panel.create(true);
   check(opened.at(-1).id===temporaryId,'Temporary child uses the same normal chat navigation');
+  check(!!wb.tabs.querySelector('[data-tab="child:'+temporaryId+'"]'),'A temporary side chat also gets its own tab immediately');
   check(!!panel.list.querySelector('[aria-label="일상적인 채팅 종료"]'),'Temporary lifecycle is explicit');
   window.confirm=()=>true;
   let cleaned=false;

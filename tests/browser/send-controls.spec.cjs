@@ -17,7 +17,12 @@ async function prepare(page){
     window.fetch=async(url,options={})=>{
       const path=new URL(url,location.origin);
       if(path.pathname.endsWith('/timeline'))return response(fixture.page());
-      if(path.pathname.endsWith('/changes'))return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true}));
+      if(path.pathname.endsWith('/changes'))return new Promise((resolve,reject)=>{
+        const cancel=()=>reject(new DOMException('aborted','AbortError'));
+        options.signal.addEventListener('abort',cancel,{once:true});
+        fixture.publish=page=>{options.signal.removeEventListener('abort',cancel);fixture.publish=null;resolve(response(page));};
+      });
+      if(path.pathname.endsWith('/subagents'))return response({agents:[]});
       if(path.pathname.endsWith('/detail')){fixture.details.push(path.search);return response({version:Number(path.searchParams.get('version')),offset:0,text:'추론 요약 전체 내용',next:null,files:[]});}
       if(path.pathname.endsWith('/send')){const body=JSON.parse(options.body);fixture.writes.push(body);return response({status:fixture.reply});}
       if(path.pathname.endsWith('/uploads')){
@@ -53,12 +58,15 @@ test.beforeEach(async({context,request,baseURL})=>{
   expect(await(await request.get('/__fixture_health')).json()).toEqual({fixture:'cmb-browser-regression'});
 });
 
-test('subagent creation links with matching names open and message only the selected child',async({page})=>{
+test('live subagent tabs appear without refresh and address only the selected child',async({page})=>{
   await prepare(page);
+  await page.locator('#message').fill('부모 초안');
+  await page.waitForFunction(()=>sendControlsFixture.publish&&workbench.current.agentDirectories?.size);
   await page.evaluate(()=>{
     const f=sendControlsFixture,original=window.fetch;
     const ids=['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'];
-    f.children=ids;f.agentWrites=[];f.liveText='진행 기록';
+    f.children=ids;f.directory=ids.map(id=>({id,parentId:f.meta.id,nickname:'Ada',title:'fixture',path:''}));
+    f.agentWrites=[];f.detailReads=[];f.liveText='진행 기록';
     window.fetch=async(url,options={})=>{
       const path=new URL(url,location.origin),reply=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
       if(!path.pathname.includes('/subagents'))return original(url,options);
@@ -67,19 +75,26 @@ test('subagent creation links with matching names open and message only the sele
         const body=JSON.parse(options.body);f.agentWrites.push({path:path.pathname,target,body});
         return reply({id:body.id,status:'accepted'});
       }
-      if(!target)return reply({agents:ids.map(id=>({id,parentId:f.meta.id,nickname:'Ada',title:'fixture',path:''}))});
+      if(!target)return reply({agents:f.directory});
+      f.detailReads.push(target);
       return reply({id:target,live:true,control:{generation:'owner-1',canSend:true,status:'active',activeTurnId:'current-'+target},
         historyComplete:true,turns:[{id:'turn',messages:[{id:'m',role:'assistant',text:target+' '+f.liveText}]}]});
     };
     f.extraRows=ids.map((id,i)=>({key:'child-'+id,kind:'subAgentCreated',role:'activity',agent:{id,nickname:'',taskName:'task'+i},order:3+i,version:'v1'}));
-    chatTimeline.apply(f.page(),true);
+    f.meta.status='active';f.publish({...f.page(),sequence:2});
   });
   const buttons=page.getByRole('button',{name:'Ada 에이전트 생성됨',exact:true});
-  await expect(buttons).toHaveCount(2);await page.locator('#message').fill('부모 초안');
+  const tabs=page.getByRole('tab',{name:'Ada',exact:true}),main=page.getByRole('tab',{name:'채팅',exact:true});
+  await expect(tabs).toHaveCount(2);await expect(buttons).toHaveCount(2);
+  await expect(main).toHaveAttribute('aria-selected','true');await expect(page.locator('#message')).toBeFocused();
+  expect(await page.evaluate(()=>sendControlsFixture.detailReads)).toEqual([]);
   for(const n of [0,1]){
-    await buttons.nth(n).click();
+    if(n===0)await buttons.first().click();else await tabs.nth(1).click();
     const id=await page.evaluate(n=>sendControlsFixture.children[n],n),view=page.locator('.wb-agent-view');
+    await expect(tabs.nth(n)).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('.wb-float')).toHaveCount(0);
     await expect(view.locator('.message-body')).toContainText(id);
+    if(n===0)await view.getByRole('textbox').fill('첫 번째 에이전트 초안');
     if(n===1){
       await view.getByRole('textbox').fill('자식에게만 전송');
       await page.evaluate(()=>sendControlsFixture.liveText='추가된 실시간 응답');
@@ -90,10 +105,62 @@ test('subagent creation links with matching names open and message only the sele
       expect(sent.target).toBe(id);expect(sent.body.expectedTurnId).toBe('current-'+id);
       expect(sent.path).toBe('/api/sessions/11111111-1111-4111-8111-111111111111/subagents/send');
     }
-    await page.locator('.wb-float-close').click();await page.getByRole('tab',{name:'채팅',exact:true}).click();
+    await main.click();
   }
   await expect(page.locator('#message')).toHaveValue('부모 초안');
-  await page.evaluate(()=>chatTimeline.apply(sendControlsFixture.page(),true));await expect(buttons).toHaveCount(2);
+  await tabs.first().click();await expect(page.locator('.wb-agent-compose textarea')).toHaveValue('첫 번째 에이전트 초안');
+  await page.locator('.wb-tab.selected').getByRole('button',{name:'닫기'}).click();
+  await page.evaluate(()=>{
+    const f=sendControlsFixture;f.directory.push({id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',parentId:f.meta.id,nickname:'Grace'});
+  });
+  await expect(page.getByRole('tab',{name:'Grace'})).toBeVisible({timeout:12000});
+  await expect(tabs).toHaveCount(1);await expect(main).toHaveAttribute('aria-selected','true');
+  await buttons.first().click();await expect(tabs).toHaveCount(2);
+  await expect(page.locator('.wb-agent-compose textarea')).toHaveValue('첫 번째 에이전트 초안');
+  await main.click();await expect(page.locator('#message')).toHaveValue('부모 초안');
+});
+
+test('side chats use individual tabs and still discover agents from the parent chat',async({page})=>{
+  await prepare(page);
+  await page.waitForFunction(()=>workbench.current.agentDirectories?.size);
+  await page.evaluate(()=>{
+    const f=sendControlsFixture,original=window.fetch;
+    const parent=f.meta.id,host='local',reply=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+    const one={id:'10000000-0000-4000-8000-000000000001',title:'자료 확인',attachedParentId:parent,host};
+    const two={id:'10000000-0000-4000-8000-000000000002',title:'일정 확인',attachedParentId:parent,host};
+    f.sides=[one];f.rootAgents=[];
+    window.fetch=async(url,options={})=>{
+      const path=new URL(url,location.origin),id=path.pathname.split('/')[3];
+      if(path.pathname.endsWith('/side-chat')){
+        if(options.body){f.sides.push(two);return reply({id:two.id,host,parentId:parent});}
+        return reply({parentId:parent,chats:f.sides});
+      }
+      if(path.pathname.endsWith('/subagents'))return reply({agents:id===parent?f.rootAgents:[]});
+      const child=f.sides.find(chat=>chat.id===id);
+      if(child&&path.pathname.endsWith('/timeline')){
+        const attachedParent={id:parent,host,available:true};
+        return reply({...f.page(),rows:[],meta:{...f.meta,...child,attachedParent}});
+      }
+      return original(url,options);
+    };
+  });
+  const input=page.locator('#message'),main=page.getByRole('tab',{name:'채팅',exact:true});
+  await input.fill('부모 초안');
+  await page.locator('#chat .wb-add').click();
+  await page.locator('.wb-new-tab').getByRole('button',{name:'사이드 채팅',exact:true}).click();
+  await expect(page.locator('.wb-side-chat-row')).toHaveCount(1);
+  await page.evaluate(()=>sendControlsFixture.rootAgents.push({id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',parentId:sendControlsFixture.meta.id,nickname:'Eve'}));
+  await page.getByRole('button',{name:'자료 확인',exact:true}).click();
+  const first=page.getByRole('tab',{name:'자료 확인',exact:true});
+  await expect(first).toHaveAttribute('aria-selected','true');await expect(page.locator('#chat-title')).toHaveText('자료 확인');await input.fill('사이드 초안');
+  await expect(page.getByRole('tab',{name:'Eve',exact:true})).toBeVisible();
+  await expect(first).toHaveAttribute('aria-selected','true');
+  await page.locator('.wb-tab[data-tab=sidechat] [role=tab]').click();
+  await page.locator('.wb-side-content .wb-toolbar button').first().click();
+  await expect(page.getByRole('tab',{name:'일정 확인',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#chat-title')).toHaveText('일정 확인');
+  await expect(input).toHaveValue('');await first.click();await expect(input).toHaveValue('사이드 초안');
+  await main.click();await expect(input).toHaveValue('부모 초안');await expect(page.locator('.wb-float')).toHaveCount(0);
 });
 
 test('completed edit card wraps the selected file diff and keeps its original line numbers',async({page})=>{
@@ -246,6 +313,37 @@ for (const theme of ['dark','light']) {
     await expect(page.locator('#composer .composer-quote summary')).toHaveText(text);
   });
 }
+
+test('desktop composer mode menus fit above compact controls and keep keyboard selection',async({page},testInfo)=>{
+  await page.setViewportSize({width:2350,height:460});await prepare(page);
+  await page.locator('[data-open-appearance]:visible').first().click();
+  await page.locator('#appearance-chat-width').selectOption('full');
+  await page.locator('#appearance-dialog button[data-close].primary').click();
+  const send=page.locator('#send-mode'),work=page.locator('#work-mode'),menu=page.locator('#composer-mode-options');
+  const fields=[send,work];
+  for(const field of fields){
+    const box=await field.boundingBox();expect(box.width).toBeLessThan(180);
+    await field.click();await expect(menu).toBeVisible();
+    const popup=await menu.boundingBox();expect(popup.y).toBeGreaterThanOrEqual(0);
+    expect(popup.y+popup.height).toBeLessThanOrEqual(box.y);expect(popup.x+popup.width).toBeLessThanOrEqual(2350);
+    await expect(menu.getByRole('option').last()).toBeInViewport();
+    await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(field).toBeFocused();
+  }
+  await send.click();await expect(menu.getByRole('option').last()).toBeDisabled();await page.locator('#message').click();
+  await expect(menu).toHaveCount(0);
+  await work.press('Space');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+  await expect(work).toHaveValue('plan');
+  await page.evaluate(()=>sendControlsFixture.update('active'));
+  await send.click();await menu.getByRole('option').last().click();await expect(send).toHaveValue('steer');
+  await expect(work).toBeDisabled();
+  const corners=page.locator('#composer .composer-tools .tool-button:visible');
+  expect(await corners.count()).toBeGreaterThanOrEqual(5);
+  expect(await corners.evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).borderRadius==='9px'))).toBe(true);
+  await expect(page.locator('#composer .context-usage-ring')).toHaveCSS('border-radius','50%');
+  await send.click();await testInfo.attach('desktop-modes',{body:await page.screenshot(),contentType:'image/png'});
+  await page.setViewportSize({width:390,height:844});await expect(menu).toHaveCount(0);
+  expect(await send.evaluate(node=>node.getBoundingClientRect().width)).toBeGreaterThan(40);
+});
 
 test('Codex send mode stays in its original position and sends idle, queues busy or steers',async({page},testInfo)=>{
   await prepare(page);

@@ -68,7 +68,7 @@ class ChatTimeline {
     this.resize=new ResizeObserver(()=>this.restore(this.anchor,this.following));
     this.resize.observe(this.container);
   }
-  dispose(){this.abort.abort();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
+  dispose(){this.abort.abort();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
   atBottom(){return chatFollowsLatest(this.viewport);}
   nearTop(){const nodes=[...this.container.children].filter(n=>!n.hidden);return nodes.length>0&&nodes.slice(0,11).some(n=>n.getBoundingClientRect().bottom>=this.viewport.getBoundingClientRect().top);}
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
@@ -186,7 +186,13 @@ class ChatTimeline {
     }
     const ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
     this.syncRows(ordered);
-    if(!cached)this.resolveAgentNames(ordered);
+    if(!cached){
+      if(!history&&!this.meta?.temporary&&this.onAgentTabs){
+        const created=page.rows.filter(row=>row.kind==='subAgentCreated'&&row.agent&&(!reset||row.turnStatus==='inProgress'));
+        if(created.length)this.onAgentTabs(created.map(({agent})=>({...agent,nickname:this.agentName(agent)})));
+      }
+      this.resolveAgentNames(ordered);
+    }
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
     if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
@@ -210,23 +216,34 @@ class ChatTimeline {
     const name=this.agentName(agent);
     return name?timelineText('{name} agent created').replace('{name}',()=>name):timelineText('Subagent created');
   }
-  async resolveAgentNames(rows){
-    // 일부 원본 생성 항목은 ID만 제공한다. 부모의 읽기 전용 목록으로 표시 이름을 한꺼번에 보완한다.
-    if(!this.onAgent||this.meta?.temporary||this.loadingAgentNames)return;
-    const missing=rows.map(row=>row.agent).filter(agent=>agent&&!agent.nickname&&!this.agentNames.has(agent.id));
-    if(!missing.length)return;
+  async resolveAgentNames(rows,refresh=false){
+    const local=!this.meta?.temporary&&this.meta?.access?.canUseSideChat!==false;
+    if(!this.onAgent||this.loadingAgentNames||(!local&&!this.readWorkspaceAgents))return;
+    const missing=local?rows.map(row=>row.agent).filter(agent=>agent&&!agent.nickname&&!this.agentNames.has(agent.id)):[];
+    if(!missing.length&&!(this.onAgentTabs&&(refresh||!this.agentTimer)))return;
+    clearTimeout(this.agentTimer);
+    const schedule=()=>{if(this.onAgentTabs&&!this.abort.signal.aborted)this.agentTimer=setTimeout(()=>{
+      this.resolveAgentNames([...this.rows.values()].map(entry=>entry.row),true);
+    },this.meta?.status==='active'?2500:10000);};
+    if(document.hidden||this.agentTabsVisible&&!this.agentTabsVisible()){schedule();return;}
     for(const agent of missing)this.agentNames.set(agent.id,'');
     this.loadingAgentNames=true;
     try{
-      const result=await this.read('subagents');
+      const [current]=await Promise.allSettled([local?this.read('subagents'):null,this.readWorkspaceAgents?.()]);
       if(this.abort.signal.aborted)return;
-      for(const agent of result.agents||[]){
-        if(this.agentNames.has(agent.id))this.agentNames.set(agent.id,agent.nickname||agent.path?.split('/').pop()||'');
+      const result=current.value;
+      if(Array.isArray(result?.agents)){
+        this.onAgentTabs?.(result.agents,result);
+        for(const agent of result.agents)this.agentNames.set(agent.id,agent.nickname||agent.path?.split('/').pop()||'');
       }
-      for(const [key,{row}] of this.rows)if(row.agent)this.nodes.get(key).node.textContent=this.agentLabel(row.agent);
+      for(const [key,{row}] of this.rows)if(row.agent){
+        const node=this.nodes.get(key).node,label=this.agentLabel(row.agent);
+        if(node.textContent!==label)node.textContent=label;
+      }
     }catch{/* 목록이 아직 저장되지 않았어도 ID로 해당 기록을 직접 열 수 있다. */}
     finally{
       this.loadingAgentNames=false;
+      schedule();
       if(!this.abort.signal.aborted)this.resolveAgentNames([...this.rows.values()].map(entry=>entry.row));
     }
   }

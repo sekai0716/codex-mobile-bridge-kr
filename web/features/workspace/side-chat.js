@@ -52,7 +52,10 @@ class SideChatPanel {
     this.list.scrollTop = scroll;
   }
   open(chat) {
-    if (!this.disposed) return this.workbench.openChat(chat.id, chat.host || this.session.host);
+    if(this.disposed||this.workbench.current!==this.session||chat.host&&chat.host!==this.session.host)return;
+    const tab=this.workbench.sideChatTab(this.session,chat);
+    this.workbench.paintTabs(this.session);
+    return this.workbench.select(tab.id);
   }
   async create(temporary = false) {
     if (this.disposed || this.creating) return;
@@ -63,7 +66,9 @@ class SideChatPanel {
       const result = await this.workbench.request(this.url(), {action: temporary ? 'create-temporary' : 'create', creationId: this[key]});
       this[key] = uuid();
       if (this.disposed) return;
-      await this.load(); await this.open(result);
+      const listed=this.chats?.find(chat=>chat.id===result.id);
+      const opening=this.workbench.isVisible(this.session,this.tab)?this.open({...listed,...result}):null;
+      await Promise.all([this.load(),opening]);
     } catch (error) {
       if (!this.disposed) this.status.textContent = BridgeI18n.t(error.message);
     } finally {
