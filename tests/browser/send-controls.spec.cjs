@@ -96,26 +96,27 @@ test('subagent creation links with matching names open and message only the sele
   await page.evaluate(()=>chatTimeline.apply(sendControlsFixture.page(),true));await expect(buttons).toHaveCount(2);
 });
 
-test('completed edit card shows only the selected file diff and continues its line numbers',async({page})=>{
+test('completed edit card wraps the selected file diff and keeps its original line numbers',async({page})=>{
   await prepare(page);
-  await page.evaluate(()=>{
+  const removedLine = '-\tconst url = "https://example.test/' + 'a'.repeat(160) + '";';
+  await page.evaluate(removedLine=>{
     const f=sendControlsFixture,original=window.fetch;f.patchReads=[];
     window.fetch=async(url,options)=>{
       const path=new URL(url,location.origin);if(!path.searchParams.has('file'))return original(url,options);
       const file=Number(path.searchParams.get('file')),offset=Number(path.searchParams.get('offset'));
-      const first='@@ -3 +8,2 @@\n-old\n+새',data={fileIndex:file,key:'footer',version:'patch',offset,
+      const first='@@ -3 +8,2 @@\n'+removedLine+'\n+새',data={fileIndex:file,key:'footer',version:'patch',offset,
         text:offset?' 줄\n+<b>literal</b>\n':first,next:offset?null:[...first].length};
       f.patchReads.push({file,offset});return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
     };
     const files=['src/one.js','src/two.js','a','b'].map(path=>({path,added:2,removed:1,hasDiff:true}));
     f.extraRows=[{key:'footer',order:4,turnId:'t',role:'fileChanges',kind:'fileChanges',version:'patch',fileSummary:{count:4,added:8,removed:4,basis:'recorded',files}}];
     chatTimeline.apply(f.page(),true);
-  });
+  },removedLine);
   const card=page.locator('.edited-files-card');await card.locator(':scope > summary').click();
   expect(await page.evaluate(()=>sendControlsFixture.patchReads.length)).toBe(0);
   await expect(card.getByText('파일 1개 더 보기')).toBeVisible();await card.getByText('파일 1개 더 보기').click();
   const file=card.locator('.turn-diff-file').nth(1);await file.locator('summary').click();
-  await expect(file.locator('.removed code')).toHaveText('-old');
+  expect(await file.locator('.removed code').textContent()).toBe(removedLine);
   await expect(file.locator('.removed .wb-diff-number')).toHaveText('3');
   await file.getByRole('button',{name:'변경 내용 더 보기'}).click();
   await expect(file.locator('.added code')).toHaveText(['+새 줄','+<b>literal</b>']);
@@ -123,6 +124,22 @@ test('completed edit card shows only the selected file diff and continues its li
   await expect(file.getByRole('button',{name:'파일 열기'})).toBeVisible();
   expect(await page.evaluate(()=>sendControlsFixture.patchReads.map(x=>x.file))).toEqual([1,1]);
   expect(await card.evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
+
+  const diff = file.locator('.turn-diff-lines');
+  const visualLines = [];
+  for (const viewport of [{width:320,height:740}, {width:844,height:390}, {width:1280,height:900}]) {
+    await page.setViewportSize(viewport);
+    const layout = await diff.evaluate(view => {
+      const range = document.createRange();
+      range.selectNodeContents(view.querySelector('.removed code'));
+      const tops = Array.from(range.getClientRects(), rect => rect.top);
+      return {fits: view.scrollWidth <= view.clientWidth + 1, lines: new Set(tops).size};
+    });
+    expect(layout.fits).toBe(true);
+    visualLines.push(layout.lines);
+  }
+  expect(visualLines[0]).toBeGreaterThan(visualLines[2]);
+  await expect(file.locator('.removed .wb-diff-number')).toHaveText('3');
 });
 test.afterEach(async({page})=>{await page.evaluate(()=>chatTimeline?.dispose()).catch(()=>{});});
 

@@ -101,6 +101,8 @@ button.subagent-created{cursor:pointer}button.subagent-created::after{content:''
 .turn-diff-heading{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:12px}
 .turn-diff-heading .edited-files-path{flex:1}.turn-diff-file summary{cursor:pointer;list-style:none}.turn-diff-file summary::before{content:'›'}.turn-diff-file details[open]>summary::before{transform:rotate(90deg)}
 .turn-diff-lines{max-height:50vh;overflow:auto;min-width:0;overscroll-behavior:contain;tab-size:4}.turn-diff-lines:empty{display:none}
+.turn-diff-lines .wb-diff-line{width:auto}
+.turn-diff-lines .wb-diff-line code{flex:1;min-width:0;white-space:break-spaces;overflow-wrap:anywhere}
 .turn-diff-lines .wb-diff-line.added{background:color-mix(in srgb,var(--green,#24834b) 16%,transparent)}.turn-diff-lines .wb-diff-line.removed{background:color-mix(in srgb,#d35252 16%,transparent)}
 .turn-diff-action{font-size:12px;margin:2px 0 6px}.turn-diff-file [role=status]:not(:empty){display:block;padding:5px 0}
 button.edited-files-path{padding:0;border:0;border-radius:0;background:none;color:var(--green,#267044);font:inherit;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
