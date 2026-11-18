@@ -143,6 +143,48 @@ test('completed edit card wraps the selected file diff and keeps its original li
 });
 test.afterEach(async({page})=>{await page.evaluate(()=>chatTimeline?.dispose()).catch(()=>{});});
 
+for (const theme of ['dark','light']) {
+  test('dragged text quote button has readable contrast in '+theme+' mode', async ({page}, testInfo) => {
+    await page.emulateMedia({colorScheme:theme});
+    await prepare(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+    const text = 'Selection for a quote';
+    await page.evaluate(text => {
+      const fixture = sendControlsFixture;
+      fixture.extraRows = [{key:'quote-target',order:3,role:'assistant',kind:'agentMessage',text,version:1}];
+      chatTimeline.apply(fixture.page(),true);
+    },text);
+    const message = page.locator('#messages .message-body').getByText(text,{exact:true});
+    await message.scrollIntoViewIfNeeded();
+    const box = await message.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const {left,right,top,height} = range.getBoundingClientRect();
+      return {left,right,y:top+height/2};
+    });
+    await page.mouse.move(box.left+1,box.y);
+    await page.mouse.down();
+    await page.mouse.move(box.right-1,box.y,{steps:10});
+    await page.mouse.up();
+    const button = page.locator('#composer .composer-quote-selection');
+    await expect(button).toBeVisible();
+    const contrast = await button.evaluate(element => {
+      const luminance = rgb => {
+        const [r,g,b] = rgb.match(/\d+/g).map(Number).map(channel => channel/255)
+          .map(value => value<=0.04045 ? value/12.92 : ((value+0.055)/1.055)**2.4);
+        return 0.2126*r + 0.7152*g + 0.0722*b;
+      };
+      const {color,backgroundColor} = getComputedStyle(element);
+      const fg = luminance(color), bg = luminance(backgroundColor);
+      return (Math.max(fg,bg)+0.05)/(Math.min(fg,bg)+0.05);
+    });
+    await testInfo.attach('contrast',{body:contrast.toFixed(2),contentType:'text/plain'});
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    await button.click();
+    await expect(page.locator('#composer .composer-quote summary')).toHaveText(text);
+  });
+}
+
 test('Codex send mode stays in its original position and sends idle, queues busy or steers',async({page},testInfo)=>{
   await prepare(page);
   const input=page.locator('#message'),send=page.locator('#send'),mode=page.locator('#send-mode');
