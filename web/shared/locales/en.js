@@ -2,6 +2,11 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Chat width": "Chat width",
+  "Narrow view": "Narrow",
+  "Standard width": "Normal",
+  "Wide view": "Wide",
+  "Full width": "Full width",
   "Subagent created": "Subagent created",
   "{name} agent created": "Created agent {name}",
   "Message this agent": "Message this agent",

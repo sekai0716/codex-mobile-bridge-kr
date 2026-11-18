@@ -2,6 +2,11 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Chat width": "聊天宽度",
+  "Narrow view": "窄",
+  "Standard width": "标准",
+  "Wide view": "宽",
+  "Full width": "全宽",
   "Subagent created": "已创建子智能体",
   "{name} agent created": "已创建智能体 {name}",
   "Message this agent": "给此智能体发消息",

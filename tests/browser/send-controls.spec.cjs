@@ -143,6 +143,68 @@ test('completed edit card wraps the selected file diff and keeps its original li
 });
 test.afterEach(async({page})=>{await page.evaluate(()=>chatTimeline?.dispose()).catch(()=>{});});
 
+test('desktop chat width is a saved maximum for the current pane', async ({page}) => {
+  await page.setViewportSize({width:3840,height:1000});
+  await prepare(page);
+  await page.evaluate(()=>{
+    const fixture=sendControlsFixture;
+    const path='/fixture/width.html', file={id:'a'.repeat(64),name:'width.html',reference:path,references:[path],visualization:true};
+    const marker='\ue200visualize\ue202'+JSON.stringify({path,mode:'wide',title:'Width fixture'})+'\ue201';
+    fixture.extraRows=[
+      {key:'visual',order:3,role:'assistant',kind:'agentMessage',text:marker,version:1},
+      {key:'footer',order:4,role:'fileChanges',kind:'fileChanges',version:1,fileSummary:{count:1,added:1,removed:0,basis:'recorded',files:[{path:'file.txt',added:1,removed:0,hasDiff:false}]}}
+    ];
+    chatTimeline.apply({...fixture.page(),files:[file]},true);
+  });
+  await expect(page.locator('#messages .visualize-card')).toBeVisible();
+  await page.locator('#message').fill('작성 중인 초안');
+  const selector=page.locator('#appearance-chat-width');
+  async function choose(value) {
+    await page.locator('[data-open-appearance]:visible').first().click();
+    await selector.selectOption(value);
+    await page.locator('#appearance-dialog button[data-close].primary').click();
+  }
+  async function checkWidth(cap) {
+    const sizes=await page.evaluate(()=>{
+      const width=selector=>document.querySelector(selector).getBoundingClientRect().width;
+      return {pane:width('#chat .wb-main-pane'),content:[
+        width('#messages'),width('#messages .visualize-card'),width('#messages .edited-files-card'),width('#composer')
+      ]};
+    });
+    expect(sizes.pane).toBeGreaterThan(0);
+    const expected=Math.min(cap,sizes.pane);
+    for (const actual of sizes.content) expect(Math.abs(actual-expected)).toBeLessThanOrEqual(2);
+  }
+  await expect(selector).toHaveValue('normal');
+  await checkWidth(1040);
+  for (const [value,cap] of [['narrow',760],['wide',1320],['full',Infinity],['normal',1040]]) {
+    await choose(value);
+    await checkWidth(cap);
+  }
+  await page.setViewportSize({width:1200,height:900});
+  await checkWidth(1040);
+  await page.setViewportSize({width:2240,height:900});
+  await page.evaluate(()=>{const wb=window.BridgeWorkbench;wb.files();wb.split('files');wb.setRatio(.4);});
+  await expect(page.locator('#chat')).toHaveClass(/wb-split/);
+  await checkWidth(1040);
+  await page.evaluate(()=>window.BridgeWorkbench.setRatio(.7));
+  await checkWidth(1040);
+  await choose('wide');
+  await checkWidth(1320);
+  await expect(page.locator('#message')).toHaveValue('작성 중인 초안');
+  await page.reload();
+  await page.waitForFunction(()=>document.documentElement.dataset.chatWidth==='wide');
+  await expect(selector).toHaveValue('wide');
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
+  await expect(page.locator('#appearance-dialog')).toBeVisible();
+  await expect(page.locator('#chat-width-setting')).toBeHidden();
+  await page.setViewportSize({width:1800,height:900});
+  await expect(page.locator('#chat-width-setting')).toBeVisible();
+  await page.evaluate(()=>document.documentElement.classList.add('bridge-mobile'));
+  await expect(page.locator('#chat-width-setting')).toBeHidden();
+});
+
 for (const theme of ['dark','light']) {
   test('dragged text quote button has readable contrast in '+theme+' mode', async ({page}, testInfo) => {
     await page.emulateMedia({colorScheme:theme});

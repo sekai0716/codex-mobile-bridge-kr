@@ -1,7 +1,7 @@
 'use strict';
 // Appearance is local to this browser; no desktop or account settings are changed.
 const ChatAppearance=(()=>{
-  const defaults={theme:'system',accent:'#4664ed',fontSize:16,codeSize:13,density:'standard',showReasoning:true,showProcess:true,showToolImages:true,showActivity:true,showComputer:true,showPushplus:true,showAccounts:true,showFileThumbnails:true};
+  const defaults={theme:'system',accent:'#4664ed',fontSize:16,codeSize:13,density:'standard',chatWidth:'normal',showReasoning:true,showProcess:true,showToolImages:true,showActivity:true,showComputer:true,showPushplus:true,showAccounts:true,showFileThumbnails:true};
   function normalize(value={}){
     if(!value||typeof value!=='object')value={};
     return {theme:['system','light','dark'].includes(value.theme)?value.theme:defaults.theme,
@@ -9,6 +9,7 @@ const ChatAppearance=(()=>{
       fontSize:Number.isInteger(value.fontSize)&&value.fontSize>=10&&value.fontSize<=32?value.fontSize:defaults.fontSize,
       codeSize:Number.isInteger(value.codeSize)&&value.codeSize>=8&&value.codeSize<=28?value.codeSize:defaults.codeSize,
       density:['compact','standard','relaxed'].includes(value.density)?value.density:defaults.density,
+      chatWidth:['narrow','normal','wide','full'].includes(value.chatWidth)?value.chatWidth:defaults.chatWidth,
       showReasoning:typeof value.showReasoning==='boolean'?value.showReasoning:defaults.showReasoning,
       showProcess:typeof value.showProcess==='boolean'?value.showProcess:defaults.showProcess,
       showToolImages:typeof value.showToolImages==='boolean'?value.showToolImages:defaults.showToolImages,
@@ -42,6 +43,7 @@ if(typeof document!=='undefined')(()=>{
   let saved;try{saved=JSON.parse(localStorage.getItem(key));}catch{}
   let settings=ChatAppearance.normalize(saved),collapsed=false;
   const composer=get('composer'),body=get('composer-body'),toggle=get('composer-toggle'),message=get('message');
+  const widthControl=get('appearance-chat-width');
   function preserveReading(change){
     const timeline=typeof chatTimeline==='undefined'?null:chatTimeline;
     const anchor=timeline?.capture(),bottom=timeline?.following;
@@ -53,6 +55,13 @@ if(typeof document!=='undefined')(()=>{
     const dark=settings.theme==='dark'||settings.theme==='system'&&(window.BridgeNativeTheme?.dark??system.matches);
     const colors=ChatAppearance.colors(settings.accent,dark);
     root.dataset.theme=dark?'dark':'light';root.dataset.density=settings.density;
+    const webWidth = !BridgeHost.isNativeApp() && !BridgeHost.hasNativeLayout();
+    if (webWidth) root.dataset.chatWidth=settings.chatWidth;
+    else delete root.dataset.chatWidth;
+    if (widthControl) {
+      widthControl.closest('label').hidden=!webWidth;
+      widthControl.value=settings.chatWidth;
+    }
     root.dataset.showActivity=String(settings.showActivity);
     root.dataset.showComputer=String(settings.showComputer);get('appearance-computer').checked=settings.showComputer;
     root.dataset.showPushplus=String(settings.showPushplus);root.dataset.showAccounts=String(settings.showAccounts);
@@ -114,6 +123,7 @@ if(typeof document!=='undefined')(()=>{
   get('appearance-font').oninput=()=>change({fontSize:Number(get('appearance-font').value)});
   get('appearance-code').oninput=()=>change({codeSize:Number(get('appearance-code').value)});
   get('appearance-density').onchange=()=>change({density:get('appearance-density').value});
+  widthControl?.addEventListener('change',()=>change({chatWidth:widthControl.value}));
   get('appearance-reasoning').onchange=()=>change({showReasoning:get('appearance-reasoning').checked});
   get('appearance-computer').onchange=()=>change({showComputer:get('appearance-computer').checked});
   get('appearance-activity').onchange=()=>change({showActivity:get('appearance-activity').checked});

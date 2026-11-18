@@ -2,6 +2,11 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Chat width": "채팅 너비",
+  "Narrow view": "좁게 보기",
+  "Standard width": "일반",
+  "Wide view": "넓게",
+  "Full width": "가장 넓게",
   "Subagent created": "하위 에이전트 생성됨",
   "{name} agent created": "{name} 에이전트 생성됨",
   "Message this agent": "이 에이전트에게 메시지 보내기",

@@ -8,6 +8,9 @@ test('invalid or older saved appearance values keep the page readable',()=>{
   for(const [fontSize,codeSize] of [[10,8],[32,28]])assert.deepEqual(normalize({fontSize,codeSize}),{...defaults,fontSize,codeSize});
   for(const [fontSize,codeSize] of [[9,7],[33,29]])assert.deepEqual(normalize({fontSize,codeSize}),defaults);
   assert.equal(normalize({showReasoning:false,showProcess:false}).showReasoning,false);
+  assert.equal(normalize({}).chatWidth,'normal');
+  assert.equal(normalize({chatWidth:'unknown',density:'compact'}).chatWidth,'normal');
+  for(const chatWidth of ['narrow','normal','wide','full'])assert.equal(normalize({chatWidth}).chatWidth,chatWidth);
   assert.equal(normalize({showReasoning:false,showProcess:false}).showProcess,false);
   assert.deepEqual(normalize({showReasoning:'false',showProcess:null}),defaults);
   assert.equal(normalize({showFileThumbnails:false}).showFileThumbnails,false);

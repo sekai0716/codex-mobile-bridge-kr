@@ -132,7 +132,7 @@
 .wb-resizing{user-select:none}.wb-resizing *{cursor:col-resize!important}
 .wb-dragging>.wb-split-drop{display:grid;place-items:center;position:absolute;inset:8px 8px 8px 52%;z-index:20;border:2px dashed var(--accent);border-radius:14px;color:var(--text);background:var(--surface);opacity:.95;pointer-events:auto;font-size:14px}
 .wb-split-button{width:38px;flex:none;font-size:22px!important}.wb-tab[draggable=true]{cursor:grab}
-.wb-split .timeline{padding:20px}.wb-split .composer{margin:0 16px}
+.wb-split .timeline{padding:20px var(--chat-gutter,20px)}.wb-split .composer{margin:0 var(--chat-gutter,16px)}
 
 .wb-side-composer.composer{margin:0 14px;padding:8px 0 max(12px,env(safe-area-inset-bottom));background:var(--page);min-width:0}
 .wb-side-composer textarea{min-height:48px;height:48px;max-height:160px;font-size:16px;resize:none}
