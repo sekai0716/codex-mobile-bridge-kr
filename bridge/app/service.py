@@ -188,7 +188,7 @@ class LiveSession:
                 for message in turn['messages']:
                     if message.get('computerUse') and message.get('id'):
                         key = (turn['id'], message['id'])
-                        self.saved_image_calls[key] = None if key in self.saved_image_calls else message['attachments']
+                        self.saved_image_calls[key] = None if key in self.saved_image_calls else message.get('attachments')
         # Complete native patch evidence is retained by the saved reader even
         # when its messages are outside the current presentation window.
         self.saved_file_changes = {

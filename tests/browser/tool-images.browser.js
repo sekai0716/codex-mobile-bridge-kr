@@ -9,11 +9,11 @@ async function runToolImageTests(imageId){
   const elements={viewport:root,container,older:document.createElement('button'),newer:document.createElement('button')};
   const session='/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/';
   let sequence=0,detailCalls=0;
-  const calls=new Map(),detailBody=JSON.stringify({code:'await capture()',title:'Save preview'})+'\n\n'+JSON.stringify({content:[{type:'image',preview:imageId}]});
+  const calls=new Map(),bodies=new Map(),detailBody=JSON.stringify({code:'await capture()',title:'Save preview'})+'\n\n'+JSON.stringify({content:[{type:'image',preview:imageId}]});
   const timeline=new ChatTimeline({elements,url:action=>session+action+'?host=local',
     renderMeta(){},renderText:(node,text)=>node.textContent=text,status(){},request:async url=>{
       const key=new URL(url,location.href).searchParams.get('key').split('.').pop();
-      detailCalls++;return {key,version:calls.get(key).version,offset:0,text:detailBody,next:null};
+      detailCalls++;return {key,version:calls.get(key).version,offset:0,text:bodies.get(key)??detailBody,next:null};
     }});
   const images=[{type:'toolImage',desktopId:imageId,name:'Screenshot.png'}];
   const saved={key:'saved',order:0,version:'1',turnId:'turn',role:'activity',kind:'storedToolEvent',title:'cua_repl · js',
@@ -76,6 +76,57 @@ async function runToolImageTests(imageId){
     timeline.setVisibility({showToolImages:true});
     await until(()=>node('wrapped').querySelector('img')?.naturalWidth,'enabling previews did not restore the screenshot');
     check(node('wrapped').querySelectorAll('img').length===1,'Re-enabling previews restores each once');
+    const textCalls=[
+      ['inspect','cua_repl · js','Studio 창을 복원해 장치 상태 확인','undefined'],
+      ['finish','cua_repl · js','Confirmed print continued at layer 187','Completion summary received.'],
+      ['failure','cua_repl · js','기준판의 저장 플러시 수치 복원','point is over another window'],
+      ['node-text','node_repl · js','Check the paused dialog','window ready']
+    ];
+    const first=detailCalls;
+    apply(textCalls.map(([key,tool,title,output],index)=>{
+      const args=key==='finish'?{completion_summary:title}:{title,code:'await inspect()'};
+      const body=[args,{content:[{type:'text',text:output}]},{automaticApprovalReviews:[{status:'approved'}]}];
+      bodies.set(key,body.map(value=>JSON.stringify(value)).join('\n\n'));
+      return {...saved,key,order:10+index,title:tool,computerUse:{title},attachments:[],status:key==='failure'?'failed':'completed',
+        approvalReview:{status:'approved'},kind:index%2?'storedToolEvent':'mcpToolCall'};
+    }));
+    for(const [key,,title] of textCalls){
+      check(node(key).matches('details.activity:not([open])')&&!inner(key)&&node(key).parentElement===container,key+' is a standalone single disclosure');
+      check(summary(key).textContent==='컴퓨터 사용 · '+title+(key==='failure'?'ㆍ실행 실패':''),key+' keeps the task caption and original outcome');
+      check(!node(key).querySelector('.timeline-attachments'),key+' has no gallery');
+    }
+    check(detailCalls===first,'Text-only rows do not load their body while collapsed');
+    for(const [key] of textCalls){
+      summary(key).click();
+      await until(()=>node(key).querySelector('pre').textContent===bodies.get(key),key+' body was not reached in one click');
+      check(node(key).querySelector('pre').getBoundingClientRect().height>0,key+' shows input, output and review on the first click');
+    }
+    check(detailCalls===first+textCalls.length,'Each text-only click loads only that call');
+    const title='Looking above the main nozzle temperature',secondId='d'.repeat(64);
+    const mixed={...saved,key:'mixed',order:14,kind:'mcpToolCall',title:'node_repl · js',computerUse:{title},attachments:[]};
+    apply([{...mixed,status:'inProgress'}]);
+    check(!inner('mixed')&&summary('mixed').textContent.startsWith('컴퓨터 사용 · '+title),'A running titled call is shown before output arrives');
+    bodies.set('mixed',JSON.stringify({code:'await scrollStudio(654,393,-380);',title})+'\n\n'+JSON.stringify({content:[
+      {type:'text',text:'225 fields, focus: filament settings'},{type:'image',preview:imageId},{type:'image',preview:secondId}]}));
+    apply([{...mixed,version:'2',status:'completed',attachments:[
+      {...images[0],name:'Image 1.jpg'},{...images[0],desktopId:secondId,name:'Image 2.jpg'}]}]);
+    check(!node('mixed').open&&!inner('mixed').open&&!node('mixed').querySelector('img'),'Two arriving images stay collapsed by default');
+    summary('mixed').scrollIntoView({block:'center'});await frame();
+    summary('mixed').click();
+    await until(()=>node('mixed').querySelectorAll('img').length===2,'both mixed-result images did not appear');
+    const pictures=[...node('mixed').querySelectorAll('img')];
+    for(const img of pictures){img.scrollIntoView({block:'center'});await until(()=>img.naturalWidth,'a visible mixed-result image did not load');}
+    check(pictures.every((img,index)=>img.closest('details')===node('mixed')&&img.src.includes([imageId,secondId][index])),'Both photos appear in source order outside the raw record');
+    check(!inner('mixed').open&&inner('mixed').firstElementChild.textContent==='node_repl · js'&&detailCalls===first+textCalls.length,'Mixed text and commands stay inside the closed raw record');
+    inner('mixed').firstElementChild.click();
+    await until(()=>inner('mixed').querySelector('pre').textContent===bodies.get('mixed'),'mixed raw record did not load');
+    apply([{...mixed,key:'unavailable',order:15,computerUse:{title,imageUnavailable:true}}]);
+    summary('unavailable').click();
+    await until(()=>node('unavailable').querySelector('.timeline-attachments'),'missing image notice did not appear');
+    check(!inner('unavailable').open&&!node('unavailable').querySelector('img')&&node('unavailable').textContent.includes('이미지 미리보기'),'An image block without available bytes keeps its disclosure without fetching an unverified image');
+    BridgeI18n.setLanguage('en');timeline.relabel();
+    check(summary('failure').textContent.startsWith('Computer use · '+textCalls[2][2])&&node('failure').open,'Relabeling preserves the single open disclosure');
+    timeline.setVisibility({showProcess:false});check(node('failure').hidden&&node('mixed').hidden,'Process visibility applies to both layouts');
     return checks;
   }finally{timeline.dispose();root.remove();BridgeI18n.setLanguage(originalLanguage);}
 }

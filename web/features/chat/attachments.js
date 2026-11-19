@@ -1,7 +1,7 @@
 'use strict';
 // Native adapters supply identifiers; each chat surface supplies its authorized
 // preview route. Keep attachment markup and the existing image viewer shared.
-function renderChatAttachments(node,items,{url,fileUrl,showToolImages=true}={}){
+function renderChatAttachments(node,items,{url,fileUrl,showToolImages=true,loading='lazy'}={}){
   if(!items?.length)return;
   const t=value=>BridgeI18n.t(value),attachments=document.createElement('div');attachments.className='timeline-attachments';
   for(const item of items){
@@ -12,7 +12,7 @@ function renderChatAttachments(node,items,{url,fileUrl,showToolImages=true}={}){
     const link=document.createElement('a');link.href=source.original;link.target='_blank';link.rel='noopener';
     link.dataset.imagePreview=source.original;link.dataset.imageName=item.name||t('이미지 첨부');
     const image=document.createElement('img');image.className='attachment-image';image.alt=item.name||t('이미지 첨부');
-    image.loading='lazy';image.decoding='async';image.src=source.preview;
+    image.loading=loading;image.decoding='async';image.src=source.preview;
     image.onerror=()=>link.remove();link.append(image);attachments.append(link);
   }
   const label=document.createElement('small');label.className='muted';label.append(document.createTextNode(t('부착:')));

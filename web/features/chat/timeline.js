@@ -7,9 +7,23 @@ const computerActionLabels={
   scroll:'Check screen after scrolling',drag:'Check screen after dragging',activate_window:'Check active window',
   move_window:'Check window position',resize_window:'Check window size',multiple:'Check screen after actions'
 };
+const computerTextActionLabels={
+  screenshot:'Capture screen',get_app_state:'Inspect screen',click:'Click',press_key:'Press key',type_text:'Type text',
+  set_value:'Set value',scroll:'Scroll',drag:'Drag',activate_window:'Activate window',move_window:'Move window',
+  resize_window:'Resize window',list_windows:'List windows',focused_window:'Check active window',list_apps:'List apps',
+  get_tree_page:'Inspect accessibility tree',perform_action:'Perform action',doctor:'Check computer access',
+  setup_accessibility:'Set up accessibility',setup_window_targeting:'Set up window targeting',multiple:'Computer actions'
+};
+function hasToolImageContent(row){
+  return row.computerUse?.imageUnavailable||row.attachments?.some(item=>item.type==='toolImage');
+}
 function labelComputerUse(node,row){
   const {title,action}=row.computerUse;
-  const caption=timelineText('Computer use')+' · '+(title||timelineText(computerActionLabels[action]||'Inspect screen'));
+  const imageCall=node.classList.contains('tool-images');
+  const labels=imageCall?computerActionLabels:computerTextActionLabels;
+  const source=Object.hasOwn(labels,action)?labels[action]:imageCall?'Inspect screen':'';
+  const subtitle=title||(source&&timelineText(source));
+  const caption=[timelineText('Computer use'),subtitle].filter(Boolean).join(' · ');
   const summary=node.firstElementChild;
   decorateChatActivity(node,{...row,title:caption},summary);
   summary.title=caption+chatActivityStateSuffix(row);
@@ -105,7 +119,7 @@ class ChatTimeline {
     }),bottom=this.following;
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key).row;
-      if(imagesChanged&&row.attachments?.some(item=>item.type==='toolImage')){
+      if(imagesChanged&&hasToolImageContent(row)){
         const reading=captureChatActivityState(entry.node);
         const node=this.renderRow(row,reading?.open);node.dataset.key=key;
         entry.node.replaceWith(node);entry.node=node;restoreChatActivityState(node,reading);
@@ -270,7 +284,8 @@ class ChatTimeline {
       if(enabled){node.type='button';node.onclick=()=>this.onAgent({...row.agent,nickname:this.agentName(row.agent)});}
       return node;
     }
-    const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&row.attachments?.some(item=>item.type==='toolImage');
+    const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&hasToolImageContent(row);
+    // 이미지가 있는 호출은 실행 기록과 미리보기를 담을 바깥 제목을 둔다.
     const computerUse=toolImages&&row.computerUse;
     const node=document.createElement(activity&&(!toolImages||computerUse)?'details':'div');
     node.className=toolImages?'tool-images timeline-row':activity?'activity timeline-row':'message timeline-row '+row.role;
@@ -285,6 +300,10 @@ class ChatTimeline {
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
     heading.textContent=activity?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
     if(computerUse)heading.textContent=row.title;
+    else if(row.computerUse){
+      labelComputerUse(node,row);
+      heading.addEventListener('click',()=>this.holdDisclosure(heading));
+    }
     else if(activity&&!row.fileSummary)decorateChatActivity(content,row,heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
@@ -358,7 +377,7 @@ class ChatTimeline {
       const quote=document.createElement('button');quote.type='button';quote.className='plain message-quote';quote.textContent=timelineText('인용');quote.onclick=()=>node.dispatchEvent(new CustomEvent('bridge-compose-quote',{bubbles:true,detail:{getText:()=>this.fullText(row),source:row.key}}));actions.append(quote);
       renderChatMessageTime(actions,row.timestamp);
     }
-    const showAttachments=()=>renderChatAttachments(node,row.attachments,{showToolImages:this.showToolImages,fileUrl:item=>{
+    const showAttachments=()=>renderChatAttachments(node,row.attachments,{showToolImages:this.showToolImages,loading:computerUse?'eager':'lazy',fileUrl:item=>{
       const file=[...this.files.values()].find(file=>file.reference===item.path||file.references?.includes(item.path));
       return file?this.fileUrl(file):null;
     },url:item=>{
@@ -369,7 +388,12 @@ class ChatTimeline {
     if(computerUse){
       node.ontoggle=()=>{
         if(!node.open||!node.isConnected)return;
-        if(!node.querySelector('.timeline-attachments'))showAttachments();
+        if(!node.querySelector('.timeline-attachments')){
+          if(this.showToolImages&&row.computerUse.imageUnavailable){
+            const note=document.createElement('small');note.className='timeline-attachments muted';
+            note.dataset.i18n='Image preview unavailable';note.textContent=timelineText(note.dataset.i18n);node.append(note);
+          }else showAttachments();
+        }
         content.ontoggle?.();
       };
     }else showAttachments();
@@ -430,7 +454,10 @@ class ChatTimeline {
         if(toggle)toggle.textContent=toggle.getAttribute('aria-expanded')==='true'?timelineText('Collapse files'):timelineText('Show {count} more files').replace('{count}',row.fileSummary.files.length-3);
         for(const element of node.querySelectorAll('[data-i18n]'))element.textContent=timelineText(element.dataset.i18n);
       }
-      else if(node.classList.contains('computer-use'))labelComputerUse(node,row);
+      else if(row.computerUse){
+        labelComputerUse(node,row);
+        const note=node.querySelector('.timeline-attachments[data-i18n]');if(note)note.textContent=timelineText(note.dataset.i18n);
+      }
       else if(heading){
         heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
         if(row.role==='activity')decorateChatActivity(heading.parentElement,row,heading);

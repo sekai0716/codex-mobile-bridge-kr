@@ -29,9 +29,8 @@ LINUX_CALL = re.compile(
 )
 
 
-def attach_tool_images(row, item, images):
-    """Attach previews and describe a computer action only from its own call."""
-    row['attachments'] = images
+def label_computer_use(row, item):
+    """결과나 첨부가 도착하기 전에도 원래 호출의 도구와 작업 제목을 식별한다."""
     provider = item.get('server') or item.get('namespace') or ''
     name = item.get('tool') or item.get('toolName') or item.get('name') or ''
     if not isinstance(provider, str) or not isinstance(name, str):
@@ -42,18 +41,26 @@ def attach_tool_images(row, item, images):
         provider, name = name.rsplit('.', 1)
     provider = provider.removeprefix('mcp__').replace('-', '_')
     args = item.get('arguments', item.get('input', ''))
-    if isinstance(args, str) and args.lstrip().startswith('{') and (provider == 'cua_repl' or name == 'exec'):
+    if isinstance(args, str) and args.lstrip().startswith('{'):
         try:
             args = json.loads(args)
         except (ValueError, RecursionError):
             pass  # Raw functions.exec JavaScript can also begin with a block.
-    if provider == 'cua_repl' and name == 'js':
-        title = args.get('title') if isinstance(args, dict) else None
-        title = ' '.join(title.split())[:240] if isinstance(title, str) else ''
-        row.update(title='cua_repl · js', computerUse={'title': title} if title else {'action': 'get_app_state'})
-    elif provider == 'computer_use_linux' and re.fullmatch(r'[a-z][a-z_0-9]{0,63}', name):
+    if provider == 'computer_use_linux' and re.fullmatch(r'[a-z][a-z_0-9]{0,63}', name):
         # Linux's "title" is a window selector, not a description of the action.
         row.update(title='computer_use_linux · ' + name, computerUse={'action': name})
+        return
+    # A task title belongs to the call. Its result may arrive later with any
+    # combination of text and images, from any tool.
+    if isinstance(args, dict):
+        for field in ('title', 'completion_summary'):
+            label = args.get(field)
+            if isinstance(label, str) and label.strip():
+                original_tool = ' · '.join(filter(None, (provider, name)))
+                row.update(title=original_tool or row.get('title'), computerUse={'title': ' '.join(label.split())[:240]})
+                return
+    if provider == 'cua_repl' and name == 'js':
+        row.update(title='cua_repl · js', computerUse={'action': 'js'})
     elif name == 'exec' and provider in ('', 'functions'):
         code = args.get('code', args.get('input')) if isinstance(args, dict) else args
         if not isinstance(code, str) or 'mcp__computer_use_linux__' not in code:
@@ -98,11 +105,12 @@ def complete_clipped_image(data, mime, saved_images):
     return matches[0] if len(matches) == 1 else data
 
 
-def extract_tool_images(output, *, remember=None, saved_images=()):
-    """Return sanitized output and image descriptors for native or JSON-wrapped MCP results."""
+def inspect_tool_images(output, *, remember=None, saved_images=()):
+    """처리한 결과, 검증된 이미지, 원본에 이미지 블록이 있었는지를 함께 반환한다."""
     images, seen_data = [], {}
     total = nodes = parsed_chars = kept = 0
     exhausted = False
+    has_image_content = False
 
     def unscanned(value):
         # One allowance covers every unscanned value in this output, so many
@@ -121,7 +129,7 @@ def extract_tool_images(output, *, remember=None, saved_images=()):
         return {'type': 'omitted', 'reason': 'toolOutputBudget'}
 
     def walk(value, depth=0):
-        nonlocal total, nodes, parsed_chars
+        nonlocal total, nodes, parsed_chars, has_image_content
         nodes += 1
         if depth > MAX_DEPTH or nodes > MAX_NODES:
             return unscanned(value)
@@ -151,6 +159,7 @@ def extract_tool_images(output, *, remember=None, saved_images=()):
             return value
         # Codex rollouts use input_image; app-server dynamic tools use inputImage.
         if value.get('type') in ('image', 'image_url', 'output_image', 'input_image', 'inputImage'):
+            has_image_content = True
             data, mime = value.get('data'), value.get('mimeType')
             url = value.get('imageUrl', value.get('image_url', value.get('url')))
             if isinstance(url, dict):
@@ -159,7 +168,13 @@ def extract_tool_images(output, *, remember=None, saved_images=()):
                 header, _, data = url.partition(',')
                 mime = header[5:-7] if header.endswith(';base64') else None
             elif not isinstance(data, str):
-                return value
+                # Some live results retain only the gateway preview id. Use
+                # bytes already verified for this exact saved turn and call.
+                match = next((img for img in saved_images if img.get('desktopId') == value.get('preview')
+                              and img.get('mime') == mime), None)
+                if match is None:
+                    return value
+                data = match['data']
             placeholder = {'type': 'image', 'preview': 'unavailable'}
             if not isinstance(data, str) or not isinstance(mime, str) or mime not in RASTER_TYPES:
                 return placeholder
@@ -194,7 +209,12 @@ def extract_tool_images(output, *, remember=None, saved_images=()):
             keys.add('text')
         return {key: walk(part, depth + 1) if key in keys else part for key, part in value.items()}
 
-    return walk(output), images
+    clean = walk(output)
+    return clean, images, has_image_content
+
+
+def extract_tool_images(output, *, remember=None, saved_images=()):
+    return inspect_tool_images(output, remember=remember, saved_images=saved_images)[:2]
 
 
 def public_turns(turns, *, image_previews=True, include_file_diffs=False):
@@ -257,7 +277,7 @@ class ToolImageCache:
         self._put(self.images, identifier, (mime, data, raw), len(raw) + len(data),
                   'image_bytes', self.image_limit)
 
-    def extract(self, output, *, saved_images=()):
+    def inspect(self, output, *, saved_images=()):
         # Key by content, not mutable item identity: live patches can replace or
         # edit an output in place without changing its tool-call id.
         digest = hashlib.sha256()
@@ -276,7 +296,7 @@ class ToolImageCache:
             if entry is not None:
                 self.outputs.move_to_end(key)
                 return copy.deepcopy(entry[0])
-            result = extract_tool_images(output, remember=self._remember, saved_images=saved_images)
+            result = inspect_tool_images(output, remember=self._remember, saved_images=saved_images)
             # Conservatively count input plus cached projection and metadata.
             result_size = json_size_within(result, self.output_limit - input_size - 1024,
                                            ensure_ascii=True) if key is not None else None
@@ -285,6 +305,9 @@ class ToolImageCache:
                 self._put(self.outputs, key, copy.deepcopy(result), size,
                           'output_bytes', self.output_limit)
             return result
+
+    def extract(self, output, *, saved_images=()):
+        return self.inspect(output, saved_images=saved_images)[:2]
 
     def preview(self, attachment):
         identifier, mime, data = attachment['desktopId'], attachment.get('mime'), attachment.get('data')

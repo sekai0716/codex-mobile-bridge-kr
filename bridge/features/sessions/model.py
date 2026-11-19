@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from urllib.request import url2pathname
 import ntpath
-from bridge.features.sessions.tool_images import attach_tool_images, extract_tool_images
+from bridge.features.sessions.tool_images import inspect_tool_images, label_computer_use
 from bridge.features.sessions.store import items_array, native_file_changes, native_turn_file_changes, native_patch_counts
 
 
@@ -156,6 +156,17 @@ def user_display_text(text):
 REVIEW_TOOL_KINDS = {'commandExecution', 'fileChange', 'FileChange', 'mcpToolCall', 'dynamicToolCall'}
 
 
+def review_tool_id(item):
+    """저장 기록은 호출 ID, 데스크톱 항목은 도구 항목 ID로 검토 결과를 연결한다."""
+    if item.get('type') in ('function_call', 'custom_tool_call'):
+        identifier = item.get('call_id', item.get('id'))
+    elif item.get('type') in REVIEW_TOOL_KINDS:
+        identifier = item.get('id')
+    else:
+        return None
+    return identifier if isinstance(identifier, str) and identifier else None
+
+
 def approval_review_record(item, turn_status=None):
     """원본 검토 상태를 실행 결과와 분리하고, 중단된 turn의 진행 상태를 정리한다."""
     status = item.get('status') or 'unknown'
@@ -215,6 +226,34 @@ def spawned_agents(item, parent_id):
             nickname = names.get(target)
             agents.append({'id': target, 'nickname': nickname[:160] if isinstance(nickname, str) else '', 'taskName': fallback[:160]})
     return agents
+
+
+def mcp_result_failed(output):
+    """저장 기록의 MCP 결과는 JSON 문자열일 수도 있다. 본문 문구로 실패를 추측하지 않는다."""
+    if isinstance(output, str) and output.lstrip().startswith('{') and ('"isError"' in output or '"error_code"' in output):
+        try:
+            output = json.loads(output)
+        except (ValueError, RecursionError):
+            return False
+    if not isinstance(output, dict):
+        return False
+    if output.get('isError') is True:
+        return True
+    meta = output.get('_meta')
+    telemetry = meta.get('codex/telemetry') if isinstance(meta, dict) else None
+    return isinstance(telemetry, dict) and bool(telemetry.get('error_code'))
+
+
+def set_tool_attachments(row, images, has_image_content):
+    if images:
+        row['attachments'] = images
+    else:
+        row.pop('attachments', None)
+    if 'computerUse' in row:
+        if has_image_content and not images:
+            row['computerUse']['imageUnavailable'] = True
+        else:
+            row['computerUse'].pop('imageUnavailable', None)
 
 
 def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
@@ -285,19 +324,23 @@ def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
     elif kind in ("fileChange", "FileChange"):
         row.update(role="activity", title="파일 변경", text="\n\n".join(c["path"] + "\n" + c["diff"] for c in native_file_changes([item])))
     elif kind in ("mcpToolCall", "dynamicToolCall"):
-        extract = image_cache.extract if image_cache is not None else extract_tool_images
-        source = item.get("result", item.get("contentItems", item.get("content", item.get("error", ""))))
+        inspect = image_cache.inspect if image_cache is not None else inspect_tool_images
+        source = item.get("result")
+        if source is None:
+            source = item.get("error") or item.get("contentItems", item.get("content", ""))
         content = item.get("content")
         if isinstance(content, list) and content is not source:
-            clean, images = extract({"result": source, "content": content}, saved_images=saved_images)
+            clean, images, has_image_content = inspect({"result": source, "content": content}, saved_images=saved_images)
             output = clean["result"]
         else:
-            output, images = extract(source, saved_images=saved_images)
-        row.update(role="activity", title=" · ".join(str(x) for x in (item.get("server"), item.get("tool", item.get("toolName"))) if x), text=json.dumps(item.get("arguments", {}), ensure_ascii=False, indent=2), output=json.dumps(output, ensure_ascii=False, indent=2))
+            output, images, has_image_content = inspect(source, saved_images=saved_images)
+        row.update(role="activity", title=" · ".join(str(x) for x in (item.get("server"), item.get("tool", item.get("toolName"))) if x), text=json.dumps(item.get("arguments", item.get("input", {})), ensure_ascii=False, indent=2), output=json.dumps(output, ensure_ascii=False, indent=2))
+        label_computer_use(row, item)
         if isinstance(item.get('success'), bool):
             row['success'] = item['success']
-        if images:
-            attach_tool_images(row, item, images)
+        if row.get('computerUse') and (item.get('error') or mcp_result_failed(output)):
+            row['success'] = False
+        set_tool_attachments(row, images, has_image_content)
     elif kind == "error":
         row.update(role="error", text=item.get("message", "실행 실패"))
     elif kind == "planImplementation":
@@ -401,16 +444,14 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
         # 같은 turn의 고유한 대상 ID에만 연결하며 제목·명령 문자열은 사용하지 않는다.
         tool_counts, reviews = {}, {}
         for native in items:
-            if native.get('type') in REVIEW_TOOL_KINDS:
-                identifier = native.get('id')
-                if isinstance(identifier, str) and identifier:
-                    tool_counts[identifier] = tool_counts.get(identifier, 0) + 1
+            identifier = review_tool_id(native)
+            if identifier:
+                tool_counts[identifier] = tool_counts.get(identifier, 0) + 1
             elif native.get('type') == 'automaticApprovalReview':
                 target = native.get('targetItemId')
                 if isinstance(target, str) and target and native.get('turnId') in (None, turn.get('turnId')):
                     records = reviews.setdefault(target, {})
                     records[native.get('id') or str(len(records))] = approval_review_record(native, turn.get('status'))
-        visible_tools = {item['id'] for item in items[omitted:] if item.get('type') in REVIEW_TOOL_KINDS and isinstance(item.get('id'), str)}
         occurrences = {}
         prefix_ordinals = {}
         preceding_calls = {}
@@ -434,6 +475,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
             key = (item.get('call_id', item.get('id')), 'storedToolEvent')
             prefix_ordinals[key] -= 1
         items = carry + items
+        visible_tools = {key for item in items if (key := review_tool_id(item))}
         messages, calls = [], {}
         for item in items:
             kind = item.get('type')
@@ -442,18 +484,22 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
                 message = {'id': item.get('call_id', item.get('id')), 'kind': 'storedToolEvent',
                            'role': 'activity', 'title': item.get('name') or '도구 호출',
                            'text': arguments if isinstance(arguments, str) else json.dumps(arguments, ensure_ascii=False, indent=2)}
+                label_computer_use(message, item)
+                if message.get('computerUse') and item.get('status') in ('failed', 'interrupted', 'declined'):
+                    message['status'] = item['status']
                 if message['id']:
-                    calls[message['id']] = (message, item)
+                    calls[message['id']] = message
             elif kind in ('function_call_output', 'custom_tool_call_output') and item.get('call_id') in calls:
-                extract = image_cache.extract if image_cache is not None else extract_tool_images
-                output, images = extract(item.get('output', ''))
-                call, source = calls[item['call_id']]
+                inspect = image_cache.inspect if image_cache is not None else inspect_tool_images
+                output, images, has_image_content = inspect(item.get('output', ''))
+                call = calls[item['call_id']]
                 call['output'] = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
-                if images:
-                    attach_tool_images(call, source, images)
-                else:
-                    call.pop('attachments', None)
-                    call.pop('computerUse', None)
+                if call.get('computerUse'):
+                    if item.get('status') == 'failed' or mcp_result_failed(output):
+                        call['success'] = False
+                    else:
+                        call.pop('success', None)
+                set_tool_attachments(call, images, has_image_content)
                 continue
             else:
                 saved_images = ()
@@ -461,8 +507,8 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
                     saved_images = saved_image_calls.get((turn.get('turnId'), item.get('id'))) or ()
                 message = normalize_item(item, image_cache=image_cache, parent_id=state.get('id', state.get('sessionId')),
                                          saved_images=saved_images)
-            identifier = item.get('id')
-            if kind in REVIEW_TOOL_KINDS and tool_counts.get(identifier) == 1 and identifier in reviews:
+            identifier = review_tool_id(item)
+            if identifier and tool_counts.get(identifier) == 1 and identifier in reviews:
                 records = list(reviews[identifier].values())
                 message['approvalReviews'] = records
                 message['approvalReview'] = {key: value for key, value in records[-1].items() if key in ('id', 'status', 'riskLevel')}

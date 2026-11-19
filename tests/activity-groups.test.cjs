@@ -17,6 +17,7 @@ test('activity grouping follows native kinds, turn and transcript boundaries rat
 });
 test('images, approvals, errors and unknown activities remain separate and split adjacent groups',()=>{
   for(const boundary of [tool('image','imageView'),tool('tool-image','mcpToolCall',{attachments:[{type:'toolImage'}]}),
+    tool('text-call','storedToolEvent',{computerUse:{title:'Check the dialog'}}),
     tool('denied','automaticApprovalReview',{status:'denied'}),tool('declined','commandExecution',{status:'declined'}),
     tool('permission','permissionRequest'),{key:'error',role:'error'},tool('other','futureTool')]){
     assert.deepEqual(shape([tool('before'),boundary,tool('after')]),[['standalone',['before']],['standalone',[boundary.key]],['standalone',['after']]],boundary.key);

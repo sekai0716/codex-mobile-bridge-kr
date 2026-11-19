@@ -93,21 +93,109 @@ class ToolImageTests(unittest.TestCase):
         wrapper = 'await tools.mcp__computer_use_linux__click({}); image((await tools.mcp__computer_use_linux__screenshot({})).content[0]);'
         cases = [
             ({'server': 'cua_repl', 'tool': 'js', 'arguments': {'title': 'Save preview'}}, {'title': 'Save preview'}),
-            ({'tool': 'mcp__cua_repl__js'}, {'action': 'get_app_state'}),
+            ({'tool': 'mcp__cua_repl__js'}, {'action': 'js'}),
             ({'server': 'computer-use-linux', 'tool': 'click', 'arguments': {'title': 'private window', 'screenshot_after': True}}, {'action': 'click'}),
             ({'toolName': 'mcp__computer_use_linux__get_app_state'}, {'action': 'get_app_state'}),
             ({'namespace': 'functions', 'tool': 'exec', 'arguments': {'code': wrapper}}, {'action': 'multiple'}),
             ({'tool': 'functions.exec', 'arguments': json.dumps({'code': wrapper})}, {'action': 'multiple'}),
-            ({'server': 'another_server', 'tool': 'js', 'arguments': {'title': 'Other image'}}, None),
+            ({'server': 'node_repl', 'tool': 'js', 'arguments': {'title': 'Check the dialog'}}, {'title': 'Check the dialog'}),
+            ({'server': 'another_server', 'tool': 'run', 'arguments': {'title': 'Other image'}}, {'title': 'Other image'}),
+            ({'server': 'another_server', 'tool': 'js', 'arguments': {'sample': {'title': 'Not this call'}}}, None),
             ({'server': 'another_server', 'tool': 'exec', 'arguments': {'code': wrapper}}, None),
             ({'tool': 'functions.exec', 'arguments': {'code': '// '+wrapper+'\ntext(`'+wrapper+'`);'}}, None)]
         for call, expected in cases:
             with self.subTest(call=call):
                 started = {'type': 'dynamicToolCall', 'id': 'live', **call}
-                self.assertNotIn('computerUse', normalize_item(started))
+                pending = normalize_item(started)
+                self.assertEqual(pending.get('computerUse'), expected)
+                self.assertNotIn('attachments', pending)
                 completed = normalize_item({**started, 'contentItems': [image()]})
                 self.assertEqual(completed.get('computerUse'), expected)
                 self.assertEqual(len(completed['attachments']), 1)
+
+    def test_saved_and_live_text_calls_keep_titles_results_and_their_own_reviews(self):
+        calls = [
+            ('inspect', {'code': 'checkWindow()', 'title': 'Studio 창을 복원해 장치 상태 확인'}, 'undefined', False),
+            ('done', {'title': ' ', 'completion_summary': 'Confirmed print continued at layer 187'},
+             'Completion summary received.', False),
+            ('failed', {'code': 'restoreValue()', 'title': '기준판의 저장 플러시 수치 복원'},
+             'point is over another window', True),
+        ]
+        saved, results, live, reviews = [], [], [], []
+        for key, args, text, failed in calls:
+            meta = {'codex/telemetry': {'error_code': 'unknown'}} if failed else None
+            result = {'content': [{'type': 'text', 'text': text}], 'structuredContent': None, '_meta': meta}
+            saved.append({'type': 'function_call', 'namespace': 'mcp__cua_repl', 'name': 'js',
+                          'id': 'record-' + key, 'call_id': key, 'arguments': json.dumps(args)})
+            results.append({'type': 'function_call_output', 'call_id': key, 'output': json.dumps(result)})
+            live.append({'type': 'mcpToolCall', 'server': 'cua_repl', 'tool': 'js', 'arguments': args,
+                         'id': key, 'status': 'failed' if failed else 'completed', 'result': result})
+            reviews.append({'type': 'automaticApprovalReview', 'targetItemId': key, 'id': 'review-' + key,
+                            'status': 'approved', 'rationale': 'Approved ' + key})
+        session = LiveSession('thread', image_cache=tool_images.ToolImageCache())
+        def state(items):
+            return {'id': 'thread', 'turns': [{'turnId': 'turn', 'status': 'completed', 'items': items}]}
+        with session.condition:
+            session.set_history(state(saved + results[::-1] + reviews))
+            for connected in (False, True):
+                session.connected = connected
+                session.state = state(live + reviews)
+                view = session.view()
+                timeline = Timeline()
+                timeline.update({**view, 'sequence': 1})
+                rows = timeline.page()['rows']
+                for row, (key, args, text, failed) in zip(rows[:3], calls, strict=True):
+                    self.assertEqual(row['computerUse'], {'title': args['title'].strip() or args['completion_summary']})
+                    self.assertNotIn('attachments', row)
+                    self.assertEqual(row.get('success') is False, failed)
+                    self.assertEqual(row['approvalReview']['id'], 'review-' + key)
+                    detail = timeline.detail(timeline.cursor(row['key']))['text']
+                    for value in (args.get('code') or args['completion_summary'], text, 'Approved ' + key):
+                        self.assertIn(value, detail)
+                self.assertEqual(len(rows[3:]), 3)
+                self.assertTrue(all(row['reviewLinked'] for row in rows[3:]))
+
+    def test_failed_tool_keeps_native_error_body_and_uses_structured_failure_signals(self):
+        call = {'type': 'mcpToolCall', 'server': 'cua_repl', 'tool': 'js', 'arguments': {'title': 'Check window'}}
+        error = normalize_item({**call, 'result': None, 'error': {'message': 'window no longer exists'}})
+        self.assertFalse(error['success'])
+        self.assertIn('window no longer exists', error['output'])
+        for output, failed in [(json.dumps({'isError': True}), True), ({'isError': False}, False),
+                               ({'content': [{'type': 'text', 'text': 'unknown error_code'}]}, False)]:
+            self.assertEqual(normalize_item({**call, 'result': output}).get('success') is False, failed)
+
+    def test_titled_calls_with_mixed_text_and_images_follow_their_call_id_and_content_order(self):
+        args = {'code': 'await scrollStudio(654,393,-380);', 'title': 'Looking above the main nozzle temperature', 'timeout_ms': 30000}
+        text = {'type': 'text', 'text': '225 fields, focus: filament settings'}
+        samples = [base64.b64decode(PNG) + suffix for suffix in (b'first', b'second')]
+        blocks = [image(base64.b64encode(raw).decode()) for raw in samples]
+        ids = [hashlib.sha256(raw).hexdigest() for raw in samples]
+        result = {'content': [text, *blocks], 'structuredContent': None, '_meta': {'codex/nodeReplExecutionDurationMs': 2589}}
+        for provider in ('node_repl', 'cua_repl', 'future_repl'):
+            with self.subTest(provider=provider):
+                session = LiveSession('chat', image_cache=tool_images.ToolImageCache())
+                def state(items):
+                    return {'id': 'chat', 'turns': [{'turnId': 'turn', 'items': items}]}
+                call = {'type': 'mcpToolCall', 'server': provider, 'tool': 'js', 'id': 'call', 'arguments': args}
+                saved = state([{'type': 'function_call', 'name': 'mcp__' + provider + '__js', 'call_id': 'call',
+                                'arguments': json.dumps(args)},
+                               {'type': 'function_call_output', 'call_id': 'call', 'output': json.dumps(result)}])
+                with session.condition:
+                    session.set_history(saved)
+                    for content in (None, result, {'content': [text, *[
+                            {'type': 'image', 'mimeType': 'image/png', 'preview': key} for key in ids]]}):
+                        session.connected = content is not None
+                        session.state = state([{**call, 'result': content}])
+                        row = session.view()['turns'][0]['messages'][0]
+                        self.assertEqual((row['title'], row['computerUse']), (provider + ' · js', {'title': args['title']}))
+                        self.assertIn(text['text'], row['output'])
+                        self.assertEqual([img['desktopId'] for img in row['attachments']], ids)
+                        self.assertNotIn('data', row['attachments'][0])
+                    # A valid preview from a different call grants no file access.
+                    session.state['turns'][0]['items'][0]['id'] = 'different-call'
+                    unavailable = session.view()['turns'][0]['messages'][0]
+                    self.assertNotIn('attachments', unavailable)
+                    self.assertTrue(unavailable['computerUse']['imageUnavailable'])
 
     def test_tool_content_images_follow_budgets_and_never_leak_publicly(self):
         item = {'type': 'mcpToolCall', 'id': 'content-shot', 'result': 'ready',
@@ -211,7 +299,7 @@ class ToolImageTests(unittest.TestCase):
         row = state['turns'][0]['messages'][0]
         self.assertEqual(row['output'], 'replaced')
         self.assertNotIn('attachments', row)
-        self.assertNotIn('computerUse', row)
+        self.assertEqual(row['computerUse'], {'action': 'screenshot'})
 
     def test_only_bounded_inline_raster_images_are_accepted(self):
         for value in [image('invalid!'), image(PNG, 'image/jpeg'), image(PNG, {}),
