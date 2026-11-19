@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from urllib.request import url2pathname
 import ntpath
-from bridge.features.sessions.tool_images import extract_tool_images
+from bridge.features.sessions.tool_images import attach_tool_images, extract_tool_images
 from bridge.features.sessions.store import items_array, native_file_changes, native_turn_file_changes, native_patch_counts
 
 
@@ -217,7 +217,7 @@ def spawned_agents(item, parent_id):
     return agents
 
 
-def normalize_item(item, *, image_cache=None, parent_id=None):
+def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
     kind = item.get("type", "unknown")
     row = {"id": item.get("id"), "kind": kind, "status": item.get("status")}
     if item.get("timestamp") is not None:
@@ -289,15 +289,15 @@ def normalize_item(item, *, image_cache=None, parent_id=None):
         source = item.get("result", item.get("contentItems", item.get("content", item.get("error", ""))))
         content = item.get("content")
         if isinstance(content, list) and content is not source:
-            clean, images = extract({"result": source, "content": content})
+            clean, images = extract({"result": source, "content": content}, saved_images=saved_images)
             output = clean["result"]
         else:
-            output, images = extract(source)
+            output, images = extract(source, saved_images=saved_images)
         row.update(role="activity", title=" · ".join(str(x) for x in (item.get("server"), item.get("tool", item.get("toolName"))) if x), text=json.dumps(item.get("arguments", {}), ensure_ascii=False, indent=2), output=json.dumps(output, ensure_ascii=False, indent=2))
         if isinstance(item.get('success'), bool):
             row['success'] = item['success']
         if images:
-            row['attachments'] = images
+            attach_tool_images(row, item, images)
     elif kind == "error":
         row.update(role="error", text=item.get("message", "실행 실패"))
     elif kind == "planImplementation":
@@ -376,7 +376,7 @@ def merge_saved_message_times(view, saved):
             rows[0]['_timestampSource'] = prior[0].get('_timestampSource', 'saved-native-message')
 
 
-def normalize_state(state, connected=True, *, image_cache=None, item_limit=None):
+def normalize_state(state, connected=True, *, image_cache=None, item_limit=None, saved_image_calls=None):
     turns = ordered_turns(state)
     # Select bodies before normalization (tool results can contain megabytes).
     # The original state remains intact for revisions, approvals and commands.
@@ -438,21 +438,29 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None)
         for item in items:
             kind = item.get('type')
             if kind in ('function_call', 'custom_tool_call'):
+                arguments = item.get('arguments', item.get('input', ''))
                 message = {'id': item.get('call_id', item.get('id')), 'kind': 'storedToolEvent',
                            'role': 'activity', 'title': item.get('name') or '도구 호출',
-                           'text': str(item.get('arguments', item.get('input', '')))}
-                calls[message['id']] = message
+                           'text': arguments if isinstance(arguments, str) else json.dumps(arguments, ensure_ascii=False, indent=2)}
+                if message['id']:
+                    calls[message['id']] = (message, item)
             elif kind in ('function_call_output', 'custom_tool_call_output') and item.get('call_id') in calls:
                 extract = image_cache.extract if image_cache is not None else extract_tool_images
                 output, images = extract(item.get('output', ''))
-                calls[item['call_id']]['output'] = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
+                call, source = calls[item['call_id']]
+                call['output'] = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
                 if images:
-                    calls[item['call_id']]['attachments'] = images
+                    attach_tool_images(call, source, images)
                 else:
-                    calls[item['call_id']].pop('attachments', None)
+                    call.pop('attachments', None)
+                    call.pop('computerUse', None)
                 continue
             else:
-                message = normalize_item(item, image_cache=image_cache, parent_id=state.get('id', state.get('sessionId')))
+                saved_images = ()
+                if saved_image_calls and tool_counts.get(item.get('id')) == 1:
+                    saved_images = saved_image_calls.get((turn.get('turnId'), item.get('id'))) or ()
+                message = normalize_item(item, image_cache=image_cache, parent_id=state.get('id', state.get('sessionId')),
+                                         saved_images=saved_images)
             identifier = item.get('id')
             if kind in REVIEW_TOOL_KINDS and tool_counts.get(identifier) == 1 and identifier in reviews:
                 records = list(reviews[identifier].values())

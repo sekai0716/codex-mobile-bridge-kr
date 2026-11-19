@@ -2,6 +2,19 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Computer use": "컴퓨터 사용",
+  "Capture screen": "화면 캡처",
+  "Inspect screen": "화면 확인",
+  "Check screen after click": "클릭 후 화면 확인",
+  "Check screen after keypress": "키를 누른 뒤 화면 확인",
+  "Check screen after typing": "텍스트 입력 후 화면 확인",
+  "Check screen after input": "값 입력 후 화면 확인",
+  "Check screen after scrolling": "스크롤 후 화면 확인",
+  "Check screen after dragging": "드래그 후 화면 확인",
+  "Check active window": "활성 창 확인",
+  "Check window position": "창 위치 확인",
+  "Check window size": "창 크기 확인",
+  "Check screen after actions": "여러 작업 후 화면 확인",
   "Chat width": "채팅 너비",
   "Narrow view": "좁게 보기",
   "Standard width": "일반",

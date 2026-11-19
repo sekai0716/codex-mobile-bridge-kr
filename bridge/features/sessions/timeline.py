@@ -120,12 +120,12 @@ class Timeline:
                         revision = self.file_revision
                     file_patches[key] = (revision, patches)
                 version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
-                                                 revision, message.get('agent'),
+                                                 revision, message.get('agent'), message.get('computerUse'),
                                                  message.get('approvalReview'), message.get('reviewLinked'),
                                                  message.get('status'), message.get('exitCode'), message.get('success'),
                                                  message.get('source'), message.get('completed')])).hexdigest()[:24]
                 row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
-                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent') if k in message}
+                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'computerUse') if k in message}
                 if isinstance(message.get('reviewActionLabel'), str):
                     row['reviewActionLabel'] = message['reviewActionLabel'][:180].split('\n', 1)[0]
                 row.update(key=key, turnId=turn['id'], order=len(rows), version=version,

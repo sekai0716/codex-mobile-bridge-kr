@@ -2,6 +2,19 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Computer use": "Computer use",
+  "Capture screen": "Capture screen",
+  "Inspect screen": "Inspect screen",
+  "Check screen after click": "Check screen after click",
+  "Check screen after keypress": "Check screen after keypress",
+  "Check screen after typing": "Check screen after typing",
+  "Check screen after input": "Check screen after input",
+  "Check screen after scrolling": "Check screen after scrolling",
+  "Check screen after dragging": "Check screen after dragging",
+  "Check active window": "Check active window",
+  "Check window position": "Check window position",
+  "Check window size": "Check window size",
+  "Check screen after actions": "Check screen after actions",
   "Chat width": "Chat width",
   "Narrow view": "Narrow",
   "Standard width": "Normal",

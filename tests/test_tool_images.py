@@ -68,6 +68,47 @@ class ToolImageTests(unittest.TestCase):
         self.assertEqual(live['attachments'], saved['attachments'])
         self.assertNotIn(PNG, saved['output'])
 
+    def test_saved_computer_images_follow_call_ids_across_page_boundaries(self):
+        title = 'Check the saved preview'
+        args = {'code': ' '.join(['await inspect();'] * 25), 'title': title}
+        different = base64.b64encode(base64.b64decode(PNG) + b'second').decode()
+        items = [
+            {'type': 'function_call', 'namespace': 'mcp__cua_repl', 'name': 'js', 'call_id': 'a', 'arguments': json.dumps(args)},
+            {'type': 'custom_tool_call', 'name': 'exec', 'call_id': 'b', 'input': 'image((await tools.mcp__computer_use_linux__screenshot({})).content[0]);'},
+            {'type': 'custom_tool_call_output', 'call_id': 'b', 'output': [image(different)]},
+            {'type': 'function_call_output', 'call_id': 'a', 'output': result()}]
+        view = normalize_state({'turns': [{'turnId': 'turn', 'items': items}]}, item_limit=2)
+        timeline = Timeline()
+        timeline.update({**view, 'sequence': 1})
+        a, b = timeline.page()['rows']
+        self.assertEqual((a['title'], a['computerUse']), ('cua_repl · js', {'title': title}))
+        self.assertEqual((b['title'], b['computerUse']), ('functions.exec', {'action': 'screenshot'}))
+        self.assertNotIn(title, a['text'])  # The title follows the bounded code preview.
+        self.assertIn(title, timeline.details[a['key']])
+        for row, data in ((a, PNG), (b, different)):
+            self.assertEqual([img['desktopId'] for img in row['attachments']], [hashlib.sha256(base64.b64decode(data)).hexdigest()])
+            self.assertNotIn(data, json.dumps(row))
+
+    def test_live_computer_image_uses_its_source_tool_and_never_a_window_title(self):
+        wrapper = 'await tools.mcp__computer_use_linux__click({}); image((await tools.mcp__computer_use_linux__screenshot({})).content[0]);'
+        cases = [
+            ({'server': 'cua_repl', 'tool': 'js', 'arguments': {'title': 'Save preview'}}, {'title': 'Save preview'}),
+            ({'tool': 'mcp__cua_repl__js'}, {'action': 'get_app_state'}),
+            ({'server': 'computer-use-linux', 'tool': 'click', 'arguments': {'title': 'private window', 'screenshot_after': True}}, {'action': 'click'}),
+            ({'toolName': 'mcp__computer_use_linux__get_app_state'}, {'action': 'get_app_state'}),
+            ({'namespace': 'functions', 'tool': 'exec', 'arguments': {'code': wrapper}}, {'action': 'multiple'}),
+            ({'tool': 'functions.exec', 'arguments': json.dumps({'code': wrapper})}, {'action': 'multiple'}),
+            ({'server': 'another_server', 'tool': 'js', 'arguments': {'title': 'Other image'}}, None),
+            ({'server': 'another_server', 'tool': 'exec', 'arguments': {'code': wrapper}}, None),
+            ({'tool': 'functions.exec', 'arguments': {'code': '// '+wrapper+'\ntext(`'+wrapper+'`);'}}, None)]
+        for call, expected in cases:
+            with self.subTest(call=call):
+                started = {'type': 'dynamicToolCall', 'id': 'live', **call}
+                self.assertNotIn('computerUse', normalize_item(started))
+                completed = normalize_item({**started, 'contentItems': [image()]})
+                self.assertEqual(completed.get('computerUse'), expected)
+                self.assertEqual(len(completed['attachments']), 1)
+
     def test_tool_content_images_follow_budgets_and_never_leak_publicly(self):
         item = {'type': 'mcpToolCall', 'id': 'content-shot', 'result': 'ready',
                 'content': [image(), image('A' * (12 * 1024 * 1024))]}
@@ -87,6 +128,32 @@ class ToolImageTests(unittest.TestCase):
         dynamic = normalize_item({'type': 'dynamicToolCall', 'content': [image()]})
         self.assertEqual(dynamic['attachments'][0]['desktopId'], row['attachments'][0]['desktopId'])
         self.assertNotIn(PNG, json.dumps(public_turns([{'messages': [dynamic]}])))
+
+    def test_clipped_desktop_screenshot_uses_only_the_matching_saved_call(self):
+        full = base64.b64encode(base64.b64decode(PNG) + bytes(range(256))).decode()
+        clipped = full[:40] + '…' + str(len(full)-80) + ' chars truncated…' + full[-40:]
+        session = LiveSession('thread', image_cache=tool_images.ToolImageCache())
+        saved = {'id': 'thread', 'turns': [{'turnId': 'turn', 'items': [
+            {'type': 'function_call', 'call_id': 'shot', 'name': 'mcp__cua_repl__js', 'arguments': '{"title":"Preview"}'},
+            {'type': 'function_call_output', 'call_id': 'shot', 'output': [image(full)]}]}]}
+        live = {'type': 'mcpToolCall', 'id': 'shot', 'server': 'cua_repl', 'tool': 'js', 'arguments': {'title': 'Preview'}}
+        def present(*, cid='shot', turn='turn', thread='thread', data=clipped):
+            tool = {**live, 'id': cid, 'result': {'content': [{'type': 'text', 'text': json.dumps({'content': [image(data)]})}]}}
+            session.state = {'id': thread, 'turns': [{'turnId': turn, 'items': [tool]}]}
+            return session.view()['turns'][-1]['messages'][0]
+        with session.condition:
+            session.set_history(saved)
+            session.connected = True
+            row = present()
+            self.assertEqual(row['computerUse'], {'title': 'Preview'})
+            self.assertEqual(row['attachments'][0]['desktopId'], hashlib.sha256(base64.b64decode(full)).hexdigest())
+            self.assertNotIn(full, json.dumps(row))
+            for changes in ({'cid': 'other'}, {'turn': 'other'}, {'thread': 'other'},
+                            {'data': clipped.replace('…', '-', 1)}, {'data': clipped[:-1]+'!'},
+                            {'data': 'A'+clipped[1:]}, {'data': ''}):
+                self.assertNotIn('attachments', present(**changes), changes)
+            session.set_history({**saved, 'id': 'other'})
+            self.assertNotIn('attachments', present())
 
     def test_public_turns_strip_patch_metadata_without_changing_tool_bodies_or_native_state(self):
         tool={'role':'activity','kind':'fileChange','text':'original tool patch output'}
@@ -138,12 +205,13 @@ class ToolImageTests(unittest.TestCase):
 
     def test_replaced_tool_output_does_not_keep_stale_images(self):
         state = normalize_state({'turns': [{'turnId': 'turn', 'items': [
-            {'type': 'custom_tool_call', 'call_id': 'call', 'name': 'screenshot'},
+            {'type': 'custom_tool_call', 'call_id': 'call', 'name': 'mcp__computer_use_linux__screenshot'},
             {'type': 'custom_tool_call_output', 'call_id': 'call', 'output': result()},
             {'type': 'custom_tool_call_output', 'call_id': 'call', 'output': 'replaced'}]}]})
         row = state['turns'][0]['messages'][0]
         self.assertEqual(row['output'], 'replaced')
         self.assertNotIn('attachments', row)
+        self.assertNotIn('computerUse', row)
 
     def test_only_bounded_inline_raster_images_are_accepted(self):
         for value in [image('invalid!'), image(PNG, 'image/jpeg'), image(PNG, {}),

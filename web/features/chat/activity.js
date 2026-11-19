@@ -39,16 +39,22 @@ function restoreChatScrollAnchor(viewport,node,anchor){
   viewport.scrollTop+=node.getBoundingClientRect().top-viewport.getBoundingClientRect().top-anchor.offset;
   return true;
 }
+function chatActivityDetails(node){
+  return node?.tagName==='DETAILS'&&!node.classList?.contains('computer-use')?node:node?.querySelector('details.activity');
+}
 function captureChatActivityState(node){
-  const details=node?.tagName==='DETAILS'?node:node?.querySelector('details.activity');
+  const details=chatActivityDetails(node);
   if(!details)return null;
   const body=details.querySelector('.activity-body');
-  return {open:details.open,top:body?.scrollTop||0,left:body?.scrollLeft||0};
+  const state={open:details.open,top:body?.scrollTop||0,left:body?.scrollLeft||0};
+  if(details!==node&&node.tagName==='DETAILS')state.outerOpen=node.open;
+  return state;
 }
 function restoreChatActivityState(node,state){
   if(!state)return;
-  const details=node.tagName==='DETAILS'?node:node.querySelector('details.activity');
+  const details=chatActivityDetails(node);
   if(!details)return;
+  if(details!==node&&node.tagName==='DETAILS')node.open=state.outerOpen??state.open;
   details.open=state.open;
   const body=details.querySelector('.activity-body');
   if(body){body.scrollTop=state.top;body.scrollLeft=state.left;}

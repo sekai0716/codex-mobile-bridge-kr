@@ -97,6 +97,7 @@ class LiveSession:
         self.state = None
         self.history_state = None
         self.saved_view = None
+        self.saved_image_calls = {}
         self.saved_file_changes = {}
         self.history_limit = 2
         self.timeline_limit = 40
@@ -181,6 +182,13 @@ class LiveSession:
     def set_history(self, state):
         self.history_state = state
         self.saved_view = normalize_state(state, False, image_cache=self.tool_image_cache, item_limit=self.timeline_limit)
+        self.saved_image_calls = {}
+        if self.saved_view.get('id') == self.id:
+            for turn in self.saved_view['turns']:
+                for message in turn['messages']:
+                    if message.get('computerUse') and message.get('id'):
+                        key = (turn['id'], message['id'])
+                        self.saved_image_calls[key] = None if key in self.saved_image_calls else message['attachments']
         # Complete native patch evidence is retained by the saved reader even
         # when its messages are outside the current presentation window.
         self.saved_file_changes = {
@@ -200,8 +208,9 @@ class LiveSession:
     def view(self, *, item_limit=None, include_file_diffs=False):
         with self.condition:
             source = (self.state if self.connected else self.history_state or self.state) or {"id": self.id}
-            result = normalize_state(source, self.connected,
-                                     image_cache=self.tool_image_cache, item_limit=item_limit)
+            saved_calls = self.saved_image_calls if self.connected and source.get('id', source.get('sessionId')) == self.id else None
+            result = normalize_state(source, self.connected, image_cache=self.tool_image_cache,
+                                     item_limit=item_limit, saved_image_calls=saved_calls)
             if self.question_skips:
                 result['requests'] = self.question_skips.project(self.id, result['requests'])
             if not self.connected:

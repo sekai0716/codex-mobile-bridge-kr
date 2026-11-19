@@ -14,6 +14,8 @@
 .activity-group-count{margin-inline-start:6px;font-size:11px;opacity:.7}
 .activity-group-items{min-width:0;margin:2px 0 8px 5px;padding-inline-start:14px;border-inline-start:1px solid var(--line)}
 .activity-group-items>.timeline-row.activity{margin:0 0 4px}
+.computer-use>details,.computer-use>.timeline-attachments{margin-inline-start:18px}
+.computer-use>details>summary{min-height:30px;line-height:30px;cursor:pointer}
 .activity-group-items>.grouped-command>summary{min-height:30px;line-height:30px;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;list-style-position:inside;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .notice{background:var(--warning-bg);color:var(--warning-text)}
 .notice .plain{color:inherit}

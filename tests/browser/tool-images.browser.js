@@ -1,51 +1,81 @@
-// Run with timeline.js, image-viewer.js and a same-origin synthetic image endpoint.
-async function runToolImageTests(imageId) {
-  const checks=[],check=(value,label)=>{if(!value)throw Error(label);checks.push(label);};
-  const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
-  const until=async fn=>{const end=performance.now()+4000;while(!fn()){if(performance.now()>end)throw Error('Timed out');await frame();}};
-  document.getElementById('messages').replaceChildren();
-  delete document.documentElement.dataset.showToolImages;
-  let detailCalls=0;
-  const timeline=new ChatTimeline({
-    url:action=>'/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/'+action+'?host=local',
-    request:async()=>{detailCalls++;return {key:'shot',version:'v1',offset:0,text:'Screenshot ready',next:null};},
-    renderMeta:()=>{},renderText:(node,text)=>node.textContent=text,status:()=>{}});
-  const row={key:'shot',order:0,version:'v1',role:'activity',kind:'mcpToolCall',title:'cua_repl · js',
-    text:'Screenshot ready',truncated:true,attachments:[{type:'toolImage',desktopId:imageId,name:'Screenshot.png'}]};
-  const page=(row,sequence)=>({epoch:'images',sequence,rows:[row],before:'images.shot',hasMore:false,meta:{requests:[]},files:[]});
-  timeline.apply(page(row,1),true);
-  check(!!timeline.nodes.get('shot').node.querySelector('img'),'Tool screenshots are enabled by default');
-  const node=timeline.nodes.get('shot').node,img=node.querySelector('img'),details=node.querySelector('details');
-  await until(()=>img.complete&&img.naturalWidth>0);
-  check(!details.open,'Text details remain collapsed by default');
-  check(!img.closest('details')&&img.getBoundingClientRect().height>0,'Screenshot is visible outside collapsed details');
-  check(detailCalls===0,'Enabling screenshots does not fetch full text');
-  check(img.src.includes('/desktop-images/'+imageId)&&new URL(img.src).searchParams.get('host')==='local','Image uses host-scoped gateway URL');
-  node.querySelector('[data-image-preview]').click();
-  const dialog=document.getElementById('image-preview-dialog');
-  await until(()=>dialog?.open&&dialog.querySelector('img')?.naturalWidth>0);
-  check(dialog.open,'Screenshot opens in existing zoom viewer');
-  dialog.close();await frame();
-  details.open=true;await until(()=>detailCalls===1);
-  timeline.apply(page({...row,version:'v2',text:'Updated screenshot'},2));
-  check(timeline.nodes.get('shot').node.querySelector('details').open,'Live updates retain expanded tool details');
-  check(timeline.container.querySelectorAll('.timeline-attachments img').length===1,'Live updates replace the image row without duplicates');
-  timeline.relabel();
-  check(timeline.nodes.get('shot').node.querySelector('summary').textContent==='cua_repl · js','Relabeling preserves the gallery and tool heading');
-  timeline.setVisibility({showReasoning:true,showProcess:false});
-  check(timeline.nodes.get('shot').node.hidden,'Hide process preference also hides tool screenshots');
-  timeline.setVisibility({showReasoning:true,showProcess:true});
-  check(!timeline.nodes.get('shot').node.hidden,'Restoring process preference restores screenshots');
-  timeline.setVisibility({showToolImages:false});
-  check(!timeline.nodes.get('shot').node.querySelector('img'),'Disabling screenshots removes existing image previews');
-  check(timeline.nodes.get('shot').node.querySelector('details').open,'Disabling screenshots retains expanded tool details');
-  timeline.apply(page({...row,version:'v3',text:'Another update'},3));
-  check(!timeline.nodes.get('shot').node.querySelector('img'),'Live updates keep screenshot previews disabled');
-  const userRow={...row,key:'user-image',order:1,role:'user',truncated:false,attachments:[{type:'image',desktopId:imageId,name:'Upload.png'}]};
-  timeline.apply(page(userRow,4));
-  check(!!timeline.nodes.get('user-image').node.querySelector('img'),'User images remain visible when tool screenshots are disabled');
-  timeline.setVisibility({showToolImages:true});
-  check(timeline.nodes.get('shot').node.querySelectorAll('img').length===1,'Re-enabling restores exactly one screenshot');
-  timeline.dispose();
-  return checks;
+async function runToolImageTests(imageId){
+  await BridgeFeatures.load('chat');
+  const checks=[],frame=()=>new Promise(requestAnimationFrame);
+  const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+  const until=async(fn,label)=>{const end=performance.now()+4000;while(!fn()){if(performance.now()>end)throw Error(label);await frame();}};
+  const root=document.createElement('section'),container=document.createElement('div');
+  root.style.cssText='position:fixed;inset:0;overflow:auto;z-index:20;background:var(--bg)';
+  root.append(container);document.body.append(root);
+  const elements={viewport:root,container,older:document.createElement('button'),newer:document.createElement('button')};
+  const session='/api/sessions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/';
+  let sequence=0,detailCalls=0;
+  const calls=new Map(),detailBody=JSON.stringify({code:'await capture()',title:'Save preview'})+'\n\n'+JSON.stringify({content:[{type:'image',preview:imageId}]});
+  const timeline=new ChatTimeline({elements,url:action=>session+action+'?host=local',
+    renderMeta(){},renderText:(node,text)=>node.textContent=text,status(){},request:async url=>{
+      const key=new URL(url,location.href).searchParams.get('key').split('.').pop();
+      detailCalls++;return {key,version:calls.get(key).version,offset:0,text:detailBody,next:null};
+    }});
+  const images=[{type:'toolImage',desktopId:imageId,name:'Screenshot.png'}];
+  const saved={key:'saved',order:0,version:'1',turnId:'turn',role:'activity',kind:'storedToolEvent',title:'cua_repl · js',
+    computerUse:{title:'Save preview'},text:'preview',truncated:true,attachments:images};
+  const linux={...saved,key:'linux',order:1,kind:'mcpToolCall',title:'computer_use_linux · click',computerUse:{action:'click'}};
+  const wrapped={...saved,key:'wrapped',order:2,kind:'dynamicToolCall',title:'functions.exec',computerUse:{action:'screenshot'}};
+  const other={...saved,key:'other',order:3,title:'other · image',computerUse:undefined};
+  const user={...saved,key:'user',order:4,role:'user',kind:'userMessage',computerUse:undefined,truncated:false,attachments:[{...images[0],type:'image'}]};
+  const apply=(rows,reset=false)=>{
+    rows.forEach(row=>calls.set(row.key,row));
+    timeline.apply({epoch:'images',sequence:++sequence,rows,hasMore:false,meta:{requests:[]},files:[]},reset);
+  };
+  const node=key=>timeline.nodes.get(key).node,inner=key=>node(key).querySelector('details.activity');
+  const summary=key=>node(key).firstElementChild;
+  const originalLanguage=BridgeI18n.language();
+  try{
+    apply([saved,linux,{...wrapped,computerUse:undefined,attachments:[],status:'inProgress'},other,user],true);
+    apply([{...wrapped,version:'2',status:'completed'}]);
+    for(const [key,label] of [['saved','컴퓨터 사용 · Save preview'],['linux','컴퓨터 사용 · 클릭 후 화면 확인'],['wrapped','컴퓨터 사용 · 화면 캡처']]){
+      check(node(key).matches('details.computer-use:not([open])')&&!inner(key).open,key+' has two closed disclosures');
+      check(summary(key).textContent===label,key+' has the correct task caption');
+      check(!node(key).querySelector('.timeline-attachments'),key+' defers its own gallery');
+    }
+    check(node('other').tagName==='DIV'&&!!node('other').querySelector('img'),'Other tools keep their inline gallery');
+    check(!!node('user').querySelector('img'),'User uploads remain inline');
+    summary('saved').click();
+    await until(()=>node('saved').querySelector('img')?.naturalWidth,'saved screenshot did not load');
+    const img=node('saved').querySelector('img');
+    check(!inner('saved').open&&inner('saved').firstElementChild.textContent==='cua_repl · js','First expansion keeps the original command closed');
+    check(img.closest('details')===node('saved')&&img.getBoundingClientRect().height>0,'Screenshot is visible with one click');
+    check(detailCalls===0&&!node('linux').open&&!node('wrapped').open,'Opening one call leaves the other calls and full text untouched');
+    check(img.src.includes('/desktop-images/'+imageId)&&new URL(img.src).searchParams.get('host')==='local','Image uses the host-scoped gateway URL');
+    node('saved').querySelector('[data-image-preview]').click();
+    const dialog=document.getElementById('image-preview-dialog');
+    await until(()=>dialog?.open&&dialog.querySelector('img')?.naturalWidth,'zoom viewer did not open');
+    check(dialog.open,'Existing zoom viewer opens the screenshot');dialog.close();
+    inner('saved').firstElementChild.click();
+    await until(()=>inner('saved').querySelector('pre').textContent===detailBody,'command details did not load');
+    check(detailCalls===1,'Only the nested disclosure loads arguments and result');
+    summary('saved').click();
+    apply([{...saved,version:'2'}]);await frame();
+    check(!node('saved').open&&inner('saved').open&&detailCalls===1,'Refresh preserves a closed outer row with previously opened command');
+    summary('saved').click();
+    await until(()=>detailCalls===2&&node('saved').querySelector('img')?.naturalWidth,'reopening did not restore updated contents');
+    check(node('saved').querySelectorAll('img').length===1,'Reopening restores exactly one preview');
+    summary('wrapped').click();
+    await until(()=>node('wrapped').querySelector('img')?.naturalWidth,'wrapped screenshot did not load');
+    check(inner('wrapped').firstElementChild.textContent==='functions.exec'&&!inner('wrapped').open,'Live Linux wrapper reveals its original tool and screenshot');
+    for(const [lang,prefix,action] of [['en','Computer use','Capture screen'],['zh','使用电脑','截取屏幕'],['ko','컴퓨터 사용','화면 캡처']]){
+      BridgeI18n.setLanguage(lang);timeline.relabel();
+      check(summary('saved').textContent===prefix+' · Save preview'&&summary('wrapped').textContent===prefix+' · '+action,lang+' localizes actions and keeps original task titles');
+      check(node('saved').open&&inner('saved').open&&!inner('wrapped').open,lang+' preserves both disclosure levels independently');
+    }
+    timeline.setVisibility({showProcess:false});check(node('saved').hidden,'Hide process hides the whole call');
+    timeline.setVisibility({showProcess:true,showToolImages:false});
+    await frame();check(!node('saved').hidden&&!node('saved').querySelector('img')&&!!node('user').querySelector('img'),'Screenshot preference leaves user images visible');
+    check(node('saved').open&&inner('saved').open,'Preferences retain both open disclosures');
+    apply([{...wrapped,version:'3'}]);await frame();
+    check(node('wrapped').open&&!inner('wrapped').open&&!node('wrapped').querySelector('img'),'Live replacement retains image preference and disclosure choices');
+    timeline.setVisibility({showToolImages:true});
+    await until(()=>node('wrapped').querySelector('img')?.naturalWidth,'enabling previews did not restore the screenshot');
+    check(node('wrapped').querySelectorAll('img').length===1,'Re-enabling previews restores each once');
+    return checks;
+  }finally{timeline.dispose();root.remove();BridgeI18n.setLanguage(originalLanguage);}
 }

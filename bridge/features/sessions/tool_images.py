@@ -4,6 +4,7 @@ import binascii
 import copy
 import hashlib
 import json
+import re
 import threading
 from collections import OrderedDict
 
@@ -19,6 +20,48 @@ MAX_JSON_CHARS = 32 * 1024 * 1024
 # output; the rest is replaced so public views never carry unscanned bulk.
 MAX_UNSCANNED_CHARS = 16 * 1024
 RASTER_TYPES = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp'}
+
+# functions.exec records the JavaScript sent to the tool. Skip quoted samples
+# and comments so displaying code about a screenshot is not a computer action.
+LINUX_CALL = re.compile(
+    r"""//[^\n\r]*|/\*[\s\S]*?(?:\*/|$)|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`"""
+    r"""|\btools\s*\.\s*mcp__computer_use_linux__(?P<action>[a-z][a-z_0-9]{0,63})\s*\("""
+)
+
+
+def attach_tool_images(row, item, images):
+    """Attach previews and describe a computer action only from its own call."""
+    row['attachments'] = images
+    provider = item.get('server') or item.get('namespace') or ''
+    name = item.get('tool') or item.get('toolName') or item.get('name') or ''
+    if not isinstance(provider, str) or not isinstance(name, str):
+        return
+    if name.startswith('mcp__'):
+        provider, _, name = name.removeprefix('mcp__').partition('__')
+    elif '.' in name and not provider:
+        provider, name = name.rsplit('.', 1)
+    provider = provider.removeprefix('mcp__').replace('-', '_')
+    args = item.get('arguments', item.get('input', ''))
+    if isinstance(args, str) and args.lstrip().startswith('{') and (provider == 'cua_repl' or name == 'exec'):
+        try:
+            args = json.loads(args)
+        except (ValueError, RecursionError):
+            pass  # Raw functions.exec JavaScript can also begin with a block.
+    if provider == 'cua_repl' and name == 'js':
+        title = args.get('title') if isinstance(args, dict) else None
+        title = ' '.join(title.split())[:240] if isinstance(title, str) else ''
+        row.update(title='cua_repl · js', computerUse={'title': title} if title else {'action': 'get_app_state'})
+    elif provider == 'computer_use_linux' and re.fullmatch(r'[a-z][a-z_0-9]{0,63}', name):
+        # Linux's "title" is a window selector, not a description of the action.
+        row.update(title='computer_use_linux · ' + name, computerUse={'action': name})
+    elif name == 'exec' and provider in ('', 'functions'):
+        code = args.get('code', args.get('input')) if isinstance(args, dict) else args
+        if not isinstance(code, str) or 'mcp__computer_use_linux__' not in code:
+            return
+        methods = {match['action'] for match in LINUX_CALL.finditer(code) if match['action']}
+        if methods:
+            action = next(iter(methods)) if len(methods) == 1 else 'multiple'
+            row.update(title='functions.exec', computerUse={'action': action})
 
 
 def json_size_within(value, limit, *, ensure_ascii):
@@ -42,7 +85,20 @@ def decode_tool_image(data, mime):
     return raw if len(raw) <= MAX_IMAGE_BYTES and image_type(raw) == mime else None
 
 
-def extract_tool_images(output, *, remember=None):
+def complete_clipped_image(data, mime, saved_images):
+    # Desktop history can elide the middle of a base64 string. Only a unique
+    # validated image from this call with matching length and both ends qualifies.
+    marker = re.search(r'…([1-9][0-9]{0,7}) chars truncated…', data)
+    if not marker or marker.start() < 32 or len(data) - marker.end() < 32:
+        return data
+    head, tail = data[:marker.start()], data[marker.end():]
+    length = len(head) + int(marker[1]) + len(tail)
+    matches = [img['data'] for img in saved_images if img.get('mime') == mime and
+               len(img['data']) == length and img['data'].startswith(head) and img['data'].endswith(tail)]
+    return matches[0] if len(matches) == 1 else data
+
+
+def extract_tool_images(output, *, remember=None, saved_images=()):
     """Return sanitized output and image descriptors for native or JSON-wrapped MCP results."""
     images, seen_data = [], {}
     total = nodes = parsed_chars = kept = 0
@@ -107,6 +163,8 @@ def extract_tool_images(output, *, remember=None):
             placeholder = {'type': 'image', 'preview': 'unavailable'}
             if not isinstance(data, str) or not isinstance(mime, str) or mime not in RASTER_TYPES:
                 return placeholder
+            if saved_images and '…' in data:
+                data = complete_clipped_image(data, mime, saved_images)
             known = seen_data.get((mime, data))
             if known is not None:
                 return {'type': 'image', 'mimeType': mime, 'preview': known}
@@ -199,7 +257,7 @@ class ToolImageCache:
         self._put(self.images, identifier, (mime, data, raw), len(raw) + len(data),
                   'image_bytes', self.image_limit)
 
-    def extract(self, output):
+    def extract(self, output, *, saved_images=()):
         # Key by content, not mutable item identity: live patches can replace or
         # edit an output in place without changing its tool-call id.
         digest = hashlib.sha256()
@@ -211,12 +269,14 @@ class ToolImageCache:
                 break
             digest.update(chunk.encode('ascii'))
         key = digest.digest() if input_size <= self.output_limit else None
+        if key is not None and saved_images:
+            key = (key, tuple(image['desktopId'] for image in saved_images))
         with self.lock:
             entry = self.outputs.get(key) if key is not None else None
             if entry is not None:
                 self.outputs.move_to_end(key)
                 return copy.deepcopy(entry[0])
-            result = extract_tool_images(output, remember=self._remember)
+            result = extract_tool_images(output, remember=self._remember, saved_images=saved_images)
             # Conservatively count input plus cached projection and metadata.
             result_size = json_size_within(result, self.output_limit - input_size - 1024,
                                            ensure_ascii=True) if key is not None else None

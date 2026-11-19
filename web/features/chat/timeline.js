@@ -1,6 +1,19 @@
 'use strict';
 const timelineText=source=>typeof BridgeI18n==='undefined'?source:BridgeI18n.t(source);
 const timelineActivityHeading=row=>typeof chatActivityLabel==='function'?chatActivityLabel(row):timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):'');
+const computerActionLabels={
+  screenshot:'Capture screen',get_app_state:'Inspect screen',click:'Check screen after click',
+  press_key:'Check screen after keypress',type_text:'Check screen after typing',set_value:'Check screen after input',
+  scroll:'Check screen after scrolling',drag:'Check screen after dragging',activate_window:'Check active window',
+  move_window:'Check window position',resize_window:'Check window size',multiple:'Check screen after actions'
+};
+function labelComputerUse(node,row){
+  const {title,action}=row.computerUse;
+  const caption=timelineText('Computer use')+' · '+(title||timelineText(computerActionLabels[action]||'Inspect screen'));
+  const summary=node.firstElementChild;
+  decorateChatActivity(node,{...row,title:caption},summary);
+  summary.title=caption+chatActivityStateSuffix(row);
+}
 const fileChangeLabel=row=>row.fileSummary?.files.length===1
   ?timelineText('Edited {filename}').replace('{filename}',()=>row.fileSummary.files[0].path.split(/[\\/]/).pop())
   :timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
@@ -38,9 +51,7 @@ class ChatTimeline {
     this.newer=elements.newer||document.getElementById('newer');
     this.abort=new AbortController();this.rows=new Map();this.nodes=new Map();this.details=new Map();
     this.agentNames=new Map();
-    this.activityGroups=new ChatActivityGroups(summary=>{
-      this.following=false;this.anchor={key:summary.dataset.key,offset:summary.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
-    });
+    this.activityGroups=new ChatActivityGroups(summary=>this.holdDisclosure(summary));
     this.mermaidScope=window.BridgeMermaidCards?.createScope();
     this.files=new Map();this.sequence=-1;this.epoch='';this.before=null;this.hasMore=false;
     this.busy=false;this.generation=0;this.windowRevision=0;this.following=true;this.lastTop=0;this.retryCount=0;
@@ -70,6 +81,10 @@ class ChatTimeline {
   }
   dispose(){this.abort.abort();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
   atBottom(){return chatFollowsLatest(this.viewport);}
+  holdDisclosure(summary){
+    this.following=false;
+    this.anchor={key:summary.parentElement.dataset.key,offset:summary.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
+  }
   nearTop(){const nodes=[...this.container.children].filter(n=>!n.hidden);return nodes.length>0&&nodes.slice(0,11).some(n=>n.getBoundingClientRect().bottom>=this.viewport.getBoundingClientRect().top);}
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
   rowVisible(row){
@@ -256,13 +271,21 @@ class ChatTimeline {
       return node;
     }
     const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&row.attachments?.some(item=>item.type==='toolImage');
-    const node=document.createElement(activity&&!toolImages?'details':'div');
+    const computerUse=toolImages&&row.computerUse;
+    const node=document.createElement(activity&&(!toolImages||computerUse)?'details':'div');
     node.className=toolImages?'tool-images timeline-row':activity?'activity timeline-row':'message timeline-row '+row.role;
+    if(computerUse){
+      node.classList.add('activity','computer-use');
+      const summary=document.createElement('summary');node.append(summary);
+      labelComputerUse(node,row);
+      summary.addEventListener('click',()=>this.holdDisclosure(summary));
+    }
     const content=toolImages?document.createElement('details'):node;
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
     heading.textContent=activity?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
-    if(activity&&!row.fileSummary)decorateChatActivity(node,row,heading);
+    if(computerUse)heading.textContent=row.title;
+    else if(activity&&!row.fileSummary)decorateChatActivity(content,row,heading);
     if(row.fileSummary){
       node.classList.add('edited-files-card');
       heading.replaceChildren();
@@ -335,7 +358,7 @@ class ChatTimeline {
       const quote=document.createElement('button');quote.type='button';quote.className='plain message-quote';quote.textContent=timelineText('인용');quote.onclick=()=>node.dispatchEvent(new CustomEvent('bridge-compose-quote',{bubbles:true,detail:{getText:()=>this.fullText(row),source:row.key}}));actions.append(quote);
       renderChatMessageTime(actions,row.timestamp);
     }
-    renderChatAttachments(node,row.attachments,{showToolImages:this.showToolImages,fileUrl:item=>{
+    const showAttachments=()=>renderChatAttachments(node,row.attachments,{showToolImages:this.showToolImages,fileUrl:item=>{
       const file=[...this.files.values()].find(file=>file.reference===item.path||file.references?.includes(item.path));
       return file?this.fileUrl(file):null;
     },url:item=>{
@@ -343,13 +366,20 @@ class ChatTimeline {
       const source=item.uploadId?this.url('uploads/'+encodeURIComponent(item.uploadId)+'/preview'):this.url('desktop-images/'+encodeURIComponent(item.desktopId));
       return {preview:source,original:item.uploadId?source+'&variant=original':source};
     }});
+    if(computerUse){
+      node.ontoggle=()=>{
+        if(!node.open||!node.isConnected)return;
+        if(!node.querySelector('.timeline-attachments'))showAttachments();
+        content.ontoggle?.();
+      };
+    }else showAttachments();
     if(activity){
       content.open=open??false;
       // 기본값을 바꿔도 이 대화에서 직접 펼치거나 접은 선택은 유지한다.
       // 숨겨진 항목과 이미 온전한 요약은 기본 펼침 때문에 다시 조회하지 않는다.
       content.ontoggle=()=>{
         const group=node.closest('.activity-group');
-        if(content.open&&(!group||group.open)&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();
+        if(content.open&&(!computerUse||node.open)&&(!group||group.open)&&this.rowVisible(row)&&!this.details.has(row.key)&&row.truncated)load();
       };
     }
     return node;
@@ -400,8 +430,11 @@ class ChatTimeline {
         if(toggle)toggle.textContent=toggle.getAttribute('aria-expanded')==='true'?timelineText('Collapse files'):timelineText('Show {count} more files').replace('{count}',row.fileSummary.files.length-3);
         for(const element of node.querySelectorAll('[data-i18n]'))element.textContent=timelineText(element.dataset.i18n);
       }
-      else if(heading)heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-      if(heading&&row.role==='activity')decorateChatActivity(node,row,heading);
+      else if(node.classList.contains('computer-use'))labelComputerUse(node,row);
+      else if(heading){
+        heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+        if(row.role==='activity')decorateChatActivity(heading.parentElement,row,heading);
+      }
       const more=node.querySelector('.detail-more');
       if(more&&!more.disabled)more.textContent=timelineText(this.details.has(key)?'더 많은 텍스트 로드':'전체 콘텐츠 표시');
       const attachment=node.querySelector('.timeline-attachments small.muted');

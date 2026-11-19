@@ -320,6 +320,16 @@ for (const scenario of ['success', 'css-once', 'js-twice', 'js-fatal', 'runtime'
   });
 }
 
+test('computer use screenshots fold with their own saved or live call', async ({page},testInfo)=>{
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR7kAAAAASUVORK5CYII=';
+  await page.route('**/desktop-images/**',route=>route.fulfill({contentType:'image/png',body:Buffer.from(png,'base64')}));
+  await ready(page);
+  await page.addScriptTag({url:'/__browser/tool-images.browser.js'});
+  const checks=await page.evaluate(()=>runToolImageTests('c'.repeat(64)));
+  expect(checks.length).toBeGreaterThan(30);
+  await testInfo.attach('disclosures',{body:JSON.stringify(checks),contentType:'application/json'});
+});
+
 for (const [name, file, invoke] of [
   ['paperclip host reference and native attachment actions', 'host-file-reference', 'runHostFileReferenceChecks'],
   ['agent manual model and reasoning settings', 'agent-model-settings', 'runAgentModelSettingsChecks'],

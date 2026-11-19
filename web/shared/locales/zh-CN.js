@@ -2,6 +2,19 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Computer use": "使用电脑",
+  "Capture screen": "截取屏幕",
+  "Inspect screen": "查看屏幕",
+  "Check screen after click": "查看点击后的画面",
+  "Check screen after keypress": "查看按键后的画面",
+  "Check screen after typing": "查看输入文字后的画面",
+  "Check screen after input": "查看输入值后的画面",
+  "Check screen after scrolling": "查看滚动后的画面",
+  "Check screen after dragging": "查看拖动后的画面",
+  "Check active window": "查看当前窗口",
+  "Check window position": "查看窗口位置",
+  "Check window size": "查看窗口大小",
+  "Check screen after actions": "查看多步操作后的画面",
   "Chat width": "聊天宽度",
   "Narrow view": "窄",
   "Standard width": "标准",
