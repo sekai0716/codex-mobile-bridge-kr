@@ -661,8 +661,11 @@ class SessionStore:
                 # an index behind (or ahead of) that file is not a recent page.
                 if projection is None or projection[0] != rollout_stat.st_size:
                     return None
-                rows = conn.execute('SELECT turn_id, item_json FROM thread_items WHERE thread_id=? '
-                                    'ORDER BY rollout_ordinal DESC LIMIT ?', (thread_id, item_limit + 1)).fetchall()
+                # Desktop status notices have no history row or cursor. Count the
+                # next real item when deciding whether another page is available.
+                rows = conn.execute("SELECT turn_id, item_json FROM thread_items WHERE thread_id=? "
+                                    "AND json_extract(item_json, '$.type') IS NOT 'strictReviewNotice' "
+                                    "ORDER BY rollout_ordinal DESC LIMIT ?", (thread_id, item_limit + 1)).fetchall()
                 if not rows:
                     return None
                 more = len(rows) > item_limit

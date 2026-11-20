@@ -55,6 +55,7 @@ const messages={
   "하위 에이전트의 원본 연결을 확인할 수 없습니다.": "无法确认子智能体的原始连接。",
   "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.": "子智能体状态已更改。请检查当前任务后重发。",
   "Auto-review in progress": "正在自动审查",
+  "This request requires additional safety checks, which can take extra time.": "此请求需要额外的安全检查，可能需要更多时间。",
   "Auto-review denied": "已拒绝",
   "Auto-review stopped": "自动审查已停止",
   "Auto-review timed out": "自动审查超时",

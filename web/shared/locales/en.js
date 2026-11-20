@@ -55,6 +55,7 @@ const messages={
   "하위 에이전트의 원본 연결을 확인할 수 없습니다.": "The original agent connection is unavailable.",
   "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.": "The agent state changed. Check the current task before sending again.",
   "Auto-review in progress": "Auto-review in progress",
+  "This request requires additional safety checks, which can take extra time.": "This request requires additional safety checks, which can take extra time.",
   "Auto-review denied": "Denied",
   "Auto-review stopped": "Auto-review stopped",
   "Auto-review timed out": "Auto-review timed out",

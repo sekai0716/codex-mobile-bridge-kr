@@ -161,6 +161,8 @@ class LiveSession:
                     calls = set()
                     for item in items_array(turn.get('items')):
                         kind = item.get('type', 'unknown')
+                        if kind == 'strictReviewNotice':
+                            continue
                         if kind in ('function_call_output', 'custom_tool_call_output') and item.get('call_id') in calls:
                             continue
                         if kind in ('function_call', 'custom_tool_call'):

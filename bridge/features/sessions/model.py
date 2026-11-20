@@ -423,13 +423,19 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
     turns = ordered_turns(state)
     # Select bodies before normalization (tool results can contain megabytes).
     # The original state remains intact for revisions, approvals and commands.
-    counts = [len(items_array(turn.get('items'))) for turn in turns] if item_limit is not None else []
-    skip = max(0, sum(counts) - item_limit) if item_limit is not None else 0
+    turn_items = []
+    strict_review_active = False
+    for turn in turns:
+        native = items_array(turn.get('items'))
+        items = [item for item in native if item.get('type') != 'strictReviewNotice']
+        if connected and turn is turns[-1] and turn.get('status') == 'inProgress':
+            strict_review_active = len(items) != len(native)
+        turn_items.append(items)
+    skip = max(0, sum(map(len, turn_items)) - item_limit) if item_limit is not None else 0
     window_more = skip > 0
     result = []
-    for ordinal, turn in enumerate(turns):
+    for ordinal, (turn, items) in enumerate(zip(turns, turn_items)):
         started_at = turn.get('turnStartedAtMs') or turn.get('startedAt')
-        items = items_array(turn.get("items", []))
         if skip >= len(items) and skip:
             skip -= len(items)
             continue
@@ -558,6 +564,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
             "connected": connected, "status": state.get("threadRuntimeStatus", {}).get("type", "idle"),
             "permissionMode": permission_mode(state),
             "contextUsage": context_usage(state),
+            "strictReviewActive": strict_review_active,
             "reasoningSummary": reasoning_line, "reasoningTurnId": reasoning_turn_id,
             "collaborationMode": (state.get("latestCollaborationMode") or {}).get("mode"),
             **({'serviceTier': tier['serviceTier']} if 'serviceTier' in tier else {}),

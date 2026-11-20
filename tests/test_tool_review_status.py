@@ -2,6 +2,7 @@
 import json
 import unittest
 
+from bridge.app.service import LiveSession
 from bridge.features.sessions.model import normalize_state
 from bridge.features.sessions.timeline import Timeline, DETAIL_CHARS
 
@@ -22,6 +23,62 @@ def state(items, status='inProgress'):
 class ToolReviewStatusTests(unittest.TestCase):
     def messages(self, items, **kwargs):
         return normalize_state(state(items), **kwargs)['turns'][0]['messages']
+
+    def test_strict_review_is_live_turn_metadata_even_outside_the_page(self):
+        notices = [{'type': 'strictReviewNotice', 'id': f'strict-review-notice:{stamp}', 'startedAtMs': stamp}
+                   for stamp in (1795134441698, 1795134460000)]
+        raw = state([notices[0], tool(), review(status='denied'), notices[1]])
+        view = normalize_state(raw, item_limit=2)
+        self.assertTrue(view['strictReviewActive'])
+        self.assertFalse(view['historyWindowMore'])
+        messages = view['turns'][0]['messages']
+        self.assertEqual([m['kind'] for m in messages], ['commandExecution', 'automaticApprovalReview'])
+        self.assertEqual(messages[0]['approvalReview']['status'], 'denied')
+        self.assertTrue(messages[1]['reviewLinked'])
+        self.assertEqual(len(raw['turns'][0]['items']), 4)
+
+        timeline = Timeline()
+        timeline.update({**view, 'sequence': 1})
+        epoch = timeline.epoch
+        self.assertNotIn('strict-review-notice:', json.dumps(timeline.page()))
+        raw['turns'][0]['items'] = [notices[0], tool(), review(status='denied')]
+        self.assertTrue(normalize_state(raw, item_limit=1)['strictReviewActive'])
+        raw['turns'][0]['items'] = [tool(), review(status='denied')]
+        timeline.update({**normalize_state(raw), 'sequence': 2})
+        changes = timeline.changes(1, epoch, '')
+        self.assertFalse(changes['meta']['strictReviewActive'])
+        self.assertEqual(changes['rows'], [])
+
+    def test_strict_review_does_not_follow_an_old_or_disconnected_turn(self):
+        notice = {'type': 'strictReviewNotice', 'id': 'strict-review-notice:1795134441698'}
+        for status in ('completed', 'failed', 'interrupted'):
+            with self.subTest(status=status):
+                raw = state([notice], status)
+                view = normalize_state(raw)
+                self.assertFalse(view['strictReviewActive'])
+                self.assertEqual(view['turns'][0]['messages'], [])
+        raw = state([notice])
+        self.assertFalse(normalize_state(raw, connected=False)['strictReviewActive'])
+        raw['turns'].append({'turnId': 'turn-b', 'status': 'inProgress', 'items': [tool()]})
+        self.assertFalse(normalize_state(raw)['strictReviewActive'])
+
+    def test_repeated_strict_review_does_not_expand_or_reset_the_loaded_window(self):
+        session = LiveSession('thread')
+        session.connected = True
+        session.timeline_limit = 2
+        session.state = state([tool(str(i)) for i in range(5)])
+        first = session.timeline_view()
+        session.timeline.update(first, 2)
+        epoch = session.timeline.epoch
+        with session.condition:
+            session.state['turns'][0]['items'].extend(
+                {'type': 'strictReviewNotice', 'id': str(i)} for i in range(60))
+            session.changed()
+        session.timeline.update(session.timeline_view(), 2)
+        changes = session.timeline.changes(first['sequence'], epoch, '')
+        self.assertEqual(session.timeline_limit, 2)
+        self.assertEqual(changes['rows'], [])
+        self.assertTrue(changes['meta']['strictReviewActive'])
 
     def test_review_joins_only_its_unique_target_even_before_the_tool(self):
         messages = self.messages([review(), tool('tool-b'), tool()])

@@ -81,6 +81,9 @@ class StoreHistoryPathTests(unittest.TestCase):
             for ordinal,path in enumerate(('omitted.py','tail.py')):
                 item={'id':str(ordinal),'type':'fileChange','changes':[{'path':path,'diff':'+new'}]}
                 conn.execute('INSERT INTO thread_items VALUES(?,?,?,?)',('thread','t',ordinal,json.dumps(item)))
+            notice = json.dumps({'type': 'strictReviewNotice', 'id': 'strict-review-notice:1795134441698'})
+            conn.executemany('INSERT INTO thread_items VALUES(?,?,?,?)',
+                             [('thread', 't', ordinal, notice) for ordinal in range(2, 6)])
         from bridge.features.sessions.model import normalize_state
         with patch.object(self.store,'_history',side_effect=AssertionError('no full-turn scan')):
             partial=self.store.history('thread',item_limit=1)

@@ -93,7 +93,7 @@ class ChatTimeline {
     this.resize=new ResizeObserver(()=>this.restore(this.anchor,this.following));
     this.resize.observe(this.container);
   }
-  dispose(){this.abort.abort();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
+  dispose(){this.abort.abort();this.strictReviewNotice?.remove();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
   atBottom(){return chatFollowsLatest(this.viewport);}
   holdDisclosure(summary){
     this.following=false;
@@ -191,7 +191,11 @@ class ChatTimeline {
     const anchor=this.capture(),bottom=this.following;
     if(reset){this.generation++;this.activityGroups?.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);this.mermaidScope=window.BridgeMermaidCards?.createScope();this.rows.clear();this.nodes.clear();this.details.clear();this.files.clear();this.container.replaceChildren();this.epoch=page.epoch;this.retryCount=0;}
     for(const file of page.files||[])this.files.set(file.id,file);
-    if((!history&&page.sequence>=this.sequence)||reset){this.sequence=page.sequence;this.meta=page.meta;if(!cached)this.renderMeta({...page.meta,files:[...this.files.values()]});}
+    if((!history&&page.sequence>=this.sequence)||reset){
+      this.sequence=page.sequence;this.meta=page.meta;
+      this.syncStrictReviewNotice(!cached&&page.meta.strictReviewActive);
+      if(!cached)this.renderMeta({...page.meta,files:[...this.files.values()]});
+    }
     if(!history)this.pendingRequests=!cached&&!!page.meta.requests?.length;
     let changed=false;
     for(const row of page.rows){
@@ -235,6 +239,22 @@ class ChatTimeline {
       while(recentTimelinePages.size>8)recentTimelinePages.delete(recentTimelinePages.keys().next().value);
     }
     if(!cached&&!history&&!this.abort.signal.aborted&&!page.meta.loadingHistory)this.onReady?.();
+  }
+  syncStrictReviewNotice(active){
+    if(!active){
+      this.strictReviewNotice?.remove();
+      this.strictReviewNotice=null;
+      return;
+    }
+    if(!this.strictReviewNotice){
+      this.strictReviewNotice=document.createElement('p');
+      this.strictReviewNotice.className='muted';
+      this.strictReviewNotice.setAttribute('role','status');
+      this.strictReviewNotice.setAttribute('aria-live','polite');
+      this.container.after(this.strictReviewNotice);
+    }
+    const text=timelineText('This request requires additional safety checks, which can take extra time.');
+    if(this.strictReviewNotice.textContent!==text)this.strictReviewNotice.textContent=text;
   }
   syncRows(ordered=[...this.rows.values()].map(entry=>entry.row).sort((a,b)=>a.order-b.order)){
     this.activityGroups??=new ChatActivityGroups();
@@ -438,6 +458,7 @@ class ChatTimeline {
     }
   }
   relabel(){
+    this.syncStrictReviewNotice(this.strictReviewNotice?.isConnected);
     this.refreshActions();
     this.container.querySelectorAll('.message-copy').forEach(n=>n.textContent=timelineText('복사'));
     this.container.querySelectorAll('.message-quote').forEach(n=>n.textContent=timelineText('인용'));
@@ -482,7 +503,7 @@ class ChatTimeline {
         // Polls never replace the oldest loaded cursor.
         this.apply(page,!!page.reset);
         await this.pause(200);
-      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('다시 연결하는 중'));await this.pause(3000);}
+      }catch(e){if(this.abort.signal.aborted)return;this.syncStrictReviewNotice(false);this.status(timelineText('다시 연결하는 중'));await this.pause(3000);}
     }
   }
   pause(ms){return new Promise(resolve=>{const done=()=>{clearTimeout(timer);this.abort.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,ms);this.abort.signal.addEventListener('abort',done,{once:true});});}

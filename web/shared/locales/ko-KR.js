@@ -55,6 +55,7 @@ const messages={
   "하위 에이전트의 원본 연결을 확인할 수 없습니다.": "하위 에이전트의 원본 연결을 확인할 수 없습니다.",
   "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.": "하위 에이전트 상태가 바뀌었습니다. 현재 작업을 확인하고 다시 보내세요.",
   "Auto-review in progress": "자동 검토 중",
+  "This request requires additional safety checks, which can take extra time.": "이 요청은 추가 안전 검사가 필요하여 시간이 더 걸릴 수 있습니다.",
   "Auto-review denied": "거부됨",
   "Auto-review stopped": "검토 중단됨",
   "Auto-review timed out": "검토 시간 초과",

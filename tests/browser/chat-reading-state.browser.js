@@ -96,14 +96,30 @@ async function runToolReviewStatusChecks(){
     return {version:current.version,offset:0,next:null,text:current.text+'\n\n{"automaticApprovalReviews":[{"status":"denied","rationale":"Requires explicit authorization"}]}',files:[]};
   }});
   const node=()=>timeline.nodes.get('tool-a').node,heading=()=>node().firstElementChild;
-  const apply=()=>{const reset=sequence===0;timeline.apply({epoch:'review-ui',sequence:++sequence,rows:[
+  const apply=(strictReviewActive=false)=>{const reset=sequence===0;timeline.apply({epoch:'review-ui',sequence:++sequence,rows:[
     {key:'progress',order:0,role:'assistant',kind:'agentMessage',phase:'commentary',text:'검토 중인 도구와 실행 결과를 확인하고 있습니다.',version:'v1'},current,{...review,approvalReview:current.approvalReview},companion,
-  ],meta:{requests:[]},files:[],hasMore:false},reset);};
+  ],meta:{requests:[],strictReviewActive},files:[],hasMore:false},reset);};
   const language=BridgeI18n.language();
   try{
     BridgeI18n.setLanguage('ko');apply();await frame();
     const group=container.querySelector('.activity-group');group.firstElementChild.click();await frame();await frame();
     check(!container.querySelector('[data-key="review-a"]')&&heading().querySelector('.activity-state').textContent==='ㆍ자동 검토 중','review progress is attached to its tool without a duplicate timeline row');
+    apply(true);await frame();
+    const status=()=>viewport.querySelector('[role="status"]'),notice=status(),announcement=notice.firstChild;
+    check(notice.getAttribute('aria-live')==='polite'&&notice.textContent==='이 요청은 추가 안전 검사가 필요하여 시간이 더 걸릴 수 있습니다.','active additional checks use the official Korean status');
+    apply(true);
+    check(viewport.querySelectorAll('[role="status"]').length===1&&status().firstChild===announcement,'repeated updates retain a single announcement without reading it again');
+    const bounds=notice.getBoundingClientRect(),pane=viewport.getBoundingClientRect();
+    check(bounds.height>0&&bounds.left>=pane.left&&bounds.right<=pane.right+1,'the notice fits the current chat width');
+    for(const [lang,message] of [['en','This request requires additional safety checks, which can take extra time.'],['zh','此请求需要额外的安全检查，可能需要更多时间。']]){
+      BridgeI18n.setLanguage(lang);timeline.relabel();check(status()===notice&&notice.textContent===message,'live notice follows '+lang);
+    }
+    BridgeI18n.setLanguage('ko');timeline.relabel();
+    const metaOnly=(seq,active)=>({epoch:'review-ui',sequence:seq,rows:[],meta:{requests:[],strictReviewActive:active},files:[]});
+    timeline.apply(metaOnly(++sequence,false));
+    check(!status()&&heading().textContent.includes('자동 검토 중'),'a metadata-only update removes the notice and preserves the tool review');
+    timeline.apply(metaOnly(sequence-1,true),false,true);
+    check(!status(),'older history cannot restore the notice');
     check(reads===0&&writes===0,'rendering a review or opening its group does not fetch output or approve an action');
     root.style.width='320px';await frame();
     const caption=heading().querySelector('.activity-caption'),badge=heading().querySelector('.activity-state');
@@ -126,6 +142,21 @@ async function runToolReviewStatusChecks(){
     current={...current,status:'interrupted',version:'v7',approvalReview:{id:'review-a',status:'aborted'}};apply();await frame();check(heading().textContent.includes('검토 중단됨')&&heading().textContent.includes('중지됨'),'interrupted review and tool execution are distinguished');
     current={...current,status:undefined,version:'v8',approvalReview:{id:'review-a',status:'timedOut'}};apply();await frame();check(heading().textContent.endsWith('ㆍ검토 시간 초과'),'a review timeout is not presented as approval or execution success');
     current={...current,status:'declined',version:'v9',approvalReview:{id:'review-a',status:'denied'}};apply();await frame();
+    timeline.apply(metaOnly(++sequence,true),true,false,true);
+    check(!status(),'a cached page never displays a live review notice');
+    apply(true);
+    let offline=true;
+    timeline.read=async()=>{if(offline)throw Error('offline fixture');return metaOnly(++sequence,true);};
+    timeline.pause=async()=>{
+      if(offline){
+        timeline.relabel();check(!status(),'disconnect and language refresh clear the last live notice');
+        offline=false;
+      }else timeline.abort.abort();
+    };
+    await timeline.updates();
+    check(!!status(),'reconnection can show the current live notice again');
+    timeline.dispose();
+    check(!status(),'leaving the chat removes its notice');
     return {width:innerWidth,passed:checks.length,checks};
   }finally{BridgeI18n.setLanguage(language);timeline.dispose();}
 }
