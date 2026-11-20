@@ -3,9 +3,12 @@ import base64
 from contextlib import contextmanager
 import difflib
 import hashlib
+import errno
+import json
 import os
 from pathlib import Path
 import re
+import sqlite3
 import stat
 import subprocess
 import tempfile
@@ -16,6 +19,7 @@ import time
 import atexit
 
 MAX_TRANSFER = 20 * 1024 * 1024
+WORKSPACE_UPLOAD_CHUNK = 1024 * 1024
 MAX_PREVIEW = 512 * 1024
 IMAGES = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp'}
 
@@ -141,7 +145,7 @@ class Workspace:
         if not isinstance(path, str) or len(path) > 4096 or any(ord(c) < 32 for c in path) or '\\' in path or ':' in path:
             raise ValueError('잘못된 파일 경로')
         parts = path.split('/') if path else []
-        if any(p in ('', '.', '..') for p in parts):
+        if any(p in ('', '.', '..') or p.lower().startswith('.bridge-upload-') for p in parts):
             raise PermissionError('현재 프로젝트 내의 파일에만 접근 가능')
         return parts
 
@@ -412,6 +416,194 @@ class Workspace:
 
 
 
+class WorkspaceUpload:
+    """Journal offsets on the destination host, including across SSH subprocesses."""
+
+    RETENTION = 24 * 60 * 60
+    VERIFY_BATCH = 8 * WORKSPACE_UPLOAD_CHUNK
+
+    def __init__(self, workspace, path, owner, identifier, total):
+        self.workspace, self.path, self.total = workspace, path, total
+        self.parts = workspace.parts(path)
+        if not self.parts or any(p.rstrip(' .').casefold() == '.git' for p in self.parts):
+            raise PermissionError('프로젝트 내의 일반 파일 위치를 선택하세요.')
+        if not re.fullmatch(r'[a-f0-9]{64}', owner) or str(uuid.UUID(identifier)) != identifier:
+            raise ValueError('Invalid upload identity.')
+        if type(total) is not int or not 0 <= total <= 2**53 - 1:
+            raise ValueError('Invalid file size.')
+        scope = json.dumps([owner, identifier, str(workspace.root), path, total])
+        self.key = hashlib.sha256(scope.encode()).hexdigest()
+
+    @staticmethod
+    def registry():
+        # A private per-user cache keeps bookkeeping out of browsable projects.
+        base = os.environ.get('LOCALAPPDATA' if os.name == 'nt' else 'XDG_CACHE_HOME')
+        cache = (Path(base) if base and Path(base).is_absolute() else Path.home() / '.cache') / 'codex-mobile-bridge' / 'workspace-uploads'
+        cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+        db = sqlite3.connect(cache / 'journal.sqlite3', timeout=30)
+        db.row_factory = sqlite3.Row
+        return db
+
+    @staticmethod
+    def remove_stage(row):
+        if not row['temp']:
+            return
+        workspace = Workspace(row['root'])
+        parts = workspace.parts(row['path'])
+        with workspace.directory(parts[:-1]) as (directory, fd):
+            name = row['temp']
+            try:
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False) if fd is not None else (directory / name).lstat()
+            except FileNotFoundError:
+                return
+            if (str(info.st_dev), str(info.st_ino)) != (row['dev'], row['ino']):
+                return
+            try:
+                if fd is not None:
+                    os.unlink(name, dir_fd=fd)
+                else:
+                    (directory / name).unlink()
+            except FileNotFoundError:
+                pass  # A concurrent finish can close out the same committed receipt.
+
+    def run(self, phase, offset=0, encoded=None):
+        if phase not in ('start', 'status', 'chunk', 'finish', 'cancel'):
+            raise ValueError('Invalid upload operation.')
+        db = None
+        try:
+            db = self.registry()
+            db.execute('PRAGMA foreign_keys=ON')
+            # Serialize updates on the final host; a fresh SSH interpreter sees the same journal.
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('CREATE TABLE IF NOT EXISTS uploads (id TEXT PRIMARY KEY, root TEXT, path TEXT, temp TEXT, '
+                       'dev TEXT, ino TEXT, offset INTEGER, state TEXT, existing INTEGER, touched REAL)')
+            db.execute('CREATE TABLE IF NOT EXISTS checks (id TEXT PRIMARY KEY REFERENCES uploads(id) ON DELETE CASCADE, '
+                       'signature TEXT, checked INTEGER)')
+            now = time.time()
+            if phase == 'start':
+                for old in db.execute('SELECT * FROM uploads WHERE touched < ?', (now - self.RETENTION,)).fetchall():
+                    try:
+                        self.remove_stage(old)
+                    except FileNotFoundError:
+                        pass
+                    except (OSError, ValueError):
+                        continue
+                    db.execute('DELETE FROM uploads WHERE id=?', (old['id'],))
+            row = db.execute('SELECT * FROM uploads WHERE id=?', (self.key,)).fetchone()
+            if row is None and phase != 'start':
+                if phase in ('cancel', 'status'):
+                    return {'state': 'missing', 'offset': 0}
+                raise ValueError('Upload expired. Start again.')
+            if row is None:
+                with self.workspace.directory(self.parts[:-1]) as (directory, fd):
+                    name = '.bridge-upload-' + uuid.uuid4().hex
+                    handle = self.workspace.open_file(directory, fd, name, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    try:
+                        info = os.fstat(handle)
+                        db.execute('INSERT INTO uploads VALUES (?,?,?,?,?,?,0,?,0,?)',
+                                   (self.key, str(self.workspace.root), self.path, name, str(info.st_dev),
+                                    str(info.st_ino), 'pending', now))
+                        db.commit()
+                    except BaseException:
+                        os.close(handle)
+                        if fd is None:
+                            (directory / name).unlink()
+                        else:
+                            os.unlink(name, dir_fd=fd)
+                        raise
+                    os.close(handle)
+                return {'state': 'pending', 'offset': 0}
+            state, position, existing = row['state'], row['offset'], bool(row['existing'])
+            if phase == 'cancel' and state in ('pending', 'checking'):
+                self.remove_stage(row)
+                db.execute('DELETE FROM uploads WHERE id=?', (self.key,))
+                db.commit()
+                return {'state': 'missing', 'offset': 0}
+            if (state == 'pending' and phase in ('chunk', 'finish')) or (state == 'checking' and phase == 'finish'):
+                position, state, existing = self.update_file(db, row, phase, offset, encoded)
+            db.execute('UPDATE uploads SET offset=?,state=?,existing=?,touched=? WHERE id=?',
+                       (position, state, existing, now, self.key))
+            db.commit()
+            if state == 'done' and row['temp']:
+                # Commit the receipt before cleanup so a lost response is resolved by status.
+                self.remove_stage(row)
+                db.execute('DELETE FROM checks WHERE id=?', (self.key,))
+                db.execute("UPDATE uploads SET temp='' WHERE id=?", (self.key,))
+                db.commit()
+            return {'state': state, 'offset': position, 'size': self.total, 'name': self.parts[-1],
+                    'path': self.path, 'existing': existing}
+        except sqlite3.Error as error:
+            if getattr(error, 'sqlite_errorname', '') == 'SQLITE_FULL':
+                raise ValueError('Not enough disk space for the upload.') from error
+            raise ValueError('Upload journal unavailable. Retry to resume.') from error
+        finally:
+            if db is not None:
+                db.close()
+
+    def update_file(self, db, row, phase, offset, encoded):
+        position = row['offset']
+        with self.workspace.directory(self.parts[:-1]) as (directory, fd):
+            handle = self.workspace.open_file(directory, fd, row['temp'], os.O_RDWR)
+            with os.fdopen(handle, 'r+b') as stage:
+                info = os.fstat(handle)
+                if not stat.S_ISREG(info.st_mode) or (str(info.st_dev), str(info.st_ino)) != (row['dev'], row['ino']):
+                    raise PermissionError('Upload destination changed.')
+                if phase == 'chunk':
+                    data = base64.b64decode(encoded, validate=True)
+                    if (type(offset) is not int or not 0 <= offset <= position or not 0 < len(data) <= WORKSPACE_UPLOAD_CHUNK
+                            or offset + len(data) > self.total or info.st_size < position or info.st_nlink != 1):
+                        raise ValueError('Invalid upload chunk.')
+                    stage.seek(offset)
+                    if offset < position:
+                        if offset + len(data) > position or stage.read(len(data)) != data:
+                            raise ValueError('Upload chunk differs. Start again.')
+                    else:
+                        # Discard an uncommitted tail left by a short write or a process exit.
+                        stage.truncate(offset)
+                        stage.write(data)
+                        stage.flush()
+                        os.fsync(handle)
+                        position += len(data)
+                    return position, 'pending', False
+                if position != self.total or info.st_size != position:
+                    raise ValueError('Upload is incomplete.')
+                try:
+                    if fd is None:
+                        os.link(directory / row['temp'], directory / self.parts[-1])
+                    else:
+                        os.link(row['temp'], self.parts[-1], src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
+                except FileExistsError:
+                    destination = self.workspace.open_file(directory, fd, self.parts[-1], os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
+                    with os.fdopen(destination, 'rb') as target:
+                        other = os.fstat(destination)
+                        if stat.S_ISREG(other.st_mode) and os.path.samestat(info, other):
+                            return position, 'done', False
+                        if stat.S_ISREG(other.st_mode) and other.st_size == position:
+                            signature = json.dumps([other.st_dev,other.st_ino,other.st_size,other.st_mtime_ns,other.st_ctime_ns])
+                            check = db.execute('SELECT * FROM checks WHERE id=?', (self.key,)).fetchone()
+                            checked = check['checked'] if check and check['signature'] == signature else 0
+                            stage.seek(checked)
+                            target.seek(checked)
+                            end = min(position, checked + self.VERIFY_BATCH)
+                            while checked < end:
+                                size = min(WORKSPACE_UPLOAD_CHUNK, end - checked)
+                                block = stage.read(size)
+                                if len(block) != size or target.read(size) != block:
+                                    raise ValueError('동일한 이름의 파일이 이미 존재합니다. 업로드한 파일의 이름을 변경하세요.')
+                                checked += size
+                            current = (os.stat(self.parts[-1], dir_fd=fd, follow_symlinks=False)
+                                       if fd is not None else (directory / self.parts[-1]).lstat())
+                            if (not os.path.samestat(other, current) or other.st_size != current.st_size
+                                    or other.st_mtime_ns != current.st_mtime_ns or other.st_ctime_ns != current.st_ctime_ns):
+                                raise ValueError('Upload destination changed.')
+                            if checked == position:
+                                return position, 'done', True
+                            db.execute('INSERT OR REPLACE INTO checks VALUES (?,?,?)', (self.key, signature, checked))
+                            return position, 'checking', False
+                    raise ValueError('동일한 이름의 파일이 이미 존재합니다. 업로드한 파일의 이름을 변경하세요.') from None
+                return position, 'done', False
+
+
 class GitWorkspace:
     """Project Git inspection and explicitly requested local Git operations."""
     def __init__(self, workspace, *, directory_fd=None):
@@ -523,10 +715,10 @@ class GitWorkspace:
                 data = stream.read(MAX_PREVIEW + 1)
                 return data if len(data) <= MAX_PREVIEW else None
 
-    def diff(self, path, section):
+    def diff(self, path, section, *, _state=None):
         self.workspace.parts(path)
         if section not in ('staged', 'unstaged', 'untracked', 'conflict'): raise ValueError('Git 잘못된 차이 유형')
-        state = self.status()
+        state = self.status() if _state is None else _state
         entry = next((item for item in state.get('entries', []) if item['path'] == path), None)
         if not entry: raise ValueError('파일 상태가 변경되었습니다. 새로고침하세요. Git 패널')
         valid = ('conflict' if entry['conflict'] else 'untracked' if entry['untracked'] else None)
@@ -543,7 +735,63 @@ class GitWorkspace:
         else:
             before = b'' if entry['worktree'] == 'A' else self.blob(':' + self.prefix + path)
             after = b'' if entry['worktree'] == 'D' else self.working(path)
-        return self.text_diff(before, after, result)
+        preview = self.text_diff(before, after, result)
+        if (preview['kind'] != 'diff' or preview.get('metadataOnly') or entry['oldPath']
+                or section not in ('staged', 'unstaged') or state['operation']
+                or entry['index' if section == 'staged' else 'worktree'] != 'M'):
+            return preview
+        patch = self.hunk_patch(path, section)
+        if patch is None:
+            return preview
+        text, hunks = patch
+        result = {**preview, 'text': text, 'hunks': hunks, 'version': state['version']}
+        if section == 'unstaged':
+            # Git may rewrite the entire worktree file using its checkout EOL
+            # conventions. Never offer discard if that can change other lines.
+            data = after.replace(b'\r\n',b'')
+            mixed = b'\r\n' in after and b'\n' in data
+            code, attrs, truncated = self.run(['check-attr','-z','text','eol','crlf','--',path])
+            attributes = attrs.rstrip(b'\0').split(b'\0')[2::3]
+            status, setting, capped = self.run(['config','--get','core.autocrlf'])
+            mode = setting.strip().lower()
+            ordinary = all(v in (b'unspecified',b'unset') for v in attributes)
+            result['canDiscardHunk'] = (not mixed and not code and not truncated and len(attributes)==3 and ordinary
+                                       and status in (0,1) and not capped and
+                                       (mode in (b'',b'false',b'no',b'0',b'off') or
+                                        (mode in (b'true',b'yes',b'1',b'on') and b'\n' not in data) or
+                                        (mode==b'input' and b'\r\n' not in after)))
+        return result
+
+    def hunk_patch(self, path, section):
+        # Generate exactly what the user reviews, including Git's quoted paths, line
+        # endings and no-newline markers. Extended changes are file-level operations.
+        code, attributes, truncated = self.run(['check-attr', '-z', 'filter', 'working-tree-encoding', 'ident', '--', path])
+        values = attributes.rstrip(b'\0').split(b'\0')[2::3]
+        if code or truncated or len(values) != 3 or any(value not in (b'unset', b'unspecified') for value in values):
+            return None
+        args = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--no-relative',
+                '--full-index', '--no-renames', '--unified=3', '--src-prefix=a/', '--dst-prefix=b/']
+        if section == 'staged':
+            args.append('--cached')
+        status, raw, truncated = self.run(args + ['--', path])
+        if status or truncated:
+            return None
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            return None
+        header, *blocks = re.split(r'(?m)(?=^@@ )', text)
+        if not blocks or not re.fullmatch(r'diff --git [^\n]+\nindex [0-9a-f]+\.\.[0-9a-f]+ 100(?:644|755)\n--- [^\n]+\n\+\+\+ [^\n]+\n', header):
+            return None
+        # Bind tokens to the complete patch. A client supplies no Git options or
+        # patch text. Indistinguishable contexts cannot be offered for mutation.
+        snapshot = hashlib.sha256(section.encode() + b'\0' + raw).digest()
+        counts = {}
+        bodies = [block.partition('\n')[2] for block in blocks]
+        for body in bodies:
+            counts[body] = counts.get(body, 0) + 1
+        return text, [hashlib.sha256(snapshot + block.encode()).hexdigest() if counts[body] == 1 else None
+                      for block, body in zip(blocks, bodies)]
 
     @staticmethod
     def text_diff(before, after, result):
@@ -650,15 +898,41 @@ class GitWorkspace:
                 if os.name == 'nt': lock.seek(0); msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
                 else: fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
-    def mutate(self, action, version, path='', branch='', message=''):
-        allowed = ('stage', 'unstage', 'stage-all', 'unstage-all', 'commit', 'create-branch', 'switch-branch', 'merge', 'abort-merge')
+    def mutate(self, action, version, path='', branch='', message='', hunk=None):
+        partial = {'stage-hunk': 'unstaged', 'unstage-hunk': 'staged', 'discard-hunk': 'unstaged'}
+        allowed = ('stage', 'unstage', 'stage-all', 'unstage-all', 'commit', 'create-branch', 'switch-branch', 'merge', 'abort-merge', *partial)
         if action not in allowed: raise ValueError('이는 지원되지 않습니다. Git 작동하다')
+        if (action in partial and (not isinstance(hunk, str) or not re.fullmatch('[0-9a-f]{64}', hunk))
+                or action not in partial and hunk is not None):
+            raise ValueError('Refresh the diff and select the change block again.')
         self.require_repository()
         with self.mutation_lock():
             state = self.require_repository()
             if not isinstance(version, str) or version != state['version']:
                 raise ValueError('창고가 변경되었습니다. 새로고침 후 확인 후 다시 운영하시기 바랍니다.')
             if state['operation'] == 'other': raise ValueError('창고가 리베이스 또는 피킹 중입니다. 먼저 컴퓨터에서 작업을 완료하십시오.')
+            if action in partial:
+                # Re-read under the same repository lock used for file actions. A
+                # later edit invalidates both the status version and the patch token.
+                diff = self.diff(path, partial[action], _state=state)
+                identifiers = diff.get('hunks', [])
+                if hunk not in identifiers or (action=='discard-hunk' and not diff.get('canDiscardHunk')):
+                    raise ValueError('Refresh the diff and select the change block again.')
+                header, *blocks = re.split(r'(?m)(?=^@@ )', diff['text'])
+                patch = header + blocks[identifiers.index(hunk)]
+                command = ['apply', '--whitespace=nowarn']
+                if action != 'discard-hunk': command.append('--cached')
+                if action != 'stage-hunk': command.append('--reverse')
+                if self.require_repository()['version'] != version:
+                    raise ValueError('Refresh the diff and select the change block again.')
+                # git apply checks its context, locks index writes and does not
+                # allow partial success (--reject) or a three-way fallback.
+                code, _, truncated = self.run(command + ['-'], write=True, message=patch)
+                if code or truncated:
+                    raise ValueError('Refresh the diff and select the change block again.')
+                labels = {'stage-hunk': 'Change block staged', 'unstage-hunk': 'Change block unstaged',
+                          'discard-hunk': 'Change block discarded'}
+                return {'outcome': 'success', 'message': labels[action], 'state': self.status()}
             if action in ('commit', 'create-branch', 'switch-branch', 'merge', 'abort-merge') and state['scope'] != '.':
                 raise ValueError('이 작업은 전체 창고에 영향을 미칩니다. 창고의 루트디렉토리에 해당하는 채팅에서 작업해주세요.')
             if action in ('stage', 'unstage'):
@@ -829,8 +1103,14 @@ def operate(root, action, params, history_path=None):
         if action == 'download': return workspace.read(params['path'], download=True)
         if action == 'download-stream': return workspace.download(**params)
         if action == 'upload': return workspace.upload(**params)
+        if action == 'upload-part':
+            options = dict(params)
+            transfer = WorkspaceUpload(workspace, *(options.pop(k) for k in ('path', 'owner', 'identifier', 'total')))
+            return transfer.run(**options)
         raise ValueError('지원되지 않는 파일 작업')
     except PermissionError:
         raise
     except OSError as error:
+        if error.errno in (errno.ENOSPC, getattr(errno, 'EDQUOT', errno.ENOSPC)):
+            raise ValueError('Not enough disk space for the upload.') from error
         raise ValueError('파일에 액세스할 수 없습니다. 디렉터리를 새로 고친 후 다시 시도하세요.') from error

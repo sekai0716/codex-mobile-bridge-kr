@@ -232,20 +232,21 @@ class SideChatServiceTests(unittest.TestCase):
         self.assertFalse(any(r['method'] == 'thread-follower-start-turn' for r in self.fixture.requests))
 
     def test_unknown_native_creation_is_not_replayed_or_replaced_with_temporary_chat(self):
-        from bridge.features.sessions.create import CreationError
+        from bridge.features.sessions.create import CreationError, SideChatReceiptUnknown
         self.fixture.state['cwd'] = str(self.root)
         body = {'creationId': str(uuid.uuid4())}
         with patch('bridge.app.service.fork_attached', side_effect=CreationError('lost receipt')) as fork:
-            with self.assertRaises(CreationError):
+            with self.assertRaises(SideChatReceiptUnknown):
                 self.bridge.side_chat(support.THREAD, 'phone', 'create', body)
-            with self.assertRaisesRegex(CreationError, "보조\\ 채팅\\ 생성이\\ 확인되지\\ 않았습니다\\.\\ 메인\\ 채팅을\\ 확인하세요\\.\\ 다시\\ 생성되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(SideChatReceiptUnknown, "Refresh the side chat list"):
                 self.bridge.side_chat(support.THREAD, 'phone', 'create', body)
             self.assertEqual(fork.call_count, 1)
         self.assertFalse(self.bridge.side_chats.chats)
 
     def test_uninitialized_creation_is_not_sent_and_same_id_works_after_initialization(self):
         from bridge.clients.codex import desktop_runtime
-        from bridge.features.sessions.create import CreationUnavailable
+        from bridge.clients.codex.app_server import AppServerUnavailable
+        from bridge.features.sessions.create import SideChatConnectionUnavailable
         bridge = self.bridge
         self.fixture.state['cwd'] = str(self.root)
         bridge.catalog_reader.executable = 'fixture-runtime'
@@ -261,11 +262,18 @@ class SideChatServiceTests(unittest.TestCase):
         from contextlib import nullcontext
         with patch.object(desktop_runtime.sys, 'platform', 'darwin'), \
              patch.object(desktop_runtime, 'initialization_lock', return_value=nullcontext()), \
-             patch.object(desktop_runtime, 'connect', side_effect=[None, client]), \
+             patch.object(desktop_runtime, 'connect', side_effect=[None, AppServerUnavailable('no shared endpoint'), client]), \
              patch('bridge.features.sessions.create._runtime_operation') as spawn, \
              patch('bridge.app.service.fork_attached', side_effect=fork):
-            with self.assertRaisesRegex(CreationUnavailable, "기본\\ 사이드\\ 채팅\\ 연결이\\ 준비되기를\\ 기다리고\\ 있습니다\\.\\ 데스크톱\\ 작업이\\ 완료되고\\ 유휴\\ 상태가\\ 확인되면\\ 자동으로\\ 완료됩니다\\.\\ 계정\\ 관리에서\\ 준비\\ 상태를\\ 확인할\\ 수도\\ 있습니다\\.\\ 사이드\\ 채팅이\\ 아직\\ 생성되지\\ 않았습니다"):
+            with self.assertRaises(SideChatConnectionUnavailable) as caught:
                 bridge.side_chat(support.THREAD, 'phone', 'create', body)
+            self.assertEqual(caught.exception.code, 'side_chat_setup_waiting')
+            self.assertNotIn(body['creationId'], bridge.message_actions)
+            bridge.accounts.desktop_preparation = {'state': 'failed'}
+            with patch.object(desktop_runtime, 'preparation', return_value={'state': 'pending'}), self.assertRaises(SideChatConnectionUnavailable) as caught:
+                bridge.side_chat(support.THREAD, 'phone', 'create', body)
+            self.assertEqual(caught.exception.code, 'side_chat_setup_required')
+            self.assertIn('standard input/output', str(caught.exception))
             self.assertNotIn(body['creationId'], bridge.message_actions)
             client.request.assert_not_called()
             result = bridge.side_chat(support.THREAD, 'phone', 'create', body)
@@ -290,6 +298,16 @@ class SideChatHttpTests(unittest.TestCase):
     tearDown = support.HttpTests.tearDown
     request = support.HttpTests.request
     login = support.HttpTests.login
+
+    def test_native_preflight_and_missing_receipt_have_distinct_codes(self):
+        from bridge.features.sessions.create import SideChatConnectionUnavailable, SideChatReceiptUnknown
+        auth = self.login()
+        body = {'action': 'create', 'creationId': str(uuid.uuid4())}
+        for error in (SideChatConnectionUnavailable(manual=True), SideChatConnectionUnavailable(manual=False),
+                      SideChatReceiptUnknown(SideChatReceiptUnknown.message)):
+            self.server.bridge.side_chat = Mock(side_effect=error)
+            status, _, result = self.request('POST', '/api/sessions/'+support.THREAD+'/side-chat', body, auth)
+            self.assertEqual((status, result), (409, {'error': str(error), 'code': error.code}))
 
     def test_auth_csrf_and_closed_schema(self):
         path = '/api/sessions/'+support.THREAD+'/side-chat'

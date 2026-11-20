@@ -4,6 +4,18 @@ import os
 from pathlib import Path
 
 
+def process_executable(root):
+    """Linux retains the executing inode after a package replaces its file."""
+    executable = root / 'exe'
+    try:
+        return executable.resolve(strict=True)
+    except FileNotFoundError:
+        target = os.readlink(executable)
+        if not os.path.isabs(target) or not target.endswith(' (deleted)') or executable.stat().st_nlink != 0:
+            raise
+        return Path(target.removesuffix(' (deleted)'))
+
+
 def desktop_process_identity(pid):
     """공유 Desktop 연결을 현재 Linux 프로세스 세대와 실제 UID에 묶는다."""
     root = Path('/proc') / str(pid)
@@ -16,18 +28,7 @@ def desktop_process_identity(pid):
         uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
                     if line.startswith('Uid:'))
         zombie = fields[0] == 'Z'
-        image = ''
-        if not zombie:
-            executable = root / 'exe'
-            try:
-                image = str(executable.resolve(strict=True))
-            except FileNotFoundError:
-                # 패키지 갱신 후에도 기존 프로세스는 삭제된 inode를 실행한다.
-                # 커널 링크와 실제 링크 수를 함께 확인한다. PID·부팅·시작 시각 검증은 그대로 적용된다.
-                target = os.readlink(executable)
-                if not os.path.isabs(target) or not target.endswith(' (deleted)') or executable.stat().st_nlink != 0:
-                    raise
-                image = target.removesuffix(' (deleted)')
+        image = '' if zombie else str(process_executable(root))
         return {'pid': pid, 'parent': int(fields[1]), 'uid': int(uids[1]), 'ruid': int(uids[0]),
                 'image': image,
                 'startTicks': int(fields[19]), 'zombie': zombie}
@@ -54,7 +55,7 @@ def _identity(pid):
         raise OSError('Codex daemon process identity unavailable')
     uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
                 if line.startswith('Uid:'))
-    image = (root / 'exe').resolve(strict=True)
+    image = process_executable(root)
     return (int(fields[19]), tuple(int(uid) for uid in uids), str(image))
 
 

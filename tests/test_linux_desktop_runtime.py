@@ -25,12 +25,17 @@ class LinuxDesktopRuntimeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             executable=Path(folder)/'sleep'
             shutil.copy2(shutil.which('sleep'),executable)
-            with subprocess.Popen([str(executable),'30']) as process:
+            with subprocess.Popen([str(executable),'30'], env={**os.environ,'BRIDGE_TEST_PROFILE':'isolated'}) as process:
                 try:
                     before=runtime.process_identity(process.pid)
                     executable.unlink()
                     shutil.copy2(shutil.which('true'),executable)
                     self.assertEqual(runtime.process_identity(process.pid),before)
+                    from bridge.platforms.linux.desktop import processes
+                    self.assertIn(process.pid, processes(lambda path: path == executable))
+                    profile, _ = read_process_environment(process.pid, {'processIdentity': before}, executable,
+                                                          ('BRIDGE_TEST_PROFILE',))
+                    self.assertEqual(profile, {'BRIDGE_TEST_PROFILE':'isolated'})
                 finally:
                     process.terminate()
 
@@ -104,12 +109,14 @@ class LinuxDesktopRuntimeTests(unittest.TestCase):
     def test_linux_start_passes_verified_adapter_and_waits_for_previous_exit(self):
         app = desktop_app.DesktopApp(sys.executable, ROOT)
         environment = {'CODEX_CLI_PATH': '/private/verified-adapter'}
-        with patch.object(runtime, 'launch_environment', return_value=environment), \
+        with patch.dict(os.environ, {'DISPLAY': ':1', 'XDG_SESSION_TYPE':'x11'}), \
+             patch.object(runtime, 'launch_environment', return_value=environment), \
              patch.object(runtime, 'wait_stopped') as wait, \
              patch('bridge.platforms.posix.desktop.start') as start:
             app.start()
             wait.assert_called_once_with(app.home)
-            start.assert_called_once_with(app.executable, app.home, {'CODEX_HOME': str(app.home), **environment})
+            start.assert_called_once_with(app.executable, app.home, {'CODEX_HOME': str(app.home), **environment},
+                                          arguments=('--force-renderer-accessibility',))
             start.reset_mock()
             wait.side_effect = ValueError('previous writer remains')
             with self.assertRaisesRegex(ValueError, 'previous writer remains'):

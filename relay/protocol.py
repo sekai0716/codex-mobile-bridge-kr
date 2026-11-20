@@ -13,13 +13,13 @@ READ = {'', 'catalog', 'poll', 'timeline', 'detail', 'changes', 'notifications',
         'side-chat', 'terminal', 'subagents', 'workspace', 'workspace/preview',
         'workspace/download', 'workspace/info', 'workspace/git-status', 'workspace/git-diff',
         'workspace/git-history', 'workspace/git-commit', 'workspace/git-history-diff',
-        'workspace/git-branches'}
+        'workspace/git-branches', 'original-queue', 'message-management'}
 WRITE = {'send', 'stop', 'history', 'respond', 'reconnect', 'queue', 'settings',
          'permissions', 'uploads', 'message-action', 'rename', 'pin', 'archive', 'notifications',
-         'goal/cancel', 'goal/edit', 'goal/status', 'side-chat', 'terminal',
-         'workspace/upload', 'workspace/git-action'}
+         'goal/cancel', 'goal/edit', 'goal/status', 'side-chat', 'terminal', 'browser',
+         'workspace/upload', 'workspace/upload-part', 'workspace/git-action', 'history-search', 'message-management', 'queue-send'}
 DESKTOP_READ = {'list', 'detail', 'catalog', 'projects', 'account', 'access', 'terminal', 'notifications'} | {action for action in READ if action.startswith('workspace')}
-DESKTOP_WRITE = {'pin', 'send', 'stop', 'settings', 'respond', 'create', 'access', 'uploads', 'terminal', 'notifications', 'workspace/upload', 'workspace/git-action', 'archive'}
+DESKTOP_WRITE = {'pin', 'send', 'stop', 'settings', 'respond', 'create', 'access', 'uploads', 'terminal', 'notifications', 'workspace/upload', 'workspace/upload-part', 'workspace/git-action', 'archive'}
 
 
 def origin(value, test_http=False):

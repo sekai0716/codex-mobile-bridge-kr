@@ -314,6 +314,19 @@ class Runtime:
 
 
 class WslSessionTests(unittest.TestCase):
+    def test_original_search_and_queue_use_only_an_existing_subscription(self):
+        session = self.entry.session(self.identifier, attach=False)
+        with patch.object(self.entry, '_management_identity', return_value='fixture'), patch.object(self.entry, 'runtime') as activate:
+            self.assertFalse(self.entry.original_queue(self.identifier, 'fixture')['available'])
+            with self.entry.connection_lock:
+                self.entry.server = Mock(closed=False)
+                self.entry.generation = self.entry.subscriptions[session.id] = 'test-generation'
+                self.entry.server.request.return_value = {'data':[], 'nextCursor':None}
+            self.assertTrue(self.entry.original_queue(self.identifier, 'fixture')['available'])
+            self.assertEqual(self.entry.thread_history_search(session.id, {'account':'fixture','term':'과거'})['source'], 'native')
+            self.assertEqual([call.args[0] for call in self.entry.server.request.call_args_list], ['thread/queue/list','thread/searchOccurrences'])
+            activate.assert_not_called()
+
     def test_cli_scope_listing_is_cached_and_failed_control_keeps_old_release(self):
         session = self.entry.session(self.identifier, attach=False)
         self.entry.subscriptions[self.identifier] = self.entry.generation

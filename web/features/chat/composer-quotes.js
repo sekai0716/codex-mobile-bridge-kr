@@ -62,6 +62,37 @@ class ComposerQuotes {
       if(this.identity()===scope&&target.isConnected&&this.messages.contains(target)&&typeof text==='string')this.add(text,source);
     }catch(error){if(this.identity()===scope&&target.isConnected)this.onError(error.message||this.translate('전체 텍스트를 로드할 수 없습니다. 다시 시도해 보세요.'));}
   }
+  reviewLine({repository,path,side,line,text,revision}){
+    if(!this.canQuote()||!this.available()||!Number.isInteger(line)||line<1)return false;
+    const scope=this.identity(),doc=this.doc;
+    const dialog=doc.createElement('dialog'),form=doc.createElement('form');
+    dialog.className='picker diff-review-dialog';
+    const heading=doc.createElement('h2');heading.textContent=this.translate('Comment on line');
+    const location=doc.createElement('p');
+    const prefix=repository && !/^(?:[/\\]|[a-z]:)/i.test(path)?repository.replace(/[/\\]$/,'')+'/':'';
+    location.textContent=prefix+path+':'+line+' · '+this.translate(side==='old'?'Before change':'After change');
+    const origin=doc.createElement('small');origin.textContent=this.translate('Reviewed snapshot')+' · '+revision;
+    const code=doc.createElement('pre');code.textContent=text;
+    const comment=doc.createElement('textarea');comment.required=true;comment.rows=3;
+    comment.setAttribute('aria-label',this.translate('Review comment'));
+    const error=doc.createElement('p');error.setAttribute('role','alert');
+    const cancel=doc.createElement('button');cancel.type='button';cancel.textContent=this.translate('취소');cancel.onclick=()=>dialog.close();
+    const submit=doc.createElement('button');submit.type='submit';submit.className='primary';submit.textContent=this.translate('Add to chat draft');
+    const actions=doc.createElement('div');actions.className='actions';actions.append(cancel,submit);
+    form.append(heading,location,origin,code,comment,error,actions);dialog.append(form);
+    dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+    form.onsubmit=event=>{
+      event.preventDefault();
+      if(scope!==this.identity()||!this.canQuote()||!this.available()){dialog.close();return;}
+      if(!comment.value.trim()){comment.focus();return;}
+      const quote=[location.textContent,origin.textContent,text,'',this.translate('Review comment')+' — '+comment.value.trim()].join('\n');
+      // Save the reviewed snapshot with the existing session draft. Actual
+      // transmission belongs to the user's normal send/queue action.
+      if(this.quotes.length>=8||quote.length>100000){error.textContent=this.translate('The review does not fit in this draft.');return;}
+      this.add(quote,location.textContent);dialog.close();
+    };
+    doc.body.append(dialog);dialog.showModal();comment.focus();return true;
+  }
   add(text,source=''){if(!this.canQuote()||!this.available()||!text.trim()||this.quotes.length>=8)return;if(text.length>100000){this.onError(this.translate('따옴표를 포함한 메시지가 100,000자를 초과합니다. 보내기 전에 짧게 하세요.'));return;}this.quotes.push({text:text.slice(0,100000),source:String(source).slice(0,500),provider:this.scope().provider});this.onChange();this.render();}
   restore(quotes=[]){this.reset();this.quotes=ComposerQuotes.normalize(quotes);this.render();}
   reset(){this.quotes=[];this.snapshot=null;this.pressed=null;this.action.hidden=true;this.render();}

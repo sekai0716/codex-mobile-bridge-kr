@@ -27,6 +27,9 @@ if sys.platform == 'win32':
         command.extend(['--add-data', str(root/'dist/conpty'/name)+':conpty'])
 # Ship roots and their license explicitly; source users still need only stdlib.
 command.extend(['--add-data', certifi.where()+':bridge/features/auth'])
+if sys.platform == 'linux':
+    # The detached-window worker uses the desktop's system AT-SPI and X11 bindings.
+    command.extend(['--add-data', str(root/'bridge/platforms/linux/browser_window.py')+':bridge/platforms/linux'])
 command.extend([
     '--hidden-import', 'bridge.platforms.linux.interfaces',
     '--hidden-import', 'bridge.platforms.macos.interfaces',

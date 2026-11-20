@@ -176,13 +176,20 @@
 .wb-side-queue{flex:none;max-height:25%;overflow:auto;margin:0 14px}.wb-side-queue:empty{display:none}
 .wb-side-landing~.wb-status:empty{display:none}.wb-side-content:not(.has-side-chat)>.wb-status{margin:0 24px 24px;text-align:center}
 .wb-side-messages{overflow-anchor:none}
+.wb-child-view{display:flex;height:100%;min-width:0;min-height:0;flex-direction:column}
+.wb-child-view .wb-side-head small{flex:1;min-width:0;overflow-wrap:anywhere}
+.wb-child-view .wb-child-messages{min-width:0}
+.wb-child-view .wb-side-messages>.secondary{display:block;margin-inline:auto}
 
 .wb-source-line.wb-source-selected,.wb-source-number.wb-source-selected{background:color-mix(in srgb,var(--accent) 18%,var(--code))}
 
 .wb-file-font[hidden]{display:none}.wb-file-font{display:flex;align-items:center;gap:2px;flex:none}.wb-file-font button{min-width:32px;min-height:32px;padding:3px 7px}.wb-file-font-value{min-width:34px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}
 .wb-preview-content .markdown-body{font-size:var(--wb-file-font-size,14px)}
 .wb-preview-content .wb-source,.wb-preview-content>pre,.wb-preview-content .code-block pre{font-size:var(--wb-file-font-size,14px)}
-@media(max-width:520px){.wb-preview-head{flex-wrap:wrap}.wb-preview-actions{margin-left:auto;max-width:100%;flex-wrap:wrap}}
+/* Wrap at the pane's available width, including inside a wide desktop split view. */
+.wb-preview-head{flex-wrap:wrap}
+.wb-preview-title{flex:1 1 12rem}
+.wb-preview-actions{margin-inline-start:auto;max-width:100%;flex-wrap:wrap}
 .wb-preview-content .html-preview-frame iframe{zoom:var(--wb-file-preview-zoom,1)}
 
 .attachment-menu{position:fixed;inset:auto;margin:0;padding:4px 0;width:max-content;max-width:calc(100vw - 16px);border:1px solid var(--line);border-radius:14px;background:var(--page);color:var(--text);box-shadow:0 8px 32px #0003}
@@ -194,3 +201,9 @@
 .attachment-menu:focus{outline:none}
 .attachment-menu::backdrop{background:transparent}.attachment-menu .plain{display:block;width:100%;padding:14px 18px;min-height:48px;text-align:left;border:0;border-radius:0;color:var(--text);font-size:15px}.attachment-menu .plain+button{border-top:1px solid var(--line)}.attachment-menu .plain:hover{background:var(--surface)}
 .host-file-picker[open]{display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;height:min(680px,85dvh)}.host-file-picker>.picker-head,.host-file-picker>.wb-path,.host-file-picker>.wb-toolbar,.host-file-picker>.wb-search,.host-file-picker>.muted{flex:none}.host-file-picker>.wb-file-list{min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}.host-file-picker>.wb-search{margin:12px 0}.host-file-picker>.wb-path{overflow-wrap:anywhere;max-height:4em;overflow:auto}
+.wb-browser-share{display:flex;flex-direction:column;gap:.6rem;height:100%;min-width:0;min-height:0;padding:12px;box-sizing:border-box}
+.wb-browser-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.wb-browser-actions input{flex:1;min-width:8em}
+.wb-browser-stage{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;background:var(--surface)}
+.wb-browser-stage img{display:block;max-width:none;height:auto;user-select:none}
+.wb-browser-share [hidden]{display:none}

@@ -18,6 +18,11 @@ class AccountsPanel {
   attachApiAccess(panel,details){
     this.cliAccess=panel;this.apiDetails=details;this.management.insertBefore(details,this.tools);
   }
+  showDesktopConnection(){
+    this.tools.open=true;
+    this.revealRuntime=true;
+    this.render();
+  }
   text(value){return typeof BridgeI18n==='undefined'?value:BridgeI18n.t(value);}
   node(tag,text,className){const n=document.createElement(tag);if(text!==undefined){n.textContent=this.text(text);if(typeof BridgeI18n!=='undefined'&&Object.hasOwn(BridgeI18n.dictionary,text))n.setAttribute('data-i18n',text);}if(className)n.className=className;return n;}
   button(text,fn){const n=this.node('button',text);n.type='button';n.onclick=fn;return n;}
@@ -48,7 +53,16 @@ class AccountsPanel {
     this.runtimeStatus=this.node('p',undefined,'account-muted');
     this.initializeRuntime=this.button('연결 초기화',()=>{if(window.confirm(this.text('Codex 데스크톱의 모든 작업이 끝났는지 확인한 뒤 네이티브 연결을 초기화하시겠습니까? 실행 중인 앱은 정상 종료 후 재시작됩니다. 계정과 채팅 기록은 보존됩니다.')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true});});
     this.forceInitializeRuntime=this.button('그래도 초기화를 계속하세요',()=>{if(window.confirm(this.text('일부 작업 상태를 확인하지 못했습니다. 계속하면 Codex 앱이 정상 종료 후 재시작되며, 해당 작업이나 대기 중인 승인이 중단될 수 있습니다. 채팅 기록은 보존되며 나중에 이어갈 수 있습니다. 계속하시겠습니까?')))return this.perform({action:'initializeDesktopRuntime',requestId:this.requestId(),confirmed:true,tasksConfirmed:true,acknowledgeUnavailable:true});});this.forceInitializeRuntime.hidden=true;
-    this.desktopRuntime.append(this.node('h3','Codex 네이티브 채팅 연결'),this.runtimeStatus,this.initializeRuntime,this.forceInitializeRuntime);this.tools.append(this.desktopRuntime);
+    this.deferRuntime=this.button('Prepare connection after work finishes',()=>{
+      const requestId=this.value?.desktopRuntime?.deferred?.requestId;
+      if(requestId && window.confirm(this.text('Restart Codex once after all desktop work finishes to prepare the connection?')))
+        return this.perform({action:'deferDesktopRuntime',requestId,confirmed:true});
+    });
+    this.cancelDeferredRuntime=this.button('Cancel scheduled preparation',()=>{
+      const requestId=this.value?.desktopRuntime?.deferred?.requestId;
+      if(requestId)return this.perform({action:'cancelDeferredDesktopRuntime',requestId});
+    });
+    this.desktopRuntime.append(this.node('h3','Codex 네이티브 채팅 연결'),this.runtimeStatus,this.deferRuntime,this.cancelDeferredRuntime,this.initializeRuntime,this.forceInitializeRuntime);this.tools.append(this.desktopRuntime);
     if(!this.desktop){this.root.append(this.node('p','컴퓨터에서 공식 계정에 로그인하세요.','account-muted'));return;}
     const scanDetails=this.node('details');scanDetails.append(this.node('summary','로컬 구성 스캔'));
     this.scanSource=this.field('Codex 구성 디렉터리');this.scanSource.input.placeholder=this.configurationPlaceholder||this.text('현재 Codex 데이터 디렉터리를 사용하려면 비워 두세요.');
@@ -130,13 +144,14 @@ class AccountsPanel {
     const phase=value?.switch?.phase||'idle',enrollment=value?.enrollment?.phase,update=value?.desktopUpdate?.state;
     const pending=value?.sshHosts?.some(host=>host.state==='checking')||!['idle','complete','restored','failed','interrupted'].includes(phase)||['starting','waiting'].includes(enrollment)||['checking','requesting','needsDesktop'].includes(update)||value?.current?.status==='checking'||['idle','loading'].includes(value?.globalReset?.state)||value?.globalReset?.refresh?.checking||this.globalResetRefreshIntent||this.accountRows().some(row=>row.details?.usage?.status==='loading'||row.details?.models?.status==='loading');
     const sshRetry=Math.min(300000,...(value?.sshHosts||[]).filter(host=>host.state==='offline'&&host.nextRetryAt).map(host=>Math.max(5000,host.nextRetryAt*1000-Date.now()+1000)));
-    this.timer=setTimeout(()=>{if(this.visible())return this.refresh();},this.readFailed?10000:pending?2000:sshRetry);
+    const retry=value?.desktopRuntime?.deferred?.state==='waiting'?Math.min(10000,sshRetry):sshRetry;
+    this.timer=setTimeout(()=>{if(this.visible())return this.refresh();},this.readFailed?10000:pending?2000:retry);
   }
   visible(){const dialog=this.root.closest('dialog');return !this.root.closest('[hidden],.client-config-hidden')&&!document.hidden&&(!dialog||dialog.open);}
   resume(){
     const visible=this.visible();if(visible===this.lastVisible)return;
     this.lastVisible=visible;this.visit++;clearTimeout(this.timer);this.timer=null;
-    if(!visible){this.resumePending=false;this.globalResetRefreshIntent=null;clearTimeout(this.resetMidnightTimer);this.resetMidnightTimer=null;}
+    if(!visible){this.revealRuntime=false;this.resumePending=false;this.globalResetRefreshIntent=null;clearTimeout(this.resetMidnightTimer);this.resetMidnightTimer=null;}
     if(visible){if(this.loading||this.busy)this.resumePending=true;else return this.refresh();}
   }
   accountRows(){const login=this.value?.loginAccount,rows=this.value?.accounts||[];return login?[login,...rows.filter(row=>row.id!==login.id)]:rows;}
@@ -455,6 +470,21 @@ class AccountsPanel {
     this.initializeRuntime.disabled=this.busy||switching||external||(!this.desktop&&value.canSwitch===false);
     this.forceInitializeRuntime.hidden=!(value.switch?.operation==='desktopRuntime'&&phase==='failed'&&value.switch?.taskStateUnavailable===true||preparation.state==='waiting'&&preparation.taskStateUnavailable===true);
     this.forceInitializeRuntime.disabled=this.initializeRuntime.disabled;
+    const deferred=runtime.deferred;
+    this.deferRuntime.hidden=deferred?.state!=='available';this.cancelDeferredRuntime.hidden=deferred?.state!=='waiting';
+    this.deferRuntime.disabled=this.initializeRuntime.disabled;
+    this.cancelDeferredRuntime.disabled=this.busy||(!this.desktop&&value.canSwitch===false);
+    if(deferred?.state==='waiting'){
+      this.initializeRuntime.disabled=true;
+      this.forceInitializeRuntime.hidden=true;
+    }
+    if(deferred?.state==='waiting')this.runtimeStatus.textContent=this.text('Connection preparation is scheduled. Waiting until every desktop task is confirmed idle.');
+    if(deferred?.state==='cancelled')this.runtimeStatus.textContent=this.text('Scheduled connection preparation was cancelled.');
+    if(this.revealRuntime&&this.visible()&&!this.desktopRuntime.hidden){
+      this.revealRuntime=false;
+      const heading=this.desktopRuntime.querySelector('h3');
+      heading.tabIndex=-1;heading.focus({preventScroll:true});heading.scrollIntoView({block:'center'});
+    }
     const resetAccount=this.accountRows().find(row=>row.id===this.resetAccountId);
     if(this.resetDialog?.open&&(switching||!resetAccount||this.resetAccountKey&&this.resetAccountKey!==resetAccount.accountKey))this.resetDialog.close();
     this.status.textContent=this.text(labels[phase]||phase)+(value.switch?.error?' · '+this.text(value.switch.error):'');

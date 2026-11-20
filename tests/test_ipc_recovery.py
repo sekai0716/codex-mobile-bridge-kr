@@ -17,6 +17,22 @@ class RecoveryTests(unittest.TestCase):
     setUp = test_bridge.IntegrationTests.setUp
     tearDown = test_bridge.IntegrationTests.tearDown
 
+    def test_recovering_one_chat_preserves_connected_sibling(self):
+        from bridge.app.service import LiveSession
+        session = self.bridge.session(THREAD)
+        sibling = LiveSession('77777777-7777-4777-8777-777777777777')
+        sibling.runtime, sibling.connected = 'desktop', True
+        with self.bridge.lock:
+            self.bridge.live[sibling.id] = sibling
+        with session.condition:
+            session.connected = False
+            session.rebuild_recommended = True
+        with patch.object(self.bridge.ipc, 'endpoint_changed', return_value=True), patch.object(
+                self.bridge, '_rebuild_desktop_transport') as replace:
+            self.assertTrue(self.bridge.rebuild_connection(THREAD).connected)
+        replace.assert_not_called()
+        self.assertTrue(sibling.connected)
+
     def test_observed_socket_disconnect_recovers_before_old_success_cooldown(self):
         if os.name == 'nt':
             self.skipTest('Unix pathname replacement')

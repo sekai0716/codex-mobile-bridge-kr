@@ -126,7 +126,7 @@ class AgentChat {
       const result=await this.workbench.request(this.url(),undefined,controller.signal);if(controller.signal.aborted)return;
       if(result.id!==agent.id)throw Error(BridgeI18n.t('하위 에이전트의 원본 연결을 확인할 수 없습니다.'));
       this.retryDelay=0;this.control=result.live?result.control:null;this.updateComposer();
-      const stamp=JSON.stringify(result);if(stamp===this.detailStamp)return;this.detailStamp=stamp;
+      const stamp=JSON.stringify([BridgeI18n.language(),result]);if(stamp===this.detailStamp)return;this.detailStamp=stamp;
       const scroll=this.detail.scrollTop,follow=this.detail.scrollHeight-this.detail.clientHeight-scroll<60;this.detail.replaceChildren();
       const latest=result.turns.at(-1),labels={inProgress:BridgeI18n.t('마지막 녹화: 실행 중(라이브 아님)'),completed:BridgeI18n.t('마지막 녹화: 완료'),interrupted:BridgeI18n.t('마지막 녹화: 중단됨'),failed:BridgeI18n.t('마지막 기록: 실패')};
       const status=result.live?(this.control.status==='active'?'Agent working live':'Agent connected'):labels[latest?.status]||'기록된 작업 상태가 없습니다.';
@@ -140,7 +140,12 @@ class AgentChat {
           const quote=this.button(BridgeI18n.t('인용'),()=>{if(this.visible&&this.workbench.current===this.session)this.workbench.quoteMessage?.(message.text||'','agent:'+agent.id+':'+turn.id+':'+message.id,{id:this.parentId,host:this.session.host,provider:this.session.provider||'codex'});});quote.className='plain message-quote';quote.disabled=!this.workbench.quoteMessage;
           actions.append(copy,quote);renderChatMessageTime(actions,message.timestamp);body.append(actions);
         }else{
-          const details=this.node('details');details.append(this.node('summary','',message.name||message.kind||BridgeI18n.t('도구 기록')),this.node('pre','',message.output||message.text||''));body.append(details);
+          const details=this.node('details');
+          let heading;
+          if(message.kind==='collabAgentToolCall'){
+            heading=this.node('summary');heading.textContent=chatActivityLabel(message);
+          }else heading=this.node('summary','',message.name||message.kind||BridgeI18n.t('도구 기록'));
+          details.append(heading,this.node('pre','',message.output||message.text||''));body.append(details);
         }
         this.detail.append(body);
       }

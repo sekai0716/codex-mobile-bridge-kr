@@ -18,8 +18,9 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from bridge.features.workspace.workspace import MAX_TRANSFER, Workspace
+from bridge.features.workspace.workspace import MAX_TRANSFER, WORKSPACE_UPLOAD_CHUNK, Workspace
 from bridge.features.workspace.preferences import transfer_settings
+from bridge.features.workspace.browser_share import BrowserShare
 from bridge.features.workspace.files import workspace_relative_path, media_type
 from bridge.features.notifications.channels import settings as notification_settings, save_settings as save_notification_settings, save_webhook_endpoint, webhook_config, publish, publish_bark, publish_pushplus, publish_webhook, visible_webhook, WebhookDeliveryError, resolved_webhook_provider
 from socketserver import TCPServer
@@ -38,7 +39,7 @@ from bridge.features.sessions.goal import GoalError
 from bridge.clients.codex.catalog import CatalogError, CatalogIdentityChanged
 from bridge.features.sessions.store import StoreUnavailable
 from bridge.clients.codex.remote import RemoteUnavailable
-from bridge.features.sessions.create import ArchiveRejected, CreationError
+from bridge.features.sessions.create import ArchiveRejected, CreationError, SideChatConnectionUnavailable, SideChatReceiptUnknown
 from bridge.features.accounts.account import AccountError
 from bridge.features.terminals.manager import TerminalSessionMissing
 from bridge.api.html_preview import SHELL_PATH, SHELL_FILE, SHELL_CSP
@@ -104,6 +105,8 @@ class GatewayServer(ThreadingHTTPServer):
         self.mobile_updates_owner = shared is None and data_dir is not None
         self.mobile_updates = MobileUpdates(data_dir) if self.mobile_updates_owner else getattr(shared, 'mobile_updates', None)
         self.local_access = config.get('localAccess', True)
+        self.browser_share = shared.browser_share if shared else BrowserShare()
+        self.browser_share_owner = shared is None
         if shared is None:
             self.bridge = bridge
             self.notifications = None
@@ -146,6 +149,8 @@ class GatewayServer(ThreadingHTTPServer):
             return None
 
     def server_close(self):
+        if self.browser_share_owner:
+            self.browser_share.close()
         if self.mobile_updates_owner and self.cli_connections:
             self.cli_connections.close()
         if self.mobile_updates_owner:
@@ -487,6 +492,9 @@ class Handler(BaseHTTPRequestHandler):
                                          **({'enabledClients': self.server.desktop_sessions.navigation_clients() if self.server.desktop_sessions else ['codex']} if session else {}),
                                          **({'listCacheIdentity': hashlib.sha256((self.server.instance_id + '\0' + session['csrf']).encode()).hexdigest()} if session else {}),
                                          **({"computer": {"name": socket.gethostname(), "platform": platform.system()}} if session else {}),
+                                         "browserSharing": bool(session and platform.system() == 'Linux' and os.environ.get('DISPLAY')
+                                                               and os.environ.get('XDG_SESSION_TYPE') != 'wayland'
+                                                               and self.server.auth.config.get('mode') != 'none'),
                                          **({'mobileRoutes': discovery.mobile_routes(self.token())} if session and discovery and self.server.auth.mobile_client(self.headers.get('User-Agent', '')) else {}),
                                          **({'connection': discovery.descriptor(self.token())} if session and discovery else {}),
                                          "notifications": self.server.notifications is not None,
@@ -930,6 +938,11 @@ class Handler(BaseHTTPRequestHandler):
                 if self.server.auth.config.get('mode') == 'none':
                     raise PermissionError('비밀번호 없는 액세스는 데스크탑 연결을 초기화할 수 없습니다. 데스크탑 측에서 조작하십시오.')
                 body = self.read_json()
+                if isinstance(body,dict) and body.get('action') in ('deferDesktopRuntime','cancelDeferredDesktopRuntime'):
+                    expected = {'action','requestId','confirmed'} if body['action'] == 'deferDesktopRuntime' else {'action','requestId'}
+                    if set(body) != expected or body.get('confirmed', True) is not True:
+                        raise ValueError('Invalid deferred connection request.')
+                    return self.output(202, account_bridge.accounts.control(body))
                 if (not isinstance(body, dict)
                         or set(body) - {'acknowledgeUnavailable'} != {'requestId', 'confirmed', 'tasksConfirmed'}
                         or 'acknowledgeUnavailable' in body and body['acknowledgeUnavailable'] is not True):
@@ -1216,6 +1229,28 @@ class Handler(BaseHTTPRequestHandler):
                     host = query.get('host', ['local'])[0]
                     self.server.desktop_sessions.require_enabled(host if host.startswith(('wsl:', 'codex:')) else 'codex')
             side = query.get('side', [None])[0]
+            browser_match = re.fullmatch(r'/api/sessions/([0-9a-f-]{36})/browser', path)
+            if browser_match:
+                if not write:
+                    return self.output(405, {'error':'Use POST for browser sharing.'})
+                if (bridge is not self.server.bridge or query.get('host', ['local']) != ['local'] or side is not None
+                        or self.server.auth.config.get('mode') == 'none'):
+                    raise PermissionError('Browser sharing requires an authenticated local Codex chat.')
+                body = self.read_json()
+                client_id = body.pop('clientId', None)
+                if not isinstance(client_id, str) or not re.fullmatch(r'[a-zA-Z0-9-]{32,64}', client_id):
+                    raise ValueError('Invalid browser tab.')
+                owner = (self.server.auth.key(self.token()), browser_match[1], client_id)
+                can_control = False
+                if body.get('op') != 'end':
+                    live = bridge.session(browser_match[1], attach=False, background=True)
+                    if live.origin != 'desktop':
+                        raise PermissionError('Select a local Codex desktop chat.')
+                    with live.condition:
+                        state = live.state or {}
+                        can_control = (live.connected and (state.get('threadRuntimeStatus') or {}).get('type') == 'idle'
+                                       and not live.pending_requests())
+                return self.output(200, self.server.browser_share.request(owner, body, can_control=can_control))
             if side is not None and self.server.auth.config.get('mode') == 'none':
                 raise PermissionError('사이드 채팅에서는 게이트웨이 비밀번호 보호를 활성화해야 합니다.')
             side_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/side-chat", path)
@@ -1273,7 +1308,7 @@ class Handler(BaseHTTPRequestHandler):
                 identifier = query.get('id', [''])[0]
                 return self.output(200, bridge.terminal(terminal_match[1], owner, ('poll' if query.get('mode') == ['pty'] else 'read') if identifier else 'info',
                                    {'id': identifier, 'after': int(query.get('after', ['0'])[0]), 'waitMs': int(query.get('waitMs', ['0'])[0])}))
-            workspace_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/workspace(?:/(info|preview|download|upload|git-repositories|git-status|git-diff|git-history|git-commit|git-history-diff|git-branches|git-action))?", path)
+            workspace_match = re.fullmatch(r"/api/sessions/([0-9a-f-]{36})/workspace(?:/(info|preview|download|upload|upload-part|git-repositories|git-status|git-diff|git-history|git-commit|git-history-diff|git-branches|git-action))?", path)
             if workspace_match:
                 thread_id, operation = workspace_match.groups()
                 relative = query.get('path', [''])[0]
@@ -1285,9 +1320,33 @@ class Handler(BaseHTTPRequestHandler):
                 if write:
                     if operation == 'git-action':
                         body = self.read_json()
-                        if set(body) - {'action', 'version', 'path', 'branch', 'message', 'repository'} or not {'action', 'version'} <= set(body):
+                        if set(body) - {'action', 'version', 'path', 'branch', 'message', 'repository', 'hunk'} or not {'action', 'version'} <= set(body):
                             raise ValueError('Git 잘못된 작업 요청')
                         return self.output(200, bridge.workspace(thread_id, operation, body))
+                    if operation == 'upload-part':
+                        phase = query.get('phase', [''])[0]
+                        limit = WORKSPACE_UPLOAD_CHUNK if phase == 'chunk' else 0
+                        sizes = self.headers.get_all('Content-Length', ['0'] if phase != 'chunk' else [])
+                        if ('Transfer-Encoding' in self.headers or len(sizes) != 1 or not sizes[0].isascii()
+                                or not sizes[0].isdigit() or not 0 <= int(sizes[0]) <= limit):
+                            self.close_connection = True
+                            raise ValueError('Invalid upload chunk.')
+                        data = self.rfile.read(int(sizes[0]))
+                        if len(data) != int(sizes[0]):
+                            self.close_connection = True
+                            raise ValueError('업로드가 중단되었습니다. 다시 시도해 주세요.')
+                        # Bind the transfer to this authorized route/device; no credential is forwarded to SSH.
+                        if not self.authorized(True):
+                            return
+                        binding = [self.server.auth.cookie_name, self.server.auth.key(self.token()), thread_id,
+                                   desktop_workspace[1] if desktop_workspace else 'codex', query.get('sessionId', [''])[0],
+                                   query.get('host', ['local'])[0]]
+                        owner = hashlib.sha256(json.dumps(binding).encode()).hexdigest()
+                        params = {'owner': owner, 'identifier': query.get('id', [''])[0], 'path': relative,
+                                  'phase': phase, 'total': int(query.get('total', ['-1'])[0])}
+                        if phase == 'chunk':
+                            params.update(offset=int(query.get('offset', ['-1'])[0]), encoded=base64.b64encode(data).decode())
+                        return self.output(200, bridge.workspace(thread_id, 'upload-part', params))
                     if operation != 'upload': return self.output(405, {'error': '이 파일 작업은 지원되지 않습니다'})
                     sizes = self.headers.get_all('Content-Length', [])
                     if self.headers.get('Transfer-Encoding') or len(sizes) != 1 or not sizes[0].isdigit() or not 0 <= int(sizes[0]) <= MAX_TRANSFER:
@@ -1295,7 +1354,7 @@ class Handler(BaseHTTPRequestHandler):
                     content = self.rfile.read(int(sizes[0]))
                     if len(content) != int(sizes[0]): raise ValueError('업로드가 중단되었습니다. 다시 시도해 주세요.')
                     return self.output(200, bridge.workspace(thread_id, 'upload', {'path': relative, 'encoded': base64.b64encode(content).decode()}))
-                if operation == 'upload': return self.output(405, {'error': '업로드 작업을 사용해 주세요'})
+                if operation in ('upload', 'upload-part'): return self.output(405, {'error': '업로드 작업을 사용해 주세요'})
                 if operation == 'git-action': return self.output(405, {'error': 'Git 운영 요구 사항 POST 묻다'})
                 repository = {'repository': query.get('repository', [''])[0]} if 'repository' in query else {}
                 if operation == 'git-repositories': return self.output(200, bridge.workspace(thread_id, operation, {}))
@@ -1367,6 +1426,14 @@ class Handler(BaseHTTPRequestHandler):
                 body = self.read_json()
                 return self.output(200, bridge.set_goal_status(goal_status_match[1], body.get("status"),
                                                               body.get("id", ""), body.get("uiLocale"), expected=body.get("expected")))
+            lookup = re.fullmatch(r'/api/sessions/([0-9a-f-]{36})/(history-search|original-queue)', path)
+            if lookup:
+                target_id, lookup_action = lookup.groups()
+                if lookup_action == 'history-search' and write and hasattr(bridge, 'thread_history_search'):
+                    return self.output(200, bridge.thread_history_search(target_id, self.read_json()))
+                if lookup_action == 'original-queue' and not write and hasattr(bridge, 'original_queue'):
+                    return self.output(200, bridge.original_queue(target_id, query.get('account', [''])[0]))
+                return self.output(405, {'error':'This session does not support the requested operation.'})
             match = THREAD_ROUTE.fullmatch(path)
             if not match:
                 return self.output(404, {"error": "페이지가 존재하지 않습니다"})
@@ -1517,7 +1584,7 @@ class Handler(BaseHTTPRequestHandler):
         except SubmissionRejected as exc:
             self.close_connection = True
             self.output(400, {"error": str(exc), "code": "send_not_submitted"})
-        except CatalogIdentityChanged as exc:
+        except (CatalogIdentityChanged, SideChatConnectionUnavailable, SideChatReceiptUnknown) as exc:
             self.close_connection = True
             self.output(409, {"error": str(exc), "code": exc.code})
         except ValueError as exc:

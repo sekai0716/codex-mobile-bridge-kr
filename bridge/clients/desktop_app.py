@@ -141,4 +141,8 @@ class DesktopApp:
             return
         else:
             from bridge.platforms.posix import desktop as native
-        self.child = native.start(self.executable, self.home, environment)
+        # Window sharing binds to the detached web document via AT-SPI on X11.
+        options = ({'arguments': ('--force-renderer-accessibility',)}
+                   if sys.platform == 'linux' and shared and os.environ.get('DISPLAY')
+                   and os.environ.get('XDG_SESSION_TYPE') != 'wayland' else {})
+        self.child = native.start(self.executable, self.home, environment, **options)

@@ -243,6 +243,51 @@ class ToolImageTests(unittest.TestCase):
             session.set_history({**saved, 'id': 'other'})
             self.assertNotIn('attachments', present())
 
+    def test_browser_surface_screenshot_nested_and_direct_preserve_text_hide_data_and_reject_clipped_bytes(self):
+        def result(url):
+            return {'content': [{'type': 'text', 'text': 'ready'}], '_meta': {
+                    'codex/toolSurface': {'screenshot': {'url': url, 'tabId': 'tab', 'pageUrl': 'https://example.test'}}}}
+        def project(obj):
+            return normalize_item({'type': 'mcpToolCall', 'id': 'browser', 'server': 'cua_repl', 'tool': 'js',
+                                   'arguments': {'title': 'Inspect page'}, 'result': obj})
+        for wrapped in (False, True):
+            with self.subTest(wrapped=wrapped):
+                obj = result('data:image/png;base64,' + PNG)
+                if wrapped:
+                    obj = {'content': [{'type': 'text', 'text': json.dumps(obj)}]}
+                row = project(obj)
+                self.assertEqual(row['attachments'][0]['desktopId'], hashlib.sha256(base64.b64decode(PNG)).hexdigest())
+                self.assertIn('example.test', row['output'])
+                self.assertIn('ready', row['output'])
+                self.assertNotIn('base64,', row['output'])
+                self.assertNotIn(PNG, json.dumps(public_turns([{'messages': [row]}])))
+        damaged = PNG[:40] + '…' + str(len(PNG) - 80) + ' chars truncated…' + PNG[-40:]
+        for url in ('data:image/png;base64,' + damaged, 'https://untrusted.example/screenshot',
+                    'data:image/jpeg;base64,' + base64.b64encode(b'\xff\xd8\xff\xe0' + bytes(92)).decode()):
+            with self.subTest(protocol=url[:10]):
+                with patch.object(tool_images, 'decode_tool_image', side_effect=AssertionError('invalid screenshot reached raster decoder')):
+                    row = project({'content': [{'type': 'text', 'text': json.dumps(result(url))}]})
+                self.assertTrue(row['computerUse']['imageUnavailable'])
+                self.assertFalse(row.get('attachments'))
+                self.assertNotIn(url, row['output'])
+                self.assertNotIn('base64,', row['output'])
+
+    def test_surface_clipping_requires_matching_original_in_same_thread_turn_and_call(self):
+        full = base64.b64encode(base64.b64decode(PNG) + bytes(range(256))).decode()
+        clipped = full[:40] + '…' + str(len(full) - 80) + ' chars truncated…' + full[-40:]
+        def state(turn, image_id, data):
+            return {'id': 'thread', 'turns': [{'turnId': turn, 'items': [{'type': 'mcpToolCall', 'id': image_id, 'server': 'cua_repl', 'tool': 'js',
+                    'result': {'_meta': {'codex/toolSurface': {'screenshot': {'url': 'data:image/png;base64,' + data}}}}}]}]}
+        session = LiveSession('thread', image_cache=tool_images.ToolImageCache())
+        with session.condition:
+            session.set_history(state('turn', 'first', full))
+            session.connected = True
+            for turn, call, expected in [('turn', 'first', True), ('turn', 'next', False), ('other', 'first', False)]:
+                session.state = state(turn, call, clipped)
+                row = session.view()['turns'][-1]['messages'][-1]
+                self.assertEqual(bool(row.get('attachments')), expected)
+                self.assertNotIn('base64,', row['output'])
+
     def test_public_turns_strip_patch_metadata_without_changing_tool_bodies_or_native_state(self):
         tool={'role':'activity','kind':'fileChange','text':'original tool patch output'}
         turn={'id':'turn','diff':'PRIVATE_NET_PATCH'*10000,'fileChanges':[

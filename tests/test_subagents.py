@@ -77,6 +77,66 @@ class SubagentTests(unittest.TestCase):
         timeline.update({**normalize_state(self.bridge.store.history(support.THREAD)),'sequence':2})
         self.assertEqual([r['key'] for r in timeline.rows],[r['key'] for r in created])
 
+    def test_collab_delivery_and_agent_state_update_the_same_live_row(self):
+        target, second = self.child(support.THREAD), self.child(support.THREAD)
+        item = {'type': 'collabAgentToolCall', 'id': 'send', 'tool': 'sendInput', 'status': 'inProgress',
+                'receiverThreadIds': [target, target], 'receiverThreads': [{'threadId': target, 'thread': {'agentNickname': 'Ada'}}],
+                'prompt': '검토해 주세요'}
+        turn = {'turnId': 'parent-turn', 'status': 'completed', 'items': [item]}
+        timeline = Timeline()
+        def update(sequence):
+            timeline.update({**normalize_state({'id': support.THREAD, 'turns': [turn]}), 'sequence': sequence})
+            self.assertEqual(len(timeline.rows), 1)
+            return timeline.rows[0]
+        started = update(1)
+        self.assertEqual(started['status'], 'inProgress')
+        item.update(status='completed', agentsStates={target: {'status': 'running', 'message': None}})
+        sent = update(2)
+        self.assertEqual(sent['key'], started['key'])
+        self.assertNotEqual(sent['version'], started['version'])
+        self.assertEqual(sent['collab'], {'tool': 'sendInput', 'targets': [{'id': target, 'nickname': 'Ada', 'status': 'running'}]})
+        item['agentsStates'][target]['status'] = 'completed'
+        self.assertNotEqual(update(3)['version'], sent['version'])
+        item.update(tool='wait', receiverThreadIds=[], agentsStates={
+            target: {'status': 'completed', 'message': '검토 결과'}, second: {'status': 'errored', 'message': '오류 원인'}})
+        item.pop('prompt')
+        wait = update(4)
+        self.assertEqual([(a['id'], a['status']) for a in wait['collab']['targets']], [(target, 'completed'), (second, 'errored')])
+        self.assertIn('Ada\n검토 결과', timeline.details[wait['key']])
+        self.assertIn(second + '\n오류 원인', timeline.details[wait['key']])
+
+    def test_saved_collab_calls_match_live_and_ignore_other_turns_and_late_starts(self):
+        target = self.child(support.THREAD)
+        send = {'type': 'CollabAgentToolCall', 'id': 'request', 'tool': 'send_input',
+                'receiver_thread_ids': [target], 'receiver_agents': [{'thread_id': target, 'agent_nickname': 'Ada'}],
+                'prompt': '검토해 주세요'}
+        def event(item, phase='item_completed', thread=support.THREAD, turn='parent-turn'):
+            return {'type': 'event_msg', 'payload': {'type': phase, 'thread_id': thread, 'turn_id': turn, 'item': item}}
+        records = [
+            {'type': 'event_msg', 'payload': {'type': 'task_started', 'turn_id': 'parent-turn'}},
+            event(send, 'item_started'),
+            event({**send, 'status': 'completed', 'agents_states': {target: 'running'}}),
+            event(send, 'item_started'),
+            event({**send, 'id': 'wait', 'tool': 'wait', 'status': 'completed', 'agents_states': {target: {'completed': '결과'}}}),
+            event({'type': 'CollabAgentToolCall', 'id': 'empty', 'tool': 'wait', 'status': 'completed', 'agents_states': {}}),
+            event({**send, 'id': 'failure', 'status': 'failed'}),
+            event({**send, 'id': 'wrong-thread'}, thread=str(uuid.uuid4())),
+            event({**send, 'id': 'wrong-turn'}, turn='different'),
+            {'type': 'event_msg', 'payload': {'type': 'task_complete'}}]
+        (self.root / 'sessions/fixture.jsonl').write_text('\n'.join(map(json.dumps, records)))
+        saved = normalize_state(self.bridge.store.history(support.THREAD))
+        rows = saved['turns'][0]['messages']
+        self.assertEqual([r['id'] for r in rows], ['request', 'wait', 'empty', 'failure'])
+        live = {'type': 'collabAgentToolCall', 'id': 'request', 'tool': 'sendInput', 'status': 'completed',
+                'receiverThreadIds': [target], 'receiverAgents': [{'threadId': target, 'agentNickname': 'Ada'}],
+                'prompt': '검토해 주세요', 'agentsStates': {target: {'status': 'running', 'message': None}}}
+        view = normalize_state({'id': support.THREAD, 'turns': [{'turnId': 'parent-turn', 'items': [live]}]})
+        self.assertEqual(rows[0], view['turns'][0]['messages'][0])
+        self.assertEqual(rows[1]['collab']['targets'][0]['status'], 'completed')
+        self.assertIn('Ada\n결과', rows[1]['text'])
+        self.assertEqual(rows[2]['collab']['targets'], [])
+        self.assertEqual(rows[3]['status'], 'failed')
+
     def test_live_control_checks_child_turn_generation_and_durable_receipt(self):
         child=self.child(support.THREAD)
         with closing(sqlite3.connect(self.root/'state_5.sqlite')) as db, db:

@@ -21,6 +21,7 @@ from bridge.clients.codex.linux_control import LinuxCliControl
 from bridge.platforms.codex_daemon_env import read_daemon_environment, DaemonEnvironmentUnavailable
 from bridge.features.sessions.goal import GoalError, GoalUnavailable, GoalUnsupported, normalize_goal_result
 from bridge.features.sessions import linux_permissions
+from bridge.features.sessions.activity import preserve_turn_plan, update_turn_plan
 from bridge.features.sessions.store import SessionStore, StoreUnavailable
 
 MAX_REASONING_PARTS = 1024
@@ -637,6 +638,7 @@ class CliSessions:
                             prior.get('status') != starting_turn_status[turn_id]):
                         state['turns'][index] = copy.deepcopy(prior)
                         continue
+                    turn['items'] = preserve_turn_plan(turn_id, prior.get('items'), turn['items'])
                     if not (turn.get('params') or {}).get('model') and (prior.get('params') or {}).get('model'):
                         turn['params'] = copy.deepcopy(prior['params'])
                 for turn_id, prior in previous_turns.items():
@@ -666,7 +668,7 @@ class CliSessions:
         self.on_state(thread_id, copy.deepcopy(state))
         return copy.deepcopy(state)
 
-    def call(self, thread_id, desktop_method, params, timeout=30):
+    def call(self, thread_id, desktop_method, params, timeout=30, *, reviewed_request=None):
         self._check_joined_identity(thread_id)
         if desktop_method == 'thread-follower-compact-thread':
             state = self.refresh(thread_id)
@@ -757,6 +759,7 @@ class CliSessions:
             'thread-follower-command-approval-decision': 'item/commandExecution/requestApproval',
             'thread-follower-file-approval-decision': 'item/fileChange/requestApproval',
             'thread-follower-permissions-request-approval-response': 'item/permissions/requestApproval',
+            'direct-option-picker-response': 'item/tool/requestOptionPicker',
             'thread-follower-submit-user-input': 'item/tool/requestUserInput',
             'thread-follower-submit-mcp-server-elicitation-response': 'mcpServer/elicitation/request',
         }
@@ -777,6 +780,10 @@ class CliSessions:
                 if not pending or (pending['method'] != expected and not (
                         expected == 'item/tool/requestUserInput' and pending['method'] == 'tool/requestUserInput')):
                     raise AppServerUnavailable('CLI approval is no longer pending')
+                if reviewed_request is not None:
+                    from bridge.features.sessions.model import request_snapshot
+                    if request_snapshot(pending) != reviewed_request:
+                        raise AppServerUnavailable('This request changed or expired. Review the latest request.')
                 # Claim the native request id before writing. A send timeout or
                 # disconnect has an unknown result and must not permit replay.
                 self.requests[thread_id].pop(request_id)
@@ -1133,7 +1140,9 @@ class CliSessions:
             if state is None:
                 self._queue_refresh(thread_id)
                 return
-            if method == 'serverRequest/resolved':
+            if method == 'thread/queue/changed':
+                state['_queueRevision'] = state.get('_queueRevision', 0) + 1
+            elif method == 'serverRequest/resolved':
                 self.requests.get(thread_id, {}).pop(params.get('requestId'), None)
                 state['requests'] = list(self.requests.get(thread_id, {}).values())
             elif method == 'thread/settings/updated':
@@ -1158,7 +1167,7 @@ class CliSessions:
                 state.pop('completedThreadGoal', None)
                 self.metadata[thread_id]['goal'] = None
             elif method == 'turn/plan/updated':
-                state['turnPlan'] = copy.deepcopy(params.get('plan') or [])
+                update_turn_plan(state, params)
             elif method == 'thread/status/changed':
                 state['threadRuntimeStatus'] = params.get('status') or state['threadRuntimeStatus']
             elif method == 'error':
@@ -1193,6 +1202,7 @@ class CliSessions:
                     if method == 'turn/completed':
                         incoming_ids = {item.get('id') for item in items}
                         # Completed event items can omit user messages still present in thread/read.
+                        items = preserve_turn_plan(row['turnId'], row['items'], items)
                         items = [item for item in row['items'] if item.get('type') == 'userMessage'
                                  and item.get('id') not in incoming_ids] + items
                     row['items'] = items
@@ -1206,6 +1216,8 @@ class CliSessions:
                 turn = next((item for item in state['turns'] if item['turnId'] == params.get('turnId')), None)
                 if turn and isinstance(params.get('item'), dict):
                     item = params['item']
+                    if item.get('type') == 'plan' and method == 'item/completed':
+                        item = {**item, '_bridgePlanComplete': True}
                     items = turn['items']
                     for index, existing in enumerate(items):
                         if existing.get('id') == item.get('id'):
@@ -1215,18 +1227,24 @@ class CliSessions:
                                 # A late start must not erase deltas already received.
                                 item = {**item, **{field: existing[field] for field in ('summary', 'content')
                                                   if not item.get(field) and isinstance(existing.get(field), list)}}
+                            if method == 'item/started' and item.get('type') == existing.get('type'):
+                                if existing.get('status') in ('completed', 'failed', 'interrupted', 'declined') or existing.get('completed') is True or existing.get('_bridgePlanComplete'):
+                                    break
+                                if item.get('type') == 'plan' and existing.get('text') and not item.get('text'):
+                                    item = {**item, 'text': existing['text']}
                             items[index] = item
                             break
                     else:
                         items.append(item)
-            elif method == 'item/agentMessage/delta':
+            elif method in ('item/agentMessage/delta', 'item/plan/delta'):
                 turn = next((item for item in state['turns'] if item['turnId'] == params.get('turnId')), None)
-                if turn:
+                if turn and isinstance(params.get('itemId'), str) and params['itemId'] and isinstance(params.get('delta'), str):
+                    kind = 'plan' if method == 'item/plan/delta' else 'agentMessage'
                     item = next((item for item in turn['items'] if item.get('id') == params.get('itemId')), None)
                     if item is None:
-                        item = {'id': params.get('itemId'), 'type': 'agentMessage', 'text': ''}
+                        item = {'id': params['itemId'], 'type': kind, 'text': ''}
                         turn['items'].append(item)
-                    if isinstance(params.get('delta'), str):
+                    if item.get('type') == kind and not item.get('_bridgePlanComplete'):
                         item['text'] = item.get('text', '') + params['delta']
             elif method == 'item/commandExecution/outputDelta':
                 turn = next((item for item in state['turns'] if item['turnId'] == params.get('turnId')), None)
@@ -1271,6 +1289,8 @@ class CliSessions:
                 return
             if request['id'] in self.consumed_requests.get(thread_id, set()):
                 return
+            if request.get('method') == 'item/tool/requestOptionPicker':
+                request = {**request, '_directOptionResponse':True}
             self.requests.setdefault(thread_id, {})[request['id']] = request
             state = self.states.get(thread_id)
             if state is not None:

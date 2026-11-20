@@ -84,9 +84,10 @@ function syncChatMessageNodes(container,nodes){
 // 원본 종류와 turn 경계로만 묶는다. 번역된 제목이나 명령 내용으로
 // 종류를 추측하지 않으며, 이미지와 확인이 필요한 항목은 독립 행이다.
 function chatActivityGroupKind(row){
+  if(row.role==='activity'&&['imageView','ImageView'].includes(row.kind))return 'images';
   if(!['activity','fileChanges'].includes(row.role)||row.attachments?.length||['denied','declined'].includes(row.status)||row.approvalReview?.status==='denied')return null;
   // 컴퓨터 사용은 첨부 유무와 관계없이 호출 제목에서 바로 열 수 있어야 한다.
-  if(row.fileSummary||row.computerUse)return null;
+  if(row.fileSummary||row.computerUse||row.activityCard)return null;
   if(row.role==='fileChanges')return 'files';
   switch(row.kind){
     case 'commandExecution':return 'commands';
@@ -102,7 +103,7 @@ function groupChatActivityRows(rows){
   for(const row of rows){
     if(row.kind==='reasoning'||row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))continue;
     if(!chatActivityGroupKind(row)){flush();units.push({kind:'standalone',rows:[row]});continue;}
-    if(pending.length&&pending[0].turnId!==row.turnId)flush();
+    if(pending.length&&(pending[0].turnId!==row.turnId||(chatActivityGroupKind(pending[0])==='images')!==(chatActivityGroupKind(row)==='images')))flush();
     pending.push(row);
   }
   flush();return units;
@@ -142,7 +143,7 @@ class ChatActivityGroups {
       }
       group.rows=unit.rows;groups.set(group.node.dataset.key,group);
       for(const {row} of items)members.set(row.key,group);
-      const visible=items.filter(({node})=>!node.hidden),labels={commands:'Ran commands',files:'Edited files',web:'Searched the web',tools:'Tool activity',review:'Automatic approval review'};
+      const visible=items.filter(({node})=>!node.hidden),labels={commands:'Ran commands',files:'Edited files',web:'Searched the web',tools:'Tool activity',images:'Viewed images',review:'Automatic approval review'};
       const types=[...new Set(visible.map(({row})=>chatActivityGroupKind(row)))];
       const active=visible.some(({row})=>row.status==='inProgress');
       const reviewing=visible.some(({row})=>row.approvalReview?.status==='inProgress');
@@ -214,13 +215,61 @@ function decorateChatActivity(node,row,heading,command=''){
   heading.setAttribute('aria-label',heading.textContent+(['succeeded','completed'].includes(result)?' · '+label:''));
 }
 function chatActivityCaption(row){
+  if(row.activityCard)return BridgeI18n.t(row.title);
   if(row.kind==='automaticApprovalReview')return typeof row.reviewActionLabel==='string'&&row.reviewActionLabel.trim()?row.reviewActionLabel.split(/[\r\n]/,1)[0]:BridgeI18n.t('Tool request');
   if(['mcpToolCall','dynamicToolCall','storedToolEvent'].includes(row.kind)&&typeof row.title==='string')return row.title;
   return BridgeI18n.t(row.title||row.kind||row.type);
 }
-function chatActivityLabel(row){
+// Each tool reports the outcome of its own call. In particular, a finished wait may have no agent update.
+const collabActions={
+  spawnAgent:['Agent creation','Creating agent','Agent creation call finished'],
+  sendInput:['Request delivery','Sending request','Request delivered'],
+  sendMessage:['Message delivery','Sending message','Message delivered'],
+  followupTask:['Follow-up request','Sending follow-up request','Follow-up request delivered'],
+  wait:['Response wait','Waiting for response','Response wait ended'],
+  resumeAgent:['Agent resumption','Resuming agent','Agent resumed'],
+  closeAgent:['Agent closure','Closing agent','Agent closed'],
+  interruptAgent:['Agent interruption','Requesting interruption','Interruption requested'],
+  listAgents:['Agent lookup','Listing agents','Agent list retrieved']
+};
+const collabAgentStates={
+  pendingInit:'Agent initializing',running:'Agent task running',interrupted:'Agent task interrupted',
+  completed:'Agent task completed',errored:'Agent task failed',shutdown:'Agent shut down',notFound:'Agent not found'
+};
+function chatCollabLabel(row,agentNames){
+  const t=BridgeI18n.t,tool=row.collab?.tool,targets=row.collab?.targets||[];
+  if(row.spawnedAgents?.length)return t('Subagent created');
+  const [action,progress,done]=Object.hasOwn(collabActions,tool)?collabActions[tool]:['Agent operation','Agent operation in progress','Agent operation finished'];
+  let label=t(action);
+  switch(row.status){
+    case 'inProgress':label=t(progress);break;
+    case 'completed':label=t(done);break;
+    case 'failed':label=t('{action} failed').replace('{action}',()=>t(action));break;
+    case 'interrupted':label=t('{action} interrupted').replace('{action}',()=>t(action));break;
+  }
+  if(!targets.length)return label;
+  const names=targets.map(target=>target.nickname||agentNames?.get(target.id)||t('Agent {id}').replace('{id}',()=>target.id.slice(-8)));
+  const template=['sendInput','sendMessage','followupTask'].includes(tool)?'To {targets} · {action}':tool==='wait'?'From {targets} · {action}':'{targets} · {action}';
+  const values={targets:names.join(', '),action:label};
+  label=t(template).replace(/\{(targets|action)\}/g,(_,field)=>values[field]);
+  const states=[];
+  for(const [index,target] of targets.entries()){
+    if(!Object.hasOwn(collabAgentStates,target.status))continue;
+    const state=t(collabAgentStates[target.status]);
+    states.push(targets.length===1?state:names[index]+' · '+state);
+  }
+  return states.length?label+' · '+t('Last reported state ({states})').replace('{states}',()=>states.join(', ')):label;
+}
+function chatActivityLabel(row,agentNames){
   const t=BridgeI18n.t,kind=row.kind||row.type;
+  if(kind==='collabAgentToolCall')return chatCollabLabel(row,agentNames);
   if(kind!=='contextCompaction'&&kind!=='autoContextCompaction'){
+    if(['userInputResponse','permissionRequest','mcpServerElicitation'].includes(kind)&&typeof row.completed==='boolean')
+      return chatActivityCaption(row)+' · '+t(row.completed?'Request completed':'Awaiting response');
+    if(kind==='error'&&row.title==='Reconnecting to model'){
+      const attempt=/^Reconnecting(?:…|\.{3})?\s+(\d+\s*\/\s*\d+)/i.exec(row.text||'');
+      return chatActivityCaption(row)+(attempt?' · '+attempt[1]:'');
+    }
     if(kind==='automaticApprovalReview')return chatActivityCaption(row)+chatActivityStateSuffix(row);
     return chatActivityCaption(row)+(chatToolKinds.has(kind)?chatActivityStateSuffix(row):row.status==='inProgress'?t('· 진행중'):'');
   }

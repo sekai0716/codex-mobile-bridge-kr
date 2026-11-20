@@ -7,6 +7,7 @@ import threading
 from collections import OrderedDict
 import json
 import logging
+import shlex
 import shutil
 import sqlite3
 import tempfile
@@ -14,6 +15,73 @@ from contextlib import closing, contextmanager, ExitStack
 from pathlib import Path
 
 ROLLOUT_TIME_BYTES = 2 * 1024 * 1024
+
+
+def rollout_activity(item):
+    """Convert the serialized Rust event at the rollout boundary; never rewrite tool argument keys."""
+    raw = item.get('type')
+    if not isinstance(raw, str) or not raw:
+        return None
+    if raw == 'Extension' and item.get('kind') == 'web.search':
+        raw = 'webSearch'
+    kind = raw[0].lower() + raw[1:]
+    if kind in ('agentMessage', 'userMessage', 'collabAgentToolCall'):
+        return None  # Message acceptance and collaboration have dedicated identity rules.
+    row = {**item, 'type': kind}
+    aliases = {
+        'agent_thread_id': 'agentThreadId', 'agent_path': 'agentPath', 'summary_text': 'summary',
+        'saved_path': 'savedPath', 'revised_prompt': 'revisedPrompt', 'generation_id': 'generationId',
+        'content_items': 'contentItems', 'parsed_cmd': 'commandActions', 'exit_code': 'exitCode',
+        'aggregated_output': 'aggregatedOutput', 'additional_details': 'additionalDetails', 'will_retry': 'willRetry',
+        'mcp_app_ui': 'mcpAppUi', 'mcp_app_resource_uri': 'mcpAppResourceUri', 'app_context': 'appContext',
+    }
+    for source, target in aliases.items():
+        if source in row:
+            row.setdefault(target, row.pop(source))
+    if row.get('status') == 'in_progress':
+        row['status'] = 'inProgress'
+    if kind == 'mcpToolCall':
+        for field in ('appContext', 'mcpAppUi'):
+            ui = row.get(field)
+            if isinstance(ui, dict) and 'resource_uri' in ui and 'resourceUri' not in ui:
+                row[field] = {**ui, 'resourceUri': ui['resource_uri']}
+    if kind == 'commandExecution':
+        args = row.get('command')
+        if isinstance(args, list) and all(isinstance(arg, str) for arg in args):
+            # The runtime records shell wrappers as argv. Preserve the original shell command when available.
+            row['command'] = args[-1] if len(args) == 3 and args[1] in ('-lc', '-c', '/c', '-Command') else shlex.join(args)
+        for action in row.get('commandActions') or []:
+            if isinstance(action, dict) and action.get('type') == 'list_files':
+                action['type'] = 'listFiles'
+        duration = row.get('duration')
+        if isinstance(duration, dict) and type(duration.get('secs')) is int and type(duration.get('nanos')) is int:
+            row.setdefault('durationMs', duration['secs'] * 1000 + duration['nanos'] // 1_000_000)
+    if kind == 'reasoning':
+        row.pop('raw_content', None)
+    if kind == 'dynamicToolCall' and isinstance(row.get('contentItems'), list):
+        row['contentItems'] = [{**part, 'type': 'inputText'} if part.get('type') == 'input_text' else part for part in row['contentItems'] if isinstance(part, dict)]
+    if kind == 'webSearch' and isinstance(row.get('action'), dict):
+        action = row['action']
+        row['action'] = {**action, 'type': {'open_page': 'openPage', 'find_in_page': 'findInPage'}.get(action.get('type'), action.get('type'))}
+    return row
+
+
+def stored_collab_call(item):
+    """Convert native collaboration field names without interpreting the receiving agent's status."""
+    call = {'type': 'collabAgentToolCall', 'id': item.get('id')}
+    for source, dest in (('sender_thread_id', 'senderThreadId'), ('receiver_thread_ids', 'receiverThreadIds'),
+                         ('agents_states', 'agentsStates'), ('prompt', 'prompt')):
+        if source in item:
+            call[dest] = item[source]
+    for key in ('tool', 'status'):
+        value = item.get(key)
+        if isinstance(value, str):
+            call[key] = re.sub(r'_([a-z])', lambda match: match[1].upper(), value)
+    receivers = item.get('receiver_agents')
+    if isinstance(receivers, list):
+        call['receiverAgents'] = [{'threadId': agent.get('thread_id'), 'agentNickname': agent.get('agent_nickname')}
+                                  for agent in receivers if isinstance(agent, dict)]
+    return call
 
 
 def rollout_message_times(raw, thread_id):
@@ -664,7 +732,7 @@ class SessionStore:
                 # Desktop status notices have no history row or cursor. Count the
                 # next real item when deciding whether another page is available.
                 rows = conn.execute("SELECT turn_id, item_json FROM thread_items WHERE thread_id=? "
-                                    "AND json_extract(item_json, '$.type') IS NOT 'strictReviewNotice' "
+                                    "AND coalesce(json_extract(item_json, '$.type'), '') NOT IN ('strictReviewNotice','sleep','enteredReviewMode','exitedReviewMode') "
                                     "ORDER BY rollout_ordinal DESC LIMIT ?", (thread_id, item_limit + 1)).fetchall()
                 if not rows:
                     return None
@@ -687,6 +755,8 @@ class SessionStore:
                     item = json.loads(row['item_json'])
                     if not isinstance(item, dict) or not isinstance(item.get('type'), str):
                         return None
+                    if item['type'] == 'CollabAgentToolCall':
+                        item = stored_collab_call(item)
                     turns[row['turn_id']]['items'].append(item)
                 for turn in turns.values():
                     calls = {item.get('call_id', item.get('id')) for item in turn['items']
@@ -797,8 +867,28 @@ class SessionStore:
                 return result
         raw, complete = self._recent_lines(resolved, turn_limit)
         items, turns, current = [], [], None
+        positions = {}
+        completed = set()
+        typed_calls = set()
+
+        def put(item, done):
+            key = item.get('type'), item.get('id')
+            if not isinstance(key[1], str) or not key[1]:
+                if done:
+                    items.append(item)
+                return
+            pos = positions.get(key)
+            if pos is None:
+                positions[key] = len(items)
+                items.append(item)
+            elif done or key not in completed:
+                items[pos] = {**items[pos], **item}
+            if done:
+                completed.add(key)
+
         persisted_user_ids = []
         token_usage = None
+        saved_citations = {}
         for line in raw.splitlines():
             try:
                 record = json.loads(line)
@@ -810,6 +900,8 @@ class SessionStore:
                            "startedAt": record.get("timestamp")}
                 turns.append(current)
                 items = current["items"]
+                positions.clear()
+                completed.clear()
             elif record.get("type") == "event_msg" and payload.get("type") == "token_count":
                 info = payload.get('info')
                 if isinstance(info, dict) and isinstance(info.get('last_token_usage'), dict):
@@ -822,36 +914,44 @@ class SessionStore:
             elif record.get("type") == "event_msg" and payload.get("type") in ("task_complete", "turn_aborted"):
                 if current:
                     current["status"] = "completed" if payload["type"] == "task_complete" else "interrupted"
-            elif record.get("type") == "event_msg" and payload.get("type") == "item_completed":
+            elif record.get("type") == "event_msg" and payload.get("type") in ("item_started", "item_completed"):
                 item = payload.get("item", {})
-                # 저장된 원본 항목은 IPC와 다른 대소문자·필드명을 쓴다. 현재 부모와 턴에 속한 생성만 복원한다.
+                # Match both envelope identities before projecting a call. A later completion updates its original row.
                 if (isinstance(item, dict) and current is not None and payload.get('thread_id') == thread_id
                         and payload.get('turn_id') == current.get('turnId')):
-                    if item.get('type') == 'SubAgentActivity' and item.get('kind') == 'started':
-                        items.append({'type': 'subAgentActivity', 'id': item.get('id'), 'kind': 'started',
-                                      'agentThreadId': item.get('agent_thread_id'), 'agentPath': item.get('agent_path')})
-                    elif item.get('type') == 'CollabAgentToolCall' and item.get('tool') == 'spawn_agent':
-                        receivers = item.get('receiver_agents')
-                        items.append({'type': 'collabAgentToolCall', 'id': item.get('id'), 'tool': 'spawnAgent',
-                                      'status': item.get('status'), 'senderThreadId': item.get('sender_thread_id'),
-                                      'receiverThreadIds': item.get('receiver_thread_ids'), 'receiverAgents': [
-                                          {'threadId': agent.get('thread_id'), 'agentNickname': agent.get('agent_nickname')}
-                                          for agent in (receivers if isinstance(receivers, list) else ()) if isinstance(agent, dict)]})
+                    done = payload['type'] == 'item_completed'
+                    if item.get('type') == 'CollabAgentToolCall':
+                        call = stored_collab_call(item)
+                        if not done:
+                            call.setdefault('status', 'inProgress')
+                        put(call, done)
+                    elif item.get('type') == 'AgentMessage' and done and isinstance(item.get('id'), str):
+                        citation = item.get('memoryCitation', item.get('memory_citation'))
+                        if isinstance(citation, dict):
+                            saved_citations[(current['turnId'], item['id'])] = citation
+                    elif item.get('type') not in ('UserMessage', 'AgentMessage', 'FileChange', 'fileChange', 'ImageView', 'imageView'):
+                        entry = rollout_activity(item)
+                        if entry:
+                            put(entry, done)
+                            if (entry['type'] in ('commandExecution', 'dynamicToolCall', 'mcpToolCall')
+                                    and isinstance(entry.get('id'), str)):
+                                typed_calls.add((current['turnId'], entry['id']))
+                if payload['type'] == 'item_started':
+                    continue
                 if (isinstance(item, dict) and item.get('type') == 'UserMessage' and current is not None and
                         payload.get('thread_id') == thread_id and payload.get('turn_id') == current.get('turnId')):
                     # The response_item supplies display text; this separate
                     # persisted event supplies the native acceptance identity.
                     persisted_user_ids.append(item.get('client_id'))
-                if isinstance(item, dict) and item.get("type") in ("ImageView", "imageView"):
-                    # ImageView evidence only exists in event records. Preserve it
-                    # so saved history can still render the image after restart.
-                    if current is None:
-                        current = {"turnId": "history", "status": "completed", "items": []}
+                if (isinstance(item, dict) and item.get('type') in ('ImageView', 'imageView', 'FileChange', 'fileChange')
+                        and payload.get('thread_id', thread_id) == thread_id):
+                    if current is None and item.get('type') in ('ImageView', 'imageView') and not payload.get('turn_id'):
+                        current = {'turnId': 'history', 'status': 'completed', 'items': []}
                         turns.append(current)
-                        items = current["items"]
-                    items.append({"id": item.get("id", str(len(items))), "type": "ImageView", "path": item.get("path", "")})
-                elif isinstance(item, dict) and item.get("type") in ("FileChange", "fileChange") and current is not None:
-                    items.append({**item, "type": "fileChange", "status": item.get("status", "completed")})
+                        items = current['items']
+                    if current is not None and payload.get('turn_id', current.get('turnId')) == current.get('turnId'):
+                        image = item.get('type') in ('ImageView', 'imageView')
+                        put({**item, 'type': 'ImageView' if image else 'fileChange', 'status': item.get('status', 'completed')}, True)
             elif record.get("type") == "response_item":
                 if current is None:
                     current = {"turnId": "history", "status": "completed", "items": []}
@@ -866,15 +966,46 @@ class SessionStore:
                     if role == "user":
                         items.append({**identity, "type": "userMessage", "content": payload.get("content", []), "timestamp": record.get("timestamp")})
                     else:
-                        items.append({**identity, "type": "agentMessage", "text": "\n".join(x.get("text", "") for x in payload.get("content", []) if isinstance(x, dict)), "phase": payload.get("phase"), "timestamp": record.get("timestamp")})
+                        items.append({**identity, "type": "agentMessage", "text": "\n".join(x.get("text", "") for x in payload.get("content", []) if isinstance(x, dict)), "phase": payload.get("phase"), "timestamp": record.get("timestamp"),
+                                      **({"memoryCitation": payload.get("memoryCitation", payload.get("memory_citation"))} if ("memoryCitation" in payload or "memory_citation" in payload) else {})})
                 elif payload.get("type") in ("agent_message", "agentMessage"):
                     native_id = payload.get('id')
                     items.append({"id": native_id if isinstance(native_id, str) and native_id else str(len(items)),
                                   '_syntheticId': not isinstance(native_id, str) or not native_id,
                                   '_timestampSource': 'rollout-response-item',
                                   "type": "agentMessage", "text": payload.get("text", ""), "timestamp": record.get("timestamp")})
+                elif payload.get('type') in ('web_search_call', 'reasoning', 'compaction'):
+                    kind = {'web_search_call': 'webSearch', 'reasoning': 'reasoning', 'compaction': 'contextCompaction'}[payload['type']]
+                    data = {'type': kind, 'id': payload.get('id') or 'rollout-' + str(len(items))}
+                    if kind == 'reasoning':
+                        data['summary'] = [p['text'] for p in payload.get('summary') or [] if isinstance(p, dict) and isinstance(p.get('text'), str)]
+                        if not data['summary']:
+                            continue
+                    elif kind == 'webSearch':
+                        data.update(action=payload.get('action'), query=payload.get('query'), results=payload.get('results'))
+                        data = rollout_activity(data)
+                    else:
+                        data['completed'] = True
+                    if payload.get('id') and (kind, payload['id']) in completed:
+                        continue
+                    if not payload.get('id') and items and items[-1].get('type') == kind and (kind, items[-1].get('id')) in completed:
+                        # Old Responses records may follow their native item with no id and no extra display evidence.
+                        if kind == 'contextCompaction' or (kind == 'reasoning' and items[-1].get('summary') == data['summary']) or (kind == 'webSearch' and items[-1].get('action') == data.get('action')):
+                            continue
+                    put(data, True)
                 elif payload.get("type") in ("function_call", "custom_tool_call", "function_call_output", "custom_tool_call_output"):
                     items.append({"id": payload.get("call_id", str(len(items))), "type": "storedToolEvent", **payload})
+        if typed_calls:
+            for turn in turns:
+                turn['items'] = [item for item in turn['items'] if not (item.get('type') in
+                                 ('function_call', 'custom_tool_call', 'function_call_output', 'custom_tool_call_output')
+                                 and (turn['turnId'], item.get('call_id')) in typed_calls)]
+        if saved_citations:
+            for turn in turns:
+                for item in turn['items']:
+                    key = (turn.get('turnId'), item.get('id'))
+                    if item.get('type') == 'agentMessage' and not item.get('_syntheticId') and key in saved_citations:
+                        item.setdefault('memoryCitation', saved_citations[key])
         apply_rollout_message_times(turns, rollout_message_times(raw, thread_id))
         # Rollout parsing already visited these records. Retain the native patch
         # projection once so a later bounded item window need not reopen bodies.

@@ -72,6 +72,7 @@ class Workbench {
 
   }
   canSplit(){return BridgeLayout.canSplit(this.chat.clientWidth);}
+  primaryChatTab(session){return session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat';}
   get splitMode(){return this.canSplit()&&!!this.current?.splitTab;}
   isVisible(session,tab){return this.current===session&&(this.splitMode?session.splitTab===tab.id:session.active===tab.id);}
   setRatio(value,remember=true){
@@ -82,7 +83,7 @@ class Workbench {
     this.chat.style.setProperty('--wb-left',`calc(${ratio*100}% - var(--wb-divider-width, 8px) / 2)`);
     this.divider.setAttribute('aria-valuemin',String(Math.round(minimum*100)));this.divider.setAttribute('aria-valuemax',String(Math.round((1-minimum)*100)));this.divider.setAttribute('aria-valuenow',String(Math.round(ratio*100)));
   }
-  split(id){if(!this.canSplit()||!this.current?.files.some(t=>t.id===id&&!t.chatId))return;if(id!=='files')this.cancelLocate();this.rememberScroll();this.current.splitTab=id;this.current.active=id;this.paint();}
+  split(id){if(!this.canSplit()||!this.current?.files.some(t=>t.id===id&&id!==this.primaryChatTab(this.current)))return;if(id!=='files')this.cancelLocate();this.rememberScroll();this.current.splitTab=id;this.current.active=id;this.paint();}
   unsplit(){if(!this.current)return;this.current.active=this.current.splitTab||this.current.active;this.current.splitTab=null;this.paint();}
   endDrag(){this.dragTab=null;this.layout.classList.remove('wb-dragging');}
   node(tag, cls = '', text) { const n = document.createElement(tag); n.className = cls; if (text !== undefined) { n._rawText=text;n.textContent = ['pre','code'].includes(tag)?text:BridgeI18n.t(text); const source=BridgeI18n.source(text); if(source&&!['pre','code'].includes(tag))n.dataset.i18n=source; } return n; }
@@ -92,7 +93,7 @@ class Workbench {
     // 세 언어의 표시값은 번역 키를 유지한다. 파일명 등 직접 바뀐 원문은 계속 보존한다.
     const refresh=root=>{for(const n of root.querySelectorAll('[data-i18n]'))if(![n.dataset.i18n,BridgeI18n.dictionary[n.dataset.i18n],BridgeI18n.translateKorean?.(n.dataset.i18n),BridgeI18n.translateTo?.(n.dataset.i18n,'zh')].includes(n.children.length?[...n.childNodes].find(c=>c.nodeType===3)?.textContent:n.textContent))delete n.dataset.i18n;BridgeI18n.apply(root);for(const n of root.querySelectorAll('.wb-status,.wb-empty'))if(!n.children.length)n.textContent=BridgeI18n.t(n.textContent);};
     refresh(this.strip);refresh(this.panel);
-    for(const session of this.sessions.values())for(const tab of session.files){refresh(tab.body);tab.sideChat?.relabel();}
+    for(const session of this.sessions.values())for(const tab of session.files){refresh(tab.body);tab.sideChat?.relabel();tab.childView?.relabel();}
     for(const dialog of document.querySelectorAll('.picker'))refresh(dialog);
   }
   size(bytes) { return bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB'; }
@@ -188,6 +189,7 @@ class Workbench {
     if (!this.sessions.has(key)) this.sessions.set(key, {id:rootId, host, key, provider:this.provider, active: 'chat', files: [], directory: '', search: '', hidden: false, scroll: 0});
     this.current = this.sessions.get(key);
     this.current.chatId = id;
+    if(this.current.splitTab===this.primaryChatTab(this.current))this.current.splitTab=null;
     this.current.cwd = cwd;
     this.current.scroll = this.current.chatScroll?.get(id) || 0;
     if (id !== rootId) this.sideChatTab(this.current,{id,title});
@@ -200,11 +202,14 @@ class Workbench {
     if (!provider || this.locateState?.session.provider === provider) this.cancelLocate();
     if (this.previewFullscreen && (!provider || this.previewFullscreen.session.provider === provider)) this.closePreviewFullscreen();
     const visible=!provider||this.current?.provider===provider;
-    if(visible){this.stopThumbnails();this.uploadController?.abort();this.activeAgentChat?.setVisible(false);this.activeAgentChat=null;}
-    for(const [key,session] of this.sessions)if(!provider||session.provider===provider){for(const tab of session.files){tab.controller?.abort();tab.pdf?.dispose();tab.html?.dispose();tab.markdown?.dispose();tab.fileFont?.dispose();tab.git?.dispose();tab.terminal?.dispose();tab.agents?.dispose();tab.sideChat?.dispose();}this.sessions.delete(key);}
+    for (const session of this.sessions.values()) if (!provider || session.provider === provider)
+      session.files.find(tab => tab.id === 'browser')?.browser?.dispose();
+    if (visible) this.activeBrowser = null;
+    if(visible){this.stopThumbnails();this.uploadController?.abort();this.activeAgentChat?.setVisible(false);this.activeAgentChat=null;this.activeSideView=null;}
+    for(const [key,session] of this.sessions)if(!provider||session.provider===provider){for(const tab of session.files){tab.controller?.abort();tab.pdf?.dispose();tab.html?.dispose();tab.markdown?.dispose();tab.fileFont?.dispose();tab.git?.dispose();tab.terminal?.dispose();tab.agents?.dispose();tab.sideChat?.dispose();tab.childView?.dispose();}this.sessions.delete(key);}
     if(visible){this.current=null;this.chat.classList.remove('workbench-active','wb-split');this.endDrag();this.panel.replaceChildren();this.panel.hidden=true;this.tabs.replaceChildren();}
   }
-  get isFileVisible() { return !!this.current && !this.splitMode && this.current.active !== 'chat' && !this.current.active.startsWith('child:'); }
+  get isFileVisible() { return !!this.current && !this.splitMode && this.current.active !== this.primaryChatTab(this.current); }
   endpoint(session, action) {
     const path = session.provider && session.provider !== 'codex'
       ? ClientIdentity.path(session.provider,action,session.id)
@@ -218,12 +223,13 @@ class Workbench {
   rememberScroll() { const timeline=this.chat.querySelector('.timeline');if (this.current && !this.chat.classList.contains('workbench-active') && timeline.clientHeight) {this.current.scroll = timeline.scrollTop;(this.current.chatScroll ||= new Map()).set(this.current.chatId||this.current.id,timeline.scrollTop);} }
   select(id) {
     if (!this.current) return;
-    const target = id === 'chat' ? this.current.id : this.current.files.find(tab => tab.id === id)?.chatId;
-    if (target && target !== (this.current.chatId || this.current.id)) return this.openChat(target, this.current.host, id==='chat'?undefined:this.current);
+    const child = this.current.files.find(tab=>tab.id===id&&tab.chatId);
+    if(id==='chat' && this.current.chatId && this.current.chatId!==this.current.id) return this.openChat(this.current.id,this.current.host);
+    if(id==='sidechat'||(child&&id!==this.primaryChatTab(this.current)))this.current.splitTab=id;
     if(id!=='terminal')this.current.files.find(tab=>tab.id==='terminal')?.terminal?.clearCompletion?.();
     if (id !== 'files') this.cancelLocate();
     if (this.previewFullscreen && this.previewFullscreen.tab.id !== id) this.closePreviewFullscreen();
-    this.rememberScroll(); this.current.active = id; if(this.current.splitTab&&id!=='chat'&&!this.current.files.find(tab=>tab.id===id)?.chatId)this.current.splitTab=id; this.paint();
+    this.rememberScroll(); this.current.active = id; if(this.current.splitTab&&id!==this.primaryChatTab(this.current))this.current.splitTab=id; this.paint();
     if(id==='terminal')this.current.files.find(tab=>tab.id==='terminal')?.terminal?.focusOnSelect?.();
     if(id==='sidechat')this.current.files.find(tab=>tab.id==='sidechat')?.sideChat?.load();
     if (id === 'chat') { const session = this.current; requestAnimationFrame(() => { if (session === this.current && session.active === 'chat') this.chat.querySelector('.timeline').scrollTop = session.scroll; }); }
@@ -233,10 +239,10 @@ class Workbench {
     const restoreFocus=focusTab&&this.tabs.contains(focusTab),wasClose=restoreFocus&&focused===focusTab.lastElementChild&&focusTab.children.length>1;
     this.tabs.replaceChildren();
     for (const tab of [{id: 'chat', name: BridgeI18n.t('채팅')}, ...session.files]) {
-      const group = this.node('div', 'wb-tab');group.dataset.tab=tab.id; group.classList.toggle('selected', this.splitMode ? [session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat',session.splitTab].includes(tab.id) : session.active === tab.id);
-      const select = this.button(tab.name, () => this.select(tab.id)); if(tab.id.startsWith('file:')||tab.agent||tab.chatId)this.raw(select); select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(this.splitMode?[session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat',session.splitTab].includes(tab.id):session.active===tab.id));
+      const group = this.node('div', 'wb-tab');group.dataset.tab=tab.id; group.classList.toggle('selected', this.splitMode ? [this.primaryChatTab(session),session.splitTab].includes(tab.id) : session.active === tab.id);
+      const select = this.button(tab.name, () => this.select(tab.id)); if(tab.id.startsWith('file:')||tab.agent||tab.chatId)this.raw(select); select.setAttribute('role', 'tab'); select.setAttribute('aria-selected', String(this.splitMode?[this.primaryChatTab(session),session.splitTab].includes(tab.id):session.active===tab.id));
       group.append(select);
-      group.draggable=this.splitEligible&&tab.id!=='chat'&&!tab.chatId;
+      group.draggable=this.splitEligible&&tab.id!=='chat'&&tab.id!==this.primaryChatTab(session);
       group.ondragstart=event=>{if(!group.draggable){event.preventDefault();return;}this.dragTab=tab.id;event.dataTransfer.setData('text/plain',tab.id);event.dataTransfer.effectAllowed='move';this.layout.classList.add('wb-dragging');};
       group.ondragend=()=>this.endDrag();
       if (tab.id !== 'chat') group.append(this.button('×', () => this.close(tab.id), BridgeI18n.t('닫기')));
@@ -253,11 +259,20 @@ class Workbench {
     this.splitEligible=this.canSplit();
     this.paintTabs(session);
     this.chat.classList.toggle('workbench-active', this.isFileVisible); this.panel.hidden = !this.isFileVisible&&!this.splitMode;
-    this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitMode&&(session.active==='chat'||session.active.startsWith('child:'));
+    this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitMode&&session.active===this.primaryChatTab(session);
     const splitLabel=this.splitMode?'분할 보기 종료':'분할 보기로 열기';this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
-    const active = session.files.find(t => !t.chatId && t.id === (this.splitMode?session.splitTab:session.active));
+    const active = session.files.find(t => t.id!==this.primaryChatTab(session) && t.id === (this.splitMode?session.splitTab:session.active));
+    if (this.activeBrowser !== active?.browser) {
+      this.activeBrowser?.setVisible(false);
+      this.activeBrowser = active?.browser;
+      this.activeBrowser?.setVisible(true);
+    }
     // Keep the visible tool mounted across resizing (including its focus and scroll).
     if(this.panel.firstElementChild!==active?.body)this.panel.replaceChildren(...(active?[active.body]:[]));
+    if(active?.chatId&&!active.childView)active.childView=new SideChatView(this,session,active);
+    if(this.activeSideView!==active?.childView){
+      this.activeSideView?.setVisible(false);this.activeSideView=active?.childView;this.activeSideView?.setVisible(true);
+    }
     if(active?.agent&&!active.agentChat)active.agentChat=new AgentChat(this,session,active);
     if(this.activeAgentChat!==active?.agentChat){
       this.activeAgentChat?.setVisible(false);
@@ -284,8 +299,9 @@ class Workbench {
   async close(id) {
     const session = this.current, index = session.files.findIndex(t => t.id === id);
     if (index < 0) return;
-    if (session.files[index].chatId) {
+    if (session.files[index].chatId === session.chatId && session.chatId!==session.id) {
       const selected = session.chatId === session.files[index].chatId;
+      session.files[index].childView?.dispose();
       session.files.splice(index, 1);
       if (selected) return this.openChat(session.id, session.host);
       this.paint(); return;
@@ -293,15 +309,21 @@ class Workbench {
     if (id === 'files') this.cancelLocate();
     if (this.previewFullscreen?.tab === session.files[index]) this.closePreviewFullscreen();
     if (!session.files[index] || session.files[index].id !== id) return;
+    session.files[index].childView?.dispose();
+    session.files[index].browser?.dispose();
     if(session.files[index].agent){
       (session.dismissedAgents??=new Set()).add(id);session.files[index].agentChat?.dispose();
     }
     session.files[index].controller?.abort(); session.files[index].pdf?.dispose(); session.files[index].html?.dispose(); session.files[index].markdown?.dispose(); session.files[index].fileFont?.dispose(); session.files[index].git?.dispose(); session.files[index].terminal?.dispose(); session.files[index].agents?.dispose(); session.files[index].sideChat?.dispose(); session.files.splice(index, 1);
-    if(session.splitTab===id)session.splitTab=(session.files.slice(index).find(t=>!t.chatId)||session.files.slice(0,index).reverse().find(t=>!t.chatId))?.id||null;
+    if(session.splitTab===id){
+      const primary=this.primaryChatTab(session);
+      const adjacent=[...session.files.slice(index),...session.files.slice(0,index).reverse()].find(t=>t.id!==primary);
+      session.splitTab=!this.canSplit()&&id.startsWith('child:')?null:adjacent?.id||null;
+    }
     const wasActive=session.active===id;
     if(wasActive){
       const chatTab=session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat';
-      session.active=session.splitTab||(id.startsWith('agent:')?chatTab:session.files.some(t=>t.id==='files')?'files':'chat');
+      session.active=session.splitTab||(id.startsWith('agent:')||id.startsWith('child:')?chatTab:session.files.some(t=>t.id==='files')?'files':'chat');
     }
     if (this.current !== session) return;
     if (wasActive) this.select(session.active); else this.paint();
@@ -418,7 +440,20 @@ class Workbench {
       if(unavailable){button.disabled=true;button.lastChild.textContent=BridgeI18n.t('이 클라이언트는 아직 이 기능을 제공하지 않습니다.');}
       choices.append(button);
     }
+    if (this.browserSharing && this.current.host === 'local' && (!this.current.provider || this.current.provider === 'codex')) {
+      const name = BridgeI18n.t('Browser');
+      choices.append(this.button(name, () => { dialog.close(); this.browser(); }, name));
+    }
     dialog.append(head, choices); dialog.addEventListener('close', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
+  }
+  browser() {
+    const session = this.current;
+    if (!session.files.some(tab => tab.id === 'browser')) {
+      const tab = {id:'browser', name:BridgeI18n.t('Browser'), body:this.node('div','wb-browser-share')};
+      tab.browser = new BrowserPanel(this, session, tab);
+      session.files.push(tab);
+    }
+    this.select('browser');
   }
   git() {
     const session = this.current; if (!session) return;
@@ -472,7 +507,8 @@ class Workbench {
   }
   sideChatTab(session,chat){
     let tab=session.files.find(item=>item.chatId===chat.id);
-    if(!tab){tab={id:'child:'+chat.id,chatId:chat.id,name:BridgeI18n.t('보조 채팅'),body:this.node('div')};session.files.push(tab);}
+    if(!tab){tab={id:'child:'+chat.id,chatId:chat.id,name:BridgeI18n.t('보조 채팅'),body:this.node('div','wb-child-view')};session.files.push(tab);}
+    Object.assign(tab,{temporary:chat.temporary??tab.temporary,archived:chat.archived??tab.archived});
     if(chat.title)tab.name=chat.title;
     return tab;
   }
@@ -716,16 +752,33 @@ class Workbench {
     const status = this.node('p', 'wb-status'); status.setAttribute('role', 'status');
     const submit = this.node('button', 'primary', BridgeI18n.t('여기에 업로드하세요')); submit.type = 'submit';
     const cancel = this.button(BridgeI18n.t('취소'), () => dialog.close()); cancel.className = 'wb-upload-cancel'; const actions = this.node('div', 'wb-upload-actions'); actions.append(cancel, submit);
-    form.append(this.node('h2', '', BridgeI18n.t('파일 업로드')), this.node('p', 'wb-upload-target', BridgeI18n.t('다음 위치에 저장:') + (session.project || BridgeI18n.t('프로젝트 목록')) + '/' + directory), file, name, this.node('p', 'muted', BridgeI18n.t('파일당 최대 20개의 MB. 기존 파일은 덮어쓰지 않습니다.')), progress, status, error, actions);
+    form.append(this.node('h2', '', BridgeI18n.t('파일 업로드')), this.node('p', 'wb-upload-target', BridgeI18n.t('다음 위치에 저장:') + (session.project || BridgeI18n.t('프로젝트 목록')) + '/' + directory), file, name, this.node('p', 'muted', BridgeI18n.t('Existing files are kept. Interrupted uploads can be resumed.')), progress, status, error, actions);
     dialog.append(form); document.body.append(dialog);
-    dialog.onclose = () => { this.uploadController?.abort(); this.uploadController = null; dialog.remove(); };
+    let transfer;
+    const discard = () => {
+      if (!transfer) return;
+      transfer.controller.abort();
+      this.uploadPart(transfer, 'cancel').catch(() => {});
+      if (this.uploadController === transfer.controller) this.uploadController = null;
+      transfer = null;
+    };
+    dialog.onclose = () => { discard(); dialog.remove(); };
     form.onsubmit = async event => {
       event.preventDefault(); const selected = file.files[0]; if (!selected || submit.disabled) return;
-      if (selected.size > 20 * 1024 * 1024 || !name.value || /[\\/:\x00-\x1f]/.test(name.value) || ['.', '..'].includes(name.value)) { error.textContent = BridgeI18n.t('MB까지 최대 20개의 파일을 선택하고 경로 없이 파일 이름을 입력하세요.'); return; }
+      if (!name.value || /[\\/:\x00-\x1f]/.test(name.value) || ['.', '..'].includes(name.value)) { error.textContent = BridgeI18n.t('Enter a file name without a path.'); return; }
       error.textContent = ''; progress.hidden = false; progress.value = 0; submit.disabled = true; file.disabled = name.disabled = true;
       const path = (directory ? directory + '/' : '') + name.value;
       try {
-        const result = await this.upload(this.url(session, 'upload', path), selected, value => { progress.value = value; status.textContent = value === 100 ? BridgeI18n.t('저장된 파일 확인 중…') : BridgeI18n.t('업로드 중') + value + '%'; });
+        if (!transfer || transfer.file !== selected || transfer.path !== path) {
+          discard();
+          transfer = {file:selected, path, url:this.url(session, 'upload-part', path), id:uuid(), controller:new AbortController()};
+        } else if (transfer.controller.signal.aborted) transfer.controller = new AbortController();
+        const current = transfer;
+        this.uploadController = transfer.controller;
+        const result = await this.upload(transfer, value => { progress.value = value; status.textContent = value === 100 ? BridgeI18n.t('저장된 파일 확인 중…') : BridgeI18n.t('업로드 중') + value + '%'; });
+        if (!dialog.open || current !== transfer) return;
+        if (this.uploadController === current.controller) this.uploadController = null;
+        transfer = null;
         dialog.close(); this.notify(result.existing ? BridgeI18n.t('일치하는 파일이 이미 저장되었습니다.') : BridgeI18n.t('프로젝트 디렉터리에 업로드된 파일'));
         if (this.sessions.has(session.key) && session.files.includes(tab) && session.directory === viewedDirectory) this.directory(session, tab, viewedDirectory);
       } catch (failure) { error.textContent=BridgeI18n.t(failure.message); status.textContent = ''; }
@@ -733,24 +786,56 @@ class Workbench {
     };
     dialog.showModal();
   }
-  upload(url, file, progress) {
-    if(window.BridgeChannelLink?.alternate){
-      const controller=this.uploadController=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),120000);
-      return fetch(url,{method:'POST',headers:{'X-CSRF-Token':this.csrf(),'Content-Type':'application/octet-stream'},body:file,signal:controller.signal})
-        .catch(()=>{throw Error(BridgeI18n.t('업로드가 확인되지 않았습니다. 디렉터리를 새로 고치거나 동일한 파일을 다시 시도하십시오. 기존 파일은 덮어쓰지 않습니다.'));})
-        .then(async response=>{const result=await response.json();if(response.status===401)this.onUnauthorized();
-          if(!response.ok)throw Error(result.error||BridgeI18n.t('업로드 실패'));progress(100);return result;
-        }).finally(()=>clearTimeout(timer));
+  async uploadPart(transfer, phase, offset = 0, body = null) {
+    const options = new URLSearchParams({id:transfer.id, total:transfer.file.size, phase, offset});
+    const controller = new AbortController();
+    const parent = transfer.controller.signal;
+    const abort = () => controller.abort();
+    const timer = setTimeout(abort, 120000);
+    if (phase !== 'cancel') {
+      if (parent.aborted) abort();
+      parent.addEventListener('abort', abort, {once:true});
     }
-    return new Promise((resolve, reject) => {
-      const xhr = this.uploadController = new XMLHttpRequest(); xhr.open('POST', url); xhr.timeout = 120000;
-      xhr.setRequestHeader('X-CSRF-Token', this.csrf()); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-      xhr.upload.onprogress = e => { if (e.lengthComputable) progress(Math.round(e.loaded / e.total * 100)); };
-      const uncertain = () => reject(Error(BridgeI18n.t('업로드가 확인되지 않았습니다. 디렉터리를 새로 고치거나 동일한 파일을 다시 시도하십시오. 기존 파일은 덮어쓰지 않습니다.')));
-      xhr.onerror = xhr.ontimeout = xhr.onabort = uncertain;
-      xhr.onload = () => { try { const result = JSON.parse(xhr.responseText); if (xhr.status === 401) this.onUnauthorized(); if (xhr.status < 200 || xhr.status >= 300) throw Error(result.error || BridgeI18n.t('업로드 실패')); resolve(result); } catch (e) { reject(e); } };
-      xhr.send(file);
-    });
+    try {
+      const response = await fetch(transfer.url + '&' + options, {method:'POST', body, signal:controller.signal,
+        headers:{'X-CSRF-Token':this.csrf(), 'Content-Type':'application/octet-stream'}});
+      if (response.status === 401) this.onUnauthorized();
+      if (response.status === 413) throw Error(BridgeI18n.t('The gateway or reverse proxy rejected the upload chunk size.'));
+      if (response.status === 507) throw Error(BridgeI18n.t('Not enough disk space for the upload.'));
+      let data;
+      try { data = await response.json(); } catch { throw Error(BridgeI18n.t('Upload response unavailable') + ' (HTTP ' + response.status + ')'); }
+      if (!response.ok) throw Error(data.error || BridgeI18n.t('업로드 실패'));
+      return data;
+    } catch (e) {
+      if (e instanceof TypeError || e.name === 'AbortError') throw Error(BridgeI18n.t('Retry to resume the upload.'));
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      parent.removeEventListener('abort', abort);
+    }
+  }
+  async upload(transfer, progress) {
+    const file = transfer.file;
+    // The same ID is retained for retries in this dialog. The host owns the offset and receipt.
+    let state = await this.uploadPart(transfer, 'start');
+    if (state.state === 'done') return state;
+    const step = 1024 * 1024;
+    let offset = state.offset;
+    if (!['pending','checking'].includes(state.state) || !Number.isSafeInteger(offset) || offset < 0 || offset > file.size
+        || (state.state === 'checking' && offset !== file.size))
+      throw Error(BridgeI18n.t('Invalid upload response.'));
+    progress(file.size ? Math.floor(100 * offset / file.size) : 100);
+    while (offset < file.size) {
+      const end = Math.min(file.size, offset + step);
+      state = await this.uploadPart(transfer, 'chunk', offset, file.slice(offset, end));
+      if (state.state !== 'pending' || state.offset !== end) throw Error(BridgeI18n.t('Invalid upload response.'));
+      offset = end;
+      progress(Math.floor(100 * offset / file.size));
+    }
+    do {
+      state = await this.uploadPart(transfer, 'finish');
+    } while (state.state === 'checking');
+    if (state.state !== 'done' || state.size !== file.size) throw Error(BridgeI18n.t('Invalid upload response.'));
+    return state;
   }
 }

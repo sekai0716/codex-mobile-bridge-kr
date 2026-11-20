@@ -17,7 +17,7 @@ from functools import partial
 from pathlib import Path
 
 from bridge.features.sessions.create import runtime_environment
-from bridge.features.sessions.model import attachment_prompt, normalize_state, normalize_request
+from bridge.features.sessions.model import attachment_prompt, normalize_state, native_request_response
 from bridge.features.sessions.tool_images import TOOL_IMAGE_CACHE, public_turns
 from bridge.features.workspace.uploads import Uploads
 from bridge.features.workspace.workspace import Workspace
@@ -217,7 +217,7 @@ class SideChat:
                 if params.get('threadId') != self.id or not self.ready:
                     self.runtime.write({'id': message['id'], 'error': {'code': -32601, 'message': 'Unsupported side-chat request'}})
                     return
-                self.state['requests'].append(copy.deepcopy(message))
+                self.state['requests'].append({**copy.deepcopy(message),'_directOptionResponse':True})
                 return
             if not self.ready or params.get('threadId') != self.id:
                 return
@@ -500,36 +500,9 @@ class SideChat:
                 request = next((r for r in self.state['requests'] if str(r['id']) == str(identifier)), None)
                 if not request:
                     raise ValueError('이 요청은 처리되었거나 만료되었습니다.')
-                method, params = request['method'], request['params']
-                if not normalize_request(request)['supported']:
-                    raise ValueError("지원되지 않는 요청입니다. 이 응답을 중지하십시오.")
-                if method in ('item/commandExecution/requestApproval', 'item/fileChange/requestApproval'):
-                    decision = response.get('decision')
-                    if set(response) != {'decision'} or decision not in ('accept', 'decline', 'cancel') or (params.get('availableDecisions') and decision not in params['availableDecisions']):
-                        raise ValueError("한 번 허용, 거부 또는 취소를 선택하세요.")
-                    result = {'decision': decision}
-                elif method == 'item/permissions/requestApproval':
-                    if set(response) != {'decision'} or response['decision'] not in ('accept', 'decline'):
-                        raise ValueError("한 번 허용 또는 거부를 선택하세요.")
-                    result = {'permissions': params.get('permissions', {}) if response['decision'] == 'accept' else {}, 'scope': 'turn'}
-                elif method in ('item/tool/requestUserInput', 'tool/requestUserInput'):
-                    answers = response.get('answers')
-                    keys = {q['id'] for q in params.get('questions', [])}
-                    if set(response) != {'answers'} or not isinstance(answers, dict) or not keys or set(answers) != keys or any(not isinstance(v, list) or len(v) != 1 or not isinstance(v[0], str) or not v[0].strip() or len(v[0]) > 20000 for v in answers.values()):
-                        raise ValueError("모든 질문에 답변해 주세요.")
-                    result = {'answers': {k: {'answers': v} for k, v in answers.items()}}
-                elif method == 'mcpServer/elicitation/request':
-                    from bridge.app.service import validate_form
-                    action = response.get('action')
-                    if set(response) - {'action', 'content'} or action not in ('accept', 'decline', 'cancel'):
-                        raise ValueError("잘못된 승인 작업")
-                    if action == 'accept':
-                        validate_form(response.get('content'), params.get('requestedSchema', {}))
-                    result = {'action': action, 'content': response.get('content') if action == 'accept' else None}
-                else:
-                    raise ValueError("지원되지 않는 요청입니다. 이 응답을 중지하십시오.")
-                self.runtime.write({'id': request['id'], 'result': result})
+                result = native_request_response(request,response,self.state)
                 self.state['requests'].remove(request)
+                self.runtime.write({'id': request['id'], 'result': result})
                 self.queue_event.set()
             return self.view()
 

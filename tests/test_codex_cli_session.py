@@ -123,6 +123,24 @@ class CliSessionTests(unittest.TestCase):
         rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
         self.assertEqual([row.get('timestamp') for row in rows], [stamp, stamp + 1000])
 
+    def test_plan_deltas_and_notifications_keep_one_step_list_per_turn(self):
+        self.sessions.attach('thread-a', explicit=True)
+        def emit(method, **params):
+            self.sessions._event({'method': method, 'params': {'threadId': 'thread-a', **params}})
+        emit('turn/started', turn={'id': 'turn-1', 'status': 'inProgress'})
+        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta='Plan')
+        emit('item/started', turnId='turn-1', item={'id': 'proposal', 'type': 'plan', 'text': ''})
+        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta=' A')
+        for status in ('inProgress', 'completed'):
+            emit('turn/plan/updated', turnId='turn-1', plan=[{'step': 'first', 'status': status}])
+        emit('item/completed', turnId='turn-1', item={'id': 'proposal', 'type': 'plan', 'text': 'Plan A'})
+        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta='stale')
+        rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
+        self.assertEqual([row['text'] for row in rows], ['Plan A', '☑ first'])
+        emit('turn/completed', turn={'id': 'turn-1', 'status': 'completed', 'items': [{'id': 'proposal', 'type': 'plan', 'text': 'Plan A'}]})
+        rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
+        self.assertEqual([row['text'] for row in rows], ['Plan A', '☑ first'])
+
     def test_passive_attach_does_not_connect_or_resume(self):
         self.sessions._start_daemon = Mock()
         Path(self.fake.socket_path).unlink()
@@ -1027,6 +1045,21 @@ class CliSessionTests(unittest.TestCase):
         self.sessions._event({'method': 'turn/completed', 'params': {
             'threadId': 'thread-a', 'turn': {'id': 'turn-1', 'status': 'completed'}}})
         self.assertEqual(self.states[-1][1]['turns'][0]['status'], 'completed')
+
+    def test_direct_option_picker_rechecks_native_id_and_returns_original_selection(self):
+        from bridge.features.sessions.model import normalize_request, native_request_response
+        self.sessions.attach('thread-a', explicit=True)
+        self.sessions._server_request({'id':45,'method':'item/tool/requestOptionPicker','params':{
+            'threadId':'thread-a','question':'Choice','options':[{'label':'one'},{'label':'two'}],'allowMultiple':True}})
+        request=self.states[-1][1]['requests'][0];view=normalize_request(request)
+        result=native_request_response(request,{'action':'submit','selectedOptions':['two','one'],'freeformAnswer':None})
+        payload={'requestId':45,'response':result}
+        with self.assertRaises(AppServerUnavailable):
+            self.sessions.call('thread-a','direct-option-picker-response',payload,reviewed_request='stale')
+        self.sessions.call('thread-a','direct-option-picker-response',payload,reviewed_request=view['snapshot'])
+        with self.assertRaises(AppServerUnavailable):
+            self.sessions.call('thread-a','direct-option-picker-response',payload)
+        self.assertEqual(self.fake.replies,[(45,result)])
 
     def test_reasoning_deltas_stream_before_completion(self):
         # Third-party Responses backends stream chain of thought as raw text

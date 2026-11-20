@@ -20,6 +20,7 @@ class SharedServer:
     LIMIT = 64 * 1024 * 1024
     METHODS = frozenset({
         'thread/unsubscribe', 'thread/list', 'thread/read', 'thread/loaded/list', 'thread/turns/list',
+        'thread/searchOccurrences', 'thread/queue/list',
         'thread/items/list', 'thread/resume', 'thread/start', 'thread/compact/start',
         'thread/backgroundTerminals/list', 'thread/backgroundTerminals/clean',
         'turn/start', 'turn/steer', 'turn/interrupt', 'thread/settings/update',

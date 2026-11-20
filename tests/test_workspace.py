@@ -166,6 +166,18 @@ class WorkspaceHttpTests(unittest.TestCase):
         self.assertEqual(self.raw(target, b'text', auth)[0], 200)
         self.assertEqual(self.request('GET', self.path + '/preview?path=test.txt', headers=auth)[2]['text'], 'text')
 
+    def test_chunked_upload_checks_route_and_receipt(self):
+        auth = self.login()
+        target = self.path + '/upload-part?path=new.bin&total=4&id=9f8ee244-0dd6-4a11-a116-947b51088b60'
+        with tempfile.TemporaryDirectory() as cache, patch.dict(os.environ, {'XDG_CACHE_HOME': cache, 'LOCALAPPDATA': cache}):
+            self.assertEqual(self.request('GET', target, headers=auth)[0], 405)
+            self.assertEqual(self.raw(target + '&phase=start', b'', {'Cookie': auth['Cookie']})[0], 403)
+            self.assertEqual(self.raw(target + '&phase=start', b'', auth)[1]['state'], 'pending')
+            self.assertEqual(self.raw(target + '&phase=chunk&offset=0', b'test', auth)[1]['offset'], 4)
+            self.assertEqual(self.raw(target + '&phase=finish', b'', auth)[1]['state'], 'done')
+            self.assertEqual(self.raw(target + '&phase=start', b'', auth)[1]['state'], 'done')
+            self.assertEqual((self.root / 'new.bin').read_bytes(), b'test')
+
     def test_authenticated_binary_download_and_no_overwrite(self):
         auth = self.login(); data = b'\0binary\xff'; target = self.path + '/upload?path=test.apk'
         self.assertEqual(self.raw(target, data, auth)[0], 200)

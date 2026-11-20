@@ -83,7 +83,7 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} explicitly in
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true},switch:{phase:'verifying',operation:'desktopRuntime'}});
  assert.equal(ui.panel.initializeRuntime.disabled,true);assert.match(ui.panel.status.textContent,/네이티브 연결 확인 중/);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true},switch:{phase:'failed',operation:'desktopRuntime',error:'test failure'}});
- assert.equal(ui.panel.initializeRuntime.disabled,false);assert.equal(ui.panel.initializeRuntime.textContent,'다시 연결 준비');assert.match(ui.panel.status.textContent,/네이티브 연결 초기화를 완료하지 못했습니다\./);
+ assert.equal(ui.panel.initializeRuntime.disabled,false);assert.equal(ui.panel.initializeRuntime.textContent,'연결 다시 준비');assert.match(ui.panel.status.textContent,/네이티브 연결 초기화를 완료하지 못했습니다\./);
  ui.panel.accept({...ui.value(),scope:'profile'});assert.equal(ui.panel.desktopRuntime.hidden,true);
  ui.panel.clear();assert.equal(ui.panel.desktopRuntime.hidden,true);
 });
@@ -91,13 +91,37 @@ test('native initialization remains unavailable for passwordless remote access',
  const ui=fixture();ui.panel.accept({...ui.value(),canSwitch:false,desktopRuntime:{supported:true,configured:false}});assert.equal(ui.panel.initializeRuntime.disabled,true);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:false}});assert.equal(ui.panel.desktopRuntime.hidden,true);
 });
+for(const desktop of [false,true])test(`${desktop?'desktop':'web'} schedules and cancels the recorded request after confirmation`,async()=>{
+ const ui=fixture(desktop),requestId='22222222-2222-4222-8222-222222222222';
+ const runtime=state=>({...ui.value(),desktopRuntime:{supported:true,deferred:{state,requestId}}});
+ ui.panel.accept(runtime('available'));
+ assert.equal(ui.panel.deferRuntime.hidden,false);
+ assert.equal(ui.panel.cancelDeferredRuntime.hidden,true);
+ ui.confirm(false);await ui.panel.deferRuntime.onclick();assert.equal(ui.requests.length,0);
+ ui.confirm(true);await ui.panel.deferRuntime.onclick();
+ assert.deepEqual({...ui.requests[0]},{action:'deferDesktopRuntime',requestId,confirmed:true});
+ ui.panel.accept(runtime('waiting'));
+ assert.equal(ui.panel.deferRuntime.hidden,true);
+ assert.equal(ui.panel.cancelDeferredRuntime.hidden,false);
+ assert.equal(ui.panel.initializeRuntime.disabled,true);
+ assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
+ await ui.panel.cancelDeferredRuntime.onclick();
+ assert.deepEqual({...ui.requests[1]},{action:'cancelDeferredDesktopRuntime',requestId});
+ ui.panel.accept(runtime('cancelled'));
+ assert.equal(ui.panel.cancelDeferredRuntime.hidden,true);
+ assert.equal(ui.panel.deferRuntime.hidden,true);
+ if(!desktop){
+   ui.panel.accept({...runtime('available'),canSwitch:false});
+   assert.equal(ui.panel.deferRuntime.disabled,true);
+ }
+});
 test('automatic native preparation stays passive and offers unknown-task recovery',()=>{
  const ui=fixture();ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,preparation:{state:'checking'}}});
- assert.match(ui.panel.runtimeStatus.textContent,/자동 확인/);assert.equal(ui.requests.length,0);
+ assert.match(ui.panel.runtimeStatus.textContent,/데스크톱 공유 연결을 확인하는 중입니다\./);assert.equal(ui.requests.length,0);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,preparation:{state:'waiting',taskStateUnavailable:true}}});
- assert.match(ui.panel.runtimeStatus.textContent,/데스크톱이 사용 가능해지면 자동으로 준비합니다\. 기존 채팅은 계속 사용할 수 있습니다/);assert.equal(ui.panel.forceInitializeRuntime.hidden,false);
+ assert.match(ui.panel.runtimeStatus.textContent,/데스크톱 작업이 끝나면 공유 연결을 준비합니다\. 기존 채팅은 계속 사용할 수 있습니다/);assert.equal(ui.panel.forceInitializeRuntime.hidden,false);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,configured:true,preparation:{state:'ready'}}});
- assert.match(ui.panel.runtimeStatus.textContent,/기본 사이드 채팅 연결이 준비되었습니다\./);assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
+ assert.match(ui.panel.runtimeStatus.textContent,/사이드 채팅 연결이 준비됐습니다\./);assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
  assert.equal(ui.requests.length,0);
 });
 

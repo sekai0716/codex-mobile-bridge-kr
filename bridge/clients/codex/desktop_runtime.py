@@ -185,6 +185,36 @@ def record_preparation(home, request_id, *, complete=False):
         'requestId': request_id, 'state': 'complete' if complete else 'pending'}))
 
 
+def deferred_preparation(home, request_id):
+    path = directory(home) / 'deferred-preparation.json'
+    if not path.exists() and not path.is_symlink():
+        return None
+    value = _read(path)
+    if (value.get('version') != VERSION or value.get('home') != str(Path(home).resolve())
+            or value.get('state') not in ('waiting', 'consumed', 'cancelled')):
+        raise ValueError('Invalid deferred connection receipt.')
+    return value['state'] if value.get('requestId') == request_id else None
+
+
+def update_deferred_preparation(home, request_id, action):
+    """Use a separate lock so a cancellation can arrive during a passive idle audit."""
+    with exclusive_lock(home, 'deferred-preparation', timeout=3):
+        receipt = preparation(home)
+        if not receipt or receipt['state'] != 'pending' or receipt['requestId'] != request_id:
+            return None
+        state = deferred_preparation(home, request_id)
+        if action == 'schedule' and state is None:
+            state = 'waiting'
+        elif action in ('cancel', 'consume') and state == 'waiting':
+            state = 'cancelled' if action == 'cancel' else 'consumed'
+        else:
+            return state if action != 'consume' else None
+        root = private_directory(directory(home))
+        _write(root / 'deferred-preparation.json', json.dumps({'version':VERSION, 'home':str(Path(home).resolve()),
+               'requestId':request_id, 'state':state}))
+        return state
+
+
 def configure(home, application, cli):
     """Called only after the lifecycle owner has verified idle and normal exit."""
     if sys.platform not in ('darwin', 'linux', 'win32'):

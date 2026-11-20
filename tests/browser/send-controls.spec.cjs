@@ -2,14 +2,15 @@
 const {test,expect}=require('@playwright/test');
 
 // 실제 페이지와 전송 콜백을 사용하되 모든 채팅 읽기·쓰기는 메모리에서 끝낸다.
-async function prepare(page){
+async function prepare(page,initialRows=[]){
   await page.goto('/?case=session-menu');
   await expect(page.locator('#bootstrap-status')).toBeHidden();
   await page.waitForFunction(()=>typeof openChat==='function');
-  await page.evaluate(async()=>{
+  await page.evaluate(async initialRows=>{
     await BridgeFeatures.load('chat');
     const id='11111111-1111-4111-8111-111111111111',original=window.fetch;
     const fixture=window.sendControlsFixture={writes:[],quotaReads:[],settingsWrites:[],queueWrites:[],uploadWrites:[],edits:[],managedQueue:[],details:[],reply:'accepted'};
+    fixture.extraRows=initialRows;
     fixture.meta={id,title:'전송·추론 표시 검증',host:'local',provider:'openai',draftAccountIdentity:'c'.repeat(64),permissionMode:'auto-review',connected:true,loadingHistory:false,historyComplete:true,status:'idle',model:'fixture',effort:'high',serviceTier:'default',requests:[],submissions:[],collaborationMode:'default'};
     fixture.reason={key:'reason',order:1,role:'activity',kind:'reasoning',title:'추론 요약',text:'추론 요약의 앞부분',truncated:true,version:1};
     fixture.page=()=>({sequence:1,epoch:'fixture',hasMore:false,before:null,files:[],meta:fixture.meta,rows:[fixture.reason,{key:'tool',order:2,role:'activity',kind:'commandExecution',title:'명령을 실행하다',text:'명령 출력',truncated:false,version:1},...(fixture.extraRows||[])]});
@@ -50,12 +51,83 @@ async function prepare(page){
     };
     fixture.update=(status,extra={})=>{fixture.meta={...fixture.meta,status,...extra};renderState(fixture.meta);};
     await openChat(id,'local');
-  });
+  },initialRows);
 }
 
 test.beforeEach(async({context,request,baseURL})=>{
   await context.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
   expect(await(await request.get('/__fixture_health')).json()).toEqual({fixture:'cmb-browser-regression'});
+});
+
+test('shared browser opens at readable scale and maps scaled input to the selected frame',async({page})=>{
+  await prepare(page);
+  await page.evaluate(()=>{
+    const wb=window.BridgeWorkbench, request=wb.request.bind(wb), canvas=document.createElement('canvas');
+    canvas.width=1440;canvas.height=863;
+    const jpeg=canvas.toDataURL('image/jpeg').split(',')[1];
+    let control=false;
+    window.browserInputs=[];
+    wb.request=async(url, body, signal)=>{
+      if(!url.includes('/browser?'))return request(url,body,signal);
+      if(body.op==='frame')return {width:1440,height:863,jpeg,frame:'current',control,canControl:true};
+      if(body.op==='click'){window.browserInputs.push(body);return {applied:true};}
+      if(body.op==='take')control=true;
+      return {active:body.op!=='end',control,canControl:true};
+    };
+    wb.browserSharing=true;wb.browser();
+  });
+  const panel=page.locator('.wb-browser-share:visible');
+  await panel.getByRole('button',{name:'브라우저 창 공유'}).click();
+  const picture=panel.locator('img');
+  await expect(picture).toHaveCSS('width','1440px');
+  await panel.getByRole('button',{name:'제어권 가져오기'}).click();
+  await panel.getByRole('button',{name:'전체 보기'}).click();
+  await page.waitForFunction(()=>BridgeWorkbench.activeBrowser?.frame==='current'&&!BridgeWorkbench.activeBrowser.busy);
+  await picture.evaluate(img=>{
+    const r=img.getBoundingClientRect();
+    img.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:r.left+r.width*.7,clientY:r.top+r.height*.6}));
+  });
+  const [click]=await page.evaluate(()=>window.browserInputs);
+  expect(click.frame).toBe('current');expect(click.x).toBeCloseTo(.7,2);expect(click.y).toBeCloseTo(.6,2);
+  await panel.getByRole('button',{name:'공유 종료'}).click();
+  await expect(picture).toBeHidden();
+});
+
+test('collaboration shows delivery and reported agent state in live updates and reopened history',async({page})=>{
+  const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',target={id,nickname:'Ada'};
+  const row={key:'collab-send',order:3,version:'start',role:'activity',kind:'collabAgentToolCall',turnId:'turn',turnStatus:'completed',
+    text:'검토해 주세요',status:'inProgress',collab:{tool:'sendInput',targets:[target]}};
+  await prepare(page,[row]);
+  const summaries=page.locator('[data-key="collab-send"] > summary');
+  await expect(summaries).toHaveText('Ada에게 요청 전달 중');
+  async function publish(rows,sequence){
+    await page.waitForFunction(()=>typeof sendControlsFixture.publish==='function');
+    await page.evaluate(({rows,sequence})=>{
+      const f=sendControlsFixture;f.extraRows=rows;f.publish({...f.page(),sequence});
+    },{rows,sequence});
+  }
+  const sent={...row,version:'sent',status:'completed',collab:{tool:'sendInput',targets:[{...target,status:'running'}]}};
+  await publish([sent],2);
+  await expect(summaries).toHaveCount(1);
+  await expect(summaries).toHaveText('Ada에게 요청 전달됨 · 마지막 작업 상태(작업 중)');
+  await summaries.click();
+  await expect(page.locator('[data-key="collab-send"] .activity-body')).toHaveText('검토해 주세요');
+  const wait={...row,key:'collab-wait',order:4,version:'wait',status:'completed',text:'',collab:{tool:'wait',targets:[]}};
+  const failed={...row,key:'collab-fail',order:5,status:'failed'};
+  const multiple={...wait,key:'collab-multi',order:6,collab:{tool:'wait',targets:[{...target,status:'completed'},
+    {id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',nickname:'Grace',status:'errored'}]}};
+  const saved=[sent,wait,failed,multiple];
+  await publish(saved,3);
+  await expect(page.locator('[data-key="collab-wait"] > summary')).toHaveText('응답 대기 종료');
+  await expect(page.locator('[data-key="collab-fail"] > summary')).toHaveText('Ada에게 요청 전달 실패');
+  await expect(page.locator('[data-key="collab-multi"] > summary')).toContainText('Ada · 작업 완료, Grace · 작업 실패');
+  await prepare(page,saved);
+  await expect(summaries).toHaveText('Ada에게 요청 전달됨 · 마지막 작업 상태(작업 중)');
+  await expect(page.locator('[data-key="collab-wait"] > summary')).toHaveText('응답 대기 종료');
+  await page.locator('#phone-language').selectOption('en',{force:true});
+  await expect(summaries).toHaveText('To Ada · Request delivered · Last reported state (Agent task running)');
+  await page.locator('#phone-language').selectOption('zh',{force:true});
+  await expect(summaries).toContainText('请求已送达');
 });
 
 test('live subagent tabs appear without refresh and address only the selected child',async({page})=>{
@@ -78,14 +150,19 @@ test('live subagent tabs appear without refresh and address only the selected ch
       if(!target)return reply({agents:f.directory});
       f.detailReads.push(target);
       return reply({id:target,live:true,control:{generation:'owner-1',canSend:true,status:'active',activeTurnId:'current-'+target},
-        historyComplete:true,turns:[{id:'turn',messages:[{id:'m',role:'assistant',text:target+' '+f.liveText}]}]});
+        historyComplete:true,turns:[{id:'turn',messages:[{id:'m',role:'assistant',text:target+' '+f.liveText},
+          {id:'nested',role:'activity',kind:'collabAgentToolCall',status:'completed',text:'확인 요청',
+            collab:{tool:'sendMessage',targets:[{id:ids[0],nickname:'Grace',status:'running'}]}}]}]});
     };
     f.extraRows=ids.map((id,i)=>({key:'child-'+id,kind:'subAgentCreated',role:'activity',agent:{id,nickname:'',taskName:'task'+i},order:3+i,version:'v1'}));
+    f.extraRows.push({key:'wait-by-id',role:'activity',kind:'collabAgentToolCall',status:'inProgress',order:5,version:'v1',text:'',
+      collab:{tool:'wait',targets:[{id:ids[0],nickname:''}]}});
     f.meta.status='active';f.publish({...f.page(),sequence:2});
   });
   const buttons=page.getByRole('button',{name:'Ada 에이전트 생성됨',exact:true});
   const tabs=page.getByRole('tab',{name:'Ada',exact:true}),main=page.getByRole('tab',{name:'채팅',exact:true});
   await expect(tabs).toHaveCount(2);await expect(buttons).toHaveCount(2);
+  await expect(page.locator('[data-key="wait-by-id"] > summary')).toHaveText('Ada의 응답 대기 중');
   await expect(main).toHaveAttribute('aria-selected','true');await expect(page.locator('#message')).toBeFocused();
   expect(await page.evaluate(()=>sendControlsFixture.detailReads)).toEqual([]);
   for(const n of [0,1]){
@@ -94,6 +171,7 @@ test('live subagent tabs appear without refresh and address only the selected ch
     await expect(tabs.nth(n)).toHaveAttribute('aria-selected','true');
     await expect(page.locator('.wb-float')).toHaveCount(0);
     await expect(view.locator('.message-body')).toContainText(id);
+    await expect(view.locator('.wb-agent-message summary')).toHaveText('Grace에게 메시지 전달됨 · 마지막 작업 상태(작업 중)');
     if(n===0)await view.getByRole('textbox').fill('첫 번째 에이전트 초안');
     if(n===1){
       await view.getByRole('textbox').fill('자식에게만 전송');
@@ -629,4 +707,40 @@ test('Fast lightning toggles next to context without changing model, effort or d
   await expect(input).toHaveValue('전환 중에도 남겨 둘 초안');
   expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
   await page.evaluate(()=>sendControlsFixture.update('idle',{model:'unsupported-model'}));await expect(fast).toBeDisabled();
+});
+
+test('original chat search paginates and ignores a result after the chat changes', async ({page}) => {
+  await prepare(page);
+  await page.evaluate(() => {
+    window.historyLookups = [];
+    threadLookup.request = async (target, action, body) => {
+      if (action === 'original-queue') return {available:true,rows:[
+        {id:'first',text:'같은 메시지',attachments:[]},{id:'second',text:'같은 메시지',attachments:['doc.md']}]};
+      historyLookups.push(body);
+      if (body.term === '지연') return new Promise(resolve => window.finishSearch = resolve);
+      if (body.target) return {source:'native', data:{role:'assistant',text:'오래된 턴의 원문', next:null}};
+      const suffix = body.cursor ? '2' : '1';
+      return {source:'native',data:[{itemId:'item'+suffix,turnId:'turn'+suffix,snippet:'검색 '+suffix,cursor:{value:'turn-anchor'}}],
+        cursor:body.cursor ? null : {value:'page-anchor'}};
+    };
+    openCodexSessionMenu(document.querySelector('#chat-title'));
+  });
+  await page.getByRole('button',{name:'채팅에서 찾기'}).click();
+  const dialog = page.locator('dialog:has(#thread-lookup-title)'), field = dialog.getByRole('searchbox');
+  await field.fill('한글'); await field.press('Enter');
+  await dialog.getByRole('button',{name:'결과 더 보기'}).click();
+  await dialog.getByRole('button',{name:'검색 2'}).click();
+  await expect(dialog).toContainText('오래된 턴의 원문');
+  expect(await page.evaluate(()=>historyLookups.at(-1).target)).toEqual(['turn2','item2']);
+  await field.fill('지연'); await field.press('Enter');
+  await page.waitForFunction(()=>typeof finishSearch==='function');
+  await page.evaluate(()=>{
+    const old=threadLookup.scope; threadLookup.scope=()=>({...old(), key:'changed'});
+    finishSearch({source:'native',data:[{snippet:'이전 채팅 비공개 내용'}],cursor:null});
+  });
+  await expect(dialog).not.toContainText('이전 채팅 비공개 내용');
+  await expect(dialog).not.toBeVisible({timeout:5000});
+  await page.evaluate(()=>threadLookup.open('queue'));
+  await expect(dialog.locator('[data-id]')).toHaveCount(2);
+  await expect(dialog.locator('[data-id="second"]')).toContainText('doc.md');
 });

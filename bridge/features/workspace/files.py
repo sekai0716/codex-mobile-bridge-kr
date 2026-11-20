@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 from urllib.request import url2pathname
 
+from bridge.features.sessions.activity import generated_image_path
 from bridge.features.sessions.model import ordered_turns, items_array, desktop_file_attachments
 from bridge.features.workspace.visualize import reference_candidates, descriptors
 
@@ -240,6 +241,8 @@ def _model_image_references(state):
     result = {}
     trusted_views = set()
     def add(value, reference, runtime_view=False):
+        if not isinstance(value, str) or not value:
+            return
         # Remove an editor line suffix without changing the reference shown by
         # Markdown; only the actual filesystem lookup uses the trimmed path.
         path = reference_path(re.sub(r':\d+$', '', value))
@@ -257,6 +260,9 @@ def _model_image_references(state):
             kind = item.get('type')
             if kind in ('ImageView', 'imageView'):
                 add(item.get('path'), item.get('path'), runtime_view=True)
+            elif kind == 'imageGeneration':
+                if path := generated_image_path(item):
+                    add(path, path, runtime_view=True)
             elif kind in AGENT_KINDS:
                 text = item.get('text', '')
                 if isinstance(text, str):

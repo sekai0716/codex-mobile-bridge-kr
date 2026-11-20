@@ -90,6 +90,21 @@ class SavedMessageTimeJoinTests(unittest.TestCase):
         self.assertEqual(session.state, native)
         self.assertTrue(session.connected)
 
+    def test_first_empty_rollout_preserves_live_sequence_until_clock_arrives(self):
+        session = LiveSession('thread')
+        with session.condition:
+            session.state = self.state()
+            session.connected = True
+            before = session.timeline_view()
+            empty = {'id': 'thread', 'turns': []}
+            session.set_history(empty)
+            self.assertIs(session.history_state, empty)
+            self.assertEqual(session.timeline_view(), before)
+            session.set_history(self.state(timestamp=STAMP))
+            updated = session.timeline_view()
+        self.assertEqual(updated['sequence'], before['sequence'] + 1)
+        self.assertEqual(updated['turns'][0]['messages'][0]['timestamp'], STAMP)
+
     def test_missing_live_clock_retries_are_bounded_and_new_turn_can_retry(self):
         session = LiveSession('thread')
         with session.condition:

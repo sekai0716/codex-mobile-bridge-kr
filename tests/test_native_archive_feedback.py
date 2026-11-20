@@ -76,7 +76,8 @@ class ArchiveFeedback(unittest.TestCase):
 
     def test_daemon_and_wsl_channels_keep_explicit_error_separate_from_disconnect(self):
         client = CodexAppServer(self.root / 'control.sock')
-        def send(packet):
+        def send(packet, expected_process=None):
+            self.assertIsNone(expected_process)
             client.pending[packet['id']].set_result({'error': {'code': -32601, 'message': 'unsupported'}})
         client._send = send
         with self.assertRaises(ArchiveRejected) as caught: client.request('thread/archive', {'threadId': self.sid})

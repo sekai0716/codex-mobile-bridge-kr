@@ -365,7 +365,8 @@ class IntegrationTests(unittest.TestCase):
 
     def test_timeline_meta_refreshes_draft_identity_without_sequence_change(self):
         self.fixture.state['turns'] = [{'turnId': 'turn', 'items': [
-            {'id': str(i), 'type': 'agentMessage', 'text': 'row '+str(i)} for i in range(150)]}]
+            {'id': str(i), 'type': 'agentMessage', 'text': 'row '+str(i),
+             'timestamp': 1700000000+i} for i in range(150)]}]
         session = self.bridge.session(THREAD)
         account = ['']
 
@@ -577,12 +578,13 @@ class IntegrationTests(unittest.TestCase):
                   'requestedSchema':{'type':'object','properties':{}},
                   '_meta':{'codex_approval_kind':'mcp_tool_call','connector_id':'computer-use',
                            'tool_params':{'app':'Fixture App'},'persist':['session','always'], 'private':'omit'}}
-        self.fixture.state['requests'] = [{'id':'computer','method':'mcpServer/elicitation/request','params':params}]
+        self.fixture.state['requests'] = [{'id':key,'method':'mcpServer/elicitation/request','params':params}
+                                          for key in ('computer','session','always')]
         view = self.bridge.view(THREAD)
         self.assertEqual(view['requests'][0]['params']['computerUse'], {'app':'Fixture App','persistModes':['session','always']})
         self.assertNotIn('private', json.dumps(view['requests']))
         for mode in ('session','always'):
-            self.bridge.respond(THREAD,'computer',{'action':'accept','persist':mode})
+            self.bridge.respond(THREAD,mode,{'action':'accept','persist':mode})
             reply = self.fixture.requests[-1]['params']['response']
             self.assertEqual(reply, {'action':'accept','content':{},'_meta':{'persist':mode}})
         self.bridge.respond(THREAD,'computer',{'action':'decline'})
@@ -620,6 +622,28 @@ class IntegrationTests(unittest.TestCase):
             self.bridge.respond(THREAD, 9, {"decision": "accept"})
         with self.assertRaises(ValueError):
             self.bridge.respond(THREAD, 7, {"decision": "acceptForSession"})
+
+    def test_reviewed_request_rejects_changed_options_deadline_and_duplicate_writes(self):
+        from bridge.features.sessions.model import request_snapshot
+        rule={'acceptWithExecpolicyAmendment':{'execpolicy_amendment':['git','status']}}
+        native={'id':'change','method':'item/commandExecution/requestApproval','params':{
+            'command':'git status','additionalPermissions':{'network':False},'availableDecisions':['decline',rule]}}
+        self.fixture.state['requests']=[native]
+        item=self.bridge.view(THREAD)['requests'][0]
+        self.assertEqual(item['params']['additionalPermissions'],{'network':False})
+        def submit(decision,version):
+            return self.bridge.respond(THREAD,'change',{'decision':decision,'reviewedRequest':version})
+        with self.assertRaises(ValueError):submit('accept',item['snapshot'])
+        session=self.bridge.session(THREAD)
+        self.fixture.state['requests'][0]['params']['reason']='changed on owner'
+        with self.assertRaises(ValueError):submit(rule,item['snapshot'])
+        version=request_snapshot(session.state['requests'][0])
+        submit(rule,version)
+        with self.assertRaises(ValueError):submit(rule,version)
+        self.assertEqual(len([r for r in self.fixture.requests if r['method']=='thread-follower-command-approval-decision']),1)
+        self.assertEqual(next(r['params']['decision'] for r in self.fixture.requests if r['method']=='thread-follower-command-approval-decision'),rule)
+        self.fixture.state['requests'][0]['params']['expiresAtMs']=1
+        with self.assertRaises(ValueError):submit('decline',request_snapshot(self.fixture.state['requests'][0]))
 
     def test_user_input_exact_question_ids(self):
         self.fixture.state['requests'] = [{"id": 'q', "method": "item/tool/requestUserInput", "params": {"questions": [{"id": "choice"}]}}]
@@ -1090,6 +1114,29 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(session.access['canSend'])
 
 
+    def test_system_error_snapshot_recovers_controls_after_contract_rejection(self):
+        self.assertTrue(self.bridge.view(THREAD)['connected'])
+        session = self.bridge.session(THREAD)
+        def emit(value, revision):
+            self.bridge._event({'method': 'thread-stream-state-changed', 'version': 13,
+                'sourceClientId': 'owner', 'params': {'hostId': 'local', 'conversationId': THREAD,
+                'change': {'type': 'snapshot', 'revision': revision, 'conversationState': value}}})
+        invalid = state()
+        invalid['threadRuntimeStatus'] = {'type': 'unknown'}
+        emit(invalid, 40)
+        self.assertFalse(session.access['canSend'])
+        value = state()
+        value['threadRuntimeStatus'] = {'type': 'systemError'}
+        emit(value, 41)
+        self.assertTrue(session.connected)
+        self.assertIsNone(session.desktop_stream_error)
+        self.assertTrue(session.access['canSend'])
+        self.assertTrue(session.access['canChangeModel'])
+        self.assertTrue(session.access['canReconnect'])
+        self.bridge.send(THREAD, 'Continue after fixing settings', str(uuid.uuid4()))
+        call = next(r for r in self.fixture.requests if r['method'] == 'thread-follower-start-turn')
+        self.assertEqual(call['targetClientId'], 'owner')
+
     def test_future_stream_changed_envelopes_pause_controls(self):
         self.assertTrue(self.bridge.view(THREAD)['connected'])
         session = self.bridge.session(THREAD)
@@ -1255,6 +1302,26 @@ class ModelTests(unittest.TestCase):
         for value in [{}, {'age': True}, {'age': -1}, {'age': 1.5}]:
             with self.assertRaises(ValueError):
                 validate_form(value, schema)
+
+    def test_native_picker_and_named_mcp_array_preserve_selected_values(self):
+        from bridge.features.sessions.model import native_request_response
+        picker={'id':4,'method':'item/tool/requestOptionPicker','params':{
+            'question':'Pick','allowMultiple':True,'options':[{'label':'a'},{'label':'b'}]}}
+        self.assertFalse(normalize_request(picker)['supported'])
+        picker['_directOptionResponse']=True
+        reply={'action':'submit','selectedOptions':['b','a'],'freeformAnswer':'context'}
+        self.assertEqual(native_request_response(picker,reply),reply)
+        with self.assertRaises(ValueError):native_request_response(picker,{**reply,'selectedOptions':['unknown']})
+        picker['params']['allowMultiple']=False
+        with self.assertRaises(ValueError):native_request_response(picker,reply)
+        array={'type':'array','items':{'anyOf':[{'const':'a','title':'First'},{'const':'b','title':'Second'}]},'minItems':1,'maxItems':2,'uniqueItems':True}
+        mcp={'id':5,'method':'mcpServer/elicitation/request','params':{'requestedSchema':{'type':'object','properties':{'keys':array},'required':['keys']}}}
+        form=normalize_request(mcp)
+        self.assertTrue(form['supported'])
+        self.assertEqual(form['params']['requestedSchema']['properties']['keys']['items']['enum'],['a','b'])
+        self.assertEqual(native_request_response(mcp,{'action':'accept','content':{'keys':['b','a']}})['content'],{'keys':['b','a']})
+        for invalid in ([],['unknown'],['a','a'],'a'):
+            with self.assertRaises(ValueError):native_request_response(mcp,{'action':'accept','content':{'keys':invalid}})
 
 
 class HttpTests(unittest.TestCase):

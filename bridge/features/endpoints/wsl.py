@@ -9,6 +9,7 @@ import uuid
 from contextlib import contextmanager
 from functools import wraps
 from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate, queue_version
+from bridge.features.sessions import history_search
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,7 +21,8 @@ from bridge.clients.codex.configuration import magpie_managed
 from bridge.clients.codex.catalog import Catalog, normalize_native_skills
 from bridge.features.sessions import linux_permissions
 from bridge.features.accounts.draft_identity import draft_identity
-from bridge.features.sessions.model import normalize_state, normalize_request, computer_use_approval
+from bridge.features.sessions.model import normalize_state, normalize_request, native_request_response, request_snapshot
+from bridge.features.sessions.activity import preserve_turn_plan, update_turn_plan
 from bridge.features.sessions.timeline import Timeline
 from bridge.features.sessions.subagent_chat import SubagentChat
 from bridge.features.sessions.store import StoreUnavailable
@@ -228,20 +230,26 @@ class WslEntry(WslFeatures):
             self.notification_dirty.add(session.id)
         with session.condition:
             if 'id' in message:
-                if normalize_request(message).get('supported'):
-                    request = {**copy.deepcopy(message), '_generation': generation}
+                request = {**copy.deepcopy(message), '_generation': generation, '_directOptionResponse':True}
+                if normalize_request(request).get('supported'):
                     session.state.setdefault('requests', []).append(request)
                 else:
                     session.error = '그런 요청은 원본으로 해주세요 WSL Codex 중간 처리'
             elif method == 'serverRequest/resolved':
                 session.state['requests'] = [r for r in session.state.get('requests', [])
                                              if r['id'] != params.get('requestId')]
-            elif method in ('item/agentMessage/delta', 'item/commandExecution/outputDelta'):
+            elif method in ('item/agentMessage/delta', 'item/plan/delta', 'item/commandExecution/outputDelta'):
                 for turn in session.state.get('turns', []):
+                    if params.get('turnId') and params['turnId'] != turn.get('turnId'):
+                        continue
+                    if method == 'item/plan/delta' and params.get('turnId') == turn.get('turnId') and isinstance(params.get('itemId'), str) and not any(i.get('id') == params['itemId'] for i in turn.get('items', [])):
+                        turn.setdefault('items', []).append({'id': params['itemId'], 'type': 'plan', 'text': ''})
                     for item in turn.get('items', []):
-                        if item.get('id') == params.get('itemId'):
-                            key = 'text' if method == 'item/agentMessage/delta' else 'aggregatedOutput'
+                        if item.get('id') == params.get('itemId') and (method != 'item/plan/delta' or item.get('type') == 'plan') and isinstance(params.get('delta'), str):
+                            key = 'aggregatedOutput' if method == 'item/commandExecution/outputDelta' else 'text'
                             item[key] = item.get(key, '') + params.get('delta', '')
+            elif method == 'thread/queue/changed':
+                session.state['_queueRevision'] = session.state.get('_queueRevision', 0) + 1
             elif method == 'thread/settings/updated':
                 settings = params.get('threadSettings') or {}
                 session.state['latestThreadSettings'] = copy.deepcopy(settings)
@@ -255,7 +263,13 @@ class WslEntry(WslFeatures):
                 if settings.get('collaborationMode') is not None:
                     session.state['latestCollaborationMode'] = copy.deepcopy(settings['collaborationMode'])
             elif method == 'turn/plan/updated':
-                session.state['turnPlan'] = copy.deepcopy(params.get('plan') or [])
+                update_turn_plan(session.state, params)
+            elif method == 'error' and type(params.get('willRetry')) is bool:
+                turn = next((turn for turn in session.state.get('turns', []) if turn.get('turnId') == params.get('turnId')), None)
+                if turn and turn.get('status') == 'inProgress':
+                    turn.update(error=copy.deepcopy(params.get('error')), willRetry=params['willRetry'])
+                    if not params['willRetry']:
+                        turn['status'] = 'failed'
             elif method == 'thread/status/changed':
                 session.state['threadRuntimeStatus'] = copy.deepcopy(params.get('status') or {})
             elif method == 'thread/closed':
@@ -298,6 +312,11 @@ class WslEntry(WslFeatures):
                 connected, error = False, str(exc)
             with session.condition:
                 requests = session.state.get('requests', [])
+                prior_turns = {t.get('turnId'): t for t in session.state.get('turns', [])}
+                for turn in state.get('turns', []):
+                    if isinstance(turn.get('items'), list):
+                        prior = prior_turns.get(turn.get('turnId')) or {}
+                        turn['items'] = preserve_turn_plan(turn.get('turnId'), prior.get('items'), turn['items'])
                 stamp = hashlib.sha256(json.dumps([state, connected, error], sort_keys=True).encode()).hexdigest()
                 for key in ('turnPlan', 'latestCollaborationMode', 'latestTokenUsageInfo'):
                     if key in session.state:
@@ -1193,6 +1212,33 @@ class WslEntry(WslFeatures):
                 if session.state.get('modelProvider') == provider:
                     session.changed()
 
+    @contextmanager
+    def _thread_source(self, session):
+        with self.connection_lock:
+            server, generation = self.server, self.generation
+            if not session or not server or server.closed or not generation or self.subscriptions.get(session.id) != generation:
+                raise IPCError('Original session is unavailable.')
+        yield server.request, generation
+
+    def thread_history_search(self, identifier, body):
+        self._require_open()
+        return history_search.search(self, identifier, body)
+
+    def original_queue(self, identifier, account):
+        self._require_open()
+        if not account or self._management_identity(identifier, refresh=True) != account:
+            raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+        with self.lock:
+            session = self.live.get(identifier)
+        try:
+            with self._thread_source(session) as (request, _):
+                rows = history_search.queue_page(request, identifier)
+        except (IPCError, OSError, ValueError):
+            return {'available':False, 'rows':[]}
+        if self._management_identity(identifier) != account:
+            raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+        return {'available':True,'rows':rows}
+
     def message_management(self, identifier, receipt_ids=()):
         uuid.UUID(identifier)
         with self.write_lock:
@@ -1447,43 +1493,15 @@ class WslEntry(WslFeatures):
                 if not pending or pending.get('_generation') != self.generation:
                     raise ValueError('이 요청은 처리되었거나 만료되었거나 이전 연결에 속해 있습니다. 원래 터미널에서 확인하세요.')
                 pending = copy.deepcopy(pending)
-            method, params = pending['method'], pending.get('params') or {}
-            if method in ('item/commandExecution/requestApproval', 'item/fileChange/requestApproval'):
-                decision = response.get('decision')
-                if set(response) != {'decision'} or decision not in ('accept', 'decline', 'cancel') or (params.get('availableDecisions') and decision not in params['availableDecisions']):
-                    raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
-                result = {'decision': decision}
-            elif method == 'item/permissions/requestApproval':
-                if set(response) != {'decision'} or response['decision'] not in ('accept', 'decline'):
-                    raise ValueError('이번에는 승인 또는 거부를 선택하세요.')
-                result = {'permissions': params.get('permissions', {}) if response['decision'] == 'accept' else {}, 'scope': 'turn'}
-            elif method in ('item/tool/requestUserInput', 'tool/requestUserInput'):
-                answers = response.get('answers')
-                keys = {q['id'] for q in params.get('questions', [])}
-                if set(response) != {'answers'} or not isinstance(answers, dict) or not keys or set(answers) != keys or any(not isinstance(v, list) or not v or any(not isinstance(s, str) or not s.strip() or len(s) > 20000 for s in v) for v in answers.values()):
-                    raise ValueError("모든 질문에 답변해 주세요.")
-                result = {'answers': {k: {'answers': v} for k, v in answers.items()}}
-            elif method == 'mcpServer/elicitation/request':
-                action = response.get('action')
-                if action not in ('accept', 'decline', 'cancel'):
-                    raise ValueError('알 수 없는 확인 작업')
-                computer = computer_use_approval(params)
-                if computer:
-                    if set(response) - {'action', 'persist'} or ('persist' in response and (action != 'accept' or response['persist'] not in computer['persistModes'])):
-                        raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
-                    result = {'action': action, 'content': {} if action == 'accept' else None}
-                    if 'persist' in response:
-                        result['_meta'] = {'persist': response['persist']}
-                else:
-                    from bridge.app.service import validate_form
-                    if set(response) - {'action', 'content'}:
-                        raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
-                    if action == 'accept':
-                        validate_form(response.get('content'), params.get('requestedSchema', {}))
-                    result = {'action': action, 'content': response.get('content') if action == 'accept' else None}
-            else:
-                raise ValueError('그런 요청은 원본으로 해주세요 WSL 터미널 취급')
+            with session.condition:
+                result = native_request_response(pending,response,session.state)
             def dispatch():
+                with session.condition:
+                    current = next((r for r in session.state.get('requests',[]) if r.get('id')==pending['id']),None)
+                    if (not current or current.get('_responded') or request_snapshot(current)!=request_snapshot(pending)
+                            or current['_generation']!=self.generation):
+                        raise ValueError('This request changed or expired. Review the latest request.')
+                    current['_responded'] = True
                 runtime.write({'id': pending['id'], 'result': result})
                 with session.condition:
                     resolved = session.condition.wait_for(lambda: self.generation != pending['_generation'] or

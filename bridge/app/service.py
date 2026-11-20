@@ -20,6 +20,7 @@ from bridge.features.endpoints.registry import codex_list_hosts
 from bridge.app.lifecycle import private_json
 from bridge.resources import source_text
 from bridge.features.sessions.message_management import snapshot as management_snapshot, mutate as management_mutate, queue_version
+from bridge.features.sessions import history_search
 
 from bridge.features.terminals.manager import TerminalManager
 from bridge.features.sessions.side_chat import SideChats
@@ -32,7 +33,7 @@ from bridge.clients.codex.cli_session import CliSessions
 from bridge.features.sessions.identity import same_cwd
 from bridge.clients.desktop_app import DesktopApp
 from bridge.clients.codex.transport import ipc_endpoint
-from bridge.features.sessions.model import apply_patches, attachment_prompt, computer_use_approval, items_array, normalize_state, normalize_request, ordered_turns, pending_requests, async_requests, request_id, user_display_text, merge_saved_message_times
+from bridge.features.sessions.model import apply_patches, attachment_prompt, native_request_response, request_snapshot, validate_form, items_array, normalize_state, normalize_request, ordered_turns, pending_requests, async_requests, request_id, user_display_text, merge_saved_message_times
 from bridge.features.sessions.store import SessionStore, StoreUnavailable, persisted_submission_ids
 from bridge.features.workspace.files import artifact_paths, referenced_model_images, host_file_links, visualization_files, visualization_paths
 from bridge.features.workspace.visualize import identifier as visualization_id, read_source as read_visualization
@@ -43,7 +44,7 @@ from bridge.platforms.codex_daemon_env import DaemonEnvironmentUnavailable
 from bridge.clients.codex.remote import AppHosts, RemoteStore, RemoteCatalog, RemoteUnavailable, ssh_read, ssh_download, payload, project_path_name, ssh_connection, retry_ssh
 from bridge.features.sessions.create import (
     archive_thread, rename_thread, independent_directory, create_empty, fork_copy, fork_attached, open_in_desktop, open_project_in_desktop,
-    CreationError, CreationUnavailable, ForkUnavailable, project_directory,
+    CreationError, CreationUnavailable, ForkUnavailable, SideChatConnectionUnavailable, SideChatReceiptUnknown, project_directory,
     project_directory_listing, project_trust, apply_desktop_config,
 )
 from bridge.features.sessions.archive import ArchiveCommands
@@ -137,6 +138,8 @@ class LiveSession:
         self.attach_lock = threading.Lock()
         self.activation_lock = threading.Lock()
         self.action_lock = threading.RLock()
+        self.approval_claims = set()
+        self.approval_snapshot_sequence = 0
         self.timeline = Timeline()
         self.tool_image_cache = image_cache if image_cache is not None else TOOL_IMAGE_CACHE
         self.tool_images = {}
@@ -182,6 +185,7 @@ class LiveSession:
             return dict(self.timeline_source)
 
     def set_history(self, state):
+        first_read = self.saved_view is None
         self.history_state = state
         self.saved_view = normalize_state(state, False, image_cache=self.tool_image_cache, item_limit=self.timeline_limit)
         self.saved_image_calls = {}
@@ -193,12 +197,19 @@ class LiveSession:
                         self.saved_image_calls[key] = None if key in self.saved_image_calls else message.get('attachments')
         # Complete native patch evidence is retained by the saved reader even
         # when its messages are outside the current presentation window.
+        saved_turns = ordered_turns(state)
         self.saved_file_changes = {
             turn.get('turnId'): (turn['_nativeFileChanges'], turn.get('_nativeFileChangesBasis', 'recorded'))
-            for turn in ordered_turns(state) if turn.get('status') == 'completed' and turn.get('_nativeFileChanges')}
+            for turn in saved_turns if turn.get('status') == 'completed' and turn.get('_nativeFileChanges')}
         for turn in self.saved_view['turns']:
             if turn.get('status') == 'completed' and turn.get('fileChanges'):
                 self.saved_file_changes.setdefault(turn['id'], (turn['fileChanges'], turn.get('fileChangesBasis', 'recorded')))
+        # The first clock lookup may read a complete, empty rollout. Keep the
+        # snapshot for offline use without invalidating a populated live view.
+        if (first_read and not saved_turns and self.saved_view['historyComplete']
+                and not self.saved_view.get('contextUsage') and self.connected
+                and self.state and ordered_turns(self.state)):
+            return
         self.changed()
 
     def pending_requests(self):
@@ -3350,22 +3361,36 @@ class Bridge:
         return self.uploads.put(thread_id, identifier, name, data)
 
     def _desktop_metadata_operation(self, cwd, operation, failure_message, *, require_shared=False):
-        from bridge.clients.codex.desktop_runtime import connect, initialization_lock
+        from bridge.clients.codex.desktop_runtime import connect, initialization_lock, preparation
         from bridge.clients.codex.app_server import AppServerError, AppServerRequestNotSent
         from bridge.features.sessions.create import _runtime_operation
         with ExitStack() as locks:
+            local_desktop = self.host == 'local' and sys.platform in ('darwin', 'linux', 'win32')
             try:
-                if self.host == 'local' and sys.platform in ('darwin', 'linux', 'win32'):
+                if local_desktop:
                     # Every gateway using this home must finish its metadata
                     # transaction before initialization may quit the original App.
                     locks.enter_context(initialization_lock(self.codex_home))
+            except (AppServerError, OSError, ValueError) as exc:
+                raise CreationUnavailable(str(exc)) from exc
+            try:
                 client = connect(self.codex_home, self.catalog_reader.executable) if self.host == 'local' else None
             except (AppServerError, OSError, ValueError) as exc:
                 # Only connection/identity checks have run; no metadata write was sent.
-                raise CreationUnavailable(str(exc)) from exc
+                if not (local_desktop and require_shared):
+                    raise CreationUnavailable(str(exc)) from exc
+                client = None
             if client is None:
-                if require_shared and self.host == 'local' and sys.platform in ('darwin', 'linux', 'win32'):
-                    raise CreationUnavailable('기본 사이드 채팅 연결이 준비되기를 기다리고 있습니다. 데스크톱 작업이 완료되고 유휴 상태가 확인되면 자동으로 완료됩니다. 계정 관리에서 준비 상태를 확인할 수도 있습니다. 사이드 채팅이 아직 생성되지 않았습니다')
+                if require_shared and local_desktop:
+                    # A pending write receipt stops automatic replay across gateways.
+                    # Consult it under the same lock that guards account initialization.
+                    state = self.accounts.desktop_preparation.get('state')
+                    try:
+                        receipt = preparation(self.codex_home) or {}
+                        manual = state in ('failed', 'ready') or receipt.get('state') in ('pending', 'complete')
+                    except (OSError, ValueError, TypeError, KeyError):
+                        manual = True
+                    raise SideChatConnectionUnavailable(manual=manual)
                 return _runtime_operation(self.catalog_reader.executable, self.codex_home, cwd, operation,
                                           failure_message=failure_message, **_runtime_scope(self.host))
             attempted = False
@@ -3445,7 +3470,7 @@ class Bridge:
                     if entry.get('action') != 'side-chat' or entry.get('source') != thread_id:
                         raise ValueError('동일한 작업 ID를 다른 채팅에서 사용할 수 없습니다.')
                     if entry.get('status') != 'created':
-                        raise CreationError("보조 채팅 생성이 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.")
+                        raise SideChatReceiptUnknown(SideChatReceiptUnknown.message)
                     return {'id': entry['id'], 'host': self.host, 'parentId': thread_id}
                 entry = {'action': 'side-chat', 'source': thread_id, 'status': 'unknown', 'at': time.time()}
                 self.message_actions[identifier] = entry
@@ -3459,12 +3484,18 @@ class Bridge:
                                           (snapshot.get('title') or '이름없는 채팅')[:90] + ' · 보조 채팅',
                                           settings, created, isolated_home=self.host.startswith('codex:'),
                                           runtime_operation=lambda call: self._desktop_metadata_operation(
-                                              snapshot['cwd'], call, "보조 채팅 생성이 확인되지 않았습니다. 메인 채팅을 확인하세요. 다시 생성되지 않습니다.",
+                                              snapshot['cwd'], call, SideChatReceiptUnknown.message,
                                               require_shared=True))
                 except CreationUnavailable:
                     del self.message_actions[identifier]
                     self._save_actions()
                     raise
+                except CreationError as exc:
+                    raise SideChatReceiptUnknown(str(exc)) from exc
+                except (KeyError, TypeError, ValueError) as exc:
+                    # A malformed fork receipt must not turn an attempted mutation
+                    # into a session-not-found or validation error on the HTTP route.
+                    raise SideChatReceiptUnknown(SideChatReceiptUnknown.message) from exc
                 entry.update(id=child, status='created')
                 self._save_actions()
                 self._invalidate_attached_threads(thread_id)
@@ -3818,6 +3849,12 @@ class Bridge:
                     followed.last_activation = None
                     followed.retry_at = 0
 
+    def _other_desktop_connected(self, thread_id):
+        # A single owner can close a chat while other owners still use this socket.
+        with self.lock:
+            return any(other.id != thread_id and other.runtime == 'desktop' and other.connected
+                       for other in self.live.values())
+
     @operation
     def rebuild_connection(self, thread_id):
         session = self.session(thread_id, background=True)
@@ -3828,8 +3865,9 @@ class Bridge:
         # follower connection is replaced. Native tasks keep their original owner.
         rebuilt = False
         try:
-            self._rebuild_desktop_transport()
-            rebuilt = True
+            if not self._other_desktop_connected(thread_id):
+                self._rebuild_desktop_transport()
+                rebuilt = True
             return self.activate(thread_id, _transport_rebuilt=True)
         except IPCError as exc:
             with session.condition:
@@ -3904,8 +3942,9 @@ class Bridge:
                         session.cli_recovery = session.error = None
                         session.changed()
             endpoint_changed = not _transport_rebuilt and session.runtime == 'desktop' and self.ipc.endpoint_changed()
-            replace_transport = endpoint_changed or (not _transport_rebuilt and session.runtime == 'desktop' and
-                not session.connected and session.rebuild_recommended)
+            replace_transport = (not _transport_rebuilt and session.runtime == 'desktop'
+                                 and (endpoint_changed or not session.connected and session.rebuild_recommended)
+                                 and not self._other_desktop_connected(thread_id))
             if session.connected and not replace_transport:
                 return session
             with session.condition:
@@ -4095,6 +4134,8 @@ class Bridge:
                 newly_connected = not session.connected or session.runtime != 'desktop'
                 session.state = state
                 session.revision = change["revision"]
+                if change.get("type") == "snapshot":
+                    session.approval_snapshot_sequence += 1
                 session.runtime = 'desktop'
                 session.discovering = False
                 session.connected = True
@@ -4241,7 +4282,7 @@ class Bridge:
         return session
 
     @operation
-    def _call(self, session, method, params, timeout=30):
+    def _call(self, session, method, params, timeout=30, *, reviewed_request=None):
         with session.condition:
             if session.desktop_stream_error:
                 raise IPCError(session.desktop_stream_error)
@@ -4249,6 +4290,8 @@ class Bridge:
         # A newly selected default account must not gate unrelated existing providers.
         if session.runtime == "cli":
             try:
+                if reviewed_request is not None:
+                    return self.cli_sessions.call(session.id, method, params, timeout=timeout, reviewed_request=reviewed_request)
                 return self.cli_sessions.call(session.id, method, params, timeout=timeout)
             except AppServerError as exc:
                 raise IPCError(str(exc)) from exc
@@ -5391,6 +5434,48 @@ class Bridge:
             self._draft_account_identity({'provider': provider})
         return identity
 
+    @contextmanager
+    def _thread_source(self, session, *, write=False):
+        with session.condition:
+            if not session.connected or session.runtime not in ('cli', 'desktop'):
+                raise AppServerUnavailable('Original session is unavailable.')
+            runtime = session.runtime
+        with self._agent_connection({'rootOrigin': runtime, 'rootId': session.id}, write=write) as connection:
+            yield connection
+
+    @operation
+    def thread_history_search(self, thread_id, body):
+        return history_search.search(self, thread_id, body)
+
+    @operation
+    def original_queue(self, thread_id, account):
+        uuid.UUID(thread_id)
+        with self.lock:
+            session = self.live.get(thread_id)
+        if not session or not account or self._management_identity(thread_id, refresh=True) != account:
+            raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+        try:
+            with self._thread_source(session) as (request, generation):
+                rows = history_search.queue_page(request, thread_id)
+        except (AppServerError, IPCError, ValueError, OSError):
+            return {'available':False, 'rows':[]}
+        if self._management_identity(thread_id) != account:
+            raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
+        changed = False
+        with self.submit_lock:
+            for row in rows:
+                receipt = self.submissions.get(thread_id + ':' + str(row['clientId']))
+                if (receipt and receipt.get('queueOwner') == 'native' and receipt.get('status') == 'unknown'
+                        and receipt.get('nativeGeneration') == generation and receipt.get('nativeAccount') == account):
+                    receipt.update(status='accepted', nativeQueueId=row['id'])
+                    changed = True
+            if changed:
+                self._save_ledger()
+        if changed:
+            with session.condition:
+                session.changed()
+        return {'available':True, 'rows':rows}
+
     def message_management(self, thread_id, receipt_ids=()):
         uuid.UUID(thread_id)
         identity = self._management_identity(thread_id, refresh=True)
@@ -5629,6 +5714,21 @@ class Bridge:
                             raise ValueError("계획이 변경되었습니다. 다시 시도하기 전에 새로고침하세요.")
             if session.runtime == 'cli' and _async_response is None:
                 self._verify_cli_submission_account(session)
+            # Native queued input inherits the existing mode and has no field for Bridge file
+            # references, plan replies or goal activation. Keep those on their original path.
+            native_generation, native_account = None, None
+            if (active and mode == 'queue' and not files and not plan_response and not activation and _async_response is None
+                    and (work_mode is None or work_mode == 'default' and
+                         (session.state.get('latestCollaborationMode') or {}).get('mode', 'default') == 'default')):
+                try:
+                    native_account = self._management_identity(thread_id, refresh=True)
+                    if native_account:
+                        with self._thread_source(session, write=True) as (request, generation):
+                            page = request('thread/queue/list', {'threadId':thread_id, 'limit':1})
+                            if isinstance(page.get('data'), list):
+                                native_generation = generation
+                except (AppServerError, IPCError, OSError, ValueError):
+                    pass  # All probes are reads. No native submission has been attempted.
             admission = None
             if self.cli_scope.target is not None and session.runtime == 'cli' and _async_response is None:
                 with self.cli_sessions.lock:
@@ -5649,6 +5749,9 @@ class Bridge:
                             record.get('phase') == 'released' and token in record.get('connections', ()))):
                         raise IPCError('목표 CLI 해제 의도가 있거나 연결이 변경되었습니다. 전송하기 전에 명시적으로 다시 연결하십시오. 메시지가 대기열에 포함되지 않습니다.。')
                 entry = {"text": text, "mode": mode, "skills": selected, "status": "queued" if mode == "queue" else "unknown", "at": time.time()}
+                if native_generation:
+                    # An unknown native receipt is never eligible for the Bridge dispatcher.
+                    entry.update(status='unknown', queueOwner='native', nativeGeneration=native_generation, nativeAccount=native_account)
                 if self.cli_scope.target is not None:
                     entry.update(origin=session.origin, runtime=session.runtime)
                     if session.runtime == 'cli' and self.cli_sessions.remote_home:
@@ -5672,6 +5775,25 @@ class Bridge:
             with session.condition:
                 session.changed()
             if mode == "queue":
+                if native_generation:
+                    inputs = [{'type':'text','text':text,'text_elements':[]}]
+                    inputs.extend({'type':'skill','name':s['name'],'path':s['path']} for s in selected)
+                    try:
+                        with self._thread_source(session, write=True) as (request, generation):
+                            if generation != native_generation or self._management_identity(thread_id) != native_account:
+                                raise ValueError('Original session changed. Check the queue.')
+                            answer = request('thread/queue/add', {'threadId':thread_id,'clientUserMessageId':submission_id,'input':inputs})
+                            row = answer['queuedSubmission']
+                            if row.get('clientUserMessageId') != submission_id or not row.get('id'):
+                                raise ValueError('Unknown queue receipt.')
+                    except (AppServerError, IPCError, OSError, ValueError, KeyError):
+                        return {'id':submission_id,'status':'unknown'}
+                    with self.submit_lock:
+                        self.submissions[key].update(status='accepted', nativeQueueId=row['id'])
+                        self._save_ledger()
+                    with session.condition:
+                        session.changed()
+                    return {'status':'queued','id':submission_id,'queueOwner':'native'}
                 return {"status": "queued", "id": submission_id}
             return self._dispatch(session, key, entry)
 
@@ -5734,7 +5856,16 @@ class Bridge:
             with session.condition:
                 current = session.state
                 model = current.get("latestModel") or (current.get("latestCollaborationMode") or {}).get("settings", {}).get("model")
-                effort = current.get("latestReasoningEffort") or (current.get("latestThreadSettings") or {}).get("effort")
+                # 압축용 내부 turn은 latestReasoningEffort를 minimal로 바꿀 수 있다.
+                # 실제 실행 설정을 우선하며 명시적인 null(네이티브 기본값)도 보존한다.
+                settings = current.get("latestThreadSettings") or {}
+                mode_settings = (current.get("latestCollaborationMode") or {}).get("settings") or {}
+                if 'effort' in settings:
+                    effort = settings['effort']
+                elif 'reasoning_effort' in mode_settings:
+                    effort = mode_settings['reasoning_effort']
+                else:
+                    effort = current.get("latestReasoningEffort")
             if not model:
                 raise ValueError("모델 설정을 사용할 수 없습니다. 모드 전환 전에 다시 연결")
             request["collaborationMode"] = {"mode": "plan" if entry["workMode"] == "plan" else "default",
@@ -5831,7 +5962,7 @@ class Bridge:
         return '<send_user_message_question_reply>\n' + json.dumps(replies, ensure_ascii=False, separators=(',', ':')) + '\n</send_user_message_question_reply>'
 
     def respond(self, thread_id, request_id, response):
-        if response.get('action') == 'skip':
+        if response.get('action') == 'skip' and 'questionId' in response:
             return self._skip_question(thread_id, request_id, response)
         session = self._target(thread_id)
         plan_id = str(uuid.uuid5(uuid.UUID(thread_id), "plan:" + str(request_id)))
@@ -5881,49 +6012,46 @@ class Bridge:
             "tool/requestUserInput": "thread-follower-submit-user-input",
             "mcpServer/elicitation/request": "thread-follower-submit-mcp-server-elicitation-response",
         }
+        if method == 'item/tool/requestOptionPicker' and session.runtime == 'cli':
+            mapping[method] = 'direct-option-picker-response'
         if method not in mapping:
             raise ValueError("이러한 요청은 데스크탑에서 해주세요 App 중간 처리")
-        payload = {"requestId": pending["id"]}
-        if method in ("item/commandExecution/requestApproval", "item/fileChange/requestApproval"):
-            decision = response.get("decision")
-            if decision not in ("accept", "decline", "cancel"):
-                raise ValueError("이 승인, 거부 또는 취소만 지원합니다.")
-            available = params.get("availableDecisions")
-            if available and decision not in available:
-                raise ValueError("이 승인에는 선택한 작업이 지원되지 않습니다.")
-            payload["decision"] = decision
-        elif method == "item/permissions/requestApproval":
-            if response.get("decision") not in ("accept", "decline"):
-                raise ValueError("승인 또는 거부를 선택하세요.")
-            payload["response"] = {"permissions": params.get("permissions", {}) if response["decision"] == "accept" else {}, "scope": "turn"}
-        elif method in ("item/tool/requestUserInput", "tool/requestUserInput"):
-            answers = response.get("answers")
-            if not isinstance(answers, dict):
-                raise ValueError("질문에 대한 답변을 작성해 주세요.")
-            allowed_ids = {q["id"] for q in params.get("questions", [])}
-            if not allowed_ids or set(answers) != allowed_ids or any(not isinstance(v, list) or not v or not all(isinstance(s, str) and len(s) <= 20000 for s in v) for v in answers.values()):
-                raise ValueError("답변이 불완전하거나 형식이 잘못되었습니다.")
-            payload["response"] = {"answers": {k: {"answers": v} for k, v in answers.items()}}
-        else:
-            action = response.get("action")
-            if action not in ("accept", "decline", "cancel"):
-                raise ValueError("알 수 없는 확인 작업")
-            computer = computer_use_approval(params)
-            if computer:
-                if set(response) - {'action', 'persist'} or ('persist' in response and
-                        (action != 'accept' or response['persist'] not in computer['persistModes'])):
-                    raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
-                payload['response'] = {'action': action, 'content': {} if action == 'accept' else None}
-                if 'persist' in response:
-                    payload['response']['_meta'] = {'persist': response['persist']}
+        with session.action_lock:
+            owner = session.owner
+            epoch = session.connection_epoch
+            if session.runtime == 'desktop' and self.ipc.owner(thread_id,host=self.native_host) != owner:
+                raise ValueError('This request changed or expired. Review the latest request.')
+            if session.runtime == 'desktop' and 'reviewedRequest' in response:
+                with session.condition:
+                    previous_snapshot = session.approval_snapshot_sequence
+                    self.ipc.follow(thread_id,owner,host=self.native_host)
+                    received = session.condition.wait_for(lambda: session.approval_snapshot_sequence>previous_snapshot or
+                        not session.connected or session.owner!=owner or session.connection_epoch!=epoch,timeout=6)
+                    if not received:
+                        raise ValueError('The owner could not confirm this request. Check the original conversation.')
+            with session.condition:
+                if not session.connected or session.owner != owner or session.connection_epoch != epoch:
+                    raise ValueError('This request changed or expired. Review the latest request.')
+                active_requests = (session.state or {}).get('requests', [])
+                original = next((r for r in active_requests if str(r.get('id'))==str(request_id)),None)
+                if not original or request_snapshot(original)!=request_snapshot(pending):
+                    raise ValueError('This request changed or expired. Review the latest request.')
+                result = native_request_response(original,response,session.state)
+                key = (owner,request_snapshot(original))
+                session.approval_claims.intersection_update((owner,request_snapshot(r)) for r in active_requests)
+                if key in session.approval_claims:
+                    raise ValueError('This response was already submitted. Check the original conversation.')
+                session.approval_claims.add(key)
+            payload = {'requestId':pending['id']}
+            if method in ('item/commandExecution/requestApproval','item/fileChange/requestApproval'):
+                payload.update(result)
             else:
-                if set(response) - {'action', 'content'}:
-                    raise ValueError('이 요청은 선택한 승인 범위를 지원하지 않습니다.')
-                content = response.get("content")
-                if action == "accept":
-                    validate_form(content, params.get("requestedSchema", {}))
-                payload["response"] = {"action": action, "content": content if action == "accept" else None}
-        return self._call(session, mapping[method], payload)
+                payload['response'] = result
+            # Direct runtime clients also check the original request under their
+            # own lock immediately before claiming its native JSON-RPC ID.
+            if session.runtime == 'cli' and 'reviewedRequest' in response:
+                return self._call(session, mapping[method], payload, reviewed_request=request_snapshot(pending))
+            return self._call(session, mapping[method], payload)
 
     def assert_detachable(self):
         """Check gateway-owned work before removing an already disabled entry."""
@@ -5995,27 +6123,3 @@ class Bridge:
         self.cli_sessions.close()
         if self.goal:
             self.goal.close()
-
-
-def validate_form(value, schema):
-    """Validate the small JSON-schema form subset that the phone can render."""
-    from bridge.features.sessions.model import form_supported
-    if not form_supported(schema):
-        raise ValueError("이 양식은 데스크톱에서 작성해야 합니다.")
-    if not isinstance(value, dict):
-        raise ValueError("양식을 작성해주세요")
-    properties = schema.get("properties", {})
-    if set(value) - set(properties) or set(schema.get("required", [])) - set(value):
-        raise ValueError("불완전한 양식 필드")
-    for key, item in value.items():
-        field = properties[key]
-        kind = field.get("type", "string")
-        valid = ((kind == "string" and isinstance(item, str)) or
-                 (kind == "boolean" and isinstance(item, bool)) or
-                 (kind in ("number", "integer") and type(item) in (int, float) and (kind != "integer" or int(item) == item)))
-        if not valid or ("enum" in field and item not in field["enum"]):
-            raise ValueError("양식 필드의 형식이 잘못되었습니다.：" + key)
-        if isinstance(item, str) and not field.get("minLength", 0) <= len(item) <= field.get("maxLength", 20000):
-            raise ValueError("양식 텍스트 길이가 잘못되었습니다.：" + key)
-        if type(item) in (int, float) and not field.get("minimum", float("-inf")) <= item <= field.get("maximum", float("inf")):
-            raise ValueError("양식 값이 범위를 벗어났습니다.：" + key)

@@ -11,6 +11,7 @@
   "/app.js": [
     "shared/dialog-dismiss.js",
     "features/chat/session-menu.js",
+    "features/chat/history-search.js",
     "shell/app.js"
   ],
   "/bootstrap.js": "shared/bootstrap.js",
@@ -84,7 +85,7 @@
     "layouts/medium/workbench.css",
     "features/workspace/workbench-input.css"
   ],
-  "/workbench.js": "features/workspace/workbench.js",
+  "/workbench.js": ["features/workspace/browser-panel.js", "features/workspace/workbench.js"],
   "/source-view.js": "features/workspace/source-view.js",
   "/code-syntax.js": "shared/code-syntax.js",
   "/vendor/prism/source-view.min.js": "vendor/prism/source-view.min.js",

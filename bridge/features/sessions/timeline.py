@@ -65,6 +65,11 @@ class Timeline:
                         entries.append(((None, child, 'subAgentCreated', 0), turn, creation, False))
                     continue
                 entries.append((identity + (ordinal,), turn, message, message.get('_firstUser', message is first_user)))
+                if message.get('memorySources'):
+                    citation = {'role': 'activity', 'kind': 'memoryCitation', 'title': 'Memory sources',
+                                'text': message['memorySources'], '_sourceIdentity': identity + (ordinal,)}
+                    entries.append(((turn['id'], message.get('id'), 'memoryCitation', ordinal), turn, citation, False))
+
             if turn.get('status') == 'completed' and turn.get('fileChanges'):
                 changes = turn['fileChanges']
                 added = sum(change['added'] for change in changes)
@@ -98,6 +103,16 @@ class Timeline:
                 ordinal = identity[3]
                 key = base + '-' + str(ordinal)
                 text = message.get('text') or ''
+                label_lines = []
+                if message.get('commandInfo'):
+                    line = text.count('\n') + 2
+                    parts = []
+                    for label, value in message['commandInfo']:
+                        if len(label_lines) < 128:
+                            label_lines.append(line)
+                        parts.append(label + '\n' + value)
+                        line += 3 + value.count('\n')
+                    text += '\n\n' + '\n\n'.join(parts)
                 if message.get('output'):
                     text += '\n\n' + message['output']
                 preview = text
@@ -120,15 +135,17 @@ class Timeline:
                         revision = self.file_revision
                     file_patches[key] = (revision, patches)
                 version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
-                                                 revision, message.get('agent'), message.get('computerUse'),
+                                                 revision, message.get('title'), message.get('activityCard'), message.get('appView'), message.get('agent'), message.get('collab'), message.get('computerUse'),
                                                  message.get('approvalReview'), message.get('reviewLinked'),
                                                  message.get('status'), message.get('exitCode'), message.get('success'),
                                                  message.get('source'), message.get('completed')])).hexdigest()[:24]
                 row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
-                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'computerUse') if k in message}
+                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'collab', 'computerUse', 'activityCard', 'appView') if k in message}
+                if label_lines:
+                    row['commandLabelLines'] = label_lines
                 if isinstance(message.get('reviewActionLabel'), str):
                     row['reviewActionLabel'] = message['reviewActionLabel'][:180].split('\n', 1)[0]
-                row.update(key=key, turnId=turn['id'], order=len(rows), version=version,
+                row.update(key=key, turnId=turn['id'], itemId=message.get('id'), order=len(rows), version=version,
                            text=preview[:180 if activity else TEXT_PREVIEW],
                            truncated=(activity and bool(text)) or len(text) > TEXT_PREVIEW, turnStatus=turn.get('status'),
                            editable=turn.get('actionable', True) and first_user and message.get('kind') == 'userMessage',
@@ -152,8 +169,8 @@ class Timeline:
                 key = hashlib.sha256(encoded([turn['id'], 'error'])).hexdigest()[:24] + '-error'
                 text = turn['error'] if isinstance(turn['error'], str) else json.dumps(turn['error'], ensure_ascii=False)
                 error = turn['error']
-                if isinstance(error, dict) and isinstance(error.get('codexErrorInfo'), dict) and 'responseStreamDisconnected' in error['codexErrorInfo'] and error.get('additionalDetails') == 'Connection failed: error sending request':
-                    text = '컴퓨터에서 Codex 모델 서비스에 연결할 수 없습니다. 이 기계를 사용하세요 CLI , 채팅 세부정보에서 확인하실 수 있습니다 CLI 회로망。'
+                if isinstance(error, dict) and isinstance(error.get('message'), str):
+                    text = '\n'.join(value for value in (error['message'], error.get('additionalDetails')) if isinstance(value, str) and value)
                 rows.append(dict(key=key, turnId=turn['id'], order=len(rows), role='error', text=text[:TEXT_PREVIEW],
                                  truncated=len(text) > TEXT_PREVIEW, version=hashlib.sha256(text.encode()).hexdigest()[:24]))
                 details[key] = text

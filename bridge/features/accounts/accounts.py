@@ -198,6 +198,7 @@ class Accounts:
         self.login_cancel = threading.Event()
         self.thread = None
         self.desktop_preparation = {'state': 'idle'}
+        self.desktop_preparation_scheduler = None
 
     @property
     def independent(self):
@@ -339,12 +340,60 @@ class Accounts:
         supported = sys.platform in ('darwin', 'linux', 'win32') and getattr(self.bridge, 'host', 'local') == 'local'
         result = {'supported': supported, 'configured': False, 'preparation': dict(self.desktop_preparation)}
         if supported:
-            from bridge.clients.codex.desktop_runtime import settings
+            from bridge.clients.codex.desktop_runtime import settings, preparation, deferred_preparation
             try:
                 result['configured'] = settings(self.home) is not None
+                prior = preparation(self.home)
+                if prior and prior['state'] == 'pending':
+                    identifier = prior['requestId']
+                    state = deferred_preparation(self.home, identifier)
+                    if state or self._verified_preparation_failure(identifier):
+                        result['deferred'] = {'requestId':identifier, 'state':state or 'available'}
             except (OSError, ValueError, TypeError, KeyError):
                 result['error'] = "공유 연결 설정을 읽을 수 없습니다. 연결을 다시 초기화하십시오."
         return result
+
+    def _verified_preparation_failure(self, request_id):
+        # Read the persisted terminal outcome. Startup can translate an interrupted
+        # request into an in-memory 'failed' label without knowing its actual result.
+        switch = read_json(self.root / 'switch.json', {})
+        return (switch.get('operation') == 'desktopRuntime' and switch.get('phase') == 'failed'
+                and switch.get('requestId') == request_id and
+                (switch.get('failureKind') == 'verificationFailed'
+                 or switch.get('error') == '데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.'))
+
+    def defer_desktop_runtime(self, value):
+        from bridge.clients.codex.desktop_runtime import update_deferred_preparation
+        action, request_id = value.get('action'), value.get('requestId')
+        schedule = action == 'deferDesktopRuntime'
+        required = {'action','requestId','confirmed'} if schedule else {'action','requestId'}
+        if (set(value) != required or schedule and value['confirmed'] is not True
+                or not isinstance(request_id,str) or str(uuid.UUID(request_id)) != request_id
+                or self.independent or getattr(self.bridge,'host','local') != 'local'
+                or sys.platform not in ('linux','darwin','win32')):
+            raise ValueError('Invalid deferred connection request.')
+        def register():
+            with self.gate, self.lock:
+                self.require_managed_writes()
+                if not self._verified_preparation_failure(request_id):
+                    raise ValueError('The previous connection result could not be verified.')
+                if update_deferred_preparation(self.home, request_id, 'schedule') != 'waiting':
+                    raise ValueError('This connection request has already ended.')
+        if schedule:
+            if self.desktop_preparation_scheduler is None:
+                raise ValueError('Enable Codex in app management before scheduling.')
+            self.desktop_preparation_scheduler(register)
+        else:
+            state = update_deferred_preparation(self.home, request_id, 'cancel')
+            if state != 'cancelled':
+                raise ValueError('This connection request has already ended.')
+        return self.public()
+
+    def cancel_deferred_desktop_runtime(self):
+        from bridge.clients.codex.desktop_runtime import preparation, update_deferred_preparation
+        prior = preparation(self.home)
+        if prior and prior['state'] == 'pending':
+            update_deferred_preparation(self.home, prior['requestId'], 'cancel')
 
     @staticmethod
     def name(value):
@@ -826,6 +875,8 @@ class Accounts:
             raise ValueError('독립 실행형 구성은 기본값을 관리하지 않습니다. Codex Desktop')
         if action == 'initializeDesktopRuntime':
             return self.initialize_desktop_runtime(value)
+        if action in ('deferDesktopRuntime', 'cancelDeferredDesktopRuntime'):
+            return self.defer_desktop_runtime(value)
         if action == 'retrySsh':
             if set(value) != {'action', 'host'}:
                 raise ValueError('SSH 재시도 요청에 지원되지 않는 필드가 포함되어 있습니다.')
@@ -1097,6 +1148,7 @@ class Accounts:
     def _initialize_desktop_runtime(self, app, acknowledged=False, *, automatic=False, cancelled=lambda: False):
         from bridge.clients.codex.desktop_runtime import configure, connect, initialization_lock, process_identity, DesktopRuntimeBusy
         from bridge.clients.codex.desktop_runtime import preparation, record_preparation, settings
+        from bridge.clients.codex.desktop_runtime import deferred_preparation, update_deferred_preparation
         from bridge.clients.codex.app_server import AppServerUnavailable
         from bridge.clients.lifecycle import inspect_client, stop_client
         if sys.platform == 'win32':
@@ -1139,6 +1191,8 @@ class Accounts:
                     raise ValueError("Codex 데스크탑 프로세스 ID가 변경되었습니다. 연결을 다시 초기화하십시오.")
             return state, identities
 
+        deferred = None
+        verified_retry = False
         try:
             with self.gate, self.bridge.account.lock, initialization_lock(self.home):
                 preparation_error = None
@@ -1158,9 +1212,14 @@ class Accounts:
                         self.desktop_preparation = {'state': 'ready'}
                         return False
                     prior = preparation(self.home)
+                    verified_retry = bool(prior and prior['state'] == 'complete' and
+                                          deferred_preparation(self.home, prior['requestId']) == 'consumed')
                     if prior and prior['state'] == 'pending':
-                        self.desktop_preparation = {'state': 'failed', 'reason': '마지막 기본 연결 준비 결과를 확인해야 합니다. 계정관리에서 다시 준비해주세요. 자동으로 다시 시작되지 않습니다.'}
-                        return False
+                        if deferred_preparation(self.home, prior['requestId']) == 'waiting':
+                            deferred = prior['requestId']
+                        else:
+                            self.desktop_preparation = {'state': 'failed', 'reason': '마지막 기본 연결 준비 결과를 확인해야 합니다. 계정관리에서 다시 준비해주세요. 자동으로 다시 시작되지 않습니다.'}
+                            return False
                     app.validate(self.runtime)
                     from bridge.clients.codex.desktop_runtime import validate_runtime, launcher_settings
                     try:
@@ -1171,10 +1230,13 @@ class Accounts:
                         # An unsupported shared transport must not prevent an
                         # ordinary cold App launch. Existing shared settings or
                         # an uncertain launch never use this fallback.
-                        if settings(self.home) is not None:
+                        if deferred or settings(self.home) is not None:
                             raise
                         preparation_error = exc
                 state, identities = observed()
+                if verified_retry and state['running']:
+                    self.desktop_preparation = {'state':'failed', 'reason':'A scheduled restart already completed. Check the current connection.'}
+                    return False
                 if preparation_error and state['running']:
                     raise preparation_error
                 try:
@@ -1202,8 +1264,10 @@ class Accounts:
                 if automatic:
                     if self.bridge.closed.is_set() or cancelled():
                         return False
+                    if deferred and update_deferred_preparation(self.home, deferred, 'consume') != 'consumed':
+                        return False
                     self.state = {'phase': 'preparing', 'operation': 'desktopRuntime', 'automatic': True,
-                                  'requestId': str(uuid.uuid4()), 'error': None}
+                                  'requestId': deferred or str(uuid.uuid4()), 'error': None}
                     self.phase('preparing')
                     self.desktop_preparation = {'state': 'preparing'}
                 # This receipt must precede stop/configure/start and live beside
@@ -1235,11 +1299,16 @@ class Accounts:
         except Exception as exc:
             # Keep a successfully saved configuration available for an explicit
             # retry. Never force-stop or automatically start the App a second time.
-            if automatic and isinstance(exc, DesktopRuntimeBusy) and self.desktop_preparation.get('state') != 'preparing':
+            if automatic and (isinstance(exc, DesktopRuntimeBusy) and self.desktop_preparation.get('state') != 'preparing'
+                              or deferred and self.desktop_preparation.get('state') == 'checking'):
                 self.desktop_preparation = {'state': 'waiting', 'reason': str(exc)}
                 return True
             if not automatic or self.desktop_preparation.get('state') == 'preparing':
-                self.phase('failed', error=str(exc))
+                values = {}
+                if (self.state.get('phase') == 'verifying' and
+                        str(exc) == '데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.'):
+                    values['failureKind'] = 'verificationFailed'
+                self.phase('failed', error=str(exc), **values)
             self.desktop_preparation = {'state': 'failed', 'reason': str(exc)}
             return False
 

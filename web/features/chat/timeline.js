@@ -1,6 +1,6 @@
 'use strict';
 const timelineText=source=>typeof BridgeI18n==='undefined'?source:BridgeI18n.t(source);
-const timelineActivityHeading=row=>typeof chatActivityLabel==='function'?chatActivityLabel(row):timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):'');
+const timelineActivityHeading=(row,agentNames)=>typeof chatActivityLabel==='function'?chatActivityLabel(row,agentNames):timelineText(row.title||row.kind)+(row.status==='inProgress'?timelineText('· 진행중'):'');
 const computerActionLabels={
   screenshot:'Capture screen',get_app_state:'Inspect screen',click:'Check screen after click',
   press_key:'Check screen after keypress',type_text:'Check screen after typing',set_value:'Check screen after input',
@@ -263,12 +263,13 @@ class ChatTimeline {
   agentName(agent){return agent.nickname||this.agentNames.get(agent.id)||agent.taskName||'';}
   agentLabel(agent){
     const name=this.agentName(agent);
+    if(agent.activity)return [name,timelineText(agent.activity)].filter(Boolean).join(' · ');
     return name?timelineText('{name} agent created').replace('{name}',()=>name):timelineText('Subagent created');
   }
   async resolveAgentNames(rows,refresh=false){
     const local=!this.meta?.temporary&&this.meta?.access?.canUseSideChat!==false;
     if(!this.onAgent||this.loadingAgentNames||(!local&&!this.readWorkspaceAgents))return;
-    const missing=local?rows.map(row=>row.agent).filter(agent=>agent&&!agent.nickname&&!this.agentNames.has(agent.id)):[];
+    const missing=local?rows.flatMap(row=>row.agent?[row.agent]:row.collab?.targets||[]).filter(agent=>!agent.nickname&&!this.agentNames.has(agent.id)):[];
     if(!missing.length&&!(this.onAgentTabs&&(refresh||!this.agentTimer)))return;
     clearTimeout(this.agentTimer);
     const schedule=()=>{if(this.onAgentTabs&&!this.abort.signal.aborted)this.agentTimer=setTimeout(()=>{
@@ -288,6 +289,12 @@ class ChatTimeline {
       for(const [key,{row}] of this.rows)if(row.agent){
         const node=this.nodes.get(key).node,label=this.agentLabel(row.agent);
         if(node.textContent!==label)node.textContent=label;
+      }else if(row.collab?.targets?.length){
+        const node=this.nodes.get(key).node,heading=node.firstElementChild,label=timelineActivityHeading(row,this.agentNames);
+        if(heading.textContent!==label){
+          heading.textContent=label;
+          decorateChatActivity(node,row,heading);
+        }
       }
     }catch{/* 목록이 아직 저장되지 않았어도 ID로 해당 기록을 직접 열 수 있다. */}
     finally{
@@ -297,14 +304,14 @@ class ChatTimeline {
     }
   }
   renderRow(row,open){
-    if(row.kind==='subAgentCreated'&&row.agent){
+    if(['subAgentCreated','subAgentActivity'].includes(row.kind)&&row.agent){
       const enabled=this.onAgent&&!this.meta?.temporary;
       const node=document.createElement(enabled?'button':'div');node.className='subagent-created timeline-row';
       node.textContent=this.agentLabel(row.agent);
       if(enabled){node.type='button';node.onclick=()=>this.onAgent({...row.agent,nickname:this.agentName(row.agent)});}
       return node;
     }
-    const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&hasToolImageContent(row);
+    const activity=row.role==='activity'||row.role==='fileChanges',toolImages=activity&&(hasToolImageContent(row)||row.kind==='imageGeneration'&&row.attachments?.length>0);
     // 이미지가 있는 호출은 실행 기록과 미리보기를 담을 바깥 제목을 둔다.
     const computerUse=toolImages&&row.computerUse;
     const node=document.createElement(activity&&(!toolImages||computerUse)?'details':'div');
@@ -318,7 +325,7 @@ class ChatTimeline {
     const content=toolImages?document.createElement('details'):node;
     if(toolImages){content.className='activity';node.append(content);}
     const heading=document.createElement(activity?'summary':'span');heading.className=activity?'':'who';
-    heading.textContent=activity?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
+    heading.textContent=activity?timelineActivityHeading(row,this.agentNames):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');content.append(heading);
     if(computerUse)heading.textContent=row.title;
     else if(row.computerUse){
       labelComputerUse(node,row);
@@ -372,7 +379,22 @@ class ChatTimeline {
     const paint=()=>{
       const reading=captureChatActivityState(node);
       const detail=this.details.get(row.key),text=detail?.text??row.text;
-      body.replaceChildren();if(activity)body.textContent=text;else this.renderText(body,text,[...this.files.values()],()=>this.fullText(row));
+      body.replaceChildren();
+      if(activity&&row.kind==='webSearch'){
+        // Only user-activated web links leave the authenticated chat. Tool app resource URIs never load here.
+        for(const [index,line] of (text||'').split('\n').entries()){
+          if(index)body.append('\n');
+          let url;
+          try{if(/^https?:\/\/[^\s\\]+$/i.test(line))url=new URL(line);}catch{}
+          if(url&&!url.username&&!url.password){
+            const link=document.createElement('a');link.href=url.href;link.textContent=line;link.target='_blank';link.rel='noopener noreferrer';body.append(link);
+          }else body.append(line);
+        }
+      }else if(row.kind==='commandExecution'&&Array.isArray(row.commandLabelLines)){
+        const labels=new Set(row.commandLabelLines);
+        body.textContent=(text||'').split('\n').map((line,index)=>labels.has(index)?timelineText(line):line).join('\n');
+      }else if(activity)body.textContent=text;
+      else this.renderText(body,text,[...this.files.values()],()=>this.fullText(row));
       if(activity)body.hidden=!text;
       more.hidden=detail?detail.next===null:!row.truncated;
       more.textContent=detail?timelineText('더 많은 텍스트 로드'):timelineText('전체 콘텐츠 표시');
@@ -390,6 +412,7 @@ class ChatTimeline {
       }catch(e){if(!this.abort.signal.aborted){more.hidden=false;more.textContent=timelineText('로드할 수 없습니다. 다시 시도하려면 클릭하세요.');}}
       finally{more.disabled=false;}
     };
+    if(row.commandLabelLines)body.relabelCommand=paint;
     more.onclick=load;content.append(body,more);paint();
     if(row.role==='user'||row.role==='assistant'){
       const actions=document.createElement('div');actions.className='message-actions';
@@ -405,6 +428,11 @@ class ChatTimeline {
       const source=item.uploadId?this.url('uploads/'+encodeURIComponent(item.uploadId)+'/preview'):this.url('desktop-images/'+encodeURIComponent(item.desktopId));
       return {preview:source,original:item.uploadId?source+'&variant=original':source};
     }});
+    if(row.appView||row.kind==='imageGeneration'&&row.status==='completed'&&!row.attachments?.length){
+      const note=document.createElement('p');
+      note.dataset.i18n=row.appView?'Open this chat in the desktop app to use the app view.':'Image preview unavailable';
+      note.textContent=timelineText(note.dataset.i18n);content.append(note);
+    }
     if(computerUse){
       node.ontoggle=()=>{
         if(!node.open||!node.isConnected)return;
@@ -466,7 +494,9 @@ class ChatTimeline {
     this.historyStatus();
     for(const [key,entry] of this.nodes){
       const row=this.rows.get(key)?.row;if(!row)continue;
-      if(row.kind==='subAgentCreated'&&row.agent){entry.node.textContent=this.agentLabel(row.agent);continue;}
+      if(row.commandLabelLines)entry.node.querySelector('.activity-body')?.relabelCommand?.();
+      if(row.appView||row.kind==='imageGeneration')for(const label of entry.node.querySelectorAll('[data-i18n]'))label.textContent=timelineText(label.dataset.i18n);
+      if(['subAgentCreated','subAgentActivity'].includes(row.kind)&&row.agent){entry.node.textContent=this.agentLabel(row.agent);continue;}
       const node=entry.node,heading=(row.role==='activity'||row.role==='fileChanges')?(node.tagName==='DETAILS'?node.firstElementChild:node.querySelector('details.activity > summary')):node.firstElementChild;
       if(row.fileSummary){
         const label=node.querySelector('.edited-files-label');if(label)label.textContent=fileChangeLabel(row);
@@ -480,7 +510,7 @@ class ChatTimeline {
         const note=node.querySelector('.timeline-attachments[data-i18n]');if(note)note.textContent=timelineText(note.dataset.i18n);
       }
       else if(heading){
-        heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+        heading.textContent=(row.role==='activity'||row.role==='fileChanges')?timelineActivityHeading(row,this.agentNames):row.role==='user'?timelineText('사용자'):row.role==='error'?timelineText('실행 오류'):['CODEX',row.model&&[row.model,row.effort].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
         if(row.role==='activity')decorateChatActivity(heading.parentElement,row,heading);
       }
       const more=node.querySelector('.detail-more');

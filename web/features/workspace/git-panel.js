@@ -31,7 +31,7 @@ class GitPanel {
         const label = repositories.some(other => other !== row && other.name === row.name) ? row.root : row.name;
         const option = this.workbench.raw(this.node('option', '', label)); option.value = row.path; option.title = row.root; picker.append(option);
       }
-      picker.value = this.repository; picker.title = repositories.find(row => row.path === this.repository).root;
+      picker.value = this.repository; this.repositoryRoot = picker.title = repositories.find(row => row.path === this.repository).root;
       picker.onchange = () => { this.repository = picker.value; this.selected = this.selectedCommit = null; this.windowStates = {}; this.load(); };
       this.tab.body.append(picker);
       const result = await this.workbench.request(this.url('git-status'), undefined, controller.signal);
@@ -120,14 +120,29 @@ class GitPanel {
       this.renderDiff(result, content, header);
     } catch (error) { if (!controller.signal.aborted) content.replaceChildren(this.node('p', 'wb-status error', error.message), this.button(BridgeI18n.t('다시 시도'), () => this.show(entry, section, row))); }
   }
-  renderDiff(result, content, header) {
+  renderDiff(result, content, header, revision = '') {
       content.replaceChildren();
+      const repository = this.repository, root = this.repositoryRoot;
+      const target = {id:this.session.chatId || this.session.id, host:this.session.host, provider:this.session.provider || 'codex'};
+      const canReview = target.provider === 'codex' && this.workbench.reviewLine;
+      const source = revision || [BridgeI18n.t(result.section === 'staged' ? 'Staged changes' : 'Working tree'), (result.version || this.state.version || '').slice(0,12)].join(' · ');
+      const numberCell = (number,side,text) => {
+        if (number && canReview) {
+          const path = side === 'old' && result.oldPath || result.path;
+          const cell = this.button(String(number), () => this.workbench.reviewLine({repository:root,path,side,line:number,text,revision:source},target));
+          cell.className = 'wb-diff-number'; cell.setAttribute('aria-label', BridgeI18n.t('Comment on line') + ' ' + number + ' · ' + BridgeI18n.t(side === 'old' ? 'Before change' : 'After change'));
+          return cell;
+        }
+        const cell = this.node('span','wb-diff-number',number); cell.setAttribute('aria-hidden','true'); return cell;
+      };
+      if (!revision && !result.hunks?.some(Boolean)) header.append(this.node('small','',BridgeI18n.t('Partial changes are unavailable for this diff.')));
       const messages = {binary: BridgeI18n.t('바이너리 또는 UTF-8이 아닌 파일에는 텍스트 비교를 사용할 수 없습니다.'), large: BridgeI18n.t('파일이 차이점 미리보기 제한을 초과했습니다. 컴퓨터에서 확인하세요.'), submodule: BridgeI18n.t('컴퓨터에서 이 하위 모듈 내부의 변경 사항을 확인하세요.')};
       if (messages[result.kind]) { content.append(this.node('p', 'wb-status', messages[result.kind])); return; }
       if (result.kind === 'conflict') { const pre = this.node('pre', 'wb-git-conflict', result.text); content.append(pre); return; }
       if (!result.text) { content.append(this.node('p', 'wb-status', BridgeI18n.t('텍스트 차이가 없습니다. 이는 권한 변경, 이름 바꾸기 또는 빈 파일일 수 있습니다.'))); return; }
       const lines = result.text.split('\n'); if (lines[lines.length - 1] === '') lines.pop();
-      let oldLine = 0, newLine = 0, added = 0, removed = 0, inHunk = false;
+      const blocks = result.hunks ? result.text.split(/(?=^@@ )/m).slice(1) : [];
+      let oldLine = 0, newLine = 0, added = 0, removed = 0, inHunk = false, block = -1;
       const fragment = document.createDocumentFragment();
       for (const text of lines) {
         const hunk = text.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -137,9 +152,21 @@ class GitPanel {
         else if (inHunk && text.startsWith('-')) { old = oldLine++; removed++; line.classList.add('removed'); }
         else if (inHunk && text.startsWith(' ')) { old = oldLine++; next = newLine++; }
         else line.classList.add('meta');
-        const oldCell = this.node('span', 'wb-diff-number', old), nextCell = this.node('span', 'wb-diff-number', next);
-        oldCell.setAttribute('aria-hidden', 'true'); nextCell.setAttribute('aria-hidden', 'true');
-        line.append(oldCell, nextCell, this.node('code', '', text)); fragment.append(line);
+        line.append(numberCell(old,'old',text), numberCell(next,'new',text), this.workbench.raw(this.node('code', '', text))); fragment.append(line);
+        if (!hunk || revision) continue;
+        const index = ++block, token = result.hunks?.[index];
+        if (token === null) fragment.append(this.node('small','wb-status',BridgeI18n.t('This block matches another change and cannot be applied separately.')));
+        if (!token || !result.version) continue;
+        const actions = this.node('div','wb-git-actions wb-hunk-actions');
+        const run = action => this.execute({action,path:result.path,hunk:token},result.version,repository);
+        if (result.section === 'staged') actions.append(this.button(BridgeI18n.t('Unstage change block'), () => run('unstage-hunk').catch(()=>{})));
+        else {
+          actions.append(this.button(BridgeI18n.t('Stage change block'), () => run('stage-hunk').catch(()=>{})));
+          const label = BridgeI18n.t('Discard change block');
+          if (result.canDiscardHunk) actions.append(this.button(label, () => this.dialog(BridgeI18n.t('Discard this change block?'), BridgeI18n.t('Only the displayed changes will be discarded.'), label, () => run('discard-hunk'), [this.workbench.raw(this.node('pre','wb-hunk-preview',blocks[index]))])));
+          else actions.append(this.node('small','',BridgeI18n.t('Partial discard is unavailable for this file’s line endings.')));
+        }
+        fragment.append(actions);
       }
       content.append(fragment); header.append(this.node('span', 'wb-diff-summary', '+' + added + ' / −' + removed));
   }
@@ -150,7 +177,7 @@ class GitPanel {
     for (const button of this.tab.body.querySelectorAll('button,select')) button.disabled = true;
     try {
       const result = await this.workbench.request(this.workbench.url(this.session, 'git-action'), {...params, version, repository});
-      this.workbench.notify(result.message);
+      this.workbench.notify(BridgeI18n.t(result.message));
       if (result.outcome !== 'success') this.actionError = result.message;
       return result;
     } catch (error) { this.actionError = error.message; throw error; }
@@ -251,7 +278,7 @@ class GitPanel {
     content.append(this.node('p', 'wb-status', BridgeI18n.t('차이점 로드 중…'))); area.replaceChildren(header, content);
     try {
       const result = await this.workbench.request(this.url('git-history-diff', path) + '&revision=' + revision, undefined, controller.signal);
-      if (!controller.signal.aborted) this.renderDiff(result, content, header);
+      if (!controller.signal.aborted) this.renderDiff(result, content, header, revision);
     } catch (error) { if (!controller.signal.aborted) content.replaceChildren(this.node('p', 'wb-status error', error.message)); }
   }
   async branches(controller) {

@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+from bridge.platforms.linux.codex_daemon_env import process_executable
 from bridge.platforms.posix.desktop import quit_process
 from bridge.platforms.posix.desktop import start
 from bridge.platforms.posix.desktop import terminate
@@ -14,7 +15,7 @@ def _process_rows():
         try:
             if path.stat().st_uid != os.getuid():
                 continue
-            executable = (path/'exe').resolve(strict=True)
+            executable = process_executable(path)
         except (OSError, RuntimeError):
             continue
         yield path, executable

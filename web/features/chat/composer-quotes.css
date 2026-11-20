@@ -5,3 +5,10 @@
 .composer-quote{display:flex;align-items:flex-start;gap:8px;max-width:100%;border-left:3px solid var(--accent,#64748b);border-radius:4px;background:var(--panel,#8881);padding:6px 8px;font-size:12px}
 .composer-quote>details{min-width:0;overflow-wrap:anywhere}.composer-quote summary{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.composer-quote-full{white-space:pre-wrap;max-height:240px;overflow:auto;margin-top:6px}
 .composer-quote>button{flex:none;cursor:pointer;border:0;background:transparent;color:inherit;font-size:18px;line-height:1;padding:2px 5px}
+.diff-review-dialog form{display:grid;gap:10px}
+.diff-review-dialog h2,.diff-review-dialog p{margin:0;overflow-wrap:anywhere}
+.diff-review-dialog small{color:var(--muted);overflow-wrap:anywhere}
+.diff-review-dialog pre,.wb-hunk-preview{white-space:pre-wrap;overflow-wrap:anywhere;max-height:35vh;overflow:auto}
+.diff-review-dialog textarea{width:100%;min-height:4em}
+.wb-diff-line button.wb-diff-number{border:0;border-radius:0;background:transparent;color:var(--accent);font:inherit;text-align:right;cursor:pointer}
+.wb-diff-line button.wb-diff-number:hover,.wb-diff-line button.wb-diff-number:focus-visible{text-decoration:underline}

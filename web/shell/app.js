@@ -205,6 +205,7 @@ async function refreshComputer(){
   $('connected-computer').dataset.deviceName=location.host;
   $('computer-name').textContent=location.host;$('connected-computer').title=location.host;
   try{const auth=await api('/api/auth');if(!auth.authenticated||$('app').hidden)return;
+    workbench.browserSharing=auth.browserSharing===true;
     const binding=$('mobile-binding-status');binding.hidden=!auth.trustedDevice;binding.setAttribute('data-i18n','이 전화는 연결되어 있습니다. 데스크톱 게이트웨이의 로그인된 장치에서 연결을 해제하세요.');binding.textContent=t('이 전화는 연결되어 있습니다. 데스크톱 게이트웨이의 로그인된 장치에서 연결을 해제하세요.');
     const name=auth.computer?.name||location.host;$('connected-computer').dataset.deviceName=name;$('computer-name').textContent=name;
     $('connected-computer').title=[name,auth.computer?.platform,location.host].filter(Boolean).join(' · ');
@@ -438,6 +439,10 @@ function sessionMenuContext(chat,provider='codex'){
     if(!message)throw Error('이 채팅에는 아직 분기할 수 있는 메시지가 없습니다.');
     return desktopSessions.fork(message.forkMessageId);
   };
+  if (provider === 'codex' && threadLookup) {
+    context.findMessages = async () => { await ensure(); threadLookup.open('search'); };
+    context.originalQueue = async () => { await ensure(); threadLookup.open('queue'); };
+  }
   const archiveId=uuid();
   if(provider==='codex'||caps[view.archived?'unarchive':'archive']===true)context.archive=async()=>{
     const body={archived:!view.archived,id:archiveId,...(!view.archived?{disconnect:true}:{})};
@@ -797,6 +802,27 @@ function messageManagementTarget(){
   return currentId&&codexDraftScope?{scope:codexDraftScope,drafts:composerDrafts,temporary:sessionStorage,temporaryKey:'pending:'+chatKey(),
     url:sessionUrl(currentId,'message-management',currentHost),sendUrl:sessionUrl(currentId,'send',currentHost),uuid}:null;
 }
+const threadLookup = typeof ThreadLookup === 'function' ? new ThreadLookup({
+  t,
+  scope:() => {
+    if (clientNavigation.provider !== 'codex' || !currentId || !codexDraftScope?.account) return null;
+    return {id:currentId, host:currentHost, account:codexDraftScope.account,
+      key:JSON.stringify([draftGateway,currentHost,currentId,codexDraftScope.account])};
+  },
+  request:(target, action, body, signal) => {
+    const url = sessionUrl(target.id, action, target.host) + (action === 'original-queue' ? '&account=' + encodeURIComponent(target.account) : '');
+    return api(url, body, signal, () => threadLookup.scope()?.key === target.key);
+  },
+  jump:hit => {
+    const row = [...(chatTimeline?.rows.values() || [])].find(item => item.turnId === hit.turnId && item.itemId === hit.itemId);
+    const node = row && chatTimeline.nodes.get(row.key)?.node;
+    if (!node?.isConnected) return false;
+    return () => {
+      node.scrollIntoView({block:'center'});
+      node.animate?.([{outline:'2px solid var(--accent)'},{outline:'2px solid transparent'}], {duration:1400});
+    };
+  }
+}) : null;
 workbench.temporaryCleanup=(id,host)=>{
   const scope={gateway:draftGateway,provider:'codex',account:'temporary:'+id,host,session:id};
   const cacheKey=JSON.stringify([listIdentity,host,id]),key=chatKey(id,host);
@@ -832,6 +858,10 @@ desktopSessions.onManageMessages=openMessageManagement;
 
 codexQuotes=typeof ComposerQuotes==='function'?new ComposerQuotes({messages:$('messages'),input:$('message'),container:$('message').parentElement,scope:()=>desktopSessions.provider==='codex'&&currentId&&codexDraftScope?.gateway===draftGateway&&codexDraftScope?.session===currentId&&codexDraftScope?.host===currentHost?codexDraftScope:null,onChange:()=>{codexDraftTouched=true;saveDraft();},onError:text=>{$('send-error').textContent=text;},onPrompt:text=>{const input=$('message'),start=input.selectionStart,end=input.selectionEnd;input.value+=(input.value?'\n\n':'')+text;input.setSelectionRange(start,end);input.oninput();window.BridgePresentation?.resizeMessage();},translate:t}):null;
 workbench.quoteMessage=(text,source,target)=>{if(target.provider==='codex'&&target.id===currentId&&target.host===currentHost&&desktopSessions.provider==='codex')codexQuotes?.add(text,source);};
+workbench.reviewLine=(review,target)=>{
+  if(target.provider!=='codex'||target.id!==currentId||target.host!==currentHost||desktopSessions.provider!=='codex')return;
+  if(!codexQuotes?.reviewLine(review))toast(t('The chat draft is unavailable.'));
+};
 
 function imageComposerTarget(){
   if($('app').hidden||!$('app').classList.contains('chat-open'))return null;
@@ -971,6 +1001,10 @@ async function openChat(id,host="local",sideWorkspace=null){
 try{if(window.BridgeFeatures)await window.BridgeFeatures.load('chat');}catch(error){if(openGeneration===chatOpenGeneration&&workbench.current===opening&&$('app').classList.contains('chat-open')){$('status').textContent=t('연결 실패');$('send-error').textContent=t(error.message);}return;}
 if(openGeneration!==chatOpenGeneration||workbench.current!==opening||currentId!==id||currentHost!==host||!$('app').classList.contains('chat-open'))return;
 const timeline=chatTimeline=new ChatTimeline({cacheKey:listIdentity?JSON.stringify([listIdentity,host,id]):'',url:action=>sessionUrl(id,action,host),request:api,renderMeta:renderState,onReady:reportVisibleChat,onFile:async path=>{const session=workbench.current;if(currentId!==id||currentHost!==host||!session||(session.chatId||session.id)!==id||session.host!==host)return;try{const childRelative=timelineFilePath(path,state?.cwd),relative=timelineFilePath(state.cwd.replace(/[\\/]$/,'')+'/'+childRelative,session.cwd||state.cwd);await workbench.request(workbench.url(session,'info',relative));if(workbench.current!==session||currentId!==id||currentHost!==host)return;await workbench.locate(session,relative);}catch(error){if(workbench.current===session)toast(t(error.message));}},canEdit:()=>currentAccess().canEditMessages,renderText:(node,text,files,fullText)=>renderMarkdown(node,text,files,file=>timeline.fileUrl(file),{fullText}),onAction:(action,row,timeline)=>{if(!currentAccess().canEditMessages)return;const pendingKey='fork-edit:'+host+'|'+id;let pending;try{pending=JSON.parse(sessionStorage.getItem(pendingKey));}catch{}if(pending&&pending.sourceTurnId===row.turnId&&action==='edit'){sessionStorage.setItem('message-edit:'+timeline.url('message-action')+':'+row.key,pending.text);sessionStorage.removeItem(pendingKey);}return messageActions.open(action,row,timeline);},status:text=>{$('status').textContent=t(text);}});
+  timeline.onReviewLine=review=>{
+    if(chatTimeline===timeline&&!timeline.abort.signal.aborted)
+      workbench.reviewLine({...review,repository:timeline.meta?.cwd||opening.cwd},{provider:'codex',id,host});
+  };
   timeline.onAgent=agent=>{
     if(currentId===id&&currentHost===host&&workbench.current===opening&&!timeline.abort.signal.aborted&&!state?.temporary)
       workbench.agents(agent,id);
@@ -986,10 +1020,13 @@ const timeline=chatTimeline=new ChatTimeline({cacheKey:listIdentity?JSON.stringi
     if(agentTabScope()&&Array.isArray(directory.agents))workbench.updateAgentTabs(opening.id,directory.agents,directory);
   };
   reconnectFailure=null;
+  $('reconnect').disabled=false;
   window.BridgePresentation?.openChat();
   const reading=timeline.start();
   const openingAccess=sessionAccess(known?.access||routeAccess);
-  if(openingAccess.source==='desktop'&&openingAccess.canReconnect)api(sessionUrl(id,'reconnect',host),{activate:true},timeline.abort.signal).catch(error=>{if(!timeline.abort.signal.aborted)toast(error.message);});
+  if(openingAccess.source==='desktop'&&openingAccess.canReconnect)api(sessionUrl(id,'reconnect',host),{activate:true},timeline.abort.signal).catch(error=>{
+    if(!timeline.abort.signal.aborted&&chatTimeline===timeline&&!state?.connected)toast(error.message);
+  });
   await reading;
   if(!timeline.abort.signal.aborted&&workbench.current?.chatScroll?.has(id))$('timeline').scrollTop=workbench.current.chatScroll.get(id);
   if(!timeline.abort.signal.aborted){scheduleCatalog();loadNotificationState(id,host);}
@@ -1115,7 +1152,146 @@ function renderState(view){
 }
 $('send-mode').onchange=()=>{codexDraftTouched=true;sendModes.render(state,sending);workModes.render(state,$('send-mode').value,sending);saveDraft();};
 function jsonPretty(value){return typeof value==='string'?value:JSON.stringify(value,null,2);}
-function renderApprovals(requests){const stamp=JSON.stringify([BridgeI18n.language(),requests]);if(stamp===approvalStamp)return;approvalStamp=stamp;const container=$('approvals'),previous=new Map([...container.children].map(card=>[card.dataset.request,card])),kept=new Set();let position=0;for(const request of requests){const old=previous.get(String(request.id)),requestStamp=JSON.stringify([BridgeI18n.language(),request]),mount=card=>{card.approvalRequest=request;card.requestStamp=requestStamp;kept.add(card);const before=container.children[position++];if(before!==card)container.insertBefore(card,before||null);};if(old?.requestStamp===requestStamp){mount(old);continue;}if(request.method==='bridge/requestUserInputAsync'&&request.supported){mount(renderAsyncApproval(request,old));continue;}if(request.supported&&request.params?.computerUse){mount(renderComputerApproval(request));continue;}if(request.method==='item/plan/requestImplementation'&&request.supported){mount(renderPlanApproval(request));continue;}const card=el('section','approval');card.dataset.request=String(request.id);const params=request.params||{}, method=request.method;const heading=method.includes('requestUserInput')?t('Codex에는 귀하의 답변이 필요합니다'):method.includes('fileChange')?t('파일 변경을 허용하시겠습니까?'):method.includes('commandExecution')?t('이 명령을 허용하시겠습니까?'):method.includes('permissions')?t('이번 차례에 권한을 허용하시겠습니까?'):t('확인 대기 중');card.append(el('h3','',heading));const controls={};if(!request.supported){card.append(el('p','',params.message||t('데스크톱 앱에서 이 요청을 처리하세요.')));mount(card);continue;}if(params.reason)card.append(el('p','',params.reason));if(params.command)card.append(el('pre','',jsonPretty(params.command)));if(params.cwd)card.append(el('p','muted',params.cwd));for(const key of ['changes','grantRoot','permissions','networkApprovalContext'])if(params[key])card.append(el('pre','',jsonPretty(params[key])));const form=el('form');if(method.includes('requestUserInput')){for(const question of params.questions||[]){const label=el('label','',question.question||question.header||question.id);if(question.options?.length){const select=el('select');select.append(new Option(t('선택하다…'),''));for(const option of question.options)select.append(new Option(option.label+(option.description?' — '+option.description:''),option.label));select.append(new Option(t('답장을 직접 작성하세요.'),'__custom__'));label.append(select);const custom=el('textarea');custom.rows=2;custom.hidden=true;custom.placeholder=t('답장을 입력하세요');select.onchange=()=>custom.hidden=select.value!=='__custom__';label.append(custom);controls[question.id]=()=>select.value==='__custom__'?custom.value:select.value;}else{const input=el('textarea');input.rows=2;input.required=true;label.append(input);controls[question.id]=()=>input.value;}form.append(label);}}else if(method==='mcpServer/elicitation/request'){if(params.message)form.append(el('p','',params.message));const schema=params.requestedSchema||{};for(const [key,field] of Object.entries(schema.properties||{})){const label=el('label','',field.title||key);let input;if(field.enum){input=el('select');input.append(new Option(t('선택하다…'),''));for(const [i,value] of field.enum.entries())input.append(new Option(field.enumNames?.[i]||String(value),String(value)));}else{input=el('input');input.type=field.type==='boolean'?'checkbox':['number','integer'].includes(field.type)?'number':'text';if(input.type==='number')input.step=field.type==='integer'?'1':'any';}input.required=(schema.required||[]).includes(key)&&input.type!=='checkbox';if(field.description)label.append(el('p','muted',field.description));label.append(input);form.append(label);controls[key]=()=>input.type==='checkbox'?input.checked:input.value===''?undefined:['number','integer'].includes(field.type)?Number(input.value):input.value;}}const actions=el('div','actions'),error=el('p','error');async function submit(response){const id=currentId,host=currentHost;approvalBusy++;setLanguageBusy();const buttons=card.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);error.textContent='';try{await api(sessionUrl(id,'respond',host),{requestId:request.id,response});submittedRequestIds.add(request.id);bumpRecency(id,host);toast('답장을 보냈습니다');card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));}catch(e){error.textContent=t(e.message);buttons.forEach(b=>b.disabled=false);}finally{approvalBusy--;setLanguageBusy();}}const isInput=method.includes('requestUserInput'),isMcp=method==='mcpServer/elicitation/request';const yes=el('button','primary',isInput?t('답장 제출'):t('한 번만 허용'));yes.type='submit';const available=params.availableDecisions;const canAccept=!available||available.includes('accept');if(isInput||isMcp||canAccept)actions.append(yes);if(!isInput){const no=el('button','secondary',t('거부'));no.type='button';no.onclick=()=>submit(isMcp?{action:'decline'}:{decision:'decline'});if(!available||available.includes('decline'))actions.append(no);if(method.includes('commandExecution')||method.includes('fileChange')||isMcp){const cancel=el('button','secondary',t('취소'));cancel.type='button';cancel.onclick=()=>submit(isMcp?{action:'cancel'}:{decision:'cancel'});if(!available||available.includes('cancel'))actions.append(cancel);}}form.onsubmit=event=>{event.preventDefault();if(isInput){const answers={};for(const [key,get] of Object.entries(controls)){const value=get();if(!value.trim()){error.textContent=t('각 질문에 답변해 주세요.');return;}answers[key]=[value];}submit({answers});}else if(isMcp){const content={};for(const [key,get] of Object.entries(controls)){const value=get();if(value!==undefined)content[key]=value;}submit({action:'accept',content});}else submit({decision:'accept'});};form.append(actions,error);card.append(form);if(submittedRequestIds.has(request.id)){card.querySelectorAll('button').forEach(button=>button.disabled=true);card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));}mount(card);}for(const card of [...container.children])if(!kept.has(card))card.remove();}
+function renderApprovals(requests){
+  const stamp=JSON.stringify([BridgeI18n.language(),requests]);if(stamp===approvalStamp)return;
+  approvalStamp=stamp;
+  const container=$('approvals'),previous=new Map([...container.children].map(card=>[card.dataset.request,card])),kept=new Set();
+  for(const [index,request] of requests.entries()){
+    const old=previous.get(String(request.id)),key=JSON.stringify([BridgeI18n.language(),request]);let card;
+    if(old?.requestStamp===key)card=old;
+    else if(request.supported&&request.method==='bridge/requestUserInputAsync')card=renderAsyncApproval(request,old);
+    else if(request.supported&&request.params?.computerUse)card=renderComputerApproval(request);
+    else if(request.supported&&request.method==='item/plan/requestImplementation')card=renderPlanApproval(request);
+    else card=renderNativeRequest(request);
+    card.approvalRequest=request;card.requestStamp=key;kept.add(card);
+    const before=container.children[index];if(before!==card)container.insertBefore(card,before||null);
+  }
+  for(const card of [...container.children])if(!kept.has(card))card.remove();
+}
+function renderNativeRequest(request){
+  const card=el('section','approval'),error=el('p','error'),actions=el('div','actions'),form=el('form');
+  card.dataset.request=String(request.id);error.setAttribute('role','alert');
+  const id=currentId,host=currentHost,params=request.params||{},method=request.method;
+  const input=method.includes('requestUserInput'),picker=method==='item/tool/requestOptionPicker',mcp=method==='mcpServer/elicitation/request';
+  const permissions=method==='item/permissions/requestApproval',command=method==='item/commandExecution/requestApproval',files=method==='item/fileChange/requestApproval';
+  const heading=input||picker?'Codex에는 귀하의 답변이 필요합니다':files?'파일 변경을 허용하시겠습니까?':command?'이 명령을 허용하시겠습니까?':permissions?'Permission request':'확인 대기 중';
+  card.append(el('h3','',t(heading)));
+  if(!request.supported){card.append(el('p','',params.message||t('데스크톱 앱에서 이 요청을 처리하세요.')));return card;}
+  if(params.reason)card.append(el('p','',params.reason));
+  if(params.command)card.append(el('pre','',jsonPretty(params.command)));
+  if(params.cwd)card.append(el('p','muted',params.cwd));
+  for(const [key,label] of Object.entries({changes:'변경 사항',grantRoot:'Permission target',permissions:'Permission request',additionalPermissions:'Additional permissions',networkApprovalContext:'Network access',proposedExecpolicyAmendment:'Proposed command rule',proposedNetworkPolicyAmendments:'Proposed network rules',commandActions:'Command actions',environmentId:'Environment'})){
+    if(params[key]!=null){card.append(el('strong','',t(label)),el('pre','',jsonPretty(params[key])));}
+  }
+  const until=params.expiresAtMs??params.deadlineAtMs;
+  if(Number.isFinite(until))card.append(el('p','muted',t('Expires')+' · '+new Date(until).toLocaleString()));
+  if(params.message)form.append(el('p','',params.message));
+  const controls=new Map();
+  const receiptKey=request.snapshot?request.id+'.'+request.snapshot:request.id;
+  let locked=submittedRequestIds.has(receiptKey);
+  const disable=()=>form.querySelectorAll('input,select,textarea,button').forEach(node=>node.disabled=locked);
+  async function submit(response){
+    if(locked||currentId!==id||currentHost!==host||!card.isConnected)return;
+    if(Number.isFinite(until)&&Date.now()>=until){error.textContent=t('This request changed or expired. Review the latest request.');return;}
+    locked=true;disable();error.textContent='';approvalBusy++;setLanguageBusy();
+    try{
+      const reviewed=request.snapshot?{...response,reviewedRequest:request.snapshot}:response;
+      const receipt=await api(sessionUrl(id,'respond',host),{requestId:request.id,response:reviewed});
+      if(receipt?.status==='unknown')throw Error(receipt.message||'This response may have reached the owner. Check the original conversation.');
+      if(currentId!==id||currentHost!==host)return;
+      submittedRequestIds.add(receiptKey);bumpRecency(id,host);toast('답장을 보냈습니다');
+      card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));
+    }catch(failure){
+      if(currentId!==id||currentHost!==host)return;
+      error.textContent=t(failure.message);
+      // A response may have reached the owner even when the receipt was lost.
+      // The fresh projection (or the original app) determines what is pending.
+      try{
+        const fresh=await api(sessionUrl(id,'',host));
+        if(currentId===id&&currentHost===host&&Array.isArray(fresh.requests)){
+          renderApprovals(fresh.requests);
+          if(failure.status===400&&card.isConnected&&fresh.requests.some(row=>row.id===request.id&&row.snapshot===request.snapshot)
+              && !['This request changed or expired. Review the latest request.','This response was already submitted. Check the original conversation.'].includes(failure.message)){
+            locked=false;disable();
+          }
+        }
+      }catch{}
+    }finally{approvalBusy--;setLanguageBusy();}
+  }
+  function action(label,handler,primary=false){
+    const button=el('button',primary?'primary':'secondary',label);button.type='button';button.onclick=handler;actions.append(button);return button;
+  }
+  function submitForm(label,read){
+    const button=el('button','primary',label);button.type='submit';actions.append(button);
+    form.onsubmit=event=>{event.preventDefault();try{submit(read());}catch(failure){error.textContent=t(failure.message);}};
+  }
+  if(input){
+    for(const question of params.questions||[]){
+      const label=el('label','',question.question||question.header||question.id),text=el('textarea');text.rows=2;
+      if(question.options?.length){
+        const select=el('select');select.required=true;select.append(new Option(t('선택하다…'),''));
+        for(const [index,option] of question.options.entries())select.append(new Option(option.label+(option.description?' — '+option.description:''),String(index)));
+        select.append(new Option(t('답장을 직접 작성하세요.'),'custom'));text.hidden=true;text.placeholder=t('답장을 입력하세요');
+        select.onchange=()=>{text.hidden=select.value!=='custom';text.required=!text.hidden;};label.append(select,text);
+        controls.set(question.id,()=>select.value==='custom'?text.value:question.options[Number(select.value)].label);
+      }else{text.required=true;label.append(text);controls.set(question.id,()=>text.value);}
+      form.append(label);
+    }
+    submitForm(t('답장 제출'),()=>{
+      const answers={};for(const [key,read] of controls){const value=read().trim();if(!value)throw Error('각 질문에 답변해 주세요.');Object.defineProperty(answers,key,{value:[value],enumerable:true});}
+      return {answers};
+    });
+  }else if(picker){
+    const group=el('fieldset');group.append(el('legend','',params.question));
+    const nodes=(params.options||[]).map(option=>{
+      const line=el('label'),field=el('input');field.type=params.allowMultiple?'checkbox':'radio';field.name='option';
+      line.append(field,document.createTextNode(option.label));if(option.description)line.append(el('small','muted',option.description));group.append(line);return {field,option};
+    });
+    const free=el('textarea');free.rows=2;free.placeholder=t('답장을 직접 작성하세요.');free.setAttribute('aria-label',free.placeholder);group.append(free);form.append(group);
+    const read=kind=>({action:kind,selectedOptions:nodes.filter(row=>row.field.checked).map(row=>row.option.label),freeformAnswer:free.value.trim()||null});
+    submitForm(params.submitLabel||t('답장 제출'),()=>{const value=read('submit');if(!value.selectedOptions.length&&!value.freeformAnswer)throw Error('각 질문에 답변해 주세요.');return value;});
+    action(params.skipLabel||t('건너뛰기'),()=>submit(read('skip')));action(t('취소'),()=>submit({action:'dismiss',selectedOptions:[],freeformAnswer:null}));
+  }else if(mcp){
+    const schema=params.requestedSchema||{};
+    for(const [key,field] of Object.entries(schema.properties||{})){
+      const label=el('label','',field.title||key),multiple=field.type==='array',items=multiple?field.items:field,required=(schema.required||[]).includes(key);
+      let control,read;
+      if(items.enum){
+        control=el('select');control.multiple=multiple;if(!multiple)control.append(new Option(t('선택하다…'),''));
+        for(const [index,value] of items.enum.entries())control.append(new Option(items.enumNames?.[index]||String(value),String(index)));
+        read=()=>{const values=[...control.selectedOptions].filter(node=>node.value!=='').map(node=>items.enum[Number(node.value)]);return multiple?(values.length||required?values:undefined):values[0];};
+      }else if(multiple){
+        control=el('textarea');control.rows=2;control.placeholder='["a", "b"]';
+        read=()=>{if(!control.value.trim())return required?[]:undefined;try{const value=JSON.parse(control.value);if(Array.isArray(value))return value;}catch{}throw Error('Enter an array of values.');};
+      }else if(field.type==='boolean'){
+        control=el('select');control.append(new Option(t('선택하다…'),''),new Option('true','true'),new Option('false','false'));read=()=>control.value===''?undefined:control.value==='true';
+      }else{
+        control=el('input');control.type=['number','integer'].includes(field.type)?'number':'text';if(control.type==='number')control.step=field.type==='integer'?'1':'any';
+        read=()=>control.value===''?undefined:control.type==='number'?Number(control.value):control.value;
+      }
+      control.required=required&&!multiple;if(field.description)label.append(el('p','muted',field.description));label.append(control);form.append(label);controls.set(key,read);
+    }
+    submitForm(t('한 번만 허용'),()=>({action:'accept',content:Object.fromEntries([...controls].map(([key,read])=>[key,read()]).filter(([,value])=>value!==undefined))}));
+    for(const [kind,label] of [['decline','거부'],['cancel','취소']])action(t(label),()=>submit({action:kind}));
+  }else if(permissions){
+    action(t('Allow for this turn'),()=>submit({decision:'accept',scope:'turn'}),true);
+    if(request.snapshot)action(t('Allow for this session'),()=>submit({decision:'accept',scope:'session'}));
+    action(t('거부'),()=>submit({decision:'decline'}));
+  }else if(command||files){
+    const names={accept:'한 번만 허용',acceptForSession:'Allow for this session',decline:'거부',cancel:'취소'};
+    for(const choice of params.availableDecisions??['accept','decline','cancel']){
+      if(typeof choice==='string'&&Object.hasOwn(names,choice))action(t(names[choice]),()=>submit({decision:choice}),choice==='accept');
+      else if(choice&&typeof choice==='object'){
+        const label=choice.acceptWithExecpolicyAmendment?'Apply command rule':choice.applyNetworkPolicyAmendment?'Apply network rule':null;
+        if(label)action(t(label)+' · '+JSON.stringify(Object.values(choice)[0]),()=>submit({decision:choice}));
+      }
+    }
+  }
+  form.append(actions,error);card.append(form);disable();
+  if(locked)card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));
+  return card;
+}
+
 function renderAsyncApproval(request, previous){
   const id=currentId,host=currentHost,card=el('section','approval'),form=el('form'),error=el('p','error');
   card.dataset.request=String(request.id);card.append(el('h3','',t('Codex에는 귀하의 답변이 필요합니다')));
@@ -1191,11 +1367,21 @@ function renderComputerApproval(request){
   card.dataset.request=String(request.id);card.append(el('h3','',t('컴퓨터 앱 액세스를 허용하시겠습니까?')),el('p','',computer.app));
   if(request.params.message)card.append(el('p','',request.params.message));
   const actions=el('div','actions'),error=el('p','error');card.append(actions,error);
-  let busy=submittedRequestIds.has(request.id);
+  const receiptKey=request.snapshot?request.id+'.'+request.snapshot:request.id;
+  let busy=submittedRequestIds.has(receiptKey);
   async function submit(response){
     if(busy)return;busy=true;approvalBusy++;setLanguageBusy();actions.querySelectorAll('button').forEach(b=>b.disabled=true);error.textContent='';
-    try{await api(sessionUrl(id,'respond',host),{requestId:request.id,response});bumpRecency(id,host);if(id===currentId&&host===currentHost)submittedRequestIds.add(request.id);card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));}
-    catch(e){error.textContent=t(e.message);busy=false;actions.querySelectorAll('button').forEach(b=>b.disabled=false);}
+    try{
+      const receipt=await api(sessionUrl(id,'respond',host),{requestId:request.id,response:request.snapshot?{...response,reviewedRequest:request.snapshot}:response});
+      if(receipt?.status==='unknown')throw Error(receipt.message||'This response may have reached the owner. Check the original conversation.');
+      bumpRecency(id,host);if(id===currentId&&host===currentHost)submittedRequestIds.add(receiptKey);
+      card.append(el('p','muted',t('전송된. 데스크톱 확인을 기다리는 중…')));
+    }catch(failure){
+      error.textContent=t(failure.message);
+      if(id===currentId&&host===currentHost){
+        try{const fresh=await api(sessionUrl(id,'',host));if(id===currentId&&host===currentHost&&Array.isArray(fresh.requests))renderApprovals(fresh.requests);}catch{}
+      }
+    }
     finally{approvalBusy--;setLanguageBusy();}
   }
   function choice(label,response,primary=false){const button=el('button',primary?'primary':'secondary',t(label));button.type='button';button.disabled=busy;button.onclick=()=>submit(response);actions.append(button);}
@@ -1251,6 +1437,7 @@ async function ignoreSubmission(value){
 const queuedSends=new Set();
 function renderQueue(rows){
   $('queued').replaceChildren();
+  threadLookup?.watch(state, $('queued'));
   const pending=codexDraftScope&&composerDrafts?.pendingRecords(codexDraftScope,{temporary:sessionStorage,temporaryKey:'pending:'+chatKey()})||[];
   if(rows.length||pending.length){const manage=el('button','plain',t('메시지 관리'));manage.type='button';manage.onclick=openMessageManagement;$('queued').append(manage);}
   const target=currentId,host=currentHost,account=codexDraftScope?.account;
@@ -1374,11 +1561,15 @@ $('stop').onclick=async()=>{if(!currentAccess().canInterrupt)return;try{await ap
 $('history').onclick=async()=>{$('history').disabled=true;try{await api('/api/sessions/'+currentId+'/history',{});}catch(e){toast(e.message);}finally{$('history').disabled=false;}};
 $('reconnect').onclick=async()=>{
   const access=currentAccess();if(!access.canReconnect||$('reconnect').disabled)return;
-  const id=currentId,host=currentHost,rebuild=state?.rebuildRecommended||state?.desktopRestartRecommended;
+  const id=currentId,host=currentHost,timeline=chatTimeline,rebuild=state?.rebuildRecommended||state?.desktopRestartRecommended;
   $('reconnect').disabled=true;reconnectFailure=null;
   try{await api(sessionUrl(id,'reconnect',host),{activate:true,...(rebuild?{rebuild:true}:{})});}
-  catch(e){if(id===currentId&&host===currentHost){reconnectFailure=e.message;$('notice').hidden=false;$('notice-text').textContent=t(e.message);}toast(e.message);}
-  finally{$('reconnect').disabled=false;}
+  catch(e){
+    if(timeline===chatTimeline&&!timeline?.abort.signal.aborted&&id===currentId&&host===currentHost&&!state?.connected){
+      reconnectFailure=e.message;$('notice').hidden=false;$('notice-text').textContent=t(e.message);toast(e.message);
+    }
+  }
+  finally{if(timeline===chatTimeline)$('reconnect').disabled=false;}
 };
 $('reconnect-manager').onclick=()=>clientNavigation.openManager();
 document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>$(button.dataset.close).close());
@@ -1888,7 +2079,7 @@ function renderAccountEntries(){
   if(codexCliDetails.hidden)codexCliAccessPanel?.clear();
 }
 
-const accountsPanel=window.BridgeSharedRelay||typeof AccountsPanel==='undefined'?null:new AccountsPanel({root:$('accounts-content'),toolbar:$('accounts-heading'),read:force=>api(accountUrl('/api/accounts'+(accountsPanel?.visible()&&accountsPanel?.value?.resetDynamicEnabled?'?resetForecast='+(force?'refresh':'1'):''))),request:({action,...value})=>action==='ignoreSubmission'?ignoreSubmission(value):api(accountUrl(action==='initializeDesktopRuntime'?'/api/accounts/desktop-runtime':action==='retrySsh'?'/api/accounts/ssh-retry':action==='account'?'/api/accounts/account':action==='details'?'/api/accounts/details':action==='reminders'?'/api/accounts/reminders':action==='checkDesktopUpdate'||action==='requestDesktopUpdate'?'/api/accounts/desktop-update':'/api/accounts/switch'),action==='checkDesktopUpdate'||action==='requestDesktopUpdate'?{action,...value}:value),onChanged:value=>{if(codexActiveAccountId!==undefined&&codexActiveAccountId!==value.activeId){browserNavigation.invalidate();if(typeof ChatTimeline!=='undefined')ChatTimeline.clearCache?.();clearCodexProvisionalDrafts();clearQuoteComposer();codexDraftScope=null;codexDraftTouched=false;}resetModelCatalog();},onUpdate:value=>{codexActiveAccountId=value.activeId;const label='계정';$('accounts-button').setAttribute('data-i18n',label);$('accounts-button').textContent=t(label);}});
+const accountsPanel=window.BridgeSharedRelay||typeof AccountsPanel==='undefined'?null:new AccountsPanel({root:$('accounts-content'),toolbar:$('accounts-heading'),read:force=>api(accountUrl('/api/accounts'+(accountsPanel?.visible()&&accountsPanel?.value?.resetDynamicEnabled?'?resetForecast='+(force?'refresh':'1'):''))),request:({action,...value})=>action==='ignoreSubmission'?ignoreSubmission(value):api(accountUrl(['initializeDesktopRuntime','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?'/api/accounts/desktop-runtime':action==='retrySsh'?'/api/accounts/ssh-retry':action==='account'?'/api/accounts/account':action==='details'?'/api/accounts/details':action==='reminders'?'/api/accounts/reminders':action==='checkDesktopUpdate'||action==='requestDesktopUpdate'?'/api/accounts/desktop-update':'/api/accounts/switch'),['checkDesktopUpdate','requestDesktopUpdate','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?{action,...value}:value),onChanged:value=>{if(codexActiveAccountId!==undefined&&codexActiveAccountId!==value.activeId){browserNavigation.invalidate();if(typeof ChatTimeline!=='undefined')ChatTimeline.clearCache?.();clearCodexProvisionalDrafts();clearQuoteComposer();codexDraftScope=null;codexDraftTouched=false;}resetModelCatalog();},onUpdate:value=>{codexActiveAccountId=value.activeId;const label='계정';$('accounts-button').setAttribute('data-i18n',label);$('accounts-button').textContent=t(label);}});
 accountsPanel?.attachApiAccess(codexCliAccessPanel,codexCliDetails);
 function openCurrentAccounts(){
   const activeProvider=clientNavigation.provider,provider=ClientIdentity.family(activeProvider),entry=ClientIdentity.entry(activeProvider)?activeProvider:provider;
@@ -1929,6 +2120,10 @@ function openCurrentAccounts(){
   return true;
 }
 $('accounts-button').onclick=openCurrentAccounts;
+if(accountsPanel)workbench.openDesktopConnection=()=>{
+  if(currentHost==='local'&&isCodexClient(clientNavigation.provider)&&openCurrentAccounts())
+    accountsPanel.showDesktopConnection();
+};
 window.BridgeNavigation={
   accounts:openCurrentAccounts,
   back(){

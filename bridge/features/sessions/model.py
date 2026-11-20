@@ -1,11 +1,16 @@
 """Normalize desktop state without changing the native thread or provider."""
 import copy
+import hashlib
 import json
+import math
 import re
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from urllib.request import url2pathname
 import ntpath
+from bridge.features.sessions.activity import (automation_result, command_info, function_message, generated_image_path, lines, memory_sources,
+                                               native_activity, readable, records, visible_items)
 from bridge.features.sessions.tool_images import inspect_tool_images, label_computer_use
 from bridge.features.sessions.store import items_array, native_file_changes, native_turn_file_changes, native_patch_counts
 
@@ -195,37 +200,61 @@ def review_action_label(action):
     return str(action.get('reason') or action.get('target') or '')
 
 
-def spawned_agents(item, parent_id):
-    """원본 생성 완료 증거에서 ID와 표시 이름만 추출한다. 실행·대기·후속 알림은 생성이 아니다."""
-    kind = item.get('type')
+def collab_activity(item, parent_id):
+    """Keep the collaboration call's outcome separate from each receiver's last reported state."""
+    tool = item.get('tool')
+    states = item.get('agentsStates')
+    states = states if isinstance(states, dict) else {}
     names = {}
-    if kind == 'subAgentActivity' and item.get('kind') == 'started':
-        targets = [item.get('agentThreadId')]
-        path = item.get('agentPath')
-        fallback = path.rsplit('/', 1)[-1] if isinstance(path, str) else ''
-    elif (kind == 'collabAgentToolCall' and item.get('tool') == 'spawnAgent' and item.get('status') == 'completed'
-          and (not parent_id or item.get('senderThreadId') in (None, parent_id))):
-        fallback = ''
-        targets = item.get('receiverThreadIds') or []
-        # 데스크톱은 수신 스레드를 객체로 보강하고, 저장 기록은 닉네임만 보관할 수 있다.
-        for field in ('receiverAgents', 'receiverThreads'):
-            receivers = item.get(field)
-            for receiver in receivers if isinstance(receivers, list) else ():
-                if not isinstance(receiver, dict) or not isinstance(receiver.get('threadId'), str):
-                    continue
-                thread = receiver.get('thread')
-                names[receiver['threadId']] = receiver.get('agentNickname') or (
-                    thread.get('agentNickname') if isinstance(thread, dict) else None) or names.get(receiver['threadId'])
-        if not targets:
-            targets = list(names)
-    else:
-        return []
-    agents = []
-    for target in targets if isinstance(targets, list) else []:
-        if isinstance(target, str) and re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', target) and target != parent_id:
-            nickname = names.get(target)
-            agents.append({'id': target, 'nickname': nickname[:160] if isinstance(nickname, str) else '', 'taskName': fallback[:160]})
-    return agents
+    for field in ('receiverAgents', 'receiverThreads'):
+        receivers = item.get(field)
+        for receiver in receivers if isinstance(receivers, list) else ():
+            if not isinstance(receiver, dict) or not isinstance(receiver.get('threadId'), str):
+                continue
+            thread = receiver.get('thread')
+            nickname = receiver.get('agentNickname') or (thread.get('agentNickname') if isinstance(thread, dict) else None)
+            names.setdefault(receiver['threadId'], '')
+            if isinstance(nickname, str) and nickname.strip():
+                names[receiver['threadId']] = nickname.strip()[:160]
+
+    ids = item.get('receiverThreadIds')
+    ids = ids if isinstance(ids, list) and ids else list(names)
+    # A wait can report a state without repeating the ID in the receiver list.
+    # Only explicit spawn receivers can produce a child-creation entry.
+    if tool != 'spawnAgent':
+        ids = [*ids, *states]
+    targets, seen = [], set()
+    prompt = item.get('prompt')
+    detail = [prompt] if isinstance(prompt, str) and prompt.strip() else []
+    for target in ids:
+        if not valid_agent_id(target) or target in seen:
+            continue
+        seen.add(target)
+        agent = {'id': target, 'nickname': names.get(target, '')}
+        state = states.get(target)
+        status, message = state, None
+        if isinstance(state, dict):
+            if 'status' in state:  # App Server v2
+                status, message = state['status'], state.get('message')
+            elif len(state) == 1:  # Native rollout: {"completed": "..."} or {"errored": "..."}
+                status, message = next(iter(state.items()))
+        if isinstance(status, str):
+            agent['status'] = {'pending_init': 'pendingInit', 'not_found': 'notFound'}.get(status, status)
+        if isinstance(message, str) and message.strip():
+            detail.append((agent['nickname'] or target) + '\n' + message)
+        targets.append(agent)
+
+    if (tool == 'spawnAgent' and item.get('status') == 'completed'
+            and (not parent_id or item.get('senderThreadId') in (None, parent_id))):
+        created = [{'id': a['id'], 'nickname': a['nickname'], 'taskName': ''} for a in targets if a['id'] != parent_id]
+        if created:
+            return {'role': 'activity', 'title': 'Subagent created', 'text': '', 'spawnedAgents': created}
+    return {'role': 'activity', 'title': 'Agent operation', 'text': '\n\n'.join(detail),
+            'collab': {'tool': tool if isinstance(tool, str) else '', 'targets': targets}}
+
+
+def valid_agent_id(value):
+    return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', value) is not None
 
 
 def mcp_result_failed(output):
@@ -282,6 +311,25 @@ def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
             row["attachments"] = desktop_attachments
     elif kind in ("agentMessage", "assistantMessage"):
         row.update(role="assistant", text=item.get("text", ""), phase=item.get("phase"))
+        if citation := memory_sources(item.get('memoryCitation')):
+            row['memorySources'] = citation
+    elif kind == 'hookPrompt':
+        row.update(role='user', text=lines(*(frag.get('text') for frag in records(item.get('fragments')))))
+    elif kind == 'functionCallOutput':
+        row.update(role='user', text=function_message(item))
+    elif kind == 'imageGeneration':
+        status = item.get('status')
+        title = {'failed': 'Image generation failed', 'generating': 'Generating image', 'inProgress': 'Generating image',
+                 'completed': 'Generated image'}.get(status, 'Image generation')
+        row.update(role='activity', title=title, text=lines(item.get('revisedPrompt'), readable(item.get('failure'))))
+        if path := generated_image_path(item):
+            row['attachments'] = [{'type': 'localImage', 'path': path, 'name': ntpath.basename(path)}]
+        elif isinstance(src := item.get('src'), str) and src.startswith('data:image/'):
+            header, _, data = src.partition(',')
+            if header.endswith(';base64'):
+                inspect = image_cache.inspect if image_cache is not None else inspect_tool_images
+                _, images, present = inspect({'type': 'image', 'mimeType': header[5:-7], 'data': data})
+                set_tool_attachments(row, images, present)
     elif kind in ("ImageView", "imageView"):
         raw = item.get("path", "")
         path = raw
@@ -307,8 +355,25 @@ def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
         row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
         row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
-    elif kind in ('subAgentActivity', 'collabAgentToolCall') and (created := spawned_agents(item, parent_id)):
+        if metadata := command_info(item):
+            row['commandInfo'] = metadata
+    elif kind == 'collabAgentToolCall':
+        row.update(collab_activity(item, parent_id))
+    elif (kind == 'subAgentActivity' and item.get('kind') == 'started'
+          and valid_agent_id(child := item.get('agentThreadId')) and child != parent_id):
+        path = item.get('agentPath')
+        task = path.rsplit('/', 1)[-1] if isinstance(path, str) else ''
+        created = [{'id': child, 'nickname': '', 'taskName': task[:160]}]
         row.update(role='activity', title='Subagent created', text='', spawnedAgents=created)
+    elif kind == 'subAgentActivity':
+        title = {'interacted': 'Agent interaction', 'interrupted': 'Agent task interrupted',
+                 'completed': 'Agent task completed'}.get(item.get('kind'), 'Agent operation')
+        row.update(role='activity', title=title, text=readable(item.get('agentPath')))
+        child = item.get('agentThreadId')
+        if valid_agent_id(child) and child != parent_id:
+            path = item.get('agentPath')
+            row['agent'] = {'id': child, 'taskName': path.rsplit('/', 1)[-1][:160] if isinstance(path, str) else '',
+                            'activity': title}
     elif kind in ('contextCompaction', 'autoContextCompaction'):
         row.update(role='activity', title=kind, text=json.dumps(item, ensure_ascii=False, indent=2))
         # 원본 압축 항목은 status 대신 source와 completed를 사용한다.
@@ -341,10 +406,23 @@ def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
         if row.get('computerUse') and (item.get('error') or mcp_result_failed(output)):
             row['success'] = False
         set_tool_attachments(row, images, has_image_content)
+        ui = item.get('mcpAppUi') or item.get('appContext') or {}
+        if kind == 'mcpToolCall' and (item.get('mcpAppResourceUri') or isinstance(ui, dict) and ui.get('resourceUri')):
+            row['appView'] = True
+        if (card := automation_result(item)) is not None:
+            row.update(title='Automation update', text=card, activityCard=True)
     elif kind == "error":
-        row.update(role="error", text=item.get("message", "실행 실패"))
+        if item.get('willRetry') is True:
+            row.update(role='activity', title='Reconnecting to model', text=lines(item.get('message'), item.get('additionalDetails')))
+        else:
+            row.update(role='error', text=lines(item.get('message') or '실행 실패', item.get('additionalDetails')))
     elif kind == "planImplementation":
-        row.update(role="assistant", title="계획", text=item.get("planContent", ""))
+        row.update(role='activity', title='Plan implemented' if item.get('isCompleted') else 'Implement plan', text=item.get('planContent') or '')
+    elif (projection := native_activity(item)) is not None:
+        title, text = projection
+        row.update(role='activity', title=title, text=text)
+        if isinstance(item.get('completed'), bool):
+            row['completed'] = item['completed']
     else:
         row.update(role="activity", title=kind, text=json.dumps(item, ensure_ascii=False, indent=2))
     # Preserve non-text attachment descriptors. They are not fetched from arbitrary URLs.
@@ -427,9 +505,9 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
     strict_review_active = False
     for turn in turns:
         native = items_array(turn.get('items'))
-        items = [item for item in native if item.get('type') != 'strictReviewNotice']
+        items = visible_items(native, turn)
         if connected and turn is turns[-1] and turn.get('status') == 'inProgress':
-            strict_review_active = len(items) != len(native)
+            strict_review_active = any(item.get('type') == 'strictReviewNotice' for item in native)
         turn_items.append(items)
     skip = max(0, sum(map(len, turn_items)) - item_limit) if item_limit is not None else 0
     window_more = skip > 0
@@ -550,7 +628,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
         result.append({"model": model, "effort": effort, "id": turn.get("turnId") or str(ordinal), "status": turn.get("status"),
                        "startedAt": started_at, "messages": messages,
                        "actionable": bool(turn.get("turnId")) and turn.get("turnId") != "history",
-                       "error": turn.get("error"), "diff": turn.get("diff"),
+                       "error": None if turn.get("willRetry") is True else turn.get("error"), "diff": turn.get("diff"),
                        # A partial turn cannot establish complete totals. Defer its footer
                        # until backfill includes the whole turn; never scan omitted patches.
                        "fileChanges": native_turn_file_changes(turn) if '_nativeFileChanges' in turn or (not omitted and (items_complete or authoritative_diff)) else [],
@@ -570,6 +648,7 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
             **({'serviceTier': tier['serviceTier']} if 'serviceTier' in tier else {}),
             "goal": copy.deepcopy(state.get("threadGoal") or state.get("completedThreadGoal")),
             "turns": result, "requests": pending_requests(state), "historyWindowMore": window_more,
+            "queueRevision": state.get('_queueRevision', 0),
             "historyComplete": history.get("isComplete", state.get("turnsPagination", {}).get("hasLoadedOldest", True))}
 
 
@@ -607,8 +686,10 @@ def pending_requests(state):
         if related and normalized["supported"]:
             if request.get("method") == "item/fileChange/requestApproval":
                 normalized["params"]["changes"] = copy.deepcopy(related.get("changes", []))
+                normalized["snapshot"] = request_snapshot(request, normalized["params"]["changes"])
             elif request.get("method") == "item/commandExecution/requestApproval" and not normalized["params"].get("command"):
                 normalized["params"]["command"] = related.get("command", "")
+                normalized["snapshot"] = request_snapshot(request, normalized["params"]["command"])
         requests.append(normalized)
     return requests + async_requests(state)
 
@@ -638,9 +719,11 @@ def normalize_request(request):
     params = request.get("params", {})
     method = request.get("method")
     fields = {
-        "item/commandExecution/requestApproval": ("command", "cwd", "reason", "availableDecisions", "networkApprovalContext"),
-        "item/fileChange/requestApproval": ("reason", "grantRoot", "changes"),
-        "item/permissions/requestApproval": ("reason", "permissions"),
+        "item/commandExecution/requestApproval": ("command", "cwd", "reason", "availableDecisions", "networkApprovalContext",
+                                                  "additionalPermissions", "proposedExecpolicyAmendment", "proposedNetworkPolicyAmendments", "commandActions", "environmentId"),
+        "item/fileChange/requestApproval": ("reason", "grantRoot", "changes", "availableDecisions"),
+        "item/permissions/requestApproval": ("reason", "permissions", "cwd", "environmentId"),
+        "item/tool/requestOptionPicker": ("question", "options", "allowMultiple", "submitLabel", "skipLabel"),
         "item/tool/requestUserInput": ("questions",),
         "tool/requestUserInput": ("questions",),
         "item/plan/requestImplementation": ("turnId", "planContent"),
@@ -649,11 +732,24 @@ def normalize_request(request):
     # Identity verification is intentionally desktop-only, including its challenge data.
     verification = "openai/userVerification" in json.dumps(params.get("_meta", {})) or "openai/userVerification" in params
     result["supported"] = method in fields and not verification
+    if method == "item/tool/requestOptionPicker":
+        options = params.get("options")
+        result["supported"] = (result["supported"] and request.get("_directOptionResponse") is True and
+            isinstance(params.get("question"), str) and isinstance(options, list) and 0 < len(options) <= 200 and
+            all(isinstance(o, dict) and isinstance(o.get("label"), str) and o["label"].strip() for o in options) and
+            len({o["label"] for o in options}) == len(options))
     if method == "mcpServer/elicitation/request" and (params.get("mode", "form") != "form" or not form_supported(params.get("requestedSchema", {}))):
         result["supported"] = False
     if result["supported"]:
         result["params"] = {k: copy.deepcopy(params[k]) for k in fields[method] if k in params}
+        if method in ('item/commandExecution/requestApproval','item/fileChange/requestApproval'):
+            result['params']['availableDecisions'] = approval_choices(method, params)
+        for key in ('expiresAtMs','deadlineAtMs'):
+            if type(params.get(key)) in (int,float):
+                result['params'][key] = params[key]
+        result['snapshot'] = request_snapshot(request)
         if method == 'mcpServer/elicitation/request':
+            result['params']['requestedSchema'] = form_fields(params.get('requestedSchema', {}))
             computer = computer_use_approval(params)
             if computer:
                 result['params']['computerUse'] = computer
@@ -662,13 +758,152 @@ def normalize_request(request):
     return result
 
 
+def request_snapshot(request, shown=None):
+    source = [request.get(key) for key in ('id','method','params','_generation')]
+    if shown is not None: source.append(shown)
+    return hashlib.sha256(json.dumps(source, sort_keys=True, ensure_ascii=True, separators=(',',':')).encode()).hexdigest()
+
+
+def approval_choices(method, params):
+    advertised = params.get('availableDecisions')
+    if advertised is None:
+        advertised = ['accept', 'decline', 'cancel']
+        if method == 'item/fileChange/requestApproval' and params.get('grantRoot'):
+            advertised.insert(1,'acceptForSession')
+        if method == 'item/commandExecution/requestApproval':
+            amendment = params.get('proposedExecpolicyAmendment')
+            if amendment: advertised.append({'acceptWithExecpolicyAmendment': {'execpolicy_amendment': amendment}})
+            for rule in params.get('proposedNetworkPolicyAmendments') or []:
+                advertised.append({'applyNetworkPolicyAmendment': {'network_policy_amendment': rule}})
+    choices = []
+    for decision in advertised if isinstance(advertised, list) else []:
+        if decision in ('accept', 'acceptForSession','decline','cancel'):
+            choices.append(decision)
+        elif method == 'item/commandExecution/requestApproval' and isinstance(decision, dict) and len(decision)==1:
+            key, spec = next(iter(decision.items()))
+            if not isinstance(spec, dict): continue
+            if key == 'acceptWithExecpolicyAmendment' and set(spec)=={'execpolicy_amendment'}:
+                argv = spec['execpolicy_amendment']
+                if isinstance(argv,list) and argv and all(isinstance(v,str) and v for v in argv): choices.append(decision)
+            if key == 'applyNetworkPolicyAmendment' and set(spec)=={'network_policy_amendment'}:
+                rule = spec['network_policy_amendment']
+                if isinstance(rule,dict) and isinstance(rule.get('host'),str) and rule['host'] and rule.get('action') in ('allow','deny'): choices.append(decision)
+    return choices
+
+
+def form_fields(schema):
+    """Map MCP's named choices to the same literal values as its legacy enum fields."""
+    if not isinstance(schema,dict) or not isinstance(schema.get('properties',{}),dict): return schema
+    def field(source):
+        if not isinstance(source,dict): return source
+        output = {k:v for k,v in source.items() if v is not None or k not in
+                  ('title','description','minItems','maxItems','minLength','maxLength','minimum','maximum','default','enumNames','format')}
+        for name in ('oneOf','anyOf'):
+            choices=output.get(name)
+            if (isinstance(choices,list) and choices and 'enum' not in output and
+                    all(isinstance(row,dict) and set(row)<={'title','const'} and isinstance(row.get('const'),str) and
+                        isinstance(row.get('title'),str) for row in choices)):
+                output.pop(name);output.update(type='string',enum=[row['const'] for row in choices],enumNames=[row['title'] for row in choices])
+        if 'items' in output: output['items']=field(output['items'])
+        return output
+    return {**schema,'properties':{key:field(value) for key,value in schema.get('properties',{}).items()}}
+
+
 def form_supported(schema):
+    schema = form_fields(schema)
     if (not isinstance(schema, dict) or schema.get("type") != "object"
             or not isinstance(schema.get('properties', {}), dict)
             or set(schema) - {"type", "properties", "required", "title", "description", "$schema", "additionalProperties"}):
         return False
     allowed = {"type", "title", "description", "enum", "enumNames", "default", "minLength", "maxLength", "minimum", "maximum"}
-    return all(isinstance(field, dict) and not set(field) - allowed and field.get("type", "string") in ("string", "number", "integer", "boolean") for field in schema.get("properties", {}).values())
+    def scalar(field):
+        return (isinstance(field, dict) and not set(field) - allowed and
+                field.get('type','string') in ('string','number','integer','boolean') and
+                ('enum' not in field or isinstance(field['enum'],list)) and
+                all(type(field[k]) is int and field[k]>=0 for k in ('minLength','maxLength') if k in field) and
+                all(type(field[k]) in (float,int) for k in ('minimum','maximum') if k in field))
+    def array(field):
+        return (isinstance(field,dict) and field.get('type')=='array' and
+                not set(field) - {'type','items','title','description','default','minItems','maxItems','uniqueItems'} and
+                all(type(field[key]) is int and field[key]>=0 for key in ('minItems','maxItems') if key in field) and
+                scalar(field.get('items')))
+    required = schema.get('required', [])
+    return (isinstance(required,list) and all(isinstance(k,str) and k in schema.get('properties',{}) for k in required)
+            and all(scalar(field) or array(field) for field in schema.get('properties', {}).values()))
+
+
+def validate_form(value, schema):
+    if not form_supported(schema): raise ValueError("이 양식은 데스크톱에서 작성해야 합니다.")
+    schema = form_fields(schema)
+    if not isinstance(value, dict): raise ValueError("양식을 작성해주세요")
+    props = schema.get('properties', {})
+    if set(value)-set(props) or set(schema.get('required',[]))-set(value): raise ValueError("불완전한 양식 필드")
+    def valid(item, field):
+        kind = field.get('type','string')
+        if kind == 'array':
+            return (isinstance(item,list) and field.get('minItems',0)<=len(item)<=min(field.get('maxItems',1000),1000)
+                    and all(valid(v,field['items']) for v in item)
+                    and (not field.get('uniqueItems') or len(set(item))==len(item)))
+        if 'enum' in field and item not in field['enum']: return False
+        if kind == 'boolean': return type(item) is bool
+        if kind == 'string': return isinstance(item,str) and field.get('minLength',0)<=len(item)<=field.get('maxLength',20000)
+        return (type(item) in (int,float) and (type(item) is int or math.isfinite(item)) and (kind!='integer' or int(item)==item)
+                and field.get('minimum',-math.inf)<=item<=field.get('maximum',math.inf))
+    for key,item in value.items():
+        if not valid(item,props[key]): raise ValueError("양식 필드의 형식이 잘못되었습니다.：" + key)
+
+
+def native_request_response(request, response, state=None):
+    """Build the owner's response exclusively from the still-pending native request."""
+    if not normalize_request(request)['supported']: raise ValueError("데스크톱 앱에서 이 요청을 처리하세요.")
+    params, method = request.get('params') or {}, request['method']
+    response = dict(response)
+    snapshot = response.pop('reviewedRequest', None)
+    expected = request_snapshot(request)
+    if snapshot is not None and state is not None:
+        expected = next((r.get('snapshot') for r in pending_requests(state) if r.get('id')==request['id']),None)
+    if (snapshot is not None and snapshot != expected or any(
+            type(params.get(k)) in (int,float) and params[k] <= time.time()*1000 for k in ('expiresAtMs','deadlineAtMs'))):
+        raise ValueError('This request changed or expired. Review the latest request.')
+    decision = response.get('decision')
+    if method in ('item/commandExecution/requestApproval','item/fileChange/requestApproval'):
+        if set(response) != {'decision'} or decision not in approval_choices(method,params):
+            raise ValueError("이 승인에는 선택한 작업이 지원되지 않습니다.")
+        return {'decision':decision}
+    if method=='item/permissions/requestApproval':
+        scope = response.get('scope','turn')
+        if set(response)-{'decision','scope'} or decision not in ('accept','decline') or scope not in ('turn','session') or (decision=='decline' and scope!='turn'):
+            raise ValueError("이 요청은 선택한 승인 범위를 지원하지 않습니다.")
+        return {'permissions':params.get('permissions',{}) if decision=='accept' else {},'scope':scope}
+    if method in ('item/tool/requestUserInput','tool/requestUserInput'):
+        answers = response.get('answers')
+        keys = {q['id'] for q in params.get('questions',[])}
+        if (set(response)!={'answers'} or not isinstance(answers,dict) or not keys or set(answers)!=keys or
+            any(not isinstance(v,list) or not v or any(not isinstance(s,str) or not s.strip() or len(s)>20000 for s in v) for v in answers.values())):
+            raise ValueError("모든 질문에 답변해 주세요.")
+        return {'answers':{k:{'answers':v} for k,v in answers.items()}}
+    action = response.get('action')
+    if method=='item/tool/requestOptionPicker':
+        selected,free = response.get('selectedOptions'),response.get('freeformAnswer')
+        labels = [o['label'] for o in params['options']]
+        if (set(response)!={'action','selectedOptions','freeformAnswer'} or action not in ('submit','skip','dismiss') or
+            not isinstance(selected,list) or any(v not in labels for v in selected) or len(set(selected))!=len(selected) or
+            (len(selected)>1 and params.get('allowMultiple') is not True) or
+            (free is not None and (not isinstance(free,str) or not free.strip() or len(free)>20000)) or
+            (action=='submit' and not(selected or free)) or (action=='dismiss' and (selected or free))):
+            raise ValueError("모든 질문에 답변해 주세요.")
+        return response
+    if method != 'mcpServer/elicitation/request' or action not in ('accept','decline','cancel'): raise ValueError("알 수 없는 확인 작업")
+    computer = computer_use_approval(params)
+    if computer:
+        if set(response)-{'action','persist'} or ('persist' in response and (action!='accept' or response['persist'] not in computer['persistModes'])):
+            raise ValueError("이 요청은 선택한 승인 범위를 지원하지 않습니다.")
+        result = {'action':action,'content':{} if action=='accept' else None}
+        if 'persist' in response: result['_meta'] = {'persist':response['persist']}
+        return result
+    if set(response)-{'action','content'}: raise ValueError("이 요청은 선택한 승인 범위를 지원하지 않습니다.")
+    if action=='accept': validate_form(response.get('content'),params.get('requestedSchema',{}))
+    return {'action':action,'content':response.get('content') if action=='accept' else None}
 
 
 def question_replies(text):

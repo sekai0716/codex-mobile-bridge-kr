@@ -60,12 +60,6 @@
     "reason": "Existing private-file writer is located in app.lifecycle; moving persistence utilities is outside this test-only change."
   },
   {
-    "file": "bridge/features/endpoints/wsl.py",
-    "dependency": "bridge.app.service.validate_form",
-    "rule": "implementation-upward",
-    "reason": "Existing session creation shares app.service form validation; preserve its current validation semantics."
-  },
-  {
     "file": "bridge/features/endpoints/wsl_features.py",
     "dependency": "bridge.app.lifecycle.private_json",
     "rule": "implementation-upward",
@@ -118,12 +112,6 @@
     "dependency": "bridge.app.lifecycle.private_json",
     "rule": "implementation-upward",
     "reason": "Existing private-file writer is located in app.lifecycle; moving persistence utilities is outside this test-only change."
-  },
-  {
-    "file": "bridge/features/sessions/side_chat.py",
-    "dependency": "bridge.app.service.validate_form",
-    "rule": "implementation-upward",
-    "reason": "Existing session creation shares app.service form validation; preserve its current validation semantics."
   },
   {
     "file": "bridge/features/updates/gateway.py",

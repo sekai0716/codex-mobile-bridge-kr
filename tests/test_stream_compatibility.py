@@ -20,6 +20,14 @@ class StreamCompatibilityTests(unittest.TestCase):
     def test_legacy_partial_snapshots_remain_readable(self):
         validate_stream_state(11, {'id': 'thread'})
 
+    def test_system_error_is_a_readable_runtime_state(self):
+        value = self.state()
+        value['threadRuntimeStatus'] = {'type': 'systemError'}
+        value['turns'][0]['status'] = 'failed'
+        for version in (13, 99):
+            with self.subTest(version=version):
+                validate_stream_state(version, value)
+
     def test_v13_requires_readable_control_state(self):
         for key, value in [('requests', None), ('threadRuntimeStatus', {'type': 'unknown'}),
                            ('turns', [{'status': 'new-status', 'items': []}])]:

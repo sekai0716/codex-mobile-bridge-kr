@@ -128,6 +128,81 @@ def inspect_tool_images(output, *, remember=None, saved_images=()):
             exhausted = True
         return {'type': 'omitted', 'reason': 'toolOutputBudget'}
 
+    def image_block(value, *, surface=False):
+        nonlocal total, has_image_content
+        has_image_content = True
+        data, mime = value.get('data'), value.get('mimeType')
+        url = value.get('imageUrl', value.get('image_url', value.get('url')))
+        if isinstance(url, dict):
+            url = url.get('url')
+        if isinstance(url, str) and url.startswith('data:'):
+            header, _, data = url.partition(',')
+            mime = header[5:-7] if header.endswith(';base64') else None
+        elif not isinstance(data, str):
+            # Some live results retain only the gateway preview id. Use
+            # bytes already verified for this exact saved turn and call.
+            match = next((img for img in saved_images if img.get('desktopId') == value.get('preview')
+                          and img.get('mime') == mime), None)
+            if match is None:
+                return value
+            data = match['data']
+        placeholder = {'type': 'image', 'preview': 'unavailable'}
+        if not isinstance(data, str) or not isinstance(mime, str) or mime not in RASTER_TYPES:
+            return placeholder
+        if '…' in data:
+            if saved_images:
+                data = complete_clipped_image(data, mime, saved_images)
+            if '…' in data:
+                return placeholder
+        if surface and mime == 'image/jpeg':
+            # Browser screenshot data URLs have a complete JPEG end marker.
+            # Reject damaged payloads before allocating their full decoded body.
+            try:
+                if not base64.b64decode(data[-8:], validate=True).endswith(b'\xff\xd9'):
+                    return placeholder
+            except (ValueError, binascii.Error):
+                return placeholder
+        known = seen_data.get((mime, data))
+        if known is not None:
+            return {'type': 'image', 'mimeType': mime, 'preview': known}
+        # Base64 length bounds decoded bytes before allocating them. A
+        # repeated accepted payload was handled above even at the limit.
+        remaining = min(MAX_IMAGE_BYTES, MAX_TOTAL_BYTES - total)
+        if (len(images) >= MAX_IMAGES or remaining <= 0 or
+                len(data) > ((remaining + 2) // 3) * 4):
+            return placeholder
+        raw = decode_tool_image(data, mime)
+        if raw is None:
+            return placeholder
+        identifier = hashlib.sha256(raw).hexdigest()
+        if total + len(raw) > MAX_TOTAL_BYTES:
+            return placeholder
+        seen_data[(mime, data)] = identifier
+        if identifier not in (image['desktopId'] for image in images):
+            total += len(raw)
+            images.append({'type': 'toolImage', 'desktopId': identifier, 'mime': mime,
+                           'name': 'Image ' + str(len(images) + 1) + '.' + RASTER_TYPES[mime], 'data': data})
+            if remember is not None:
+                remember(identifier, mime, data, raw)
+        return {'type': 'image', 'mimeType': mime, 'preview': identifier}
+
+    def surface_meta(meta):
+        # The desktop browser puts screenshots in tool metadata as well as MCP content.
+        # Retain page and tab metadata, but never publish or navigate to the screenshot URL.
+        nonlocal has_image_content
+        surface = meta.get('codex/toolSurface') if isinstance(meta, dict) else None
+        shot = surface.get('screenshot') if isinstance(surface, dict) else None
+        if not isinstance(shot, dict) or not isinstance(shot.get('url'), str):
+            return meta
+        url = shot['url']
+        has_image_content = True
+        preview = {'type': 'image', 'preview': 'unavailable'}
+        if url.startswith('data:image/'):
+            preview = image_block({'type': 'image', 'image_url': url}, surface=True)
+        safe_shot = {k: v for k, v in shot.items() if k != 'url'}
+        safe_shot['preview'] = preview.get('preview', 'unavailable')
+        return {**meta, 'codex/toolSurface': {**surface, 'screenshot': safe_shot}}
+
     def walk(value, depth=0):
         nonlocal total, nodes, parsed_chars, has_image_content
         nodes += 1
@@ -159,55 +234,15 @@ def inspect_tool_images(output, *, remember=None, saved_images=()):
             return value
         # Codex rollouts use input_image; app-server dynamic tools use inputImage.
         if value.get('type') in ('image', 'image_url', 'output_image', 'input_image', 'inputImage'):
-            has_image_content = True
-            data, mime = value.get('data'), value.get('mimeType')
-            url = value.get('imageUrl', value.get('image_url', value.get('url')))
-            if isinstance(url, dict):
-                url = url.get('url')
-            if isinstance(url, str) and url.startswith('data:'):
-                header, _, data = url.partition(',')
-                mime = header[5:-7] if header.endswith(';base64') else None
-            elif not isinstance(data, str):
-                # Some live results retain only the gateway preview id. Use
-                # bytes already verified for this exact saved turn and call.
-                match = next((img for img in saved_images if img.get('desktopId') == value.get('preview')
-                              and img.get('mime') == mime), None)
-                if match is None:
-                    return value
-                data = match['data']
-            placeholder = {'type': 'image', 'preview': 'unavailable'}
-            if not isinstance(data, str) or not isinstance(mime, str) or mime not in RASTER_TYPES:
-                return placeholder
-            if saved_images and '…' in data:
-                data = complete_clipped_image(data, mime, saved_images)
-            known = seen_data.get((mime, data))
-            if known is not None:
-                return {'type': 'image', 'mimeType': mime, 'preview': known}
-            # Base64 length bounds decoded bytes before allocating them. A
-            # repeated accepted payload was handled above even at the limit.
-            remaining = min(MAX_IMAGE_BYTES, MAX_TOTAL_BYTES - total)
-            if (len(images) >= MAX_IMAGES or remaining <= 0 or
-                    len(data) > ((remaining + 2) // 3) * 4):
-                return placeholder
-            raw = decode_tool_image(data, mime)
-            if raw is None:
-                return placeholder
-            identifier = hashlib.sha256(raw).hexdigest()
-            if total + len(raw) > MAX_TOTAL_BYTES:
-                return placeholder
-            seen_data[(mime, data)] = identifier
-            if identifier not in (image['desktopId'] for image in images):
-                total += len(raw)
-                images.append({'type': 'toolImage', 'desktopId': identifier, 'mime': mime,
-                               'name': 'Image ' + str(len(images) + 1) + '.' + RASTER_TYPES[mime], 'data': data})
-                if remember is not None:
-                    remember(identifier, mime, data, raw)
-            return {'type': 'image', 'mimeType': mime, 'preview': identifier}
+            return image_block(value)
         # Only decode known result envelopes and text content blocks, never arbitrary fields.
         keys = {'content', 'contentItems', 'result'}
         if value.get('type') in ('text', 'output_text', 'input_text', 'inputText'):
             keys.add('text')
-        return {key: walk(part, depth + 1) if key in keys else part for key, part in value.items()}
+        clean = {key: walk(part, depth + 1) if key in keys else part for key, part in value.items()}
+        if '_meta' in value:
+            clean['_meta'] = surface_meta(value['_meta'])
+        return clean
 
     clean = walk(output)
     return clean, images, has_image_content

@@ -1,28 +1,39 @@
 'use strict';
 
 // 청크 경계에서 긴 줄이 잘려도 같은 코드 줄에 이어 붙이고 줄 번호는 한 번만 센다.
-function appendTurnDiff(view, cursor, text, next) {
+function appendTurnDiff(view, cursor, text, next, review) {
   const fragment=document.createDocumentFragment(), lines=text.split('\n');
   for(const [index,part] of lines.entries()){
     const last=index===lines.length-1;
     if(last&&!part)break;
     if(!cursor.partial){
       const line=document.createElement('div'),number=document.createElement('span'),code=document.createElement('code');
-      const hunk=part.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      line.className='wb-diff-line meta';number.className='wb-diff-number';number.setAttribute('aria-hidden','true');
+      line.append(number,code);fragment.append(line);cursor.partial={line,number,code};
+    }
+    const {line,number,code}=cursor.partial;
+    code.append(document.createTextNode(part));
+    if(!last||next===null){
+      const value=code.textContent;
+      const hunk=value.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       let type='meta',location='';
       if(hunk){cursor.old=Number(hunk[1]);cursor.new=Number(hunk[2]);cursor.hunk=true;type='hunk';}
-      else if(part.startsWith('diff --git ')){cursor.hunk=false;cursor.headers=true;}
-      else if(!cursor.hunk&&(part.startsWith('--- ')||part.startsWith('+++ '))){cursor.headers=true;}
+      else if(value.startsWith('diff --git ')){cursor.hunk=false;cursor.headers=true;}
+      else if(!cursor.hunk&&(value.startsWith('--- ')||value.startsWith('+++ '))){cursor.headers=true;}
       else if(cursor.hunk||!cursor.headers){
-        if(part.startsWith('+')){type='added';if(cursor.hunk)location=cursor.new++;}
-        else if(part.startsWith('-')){type='removed';if(cursor.hunk)location=cursor.old++;}
-        else if(cursor.hunk&&part.startsWith(' ')){type='context';cursor.old++;location=cursor.new++;}
+        if(value.startsWith('+')){type='added';if(cursor.hunk)location=cursor.new++;}
+        else if(value.startsWith('-')){type='removed';if(cursor.hunk)location=cursor.old++;}
+        else if(cursor.hunk&&value.startsWith(' ')){type='context';cursor.old++;location=cursor.new++;}
       }
-      line.className='wb-diff-line '+type;number.className='wb-diff-number';number.setAttribute('aria-hidden','true');
-      number.textContent=location;line.append(number,code);fragment.append(line);cursor.partial=code;
+      line.className='wb-diff-line '+type;number.textContent=location;
+      if(location&&review){
+        const button=document.createElement('button');button.type='button';button.className='wb-diff-number';
+        button.textContent=location;button.setAttribute('aria-label',timelineText('Comment on line')+' '+location);
+        button.onclick=()=>review({line:location,side:type==='removed'?'old':'new',text:value});
+        number.replaceWith(button);
+      }
+      cursor.partial=null;
     }
-    cursor.partial.append(document.createTextNode(part));
-    if(!last||next===null)cursor.partial=null;
   }
   view.append(fragment);
 }
@@ -64,7 +75,8 @@ function renderTurnDiffFile(timeline,row,file,index,card){
       if(data.key!==row.key||data.version!==row.version||data.fileIndex!==index||data.offset!==offset||
          typeof data.text!=='string'||(data.next!==null&&(!Number.isInteger(data.next)||data.next<=offset)))
         throw Error(timelineText('메시지가 변경되었습니다. 다시 열어보세요.'));
-      appendTurnDiff(view,cursor,data.text,data.next);offset=data.next;failed=false;
+      const review=timeline.onReviewLine&&((selection)=>timeline.onReviewLine({...selection,path:file.path,revision:timelineText('Recorded edit')+' · '+(row.turnId||row.key)+' · '+row.version}));
+      appendTurnDiff(view,cursor,data.text,data.next,review);offset=data.next;failed=false;
       notice.textContent='';more.hidden=offset===null;more.dataset.i18n='Load more diff';
     }catch(error){
       if(timeline.abort.signal.aborted)return;

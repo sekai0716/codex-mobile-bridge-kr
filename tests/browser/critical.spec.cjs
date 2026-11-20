@@ -11,6 +11,37 @@ test.beforeEach(async ({context, request, baseURL}) => {
   expect(await (await request.get('/__fixture_health')).json()).toEqual({fixture: 'cmb-browser-regression'});
 });
 
+test('native approval choices and multi-select responses are bound to the reviewed request',async({page})=>{
+  await ready(page);
+  const result=await page.evaluate(async()=>{
+    await BridgeFeatures.load('chat');
+    const original=window.fetch,writes=[],group=document.createElement('section');document.body.append(group);
+    window.fetch=async(url,options)=>{
+      if(new URL(url,location.href).pathname.endsWith('/respond')){
+        writes.push(JSON.parse(options.body));return new Response('{"status":"submitted"}',{headers:{'Content-Type':'application/json'}});
+      }
+      return original(url,options);
+    };
+    const mount=(method,params,snapshot)=>{const card=renderNativeRequest({id:'synthetic-'+snapshot,method,params,snapshot,supported:true});group.replaceChildren(card);return card;};
+    try{
+      const rule={acceptWithExecpolicyAmendment:{execpolicy_amendment:['git','status']}};
+      let card=mount('item/commandExecution/requestApproval',{command:'git status',availableDecisions:[rule,'decline'],additionalPermissions:{network:true}},'policy');
+      if(card.querySelectorAll('button').length!==2||!card.textContent.includes('network'))throw Error('unavailable decision or missing permissions');
+      card.querySelector('button').click();card.querySelector('button').click();
+      await new Promise(requestAnimationFrame);
+      card=mount('item/tool/requestOptionPicker',{question:'Pick',options:[{label:'a'},{label:'b'}],allowMultiple:true},'picker');
+      for(const box of card.querySelectorAll('input'))box.click();card.querySelector('textarea').value='note';
+      card.querySelector('form').requestSubmit();await new Promise(requestAnimationFrame);
+      card=mount('mcpServer/elicitation/request',{requestedSchema:{type:'object',properties:{items:{type:'array',items:{enum:['v1','v2'],enumNames:['First','Second']}}},required:['items']}},'mcp');
+      for(const row of card.querySelector('select').options)row.selected=true;
+      card.querySelector('form').requestSubmit();await new Promise(requestAnimationFrame);
+      return writes.map(row=>row.response);
+    }finally{window.fetch=original;group.remove();}
+  });
+  expect(result).toEqual([{decision:{acceptWithExecpolicyAmendment:{execpolicy_amendment:['git','status']}},reviewedRequest:'policy'},
+    {action:'submit',selectedOptions:['a','b'],freeformAnswer:'note',reviewedRequest:'picker'},{action:'accept',content:{items:['v1','v2']},reviewedRequest:'mcp'}]);
+});
+
 async function ready(page, scenario = 'success') {
   await page.goto('/?case=' + scenario);
   await page.waitForFunction(() => {
@@ -1003,4 +1034,54 @@ test('wide chat list collapse preserves conversation and drafts across clients a
  }
  await page.evaluate(()=>BridgeI18n.setLanguage('en'));await expect(toggle).toHaveAttribute('aria-label','Collapse chat list');await toggle.click();await info.attach('collapsed-wide',{body:await page.screenshot(),contentType:'image/png'});
  await page.setViewportSize({width:390,height:844});await expect(toggle).toBeHidden();
+});
+
+test('native activity shows sources, image groups and child chat actions in every language',async({page})=>{
+  await ready(page);
+  await page.evaluate(async()=>{
+    await BridgeFeatures.load('chat');
+    const root=document.createElement('section');
+    root.id='native-activity-fixture';
+    root.style.cssText='position:fixed;inset:0;overflow:auto;z-index:999;background:var(--page)';
+    document.body.append(root);
+    const timeline=new ChatTimeline({url:()=>'/fixture',request:()=>{throw Error('unexpected read')},renderText:(node,text)=>node.textContent=text,
+      elements:{container:root,viewport:root}});
+    timeline.onAgent=target=>root.dataset.agent=target.id;
+    const rows=[
+      {role:'activity',kind:'webSearch',title:'Opened web page',text:'source\nhttps://example.test/path\njavascript:example'},
+      {role:'activity',kind:'imageView',title:'사진 미리보기',attachments:[{name:'a.png'}]},
+      {role:'activity',kind:'imageView',title:'사진 미리보기',attachments:[{name:'b.png'}]},
+      {role:'activity',kind:'subAgentActivity',title:'Agent interaction',agent:{activity:'Agent interaction',taskName:'worker',id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}},
+      {role:'activity',kind:'mcpToolCall',title:'fixture · tool',text:'tool result',appView:true}
+    ];
+    window.fixtureActivityLanguage=language=>{
+      BridgeI18n.setLanguage(language);
+      const entries=rows.map((v,i)=>{
+        const row={...v,key:'fixture-'+i,turnId:'t',version:'1',truncated:false};
+        const node=timeline.renderRow(row);node.dataset.key=row.key;return {row,node};
+      });
+      timeline.activityGroups.sync(root,entries);
+    };
+  });
+  const root=page.locator('#native-activity-fixture');
+  for(const [language,search,group,agent] of [
+    ['ko','웹 페이지 열기','열어 본 이미지','에이전트와 대화함'],
+    ['en','Opened web page','Viewed images','Agent interaction'],
+    ['zh','打开网页','已查看图片','与智能体交互']
+  ]){
+    await page.evaluate(lang=>window.fixtureActivityLanguage(lang),language);
+    const web=root.locator('[data-key="fixture-0"]');
+    await expect(web.locator('summary')).toHaveText(search);
+    if(!await web.evaluate(n=>n.open))await web.locator('summary').click();
+    await expect(web.locator('a')).toHaveCount(1);
+    await expect(web.locator('a')).toHaveAttribute('href','https://example.test/path');
+    await expect(web.locator('a')).toHaveAttribute('rel','noopener noreferrer');
+    const images=root.locator('details.activity-group');
+    await expect(images.locator('.activity-group-label')).toHaveText(group);
+    if(!await images.evaluate(n=>n.open))await images.locator(':scope > summary').click();
+    await expect(images.locator('.activity-group-items > details')).toHaveCount(2);
+    await root.getByRole('button',{name:'worker · '+agent}).click();
+    await expect(root).toHaveAttribute('data-agent','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    await expect(root.locator('iframe')).toHaveCount(0);
+  }
 });

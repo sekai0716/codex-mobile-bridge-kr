@@ -54,7 +54,8 @@ def validate_stream_state(version, state):
     require(isinstance(state.get('modelProvider'), str) and bool(state['modelProvider']))
     require(isinstance(state.get('cwd'), str) and bool(state['cwd']))
     runtime = state.get('threadRuntimeStatus')
-    require(isinstance(runtime, dict) and runtime.get('type') in ('idle', 'active', 'running', 'waiting', 'busy'))
+    # 요청 실패 상태도 읽을 수 있어야 모델 수정과 다음 입력으로 복구할 수 있다.
+    require(isinstance(runtime, dict) and runtime.get('type') in ('idle', 'active', 'running', 'waiting', 'busy', 'systemError'))
     requests = state.get('requests')
     require(isinstance(requests, list))
     for request in requests:

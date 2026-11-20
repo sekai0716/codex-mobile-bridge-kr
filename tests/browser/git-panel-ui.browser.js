@@ -8,12 +8,12 @@ async function runGitRepositorySelectionChecks(){
   const base=window.BridgeWorkbench,session={id:'fixture',host:'local',cwd:'/workspace',files:[]},tab={body};session.files.push(tab);
   const calls=[],repositories=[{path:'repo-a',name:'repo-a',root:'/workspace/repo-a'},{path:'repo-b',name:'repo-b',root:'/workspace/repo-b'}];let empty=false,hold=false,finishDiff;
   const entry={path:'literal <file>.txt',index:'M',worktree:'M',untracked:false,conflict:false};
-  const diff=repo=>({kind:'diff',text:'--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+Changed in '+repo+'\n'});
+  const diff=repo=>({kind:'diff',path:entry.path,text:'--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+Changed in '+repo+'\n'});
   const wb={node:base.node.bind(base),button:base.button.bind(base),raw:base.raw.bind(base),notify(){},url:(s,operation,path='')=>'/synthetic/'+operation+'?path='+encodeURIComponent(path),request:async(url,params,signal)=>{
     const parsed=new URL(url,location.origin),action=parsed.pathname.split('/').at(-1),repository=params?.repository??parsed.searchParams.get('repository');calls.push({action,repository,params,signal});
     if(action==='git-repositories')return {repositories:empty?[]:repositories,project:'/workspace'};
     if(action==='git-status')return {available:true,project:repository,branch:'main',commit:'1'.repeat(40),scope:'.',entries:[entry],version:'version-'+repository};
-    if(action==='git-diff'){if(hold){hold=false;return new Promise(resolve=>finishDiff=resolve);}return diff(repository);}
+    if(action==='git-diff'){if(hold){hold=false;return new Promise(resolve=>finishDiff=resolve);}return {...diff(repository),section:parsed.searchParams.get('section'),hunks:['1'.repeat(64)],canDiscardHunk:true,version:'version-'+repository};}
     if(action==='git-history')return {commits:[{id:(repository==='repo-a'?'a':'b').repeat(40),subject:'Changes in '+repository,author:'Fixture',date:'2026-11-17T00:00:00Z',parents:[]}],hasMore:false};
     if(action==='git-commit')return {id:parsed.searchParams.get('revision'),message:'Commit in '+repository,author:'Fixture',date:'2026-11-17T00:00:00Z',parents:[],entries:[{change:'M',path:entry.path}]};
     if(action==='git-history-diff')return diff(repository);
@@ -21,6 +21,10 @@ async function runGitRepositorySelectionChecks(){
     if(action==='git-action')return {outcome:'success',message:'Synthetic action recorded'};
     throw Error('Unexpected Git fixture action '+action);
   }};
+  const composer=document.createElement('div'),input=document.createElement('textarea');
+  root.append(composer);composer.append(input);let scope='fixture',changes=0;
+  const quotes=new ComposerQuotes({messages:root,input,container:composer,scope:()=>({provider:'codex',session:scope}),onChange:()=>changes++,translate:key=>BridgeI18n.t(key)});
+  wb.reviewLine=(review,target)=>{check(target.id==='fixture'&&target.host==='local','review keeps its chat identity');quotes.reviewLine(review);};
   const panel=new GitPanel(wb,session,tab);const language=BridgeI18n.language();
   try{
     await panel.load();
@@ -32,15 +36,38 @@ async function runGitRepositorySelectionChecks(){
     picker().value='repo-b';picker().onchange();await until(()=>panel.state.project==='repo-b'&&body.querySelector('.wb-git-file'));
     await panel.show(entry,'unstaged',body.querySelector('.wb-git-file[data-section=unstaged]'));finishDiff(diff('stale-repo-a'));await old;
     check(body.textContent.includes('Changed in repo-b')&&!body.textContent.includes('stale-repo-a'),'late diffs from the previous checkout cannot replace the current selection');
+    body.querySelector('.wb-hunk-actions button:last-child').click();
+    let dialog=document.querySelector('.wb-git-dialog');
+    check(dialog.querySelector('.wb-hunk-preview').textContent.includes('+Changed in repo-b')&&!calls.some(call=>call.action==='git-action'),'discard previews the exact displayed block without writing');dialog.close();
+    await until(()=>!document.querySelector('.wb-git-dialog'));body.querySelector('.wb-hunk-actions button:first-child').click();
+    await until(()=>!panel.busy&&body.querySelector('.wb-hunk-actions'));
+    const staged=calls.find(call=>call.params?.action==='stage-hunk');
+    check(staged.params.path===entry.path&&staged.params.hunk==='1'.repeat(64)&&staged.params.version==='version-repo-b'&&staged.params.repository==='repo-b','stage submits only the selected path, token, repository and reviewed version');
     body.querySelector('[data-git-mode=history]').click();await until(()=>body.querySelector('.wb-history-row'));
     body.querySelector('.wb-history-row').click();await until(()=>body.querySelector('.wb-history-diff-area .wb-diff-summary'));
     check(body.textContent.includes('Commit in repo-b')&&body.textContent.includes('Changed in repo-b'),'commit history, details and historical diff all use the selected checkout');
+    check(!body.querySelector('.wb-hunk-actions'),'commit history exposes no worktree mutation controls');
+    body.querySelector('.removed button.wb-diff-number').click();dialog=document.querySelector('.diff-review-dialog');
+    dialog.querySelector('textarea').value='Keep this behavior';dialog.querySelector('form').requestSubmit();
+    check(changes===1&&quotes.quotes[0].text.includes('/workspace/repo-b/'+entry.path+':1')&&quotes.quotes[0].text.includes('b'.repeat(40))&&quotes.quotes[0].text.includes('-old')&&quotes.quotes[0].text.includes('Keep this behavior'),'a historic line and revision are captured in its chat draft');
+    await until(()=>!document.querySelector('.diff-review-dialog'));
+    const recorded=document.createElement('div'),cursor={};root.append(recorded);
+    const review=row=>quotes.reviewLine({...row,repository:'/workspace',path:'past.txt',revision:'recorded-turn'});
+    appendTurnDiff(recorded,cursor,'@@ -2',5,review);appendTurnDiff(recorded,cursor,' +8,2 @@\n-old\n+long',25,review);
+    check(recorded.querySelectorAll('button').length===1,'split hunk headers are parsed and incomplete lines cannot be reviewed');
+    appendTurnDiff(recorded,cursor,' line\n+last\n',null,review);recorded.querySelector('.added button').click();
+    dialog=document.querySelector('.diff-review-dialog');dialog.querySelector('textarea').value='past note';dialog.querySelector('form').requestSubmit();
+    check(changes===2&&quotes.quotes[1].text.includes('past.txt:8')&&quotes.quotes[1].text.includes('+long line')&&quotes.quotes[1].text.includes('recorded-turn'),'recorded turn comments preserve complete lines across chunk boundaries');
+    await until(()=>!document.querySelector('.diff-review-dialog'));
+    recorded.querySelector('button').click();dialog=document.querySelector('.diff-review-dialog');
+    dialog.querySelector('textarea').value='wrong scope';scope='another';dialog.querySelector('form').requestSubmit();
+    check(changes===2,'switching chat while reviewing drops the stale submission');recorded.remove();composer.remove();
     check(calls.filter(call=>['git-history','git-commit','git-history-diff'].includes(call.action)).every(call=>call.repository==='repo-b'),'every historical read carries the repository parameter');
     body.querySelector('[data-git-mode=changes]').click();await until(()=>body.querySelector('.wb-git-file'));
     panel.confirm('Selected checkout','Synthetic confirmation',{action:'stage',path:entry.path},'Confirm');
     panel.repository='repo-a';document.querySelector('.wb-git-dialog form').requestSubmit();
     await until(()=>!document.querySelector('.wb-git-dialog')&&!panel.busy);
-    const write=calls.find(call=>call.action==='git-action');
+    const write=calls.find(call=>call.params?.action==='stage');
     check(write.params.repository==='repo-b'&&write.params.version==='version-repo-b','a confirmation retains its original repository and version if selection changes');
     for(const [lang,label]of [['ko','Git 저장소'],['en','Git repository'],['zh','Git 仓库']]){
       BridgeI18n.setLanguage(lang);await panel.load();check(picker().getAttribute('aria-label')===label&&picker().value==='repo-a','repository picker follows '+lang+' without changing the selection');

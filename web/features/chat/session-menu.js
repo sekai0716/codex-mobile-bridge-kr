@@ -358,6 +358,8 @@ class SessionMenu {
       else if(c.sessionId)this.row('세션 복사 ID','copy',button=>this.copy(c.sessionId,button)).classList.add('message-copy');
       if(c.fork)this.row('채팅 브랜치 생성','fork',button=>this.execute(()=>{this.close();return c.fork();},button));
       this.separator();if(c.manage)this.row('관리 보내기','list',()=>{this.close();c.manage();});
+      if(c.findMessages)this.row('Find in chat','info',button=>this.execute(()=>{this.close();return c.findMessages();},button));
+      if(c.originalQueue)this.row('Codex queue','info',button=>this.execute(()=>{this.close();return c.originalQueue();},button));
       if(c.notifications)this.row('채팅 알림 설정','info',button=>this.execute(()=>{this.close();return c.notifications();},button));
       if(c.cliNetwork)this.row('CLI 네트워크 확인','link',()=>this.openCliNetwork());
       if(c.releaseCli)this.row('CLI 연결 해제','link',()=>{this.close();c.releaseCli();});

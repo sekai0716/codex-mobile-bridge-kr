@@ -60,6 +60,68 @@ class GitWorkspaceTests(unittest.TestCase):
         self.assertEqual(operate(parent, 'git-status', {'repository': 'project'})['entries'][0]['index'], 'M')
         self.assertEqual(GitWorkspace(Workspace(second)).status(), before_second)
 
+    def test_partial_changes_preserve_other_blocks_index_files_and_review_snapshot(self):
+        folder = self.root / 'nested'; folder.mkdir()
+        name = '변경 파일.txt'; target = folder / name
+        lines = ['line %d\n' % i for i in range(70)]
+        target.write_text(''.join(lines)); other = self.root / 'other.txt'; other.write_text('original\n')
+        self.git('add', '.'); self.git('commit', '-qm', 'initial files')
+        lines[55] = 'already staged\n'; target.write_text(''.join(lines)); self.git('add', '.')
+        staged = lines.copy()
+        lines[8] = 'first edit\n'; lines[35] = 'second edit\n'; target.write_text(''.join(lines)); other.write_text('unrelated edit\n')
+        def preview(section): return operate(folder, 'git-diff', {'path': name, 'section': section})
+        def apply(action, diff, which):
+            return operate(folder, 'git-action', {'action': action, 'path': name, 'version': diff['version'], 'hunk': diff['hunks'][which]})
+        def index_text(): return self.git('show', ':nested/' + name).stdout.decode()
+        first = preview('unstaged')
+        self.assertEqual(len(first['hunks']), 2)
+        apply('stage-hunk', first, 1); staged[35] = lines[35]
+        self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
+        with self.assertRaises(ValueError): apply('stage-hunk', first, 0)
+        apply('unstage-hunk', preview('staged'), 0); staged[35] = 'line 35\n'
+        self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
+        before = preview('unstaged'); lines[35] = 'external edit\n'; target.write_text(''.join(lines))
+        with self.assertRaises(ValueError): apply('discard-hunk', before, 1)
+        self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
+        apply('discard-hunk', preview('unstaged'), 0); lines[8] = 'line 8\n'
+        self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
+        self.assertEqual(other.read_text(), 'unrelated edit\n'); self.assertEqual(self.git('show', ':other.txt').stdout, b'original\n')
+
+    def test_partial_changes_reject_ambiguous_stale_and_unapplicable_patches(self):
+        target = self.root / 'repeat.txt'; section = ['same %d\n' % i for i in range(15)]
+        initial = section * 3; target.write_text(''.join(initial))
+        self.git('add', '.'); self.git('commit', '-qm', 'repeated contexts')
+        modified = initial[:]; modified[7] = modified[22] = 'edit\n'
+        target.write_text(''.join(modified))
+        self.assertEqual(self.diff(target.name, 'unstaged')['hunks'], [None, None])
+        modified[22] = 'distinct edit\n'; target.write_text(''.join(modified))
+        diff = self.diff(target.name, 'unstaged')
+        params = {'action':'stage-hunk','path':target.name,'version':diff['version'],'hunk':diff['hunks'][0]}
+        with self.assertRaises(ValueError): operate(self.root,'git-action',{**params,'hunk':'f'*64})
+        # Native Git cannot acquire the index lock. No other part of this patch
+        # can be written and the browser must obtain a fresh diff before retry.
+        lock = self.root / '.git/index.lock'; lock.touch()
+        try:
+            with self.assertRaises(ValueError): operate(self.root,'git-action',params)
+        finally: lock.unlink()
+        self.assertEqual(target.read_text(), ''.join(modified)); self.assertEqual(self.git('show', ':'+target.name).stdout.decode(), ''.join(initial))
+        self.git('add', '.')
+        with self.assertRaises(ValueError): operate(self.root,'git-action',params)
+        self.assertEqual(self.git('show', ':'+target.name).stdout.decode(), ''.join(modified))
+
+    def test_partial_discard_does_not_normalize_unselected_line_endings(self):
+        self.git('config','core.autocrlf','true')
+        target=self.root/'mixed.txt'; lines=[b'%d\r\n'%i for i in range(50)]
+        target.write_bytes(b''.join(lines));self.git('add','.');self.git('commit','-qm','consistent CRLF')
+        lines[3]=b'first\r\n';lines[37]=b'second\n';target.write_bytes(b''.join(lines))
+        diff=self.diff(target.name,'unstaged');self.assertEqual(len(diff['hunks']),2)
+        self.assertFalse(diff['canDiscardHunk'])
+        with self.assertRaises(ValueError):
+            operate(self.root,'git-action',{'action':'discard-hunk','path':target.name,'version':diff['version'],'hunk':diff['hunks'][0]})
+        self.assertEqual(target.read_bytes(),b''.join(lines))
+        operate(self.root,'git-action',{'action':'stage-hunk','path':target.name,'version':diff['version'],'hunk':diff['hunks'][0]})
+        self.assertEqual(target.read_bytes(),b''.join(lines))
+
     def test_repository_versions_cannot_be_replayed_against_an_identical_checkout(self):
         self.baseline()
         second = self.root.parent / 'second'; shutil.copytree(self.root, second)

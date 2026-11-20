@@ -568,6 +568,7 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_codex_disable_cancels_preparation_before_waiting_for_its_gate(self):
         entered, cancelled = threading.Event(), threading.Event()
+        self.accounts.cancel_deferred_desktop_runtime = Mock()
         # Hold the preparation gate until the disable request cancels it.
         def held_prepare(app, **options):
             with self.accounts.gate:
@@ -582,7 +583,21 @@ class ClientLifecycleTests(unittest.TestCase):
         self.manager.toggle_client({'provider': 'codex', 'enabled': False, 'quitDesktop': False})
         self.manager.runtime_preparation_thread.join(3)
         self.assertTrue(cancelled.is_set())
+        self.accounts.cancel_deferred_desktop_runtime.assert_called_once()
         self.assertFalse(self.manager.enabled('codex'))
+        self.launch.assert_not_called()
+
+    def test_scheduling_a_retry_checks_current_access_and_wakes_the_preparation_worker(self):
+        register = Mock()
+        self.manager.config['enabled']['codex'] = False
+        with self.assertRaises(ValueError):
+            self.manager._schedule_codex_runtime(register)
+        register.assert_not_called()
+        self.manager.config['enabled']['codex'] = True
+        self.manager._schedule_codex_runtime(register)
+        self.manager.runtime_preparation_thread.join(3)
+        register.assert_called_once_with()
+        self.accounts.prepare_desktop_runtime.assert_called_once()
         self.launch.assert_not_called()
 
     def test_offline_selection_never_launches_or_quits_clients(self):

@@ -24,6 +24,25 @@ class CreationUnavailable(CreationError):
     """No thread mutation could have happened."""
 
 
+class SideChatConnectionUnavailable(CreationUnavailable):
+    """A native fork could not be submitted to the desktop's shared runtime."""
+
+    def __init__(self, *, manual):
+        self.code = 'side_chat_setup_required' if manual else 'side_chat_setup_waiting'
+        super().__init__(
+            'No side chat was created. Bridge needs a shared connection to the running Codex desktop. '
+            'A desktop started with standard input/output cannot share that connection. '
+            'After all desktop tasks finish, open connection setup in Accounts.'
+            if manual else
+            'No side chat was created. The shared Codex desktop connection is not ready. '
+            'Check the preparation status in Accounts before trying again.')
+
+
+class SideChatReceiptUnknown(CreationError):
+    code = 'side_chat_creation_unknown'
+    message = 'The side chat creation result is unknown. Refresh the side chat list to check.'
+
+
 class ForkUnavailable(CreationUnavailable):
     """The capability check failed before any thread could be created."""
 

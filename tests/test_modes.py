@@ -323,6 +323,17 @@ class ModeTests(unittest.TestCase):
         self.assertNotIn('collaborationMode', self.calls()[-1]['params']['turnStart']['request'])
         self.assertEqual(len(self.calls()), 2)
 
+    def test_mode_change_preserves_settings_after_compaction_placeholder(self):
+        # 압축용 내부 turn의 minimal은 사용자가 선택한 실행 설정이 아니다.
+        for saved in ({'effort': 'max'}, {}, {'effort': None}):
+            with self.subTest(saved=saved):
+                self.live(latestReasoningEffort='minimal', latestThreadSettings=saved,
+                          latestCollaborationMode={'mode': 'default', 'settings': {
+                              'model': 'same-model', 'reasoning_effort': 'max'}})
+                self.bridge.send(THREAD, 'Continue after compaction', str(uuid.uuid4()), work_mode='default')
+                settings = self.calls()[-1]['params']['turnStart']['request']['collaborationMode']['settings']
+                self.assertEqual(settings['reasoning_effort'], None if 'effort' in saved and saved['effort'] is None else 'max')
+
     def test_remote_mode_keeps_host_and_native_version(self):
         self.bridge.host = self.fixture.host = 'remote:test'
         self.bridge.send(THREAD, 'Plan remotely', str(uuid.uuid4()), work_mode='plan')

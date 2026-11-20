@@ -164,6 +164,8 @@ class DesktopSessions:
         self.startup_thread = None
         self.runtime_preparation_thread = None
         self.runtime_preparation_cancel = threading.Event()
+        self.runtime_preparation_requested = False
+        self.runtime_preparation_finishing = False
         self.client_lock = threading.RLock()
         self.client_cache = None
         self.client_snapshot = None
@@ -234,6 +236,8 @@ class DesktopSessions:
         self._codex_guard = lambda: self.require_enabled('codex')
         if self.bridge is not None:
             self.bridge.accounts.require_client_enabled = self._codex_guard
+            if self.gateway_running:
+                self.bridge.accounts.desktop_preparation_scheduler = self._schedule_codex_runtime
             self.bridge.observation_enabled = lambda: self.enabled('codex')
         if instance is None:
             from bridge.clients.instances import ClientInstances
@@ -1950,11 +1954,24 @@ class DesktopSessions:
             self.startup_thread = threading.Thread(target=self.start_enabled, daemon=True)
             self.startup_thread.start()
 
-    def _prepare_codex_runtime(self, descriptor):
+    def _schedule_codex_runtime(self, register):
+        with self.client_lock:
+            if self.closed.is_set() or not self.config.get('enabled', {}).get('codex', True):
+                raise ValueError('Enable Codex in app management before scheduling.')
+            descriptor = self._descriptor('codex')
+            if not descriptor.get('installed') or not descriptor.get('executable'):
+                raise ValueError('먼저 데스크톱 앱에서 Codex 데스크톱 실행 파일을 선택하세요.')
+            register()
+            self._prepare_codex_runtime(descriptor, explicit=True)
+
+    def _prepare_codex_runtime(self, descriptor, *, explicit=False):
         if (self.runtime_preparation_thread and self.runtime_preparation_thread.is_alive()
-                and not self.runtime_preparation_cancel.is_set()):
+                and not self.runtime_preparation_cancel.is_set() and not self.runtime_preparation_finishing):
+            if explicit:
+                self.runtime_preparation_requested = True
             return
         cancelled = self.runtime_preparation_cancel = threading.Event()
+        self.runtime_preparation_finishing = self.runtime_preparation_requested = False
         from bridge.clients.desktop_app import DesktopApp
         app = DesktopApp(descriptor['executable'], descriptor['dataDirectory'])
         def prepare():
@@ -1963,7 +1980,14 @@ class DesktopSessions:
                     if not self.config.get('enabled', {}).get('codex', True):
                         return
                 if not self.bridge.accounts.prepare_desktop_runtime(app, cancelled=lambda: self.closed.is_set() or cancelled.is_set()):
-                    return
+                    with self.client_lock:
+                        if self.runtime_preparation_cancel is not cancelled:
+                            return
+                        if not self.runtime_preparation_requested:
+                            self.runtime_preparation_finishing = True
+                            return
+                        self.runtime_preparation_requested = False
+                    continue
                 if cancelled.wait(60):
                     return
         self.runtime_preparation_thread = threading.Thread(target=prepare, daemon=True, name='native-side-chat-preparation')
@@ -2998,11 +3022,19 @@ class DesktopSessions:
                 return self.clients(refresh=True)
         from bridge.clients.lifecycle import inspect_client, launch_client
         accounts = self.bridge.accounts if provider == 'codex' and self.bridge else None
-        if provider == 'codex' and not enabled:
-            self.runtime_preparation_cancel.set()
         account_gate = (_closing_gate(accounts.gate) if accounts and not enabled and quit_desktop
                         else accounts.gate if accounts else nullcontext())
-        with self.client_lock, self._changing(provider, rebind='connectionMode' not in value), account_gate, accounts.lock if accounts else nullcontext():
+        @contextmanager
+        def account_access():
+            # Serialize revocation with registration, before waiting on the
+            # worker's account gate so it sees cancellation during its audit.
+            if provider == 'codex' and not enabled:
+                self.runtime_preparation_cancel.set()
+                if hasattr(accounts, 'cancel_deferred_desktop_runtime'):
+                    accounts.cancel_deferred_desktop_runtime()
+            with account_gate, accounts.lock if accounts else nullcontext():
+                yield
+        with self.client_lock, self._changing(provider, rebind='connectionMode' not in value), account_access():
             if provider == 'zcode' and 'connectionMode' in value:
                 self._select_zcode_connection(value['connectionMode'])
             if not enabled and not quit_desktop:
@@ -3618,6 +3650,8 @@ class DesktopSessions:
             self.runtime_preparation_thread.join(timeout=5)
         if self.bridge is not None and getattr(self.bridge.accounts, 'require_client_enabled', None) is self._codex_guard:
             del self.bridge.accounts.require_client_enabled
+            if getattr(self.bridge.accounts, 'desktop_preparation_scheduler', None) == self._schedule_codex_runtime:
+                self.bridge.accounts.desktop_preparation_scheduler = None
         if hasattr(self, 'terminals'):
             self.terminals.close()
         for lock in self.locks.values():

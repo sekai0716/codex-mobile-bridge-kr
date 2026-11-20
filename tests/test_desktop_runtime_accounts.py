@@ -3,6 +3,7 @@ import os
 import threading
 import unittest
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -189,6 +190,97 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         other.prepare_desktop_runtime(self.app)
         self.assertEqual(other.desktop_preparation['state'], 'failed')
         self.assertEqual(desktop_runtime.preparation(self.home)['state'], 'pending')
+        self.app.start.assert_called_once()
+
+    def failed_verification(self):
+        identifier = str(uuid.uuid4())
+        desktop_runtime.record_preparation(self.home, identifier)
+        self.manager.state = {'requestId':identifier, 'operation':'desktopRuntime'}
+        self.manager.phase('failed',error='데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
+        self.manager.desktop_preparation_scheduler = lambda register: register()
+        self.mocks['connect'].return_value = None
+        return identifier
+
+    def test_scheduled_retry_waits_through_unknown_and_active_work_then_claims_once(self):
+        identifier = self.failed_verification()
+        schedule = {'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True}
+        for _ in range(2):
+            self.assertEqual(self.manager.control(schedule)['desktopRuntime']['deferred']['state'], 'waiting')
+        self.bridge.assert_desktop_idle.side_effect = [TaskStateUnavailable('unknown'), ValueError('busy'), None]
+        self.mocks['inspect'].side_effect = [self.running] * 4 + [self.stopped]
+        for _ in range(2):
+            self.assertTrue(self.manager.prepare_desktop_runtime(self.app))
+            self.mocks['stop'].assert_not_called()
+            self.mocks['configure'].assert_not_called()
+            self.app.start.assert_not_called()
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
+        self.assertEqual(desktop_runtime.deferred_preparation(self.home,identifier),'consumed')
+        self.assertEqual(desktop_runtime.preparation(self.home)['requestId'],identifier)
+        self.mocks['stop'].assert_called_once()
+        self.mocks['configure'].assert_called_once()
+        self.app.start.assert_called_once()
+        with self.assertRaises(ValueError): self.manager.control(schedule)
+
+    def test_schedule_refuses_uncertain_outcomes_and_a_cancel_is_terminal(self):
+        identifier = self.failed_verification()
+        schedule = {'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True}
+        with self.assertRaises(ValueError): self.manager.control({**schedule,'requestId':str(uuid.uuid4())})
+        self.manager.phase('verifying')
+        with self.assertRaises(ValueError): self.manager.control(schedule)
+        self.manager.phase('failed', error='unknown stop result')
+        with self.assertRaises(ValueError): self.manager.control(schedule)
+        self.manager.phase('failed', error='데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
+        self.manager.control(schedule)
+        self.manager.control({'action':'cancelDeferredDesktopRuntime','requestId':identifier})
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
+        with self.assertRaises(ValueError): self.manager.control(schedule)
+        self.assertEqual(desktop_runtime.deferred_preparation(self.home,identifier),'cancelled')
+        self.mocks['stop'].assert_not_called()
+
+    def test_other_gateway_cannot_claim_a_consumed_retry_even_after_failed_verification(self):
+        identifier = self.failed_verification()
+        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
+        self.manager.wait_ready.side_effect = ValueError('데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
+        self.manager.prepare_desktop_runtime(self.app)
+        other = accounts_module.Accounts(self.bridge)
+        self.assertEqual(desktop_runtime.preparation(self.home)['state'],'pending')
+        self.assertFalse(other.prepare_desktop_runtime(self.app))
+        self.app.start.assert_called_once()
+        self.mocks['configure'].assert_called_once()
+        self.mocks['stop'].assert_called_once()
+
+    def test_cancel_while_audit_is_running_keeps_desktop_untouched(self):
+        identifier = self.failed_verification()
+        self.manager.control({'action':'deferDesktopRuntime', 'requestId':identifier, 'confirmed':True})
+        self.bridge.assert_desktop_idle.side_effect = lambda **kwargs: self.manager.cancel_deferred_desktop_runtime()
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
+        self.assertEqual(desktop_runtime.deferred_preparation(self.home, identifier), 'cancelled')
+        self.mocks['stop'].assert_not_called()
+        self.mocks['configure'].assert_not_called()
+        self.app.start.assert_not_called()
+
+    def test_two_claims_share_one_permission(self):
+        identifier = self.failed_verification()
+        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
+        running = threading.Barrier(2)
+        def claim():
+            running.wait(3)
+            return desktop_runtime.update_deferred_preparation(self.home, identifier, 'consume')
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = [workers.submit(claim) for _ in range(2)]
+            self.assertCountEqual([result.result(timeout=5) for result in results], ['consumed', None])
+
+    def test_a_transient_connection_failure_does_not_restart_after_scheduled_success(self):
+        identifier = self.failed_verification()
+        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
+        self.mocks['connect'].side_effect = [None, Mock(), None]
+        self.mocks['inspect'].side_effect = [self.running, self.running, self.stopped, self.running]
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
+        self.assertEqual(desktop_runtime.preparation(self.home)['state'], 'complete')
+        other = accounts_module.Accounts(self.bridge)
+        self.assertFalse(other.prepare_desktop_runtime(self.app))
+        self.mocks['stop'].assert_called_once()
+        self.mocks['configure'].assert_called_once()
         self.app.start.assert_called_once()
 
     def test_a_verified_shared_owner_resolves_a_pending_launch(self):
