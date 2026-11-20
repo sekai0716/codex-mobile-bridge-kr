@@ -231,16 +231,19 @@ test('desktop chat width is a saved maximum for the current pane', async ({page}
     await selector.selectOption(value);
     await page.locator('#appearance-dialog button[data-close].primary').click();
   }
-  async function checkWidth(cap) {
+  async function checkWidth(cap, minInset=0, maxInset=minInset) {
     const sizes=await page.evaluate(()=>{
       const width=selector=>document.querySelector(selector).getBoundingClientRect().width;
-      return {pane:width('#chat .wb-main-pane'),content:[
+      return {pane:document.querySelector('#chat .wb-main-pane').clientWidth,content:[
         width('#messages'),width('#messages .visualize-card'),width('#messages .edited-files-card'),width('#composer')
       ]};
     });
     expect(sizes.pane).toBeGreaterThan(0);
-    const expected=Math.min(cap,sizes.pane);
-    for (const actual of sizes.content) expect(Math.abs(actual-expected)).toBeLessThanOrEqual(2);
+    for (const actual of sizes.content) {
+      expect(actual).toBeGreaterThanOrEqual(Math.min(cap,sizes.pane-2*maxInset)-2);
+      expect(actual).toBeLessThanOrEqual(Math.min(cap,sizes.pane-2*minInset)+2);
+      expect(Math.abs(actual-sizes.content[0])).toBeLessThanOrEqual(2);
+    }
   }
   await expect(selector).toHaveValue('normal');
   await checkWidth(1040);
@@ -253,11 +256,28 @@ test('desktop chat width is a saved maximum for the current pane', async ({page}
   await page.setViewportSize({width:2240,height:900});
   await page.evaluate(()=>{const wb=window.BridgeWorkbench;wb.files();wb.split('files');wb.setRatio(.4);});
   await expect(page.locator('#chat')).toHaveClass(/wb-split/);
-  await checkWidth(1040);
+  await checkWidth(1040,8,20);
   await page.evaluate(()=>window.BridgeWorkbench.setRatio(.7));
-  await checkWidth(1040);
+  await checkWidth(1040,20);
   await choose('wide');
-  await checkWidth(1320);
+  await checkWidth(1320,20);
+  await choose('full');
+  await checkWidth(Infinity,20);
+  await page.evaluate(()=>window.BridgeWorkbench.setRatio(0));
+  await checkWidth(Infinity,8);
+  await page.locator('#message').focus();
+  const fits=await page.locator('#chat .wb-main-pane').evaluate(pane=>{
+    const input=pane.querySelector('#message'), style=getComputedStyle(input);
+    const ring=parseFloat(style.outlineWidth)+parseFloat(style.outlineOffset);
+    const left=pane.getBoundingClientRect().left+pane.clientLeft, right=left+pane.clientWidth;
+    const field=input.getBoundingClientRect(), send=pane.querySelector('#send').getBoundingClientRect();
+    return ring>0 && field.left-ring>=left && field.right+ring<=right &&
+      send.width>0 && send.left>=left && send.right<=right;
+  });
+  expect(fits).toBe(true);
+  await page.evaluate(()=>{const wb=window.BridgeWorkbench;wb.unsplit();wb.select('chat');});
+  await checkWidth(Infinity);
+  await choose('wide');
   await expect(page.locator('#message')).toHaveValue('작성 중인 초안');
   await page.reload();
   await page.waitForFunction(()=>document.documentElement.dataset.chatWidth==='wide');
