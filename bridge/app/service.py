@@ -1183,9 +1183,19 @@ class Bridge:
         entry = registry.creation_handoffs.get((self.host, thread_id)) if registry else None
         return entry if entry and entry.get('modelSettingsPhase') in ('pending', 'unknown') else None
 
+    @staticmethod
+    def _creation_owner(session):
+        if session.runtime == 'desktop':
+            return session.owner or None
+        # A shared desktop uses the CLI transport. Pin the actual connection:
+        # its display owner string is reused across reconnects.
+        if session.runtime == 'cli' and session.origin == 'desktop' and session.owner == 'cli:' + session.id:
+            return session.creation_runtime
+        return None
+
     def _creation_owner_matches(self, session, entry):
         state = session.state or {}
-        return (session.connected and session.owner and session.runtime == 'desktop'
+        return (session.connected and self._creation_owner(session) is not None
                 and session.id == state.get('id') == entry['id'] and self.host == entry['host']
                 and (not entry.get('hostIdentity') or entry['hostIdentity'] == getattr(self.store, 'alias', None))
                 and same_cwd(entry.get('runtimeCwd') or entry.get('cwd'), state.get('cwd'), self.local and os.name == 'nt')
@@ -1344,7 +1354,7 @@ class Bridge:
             with session.condition:
                 state = session.state or {}
                 expected_cwd = entry.get('runtimeCwd') or entry.get('cwd')
-                provider, owner = state.get('modelProvider'), session.owner
+                provider, owner = state.get('modelProvider'), self._creation_owner(session)
                 if not self._creation_owner_matches(session, entry):
                     return
                 progressed = self._creation_has_messages(state)
@@ -1372,7 +1382,7 @@ class Bridge:
                 return
             with session.condition:
                 state = session.state or {}
-                if not self._creation_owner_matches(session, entry) or session.owner != owner or state['modelProvider'] != provider:
+                if not self._creation_owner_matches(session, entry) or self._creation_owner(session) != owner or state['modelProvider'] != provider:
                     return
                 effort = choice.get('effort')
                 confirmed = state.get('latestModel') == choice['model'] and (effort is None or session.view().get('effort') == effort)
@@ -1388,7 +1398,7 @@ class Bridge:
                 if not result.get('confirmed'):
                     return
             with session.condition:
-                if not self._creation_owner_matches(session, entry) or session.owner != owner or session.state['modelProvider'] != provider:
+                if not self._creation_owner_matches(session, entry) or self._creation_owner(session) != owner or session.state['modelProvider'] != provider:
                     return
             registry._set_creation_phase(entry, 'applied', session)
 
@@ -4721,7 +4731,7 @@ class Bridge:
             if not target or not getattr(session, 'connected', True):
                 raise IPCError(getattr(session, 'error', None) or CHAT_RECONNECT_ERROR)
             native = (session.creation_runtime or self.cli_sessions) if runtime == 'cli' else None
-            if expected_owner is not None and (not session.connected or runtime != 'desktop' or target != expected_owner):
+            if expected_owner is not None and self._creation_owner(session) != expected_owner:
                 raise IPCError('The desktop owner changed before the settings request.')
         if before_write:
             before_write()
@@ -5707,7 +5717,7 @@ class Bridge:
         with session.action_lock:
             entry = self._creation_entry(thread_id)
             with session.condition:
-                owner = session.owner
+                owner = self._creation_owner(session)
                 if entry and not self._creation_owner_matches(session, entry):
                     raise ValueError('Confirm the new chat model before sending. Reconnect or choose a model.')
                 progressed = self._creation_has_messages(session.state or {})
@@ -5719,7 +5729,7 @@ class Bridge:
                 return {'applied': True, 'confirmed': True, 'model': model, 'effort': effort}
             result = self._apply_settings(session, model, effort, fast_mode=fast_mode, expected_owner=owner)
             with session.condition:
-                original = entry and self._creation_owner_matches(session, entry) and session.owner == owner
+                original = entry and self._creation_owner_matches(session, entry) and self._creation_owner(session) == owner
             if original and result.get('confirmed'):
                 self.creation_registry._set_creation_phase(entry, 'superseded', session)
             return result

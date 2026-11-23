@@ -289,6 +289,41 @@ class CodexCreationHandoff(unittest.TestCase):
         self.assertEqual([call.args[0] for call in self.bridge.ipc.request.call_args_list], ['thread-follower-start-turn'])
         self.assertIsNone(self.bridge._creation_entry(self.thread_id))
 
+    def test_verified_shared_desktop_retires_used_chat_choice_without_writing_a_model(self):
+        self.session.connected = False
+        self.create()
+        self.session.connected = True
+        self.session.runtime = 'cli'
+        self.session.owner = 'cli:' + self.thread_id
+        runtime = Mock()
+        self.session.creation_runtime = runtime
+        self.session.state['turns'] = [{'turnId': 'original', 'items': [{'type': 'userMessage', 'id': 'msg'}]}]
+        meta = {}
+        self.bridge._creation_meta(self.session, meta)
+        self.assertNotIn('creationSettings', meta)
+        self.bridge._recover_creation_settings(self.session, verify_only=True)
+        self.assertEqual(self.bridge.creations[self.request_id]['modelSettingsPhase'], 'superseded')
+        self.bridge.ipc.request.assert_not_called()
+        runtime.call.assert_not_called()
+
+    def test_shared_model_write_is_pinned_across_reconnects(self):
+        self.session.runtime = 'cli'
+        self.session.owner = 'cli:' + self.thread_id
+        first = Mock()
+        self.session.creation_runtime = first
+        self.assertIs(self.bridge._creation_owner(self.session), first)
+        replacement = Mock()
+        self.session.creation_runtime = replacement
+        with self.assertRaisesRegex(IPCError, 'owner changed'):
+            self.bridge._call(self.session, 'thread-follower-update-thread-settings', {}, expected_owner=first)
+        replacement.call.assert_not_called()
+        self.session.creation_runtime = None
+        self.assertIsNone(self.bridge._creation_owner(self.session))
+        self.bridge.cli_sessions.call = Mock()
+        with self.assertRaisesRegex(IPCError, 'owner changed'):
+            self.bridge._call(self.session, 'thread-follower-update-thread-settings', {}, expected_owner=first)
+        self.bridge.cli_sessions.call.assert_not_called()
+
     def test_existing_turn_or_changed_native_identity_never_receives_settings(self):
         for state in (
                 {'turns': [{'turnId': 'already-used', 'items': []}]},
