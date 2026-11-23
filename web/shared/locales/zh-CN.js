@@ -2,6 +2,11 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Could not reconnect this chat to Codex. Try reconnecting this chat again.": "无法将此对话重新连接到 Codex。请重试。",
+  "The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.": "Codex 桌面端的共享连接尚未就绪。请等待所有桌面任务结束后正常退出桌面应用，然后在 Bridge 的账号管理中检查连接设置。",
+  "The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.": "Codex 桌面端和 Bridge 使用的账号或工作区不同。请在两端选择相同的账号和工作区。",
+  "모델 설정을 확인한 뒤 빠른 모드를 변경할 수 있습니다.": "确认模型设置后即可更改快速模式。",
+  "선택한 모델로 새 채팅을 준비하고 있습니다.": "正在使用所选模型准备新对话。",
   "요청한 모델 설정의 적용을 기다리고 있습니다.": "正在等待所选模型设置生效。",
   "Confirm the new chat model before sending. Reconnect or choose a model.": "请先确认新对话使用的模型，再发送消息。请重新连接或选择模型。",
   "생성된 채팅을 확인할 수 없습니다.": "无法确认新建的对话。",

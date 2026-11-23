@@ -26,7 +26,8 @@ function fixture({durable=true,request,local=storage(),temporary=storage(),coord
   const source=fs.readFileSync(path.join(__dirname,'../web/shell/app.js'),'utf8');
   const start=source.indexOf("$('composer').onsubmit=async event=>{"),end=source.indexOf("$('message').onkeydown",start);
   assert.ok(start>=0&&end>start,'Exercise the real composer submit handler');
-  vm.runInNewContext(source.slice(start,end),context);
+  const controls=source.slice(source.indexOf('function connectOnFirstSend('),source.indexOf('function renderModelSummary('));
+  vm.runInNewContext(controls+source.slice(start,end),context);
   return {nodes,calls,drafts,scope,context,temporary,
     submit:()=>nodes.composer.onsubmit({preventDefault(){}}),
     pending:()=>durable?drafts.pendingSend(scope):JSON.parse(temporary.getItem('pending:local|fixture'))};

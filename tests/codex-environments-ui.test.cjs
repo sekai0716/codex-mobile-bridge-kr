@@ -28,7 +28,7 @@ function fixture({native=true,listSource='all',host='local',wslSupported=true}={
  class CliAccessPanel{constructor(options){Object.assign(this,options);this.clears=0;this.refreshes=0;}clear(){this.clears++;}refresh(){this.refreshes++;return this.read();}}
  class WslAccountsPanel{constructor(options){Object.assign(this,options);}clear(){}select(entry){this.entry=entry;return this.read(entry);}}
  const close=node('button'),context=vm.createContext({$,api,Option,AccountsPanel,CliAccessPanel,WslAccountsPanel,URL,Event:class{constructor(type){this.type=type;}},window:{BridgeFeatures:{load:async name=>{calls.push({feature:name});}}},BridgeI18n:{t:value=>value,locale:()=> 'ko'},document:{getElementById:$,createElement:node,querySelector:()=>close},
-  workbench:{},csrf:'fixture-token',listIdentity:'fixture-gateway',codexActiveAccountId:'fixture-account',chatOpenGeneration:0,t:value=>value,el:(tag,_class='',text='')=>Object.assign(node(tag),{textContent:text}),
+  workbench:{},csrf:'fixture-token',listIdentity:'fixture-gateway',codexActiveAccountId:'fixture-account',codexAccountRevision:0,chatOpenGeneration:0,t:value=>value,el:(tag,_class='',text='')=>Object.assign(node(tag),{textContent:text}),
   clientNavigation:{wslSupported,provider:'codex',clients:[{id:'codex',entries}]},currentHost:host,currentId:null,listSource,listRows:[],
   renderSourceFilter(){},uuid:()=> '11111111-1111-4111-8111-111111111111',setLanguageBusy(){},loadList:async()=>{},openChat:async(id,where)=>opened.push({id,host:where}),toast:message=>notices.push(message),isCodexClient:id=>id==='codex',
   sessionStorage:{getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)}});
@@ -104,6 +104,14 @@ test('submitting an independent chat invalidates an outstanding project read',as
  resolveProjects({projects:[project(ubuntu,'late-project')]});await opening;assert.equal(ui.$('new-chat-project').options.some(option=>option.value==='late-project'),false);assert.equal(ui.run('creatingChat'),true);
  resolveCreate({id:'created',host:ubuntu});await creating;assert.deepEqual(ui.opened,[{id:'created',host:ubuntu}]);
 });
+test('the first account inventory arriving during creation still opens the confirmed chat',async()=>{
+ const ui=fixture({listSource:'wsl'});ui.context.codexActiveAccountId=undefined;let finish;
+ ui.setHandler(url=>url.startsWith('/api/projects')?{projects:[]}:new Promise(resolve=>finish=resolve));
+ await ui.$('new-chat').onclick();const pending=ui.$('new-chat-form').onsubmit({preventDefault(){}});
+ ui.context.codexActiveAccountId='discovered-account';finish({id:'confirmed-new-chat',host:ubuntu});await pending;
+ assert.deepEqual(ui.opened,[{id:'confirmed-new-chat',host:ubuntu}]);
+});
+
 test('a late creation response cannot switch the active account or open another host',async()=>{
  for(const change of ['account','host','navigation','auth','switchHost']){
   const ui=fixture({listSource:'wsl'});let created;

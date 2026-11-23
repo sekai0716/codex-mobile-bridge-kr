@@ -127,7 +127,7 @@ test('a failed CLI join remains visible through later history renders and clears
   ctx.renderState({...view,connectionError:'Transport unavailable'});
   assert.equal($('notice-text').textContent,'CLI thread is not loaded');
   ctx.renderState({...view,connected:true,access:{...access,readOnly:false,canSend:true}});
-  assert.equal(ctx.reconnectFailure,null);assert.equal($('notice').hidden,true);
+  assert.equal(ctx.chatTimeline.reconnectFailure,null);assert.equal($('notice').hidden,true);
 });
 test('connection diagnostics is secondary to settings and keeps the original export route',()=>{
   assert.doesNotMatch(html,/<a id="session-diagnostics"/);

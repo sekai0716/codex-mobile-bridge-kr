@@ -1,6 +1,7 @@
 import copy
 import json
 import sqlite3
+import sys
 import tempfile
 import threading
 import time
@@ -117,6 +118,24 @@ class DesktopIdle(unittest.TestCase):
             desktop.return_value.validate.assert_called_once_with('separately-installed-cli')
             desktop.return_value.processes.assert_called_once()
             desktop.discover.assert_not_called()
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux stale Unix socket')
+    def test_stale_refused_socket_requires_verified_stopped_desktop_for_cold_start(self):
+        self.bridge.accounts.index = {}
+        self.bridge.catalog_reader = SimpleNamespace(executable='selected-cli')
+        def refused(options):
+            raise IPCError('stale endpoint') from ConnectionRefusedError()
+        self.before_connect = refused
+        with patch('bridge.app.service.DesktopApp') as desktop:
+            app = desktop.return_value
+            app.processes.return_value = [41]
+            with self.assertRaises(TaskStateUnavailable):
+                self.bridge.assert_desktop_idle(allow_stopped_app=True, desktop_executable='selected')
+            app.processes.return_value = []
+            with self.assertRaises(TaskStateUnavailable):
+                self.bridge.assert_desktop_idle(allow_missing_ipc=True)
+            self.bridge.assert_desktop_idle(allow_stopped_app=True, desktop_executable='selected')
+            self.assertEqual(app.processes.call_count, 2)
 
     def test_601_history_candidates_do_not_serialize_a_silent_owner_before_tail_busy(self):
         identifiers = [f'history-{index:04}' for index in range(600)] + ['tail-busy']

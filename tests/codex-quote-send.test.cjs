@@ -22,7 +22,8 @@ for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preser
   renderSkillPills(){},restoringComposer:false,window:{BridgePresentation:{resizeMessage(){},showError(){}}}
  };
  const source=fs.readFileSync(require.resolve('../web/shell/app.js'),'utf8'),start=source.indexOf("$('composer').onsubmit="),end=source.indexOf("$('message').onkeydown=",start);
- vm.runInNewContext(source.slice(start,end),context);
+ const controls=source.slice(source.indexOf('function connectOnFirstSend('),source.indexOf('function renderModelSummary('));
+ vm.runInNewContext(controls+source.slice(start,end),context);
  const sending=nodes.get('composer').onsubmit({preventDefault(){}});await requestStarted;assert.equal(submitted.text,'> first');assert.equal(drafts.pending(scope),null);
  quotes.quotes.push({text:'later',source:'reply-2',provider:'codex'});context.saveDraft();assert.equal(nodes.get('message').value,'');resolve({status});await sending;
  assert.deepEqual(quotes.quotes.map(row=>row.text),['first','later']);assert.deepEqual(provisionals.get('local|chat').quotes.map(row=>row.text),['first','later']);assert.equal(nodes.get('message').value,'');

@@ -5,7 +5,10 @@ import subprocess
 
 
 def quit_process(pid):
-    os.kill(pid, signal.SIGTERM)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass  # A GUI helper can exit while the main process is closing.
 
 
 def terminate(pid):

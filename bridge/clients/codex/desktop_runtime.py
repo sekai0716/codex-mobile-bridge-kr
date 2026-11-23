@@ -413,6 +413,15 @@ def connect(home, cli):
             if verified_socket(expected) != endpoint_identity:
                 raise ValueError('Shared runtime socket changed during handshake')
             client.desktop_generation = record['generation']
+            def verify_owner():
+                try:
+                    if (settings(home) != value or _read(directory(home) / 'active.json') != record
+                            or verified_socket(expected) != endpoint_identity):
+                        raise ValueError('Desktop endpoint changed')
+                    _verify_shared_processes(record)
+                except (OSError, KeyError, ValueError, TypeError) as exc:
+                    raise AppServerUnavailable('원래 데스크톱 연결이 변경되었습니다.') from exc
+            client.verify_desktop_owner = verify_owner
             return client
         except Exception:
             client.close()

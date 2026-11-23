@@ -287,6 +287,26 @@ class AccountsTests(unittest.TestCase):
                 self.assertFalse((self.manager.root/'rollback.json').exists())
                 self.manager.phase=phase
 
+    def test_failed_quit_keeps_existing_chat_connections(self):
+        row = self.api()
+        self.manager.prepare = self.prepare
+        self.app.stop.side_effect = ValueError('quit failed')
+        self.switch(row)
+        wait_for_account_worker(self)
+        self.assertEqual(self.manager.state['phase'], 'failed')
+        self.assertEqual(self.manager.snapshot_files(), self.original)
+        self.bridge.ipc.close.assert_not_called()
+        self.bridge._disconnected.assert_not_called()
+
+    def test_linux_shared_desktop_can_be_ready_without_legacy_socket(self):
+        from bridge.clients.codex.ipc import IPCError
+        self.bridge.ipc.connect.side_effect = IPCError('disconnected')
+        with patch('bridge.features.accounts.accounts.sys.platform', 'linux'), patch(
+                'bridge.clients.codex.desktop_runtime.connect') as connect:
+            Accounts.wait_ready(self.manager, self.app)
+        connect.assert_called_once_with(self.home, self.manager.runtime)
+        connect.return_value.close.assert_called_once()
+
     def test_restart_during_thread_migration_requires_recovery(self):
         self.manager.phase('migrating',completed=1,total=2)
         restarted=Accounts(self.bridge)
@@ -346,6 +366,7 @@ class AccountsTests(unittest.TestCase):
         discover.assert_not_called()
         self.app.start.assert_not_called()
         self.assertEqual(self.manager.state['cliSync']['status'], 'verified')
+        self.assertEqual(Accounts(self.bridge).state, self.manager.state)
 
     def test_stopped_desktop_unified_switch_restores_on_verification_failure(self):
         row = self.api()

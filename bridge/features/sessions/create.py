@@ -496,7 +496,8 @@ def _open_desktop_url(url):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif sys.platform == 'linux':
         try:
-            subprocess.run(['xdg-open', url], check=True, timeout=10,
+            # xdg-open and the desktop URL handler may consult getcwd() or PWD.
+            subprocess.run(['xdg-open', url], check=True, timeout=10, cwd='/', env={**os.environ, 'PWD':'/'},
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError) as exc:
             raise CreationError("데스크톱 채팅을 열 수 없습니다. 데스크탑 로그인 세션에서 게이트웨이를 실행하고 xdg-open 및 codex:// 프로토콜 핸들러를 확인하십시오.") from exc

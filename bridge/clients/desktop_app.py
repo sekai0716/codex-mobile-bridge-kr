@@ -92,6 +92,13 @@ class DesktopApp:
             quit_app = stop_zcode if provider == 'zcode' else stop_codex
             return quit_app(self, gui_pids=gui_pids)
         pids = self.processes()
+        if sys.platform == 'linux' and provider == 'codex' and gui_pids is None and pids:
+            from bridge.clients.lifecycle import _process_state
+            descriptor = {'id': 'codex', 'dataDirectory': str(self.home)}
+            state = _process_state(descriptor, self, pids, _native().commands(pids))
+            if state['unknown'] or len(state['mainPids']) != 1:
+                raise ValueError('종료할 Codex 창을 확인할 수 없습니다. 데스크톱 앱에서 실행 중인 작업을 확인해 주세요.')
+            gui_pids = state['mainPids']
         if selected_pids is not None:
             pids = [pid for pid in pids if pid in selected_pids]
         main = pids if gui_pids is None else [pid for pid in gui_pids if pid in pids]

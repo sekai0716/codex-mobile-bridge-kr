@@ -32,6 +32,7 @@ from bridge.features.accounts.info import AccountInfo
 from bridge.features.accounts.operation_gate import OperationGate
 from bridge.features.accounts.reset_forecast import ResetForecast
 from bridge.clients.codex.configuration import magpie_managed
+from bridge.clients.codex.ipc import IPCError
 from bridge.clients.codex.transport import connect_stream
 from bridge.features.notifications.channels import read_json
 
@@ -1066,6 +1067,7 @@ class Accounts:
                 private_json(self.root/'requests.json', ledger)
                 self.state = {'phase': 'complete', 'requestId': request_id, 'targetId': row['id'],
                               'error': None, 'cliSync': {'status': 'verified'}}
+                self.phase('complete')
                 return self.public()
             executable = self.index.get('desktopExecutable') or DesktopApp.discover(self.runtime)
             if not executable:
@@ -1398,8 +1400,16 @@ class Accounts:
                 if not app.processes():
                     time.sleep(.5)
                     continue
-                self.bridge.ipc.connect()
-                if native_runtime:
+                needs_shared = native_runtime
+                try:
+                    self.bridge.ipc.connect()
+                except (IPCError, OSError):
+                    if sys.platform != 'linux' or getattr(self.bridge, 'host', 'local') != 'local':
+                        raise
+                    # New Linux desktops expose the shared app-server without
+                    # opening the older desktop follower socket.
+                    needs_shared = True
+                if needs_shared:
                     # Desktop IPC can be available before the shared handshake.
                     from bridge.clients.codex.desktop_runtime import connect
                     client = connect(self.home, self.runtime)
@@ -1466,10 +1476,11 @@ class Accounts:
             backup = {'files': before, 'activeId': self.index.get('activeId'), 'desktopExecutable': str(app.executable)}
             private_json(self.root/'rollback.json', backup)
             self.phase('stopping')
-            self.invalidate()
             app.stop(provider='codex')
             self.wait_stopped()
             stopped = True
+            # A failed quit leaves the original account and its live followers valid.
+            self.invalidate()
             # The GUI may refresh tokens or persist settings while exiting.
             after_stop = self.snapshot_files()
             changed = after_stop != before

@@ -7,14 +7,17 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from pathlib import Path, PurePosixPath
+from contextlib import nullcontext
 
 from bridge.features.sessions.identity import same_cwd
 from bridge.clients.codex.app_server import (
-    AppServerError, AppServerUnavailable, AppServerReadTimeout, AppServerUnknownResult, AppServerUnsupported, CodexAppServer)
+    AppServerError, AppServerUnavailable, AppServerReadTimeout, AppServerUnknownResult, AppServerUnsupported,
+    AppServerMessageTooLarge, CodexAppServer)
 from bridge.clients.codex.catalog import Catalog, CatalogError, ModelStore, normalize_native_skills
 from bridge.clients.codex.remote import RemoteStore, RemoteUnavailable, remote_model_catalog, remote_model_identity, ssh_read
 from bridge.clients.codex.linux_control import LinuxCliControl
@@ -25,6 +28,27 @@ from bridge.features.sessions.activity import preserve_turn_plan, update_turn_pl
 from bridge.features.sessions.store import SessionStore, StoreUnavailable
 
 MAX_REASONING_PARTS = 1024
+
+
+class _JsonLines:
+    """The official app-server's stdio transport uses one JSON object per line."""
+    def __init__(self, reader, writer):
+        self.reader, self.writer = reader, writer
+
+    def send(self, message):
+        body = json.dumps(message, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
+        if len(body) > CodexAppServer.MAX_LINE:
+            raise AppServerMessageTooLarge('Codex stdio request is too large')
+        self.writer.write(body)
+        self.writer.flush()
+
+    def receive(self):
+        body = self.reader.readline(CodexAppServer.MAX_LINE + 1)
+        if not body:
+            raise EOFError()
+        if len(body) > CodexAppServer.MAX_LINE or not body.endswith(b'\n'):
+            raise AppServerError('Incomplete or oversized Codex stdio response')
+        return json.loads(body)
 
 
 def _managed_cli(home):
@@ -131,6 +155,7 @@ class CliSessions:
         self.start_lock = threading.Lock()
         self.daemon_start_generation = 0
         self.attach_locks = {}
+        self.created_desktop = False
         self.joined = {}
         self.attaching = set()
         self.metadata = {}
@@ -362,6 +387,80 @@ class CliSessions:
             self.lifecycle.refresh()
         return result
 
+    def created_desktop_runtime(self, on_state=None, on_disconnect=None):
+        """An independent subscription for a locally created desktop chat, opened on explicit handoff only."""
+        if sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home:
+            raise AppServerUnsupported('Created desktop handoff requires the default local Linux runtime')
+        child = CliSessions(self.home, on_state or self.on_state, on_disconnect or self.on_disconnect,
+                            cli=self.configured_cli, allow_installed_runtime=True)
+        child.created_desktop = True
+        if not Path(child.client.socket_path).exists() and _managed_cli(self.home) is None:
+            # Some official desktop packages have an app-server binary but no managed
+            # daemon installation. Share its RPC implementation, never the CLI's client.
+            from bridge.features.sessions.create import runtime_environment
+            def launch(command, **kwargs):
+                env = runtime_environment(self.home)
+                env['PWD'] = '/'
+                return subprocess.Popen(command, cwd='/', env=env, **kwargs)
+            child.client = CodexAppServer(child.client.socket_path, command=[self.configured_cli, 'app-server', '--listen', 'stdio://'],
+                check_socket=False, client_name='codex-mobile-bridge-cli', transport_factory=_JsonLines,
+                process_factory=launch, on_event=child._event, on_server_request=child._server_request,
+                on_disconnect=child._disconnect)
+        return child
+
+    def loaded_desktop_runtime(self, on_state=None, on_disconnect=None):
+        """Connect a separate subscriber to the verified original Linux Desktop."""
+        from bridge.clients.codex.loaded_desktop import LoadedDesktopSessions
+        if sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home:
+            raise AppServerUnsupported('Existing desktop connection requires the default local Linux runtime')
+        return LoadedDesktopSessions(self.home, on_state or self.on_state, on_disconnect or self.on_disconnect,
+                                     cli=self.configured_cli)
+
+    def attach_created_desktop(self, thread_id, *, cwd, provider, model, effort, guard):
+        """Resume the verified, empty desktop creation without opening or sending a turn."""
+        from bridge.features.sessions.create import model_overrides
+        if (not self.created_desktop or sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home
+                or str(uuid.UUID(thread_id)) != thread_id or not Path(cwd).is_absolute() or provider != 'openai'):
+            raise AppServerUnsupported('Created desktop thread identity is unavailable')
+        overrides = model_overrides(model, effort)
+        with self.lock:
+            attach_lock = self.attach_locks.setdefault(thread_id, threading.Lock())
+        with attach_lock:
+            with self.lock:
+                if thread_id in self.joined:
+                    raise AppServerUnsupported('Created desktop thread already has a subscription')
+            account = guard()
+            self._runtime_home(self._connect_explicit(allow_start=self.client.check_socket))
+            process = self.client.process
+            saved = self.store.get(thread_id)
+            if (saved.get('id') != thread_id or saved.get('origin') != 'desktop' or saved.get('archived') != 0
+                    or saved.get('attached_thread_parent_id') or saved.get('thread_source') == 'subagent'
+                    or saved.get('cwd') != cwd or saved.get('model_provider') != provider or saved.get('has_user_event') != 0
+                    or saved.get('first_user_message')):
+                raise AppServerUnsupported('Created desktop thread no longer matches its saved identity')
+            self._check_desktop_account(saved, process, account)
+            before = self.client.request('thread/read', {'threadId': thread_id, 'includeTurns': True},
+                                         replay_safe=True, expected_process=process)['thread']
+            if (before.get('id') != thread_id or before.get('modelProvider') != provider or before.get('cwd') != cwd
+                    or (before.get('status') or {}).get('type') != 'notLoaded' or before.get('turns') != []
+                    or before.get('ephemeral') is not False or before.get('attachedToThreadId')
+                    or before.get('parentThreadId') or before.get('forkedFromId') or before.get('source') != 'vscode'
+                    or self.client.is_loaded(thread_id) or guard() != account or process is not self.client.process):
+                raise AppServerUnsupported('Created desktop thread is already active, nonempty, or changed')
+            params = {'threadId': thread_id, 'cwd': cwd, 'modelProvider': provider, **overrides}
+            return self._resume_checked(thread_id, before, params, provider, process=process, created=True)
+
+    def _check_desktop_account(self, saved, process, account):
+        from bridge.features.accounts.draft_identity import draft_identity
+        auth = self.client.request('account/read', {'refreshToken': False}, replay_safe=True, expected_process=process)
+        route = auth.get('workspaceRouting') or {}
+        workspace, user = route.get('chatgptAccountId'), auth.get('userId')
+        if (not workspace or not user or (auth.get('account') or {}).get('type') != 'chatgpt'
+                or route.get('backendOrigin') != 'https://chatgpt.com' or auth.get('requiresOpenaiAuth') is not True
+                or saved.get('creator_account_id') != workspace or saved.get('creator_user_id') != user
+                or draft_identity('chatgpt', workspace) != account):
+            raise AppServerUnsupported('Native account differs from the desktop thread owner')
+
     def observe(self, thread_id):
         """Read an already loaded native thread without subscribing or resuming it."""
         if self.alias is None and isinstance(self.client, CodexAppServer):
@@ -508,16 +607,26 @@ class CliSessions:
                 raise AppServerUnsupported('대상 세션이 여전히 기본적으로 로드되어 있습니다. 먼저 명시적으로 확인하세요. CLI 서비스 유지관리 공급자가 마이그레이션되지 않았습니다.。')
         # Ordinary resume retains all native settings. A separately confirmed
         # cold migration changes only the provider, after checking the source.
-        with self.lock:
-            self.attaching.add(thread_id)
         params = {'threadId': thread_id, 'excludeTurns': True}
         if target_provider is not None:
             params['modelProvider'] = target_provider
-        process = self.client.process
+        return self._resume_checked(thread_id, before, params, target_provider or retained or before.get('modelProvider'),
+                                    process=self.client.process, before_resume=before_resume)
+
+    def _resume_checked(self, thread_id, before, params, expected_provider, *, process, created=False,
+                        before_resume=None, desktop_lease=None):
+        # Desktop subscriptions must stay on the connection that proved the owner's identity.
+        guard = {'expected_process': process} if created or getattr(self.client, 'pinned_process', None) is process else {}
+        with self.lock:
+            self.attaching.add(thread_id)
         try:
-            if before_resume:
-                before_resume()
-            resumed = self.client.request('thread/resume', params)
+            with desktop_lease if desktop_lease is not None else nullcontext():
+                if before_resume:
+                    before_resume()
+                # An undelivered response must not release a live Desktop's retention
+                # lock while a resume is still pending. Disconnect wakes this request.
+                timeout = {'timeout': None} if desktop_lease is not None else {}
+                resumed = self.client.request('thread/resume', params, **guard, **timeout)
         except Exception as error:
             with self.lock:
                 self.attaching.discard(thread_id)
@@ -526,25 +635,27 @@ class CliSessions:
                     self.joined[thread_id] = self.client.process
                     self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'cleanupOnly': True,
                                                'cwd': before.get('cwd'),
-                                               'modelProvider': target_provider or before.get('modelProvider')}
+                                               'modelProvider': expected_provider}
             reason = (getattr(error, 'rpc_error', {}).get('data') or {}).get('type')
             if reason in ('modelProviderMismatch', 'modelProviderNotConfigured', 'modelProviderPolicyConflict'):
                 raise AppServerUnsupported('원래 세션 제공자가 현재 사용 가능한 액세스 권한과 일치하지 않거나 정책 제한이 적용됩니다. 원래 공급자 구성을 복원하거나 컴퓨터의 현재 액세스를 사용하여 새 채팅을 만드십시오. 원래 세션이 마이그레이션되지 않았습니다.。') from error
             raise
         after = resumed.get('thread') or {}
-        expected_provider = target_provider or retained or before.get('modelProvider')
-        if (target_provider is None and self.alias is None and resumed.get('modelProvider') != expected_provider):
+        if 'modelProvider' not in params and self.alias is None and resumed.get('modelProvider') != expected_provider:
             try:
                 expected_provider = self.persisted_identity(before)['modelProvider']
             except AppServerError:
                 pass
-        if (after.get('id') != thread_id or not same_cwd(before.get('cwd'), after.get('cwd'), self.alias is None and os.name == 'nt') or
+        if (created and (resumed.get('model') != params['model'] or resumed.get('cwd') != before['cwd']
+                         or ('config' in params and resumed.get('reasoningEffort') != params['config']['model_reasoning_effort'])
+                         or after.get('turns') != [] or after.get('modelProvider') != expected_provider) or
+                after.get('id') != thread_id or not same_cwd(before.get('cwd'), after.get('cwd'), self.alias is None and os.name == 'nt') or
                 resumed.get('modelProvider') != expected_provider):
             self._cleanup_failed_join(thread_id, before, process)
             raise AppServerUnsupported('CLI thread identity changed during join')
         try:
             goal = normalize_goal_result(self.client.request(
-                'thread/goal/get', {'threadId': thread_id}, replay_safe=True))
+                'thread/goal/get', {'threadId': thread_id}, replay_safe=True, **guard))
         except AppServerUnsupported:
             goal = None
         except (AppServerUnavailable, AppServerUnknownResult):
@@ -555,7 +666,10 @@ class CliSessions:
             # joining the thread for turns, models and Skills.
             goal = None
         with self.lock:
-            self.joined[thread_id] = self.client.process
+            if self.client.process is not process or process is None:
+                self.attaching.discard(thread_id)
+                raise AppServerUnavailable('Codex runtime changed during join')
+            self.joined[thread_id] = process
             self.attaching.discard(thread_id)
             self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'model': resumed.get('model'),
                                         'modelProvider': resumed.get('modelProvider'),
@@ -570,7 +684,12 @@ class CliSessions:
             if before.get('modelProvider') != resumed.get('modelProvider'):
                 self.metadata[thread_id]['historicalProvider'] = before.get('modelProvider')
         try:
-            return self.refresh(thread_id)
+            state = self.refresh(thread_id)
+            if created and (state['turns'] or state['requests'] or state['threadRuntimeStatus'].get('type') != 'idle'
+                            or state.get('latestModel') != params['model'] or
+                            'config' in params and state.get('latestReasoningEffort') != params['config']['model_reasoning_effort']):
+                raise AppServerUnsupported('Created desktop thread settings changed during join')
+            return state
         except Exception:
             self._cleanup_failed_join(thread_id, before, process)
             raise
@@ -587,7 +706,8 @@ class CliSessions:
             self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'cleanupOnly': True,
                                        'cwd': before.get('cwd'), 'modelProvider': before.get('modelProvider')}
         try:
-            result = self.client.request('thread/unsubscribe', {'threadId': thread_id})
+            options = {'expected_process': process} if self.created_desktop else {}
+            result = self.client.request('thread/unsubscribe', {'threadId': thread_id}, **options)
             if result.get('status') in ('unsubscribed', 'notSubscribed', 'notLoaded'):
                 self._invalidate(thread_id, process)
         except AppServerError:
@@ -802,7 +922,11 @@ class CliSessions:
         raise AppServerUnsupported('CLI operation is not supported by this adapter')
 
     def _check_joined_identity(self, thread_id):
-        self._require_joined(thread_id)
+        process = self._require_joined(thread_id)
+        if self.created_desktop:
+            from bridge.features.accounts.draft_identity import codex_account_identity
+            self._check_desktop_account(self.store.get(thread_id), process,
+                                        codex_account_identity(self.home, 'openai'))
         if not self.client.is_loaded(thread_id):
             self._invalidate(thread_id)
             raise AppServerUnavailable('CLI thread unloaded before the operation')
@@ -1104,10 +1228,12 @@ class CliSessions:
 
     def _require_joined(self, thread_id):
         with self.lock:
-            if self.joined.get(thread_id) is not self.client.process or self.client.process is None:
+            process = self.joined.get(thread_id)
+            if process is None or process is not self.client.process:
                 raise AppServerUnavailable('CLI thread is not joined on this connection')
             if self.metadata.get(thread_id, {}).get('cleanupOnly'):
                 raise AppServerUnavailable('이전에 CLI 접속 결과를 확인해야 합니다. 먼저 연결을 해제하십시오. 반복적인 복구나 전송 작업이 필요하지 않습니다.')
+            return process
 
     def _check_identity(self, thread_id):
         result = self.client.request('thread/read', {'threadId': thread_id,

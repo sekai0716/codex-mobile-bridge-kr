@@ -899,12 +899,12 @@ test('new-chat models use shared choices before the first input', async ({page},
 
 test('a confirmed new chat opens before history and waits for native model confirmation',async({page})=>{
   const id='22222222-3333-4333-8444-555555555555',selection={model:'chosen-model',effort:'high'};
-  const catalog={models:[{id:'chosen-model',name:'Chosen',efforts:['low','high']}],currentModel:'chosen-model',
+  const catalog={models:[{id:'chosen-model',name:'Chosen',efforts:['low','high'],fastTier:'priority'},{id:'next-model',name:'Next',efforts:['medium'],fastTier:'priority'}],fastMode:{allowed:true,provider:'openai'},currentModel:'chosen-model',
     currentEffort:'high',cache:{identity:'fixture-account'},capabilities:{models:true,effort:true}};
   const meta={id,host:'local',title:'New chat',provider:'openai',draftAccountIdentity:'a'.repeat(64),
     connected:true,historyComplete:true,status:'idle',requests:[],submissions:[],model:'old-default',effort:'low'};
   let creationCount=0,reconnects=0,sendCount=0,releaseHistory,releaseApplied,phase='pending',sequence=0;
-  const timelineLimits=[];
+  const timelineLimits=[],settingsWrites=[],reconnectWrites=[];
   const history=new Promise(resolve=>{releaseHistory=resolve;}),applied=new Promise(resolve=>{releaseApplied=resolve;});
   await page.route('**/api/projects**',route=>{
     const path=new URL(route.request().url()).pathname;
@@ -914,17 +914,23 @@ test('a confirmed new chat opens before history and waits for native model confi
   await page.route('**/api/sessions',route=>{
     if(route.request().method()!=='POST')return route.continue();
     creationCount++;
-    return route.fulfill({json:{id,host:'local',creationSettings:{...selection,status:'pending'}}});
+    const creationSettings={...selection,status:'pending',canConnectOnSend:true};
+    return route.fulfill({json:{id,host:'local',creationSettings,meta:{id,host:'local',status:'notLoaded',requests:[],attachedParent:null,
+      access:{source:'desktop',readOnly:false,canSend:true,canReconnect:true},creationSettings}}});
   });
   await page.route('**/api/sessions/'+id+'/**',async route=>{
     const url=new URL(route.request().url()),action=url.pathname.split('/').at(-1);
-    if(action==='reconnect'){reconnects++;return route.fulfill({json:{}});}
+    if(action==='reconnect'){reconnects++;reconnectWrites.push(route.request().postDataJSON());return route.fulfill({json:{}});}
     if(action==='send'){sendCount++;return route.fulfill({json:{status:'accepted'}});}
+    if(action==='settings'){
+      const body=route.request().postDataJSON();settingsWrites.push(body);
+      phase='applied';releaseApplied();return route.fulfill({json:{confirmed:true}});
+    }
     if(action==='catalog')return route.fulfill({json:url.searchParams.get('kind')==='models'?catalog:{skills:[],total:0}});
     if(action==='timeline'||action==='changes'){
       if(action==='timeline'){timelineLimits.push(url.searchParams.get('limit'));await history;}
       if(action==='changes')await applied;
-      const state=phase==='applied'?{...meta,...selection}:{...meta,creationSettings:{...selection,status:phase}};
+      const state=phase==='applied'?{...meta,...settingsWrites.at(-1)}:{...meta,creationSettings:{...selection,status:phase}};
       return route.fulfill({json:{sequence:++sequence,epoch:'new-chat',hasMore:false,before:null,files:[],rows:[],meta:state}});
     }
     return route.fulfill({json:{}});
@@ -936,9 +942,9 @@ test('a confirmed new chat opens before history and waits for native model confi
   await expect(page.locator('#new-chat-dialog')).toBeHidden();
   await expect(page.locator('#chat')).toBeVisible();await expect(page).toHaveURL(new RegExp(id));
   await expect(page.locator('#model-button')).toContainText('chosen-model');await expect(page.locator('#model-effort')).toContainText('high · 적용 대기');
-  await expect(page.locator('#send')).toBeDisabled();
+  await expect(page.locator('#message')).toBeEnabled();await expect(page.locator('#send')).toBeEnabled();
   await expect.poll(()=>timelineLimits).toEqual(['20']);
-  await expect.poll(()=>reconnects).toBe(1);
+  await expect.poll(()=>reconnects).toBe(1);expect(reconnectWrites).toEqual([{activate:true,prepareCreation:true}]);
   phase='unknown';releaseHistory();
   await expect(page.locator('#model-effort')).toContainText('설정 확인 필요');
   await expect(page.locator('#notice')).toBeVisible();await expect(page.locator('#reconnect')).toBeVisible();
@@ -947,9 +953,13 @@ test('a confirmed new chat opens before history and waits for native model confi
   expect(sendCount).toBe(0);
   await page.locator('#model-button').click();await expect(page.locator('#model-select')).toHaveValue(selection.model);
   await expect(page.locator('#effort-select')).toHaveValue(selection.effort);
-  await page.evaluate(()=>document.getElementById('model-dialog').close());
-  phase='applied';releaseApplied();
-  await expect(page.locator('#model-effort')).toHaveText('· high');await expect(page.locator('#send')).toBeEnabled();
+  const dialog=page.locator('#model-dialog');
+  await expect(dialog.locator('#fast-mode-enabled')).toBeDisabled();
+  await dialog.getByRole('radiogroup',{name:'모델'}).getByText('Next',{exact:true}).click();
+  await expect(dialog.getByRole('radio',{name:'Next'})).toBeChecked();await dialog.locator('#model-save').click();
+  await expect.poll(()=>settingsWrites).toEqual([{model:'next-model',effort:'medium'}]);
+  await expect(page.locator('#model-name')).toHaveText('next-model');
+  await expect(page.locator('#model-effort')).toHaveText('· medium');await expect(page.locator('#send')).toBeEnabled();
   await page.locator('#send').click();await expect.poll(()=>sendCount).toBe(1);
   expect(creationCount).toBe(1);expect(reconnects).toBe(1);
 });

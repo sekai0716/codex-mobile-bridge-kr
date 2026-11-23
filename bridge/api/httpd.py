@@ -1546,11 +1546,17 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("요청 응답 형식이 잘못되었습니다.")
                 result = bridge.respond(thread_id, body.get("requestId"), response)
             elif action == "reconnect":
+                prepare = body.get('prepareCreation')
+                if 'prepareCreation' in body and (prepare is not True or body.get('activate') is not True
+                                                   or set(body) != {'activate', 'prepareCreation'}
+                                                   or not hasattr(bridge, '_prepare_created_chat')):
+                    raise ValueError('잘못된 새 채팅 연결 요청')
                 if 'rebuild' in body and (body.get('rebuild') is not True or body.get('activate') is not True or set(body) != {'activate', 'rebuild'}):
                     raise ValueError('잘못된 재연결 요청')
                 if body.get('activate') is True:
                     if hasattr(bridge, 'reconnect_session'):
-                        session = bridge.reconnect_session(thread_id, rebuild=bool(body.get('rebuild')))
+                        session = bridge.reconnect_session(thread_id, rebuild=bool(body.get('rebuild')),
+                                                           **({'prepare_creation': True} if prepare else {}))
                     else:
                         # WSL entries own their CLI runtime, not a Desktop IPC follower.
                         session = bridge.rebuild_connection(thread_id) if body.get('rebuild') else bridge.activate(thread_id)

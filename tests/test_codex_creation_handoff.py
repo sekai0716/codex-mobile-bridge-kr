@@ -169,6 +169,37 @@ class CodexCreationHandoff(unittest.TestCase):
         self.bridge.ipc.request.assert_called_once()
         self.create_empty.assert_called_once()
 
+    def test_restart_reopens_only_a_catalogued_empty_local_creation(self):
+        from bridge.features.accounts.draft_identity import draft_identity
+        self.session.connected = False
+        self.create()
+        entry = self.bridge.creations[self.request_id]
+        self.bridge._set_creation_phase(entry, 'applied', self.session, reopen={'model': 'gpt-6-sol', 'effort': 'high'})
+        self.bridge.close()
+        self.bridge = Bridge(self.home, self.home / 'bridge')
+        self.addCleanup(self.bridge.close)
+        row = dict(id=self.thread_id, origin='desktop', cwd=str(self.home), model_provider='openai',
+                   archived=0, has_user_event=0, creator_account_id='account')
+        self.bridge.store.get = Mock(return_value=row)
+        self.bridge.store.attached_parent = Mock(return_value=None)
+        self.bridge.ipc.owner = Mock(side_effect=AssertionError('Opening metadata must not start a writer'))
+        with patch('bridge.app.service.sys.platform', 'linux'), patch('bridge.app.service.codex_account_identity',
+                return_value=draft_identity('chatgpt', 'account')):
+            self.bridge.submissions[self.thread_id + ':earlier'] = {'status': 'unknown'}
+            self.bridge._load_session_origin(LiveSession(self.thread_id))
+            self.assertIsNone(self.bridge._creation_entry(self.thread_id))
+            self.bridge.submissions.clear()
+            row['first_user_message'] = 'already used'
+            self.bridge._load_session_origin(LiveSession(self.thread_id))
+            self.assertIsNone(self.bridge._creation_entry(self.thread_id))
+            row.pop('first_user_message')
+            session = LiveSession(self.thread_id)
+            self.bridge._load_session_origin(session)
+            meta = {}
+            self.bridge._creation_meta(session, meta)
+        self.assertEqual(meta['creationSettings'], dict(status='pending', model='gpt-6-sol', effort='high', canConnectOnSend=True))
+        self.bridge.ipc.owner.assert_not_called()
+
     def test_catalog_read_cannot_transfer_settings_to_a_new_native_owner(self):
         def changed(*args, **kwargs):
             self.session.owner = 'different-owner'

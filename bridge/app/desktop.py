@@ -338,6 +338,12 @@ class Desktop:
 
     def argv(self):
         p = self.preferences()
+        if sys.platform == 'linux':
+            # start() resolved older relative path settings before detaching.
+            paths = json.loads(os.environ.pop('CMB_LINUX_GATEWAY_PATHS', '{}'))
+            for key in ('codexHome', 'codexBin', 'ipcPath', 'cloudflared'):
+                if key in paths and isinstance(paths[key], str) and Path(paths[key]).is_absolute():
+                    p[key] = paths[key]
         args = ['--config', str(self.config_path), '--port', str(p['port']), '--codex-home', str(Path(p['codexHome']).expanduser())]
         for flag, key in [('--lan', 'lan'), ('--tunnel', 'tunnel')]:
             if p[key]:
@@ -397,6 +403,18 @@ class Desktop:
         kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
         # Frozen children run as independent applications, not multiprocessing workers.
         environment = {**os.environ, 'PYINSTALLER_RESET_ENVIRONMENT': '1'}
+        if sys.platform == 'linux':
+            # Neither the launcher directory nor an installed build directory
+            # has to survive for the lifetime of this detached service.
+            paths = {}
+            for key in ('codexHome', 'codexBin', 'ipcPath', 'cloudflared'):
+                value = preferences[key]
+                if key == 'codexBin' and value == 'codex' and not Path(value).is_file():
+                    continue  # The default CLI name is resolved through PATH.
+                if value and not Path(value).expanduser().is_absolute():
+                    paths[key] = os.path.abspath(value)
+            environment.update(PWD='/', CMB_LINUX_GATEWAY_PATHS=json.dumps(paths))
+            kwargs['cwd'] = '/'
         with (self.data_dir/'gateway.log').open('ab') as log:
             process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=log, stderr=log, env=environment, **kwargs)
             process.stdin.write(json.dumps(temporary).encode('utf-8'))

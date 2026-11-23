@@ -78,6 +78,10 @@ class SubmissionRejected(ValueError):
     """The request was rejected before any submission was recorded or sent."""
 
 
+CHAT_RECONNECT_ERROR = 'Could not reconnect this chat to Codex. Try reconnecting this chat again.'
+SHARED_DESKTOP_SETUP = 'The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.'
+
+
 class LiveSession:
     def __init__(self, thread_id, *, image_cache=None, question_skips=None):
         self.id = thread_id
@@ -91,6 +95,9 @@ class LiveSession:
         self.attached_parent = None
         self.desktop_owner_probe = None
         self.native_attaching = False
+        self.creation_origin = None
+        self.creation_runtime = None
+        self.shared_desktop_error = None
         self.native_goal_supported = None
         self.native_goal_refresh_at = 0
         self.access = None
@@ -369,6 +376,7 @@ class Bridge:
             cli=codex_bin or 'codex', alias=alias, allow_installed_runtime=self.local, clear_sqlite_home=host.startswith('codex:'))
         self.lock = threading.RLock()
         self.reconnect_pending = {}
+        self.desktop_transport_lock = threading.Lock()
         self.ipc = DesktopIPC(ipc_path or ipc_endpoint(codex_home), self._event, self._disconnected)
         self.agent_chats = SubagentChat(self.store, self.data_dir, self._agent_connection, private_json)
         self.side_chats = SideChats(codex_bin, self.codex_home, self.data_dir, self.native_host,
@@ -389,6 +397,9 @@ class Bridge:
         self.creations_path = self.data_dir / 'creations.json'
         self.creations = json.loads(self.creations_path.read_text(encoding='utf-8')) if self.creations_path.exists() else {}
         self.creation_registry = self
+        self.local_creation_receipts = {entry['id']: entry for entry in self.creations.values()
+                                        if entry.get('host') == 'local' and entry.get('id') and entry.get('reopenModel')}
+        self.created_desktop_runtime = None
         self.creation_handoffs = {(entry['host'], entry['id']): entry for entry in self.creations.values()
                                   if entry.get('id') and entry.get('host') and entry.get('modelSettingsPhase') in ('pending', 'unknown')}
         self.submissions = json.loads(self.ledger_path.read_text(encoding='utf-8')) if self.ledger_path.exists() else {}
@@ -497,7 +508,7 @@ class Bridge:
             return self._goal_runtime_available()
         if known is None:
             try:
-                known = self.cli_sessions.supports_goal(session.id)
+                known = (session.creation_runtime or self.cli_sessions).supports_goal(session.id)
             except GoalError:
                 return False
             with session.condition:
@@ -515,7 +526,7 @@ class Bridge:
             due = time.monotonic() >= session.native_goal_refresh_at
         if native and due:
             try:
-                goal = normalize_goal_result(self.cli_sessions.get_goal(session.id))
+                goal = normalize_goal_result((session.creation_runtime or self.cli_sessions).get_goal(session.id))
             except GoalError:
                 return True
             with session.condition:
@@ -1011,7 +1022,12 @@ class Bridge:
                             cli_bridge.cli_sessions.alias != self.hosts.hosts()[project['host']]['alias']):
                         raise ValueError('기존 SSH 호스트 구성이 변경되었습니다. 게이트웨이를 다시 시작하고 프로젝트를 다시 선택하세요.')
                 if kind == 'desktop':
-                    self.ipc.connect()
+                    try:
+                        self.ipc.connect()
+                    except IPCError as error:
+                        if not (sys.platform == 'linux' and self.host == project['host'] == 'local'
+                                and model_options and isinstance(error.__cause__, (FileNotFoundError, ConnectionRefusedError))):
+                            raise
                 entry = {'project': project_key, 'title': title, 'kind': kind,
                          'cwd': project['cwd'], 'host': project['host'],
                          'directoryIdentity': project.get('directoryIdentity'), 'at': time.time()}
@@ -1143,11 +1159,22 @@ class Bridge:
                   'message': '생성되었습니다. 데스크톱에 연결 중입니다. App' if opened else '채팅이 생성되었습니다. 컴퓨터로 이동하세요. App 열고 다시 연결'}
         if entry.get('modelSettingsPhase') in ('pending', 'unknown', 'applied'):
             result['creationSettings'] = self._creation_choice(entry)
+            if bridge and bridge.host == 'local' and sys.platform == 'linux' and bridge._creation_entry(entry['id']):
+                try:
+                    created = bridge.session(entry['id'], attach=False, background=True)
+                    meta = {'id': created.id, 'host': bridge.host, 'status': 'notLoaded', 'requests': [],
+                            'attachedParent': created.attached_parent, 'access': dict(created.access or {}),
+                            'draftAccountIdentity': bridge._draft_account_identity({'provider': created.saved_provider})}
+                    bridge._creation_meta(created, meta)
+                    if meta.get('creationSettings', {}).get('canConnectOnSend'):
+                        result.update(meta=meta, creationSettings=meta['creationSettings'])
+                except (KeyError, OSError, ValueError, StoreUnavailable):
+                    pass  # The persisted ID can still be opened while metadata catches up.
         return result
 
     @staticmethod
     def _creation_choice(entry):
-        options = entry['modelOptions']
+        options = entry.get('reopenModel') or entry['modelOptions']
         return {'status': entry['modelSettingsPhase'], 'model': options['model'],
                 **({'effort': options['effort']} if options.get('effort') is not None else {})}
 
@@ -1186,18 +1213,108 @@ class Bridge:
                 if choice['status'] in ('pending', 'unknown') and (
                         not self._creation_owner_matches(session, entry) or not self._creation_has_messages(session.state)):
                     meta['creationSettings'] = choice
+                    if self._creation_account(session, entry, session.creation_origin):
+                        choice['canConnectOnSend'] = True
 
-    def _set_creation_phase(self, entry, phase, session):
+    def _creation_account(self, session, entry, row):
+        if (sys.platform != 'linux' or self.host != 'local' or not entry or not row or
+                entry.get('kind', 'desktop') != 'desktop' or session.attached_parent or
+                session.desktop_stream_error or session.cli_recovery or
+                row.get('id') != entry['id'] or row.get('origin') != 'desktop' or row.get('archived') != 0 or
+                row.get('has_user_event') != 0 or row.get('first_user_message') or
+                row.get('attached_thread_parent_id') or row.get('agent_path') or
+                row.get('model_provider') != 'openai' or not row.get('creator_account_id') or
+                not same_cwd(entry.get('runtimeCwd') or entry.get('cwd'), row.get('cwd'), False)):
+            return None
+        account = draft_identity('chatgpt', row['creator_account_id'])
+        if codex_account_identity(self.codex_home, 'openai') != account:
+            return None
+        with session.condition:
+            if any(ordered_turns(source or {}) for source in (session.state, session.history_state)) or session.pending_requests():
+                return None
+        return account
+
+    @operation
+    def _prepare_created_chat(self, thread_id):
+        try:
+            session = self.session(thread_id, attach=False, background=True)
+        except (StoreUnavailable, KeyError, OSError):
+            return None
+        with session.activation_lock:
+            entry = self._creation_entry(thread_id)
+            if not self._creation_account(session, entry, session.creation_origin):
+                return None
+            if not session.connected:
+                self._attach(session)
+            if session.connected:
+                self._recover_creation_settings(session)
+                return session
+
+            def guard():
+                row = self.store.get(thread_id)
+                account = self._creation_account(session, self._creation_entry(thread_id), row)
+                if not account or session.connected or self.closed.is_set() or self.released_cli.contains(thread_id):
+                    raise IPCError('새 채팅의 연결 상태가 바뀌었습니다. 채팅을 다시 열어 주세요.')
+                with self.submit_lock:
+                    if any(key.startswith(thread_id + ':') and receipt.get('status') in ('accepted', 'unknown', 'queued')
+                           for key, receipt in self.submissions.items()):
+                        raise IPCError('이미 보낸 메시지의 상태를 확인한 뒤 다시 연결해 주세요.')
+                try:
+                    self.ipc.owner(thread_id, host=self.native_host)
+                except IPCError as error:
+                    if (str(error) == 'no-client-found' or
+                            isinstance(error.__cause__, (FileNotFoundError, ConnectionRefusedError))):
+                        return account
+                    raise
+                raise IPCError('데스크톱에서 이 채팅을 여는 중입니다. 잠시 후 다시 연결해 주세요.')
+
+            guard()
+            with self.lock:
+                if self.created_desktop_runtime is None:
+                    self.created_desktop_runtime = self.cli_sessions.created_desktop_runtime(
+                        on_state=lambda identifier, state: self._cli_state(identifier, state, created=True),
+                        on_disconnect=lambda identifier=None: self._cli_disconnected(identifier, created=True))
+                runtime = self.created_desktop_runtime
+            options = entry.get('reopenModel') or entry['modelOptions']
+            with session.condition:
+                session.native_attaching = True
+            try:
+                state = runtime.attach_created_desktop(thread_id, cwd=session.saved_cwd, provider=session.saved_provider,
+                                                      model=options['model'], effort=options.get('effort'), guard=guard)
+                with session.condition:
+                    session.creation_runtime = runtime
+                self._cli_state(thread_id, state, created=True)
+                with session.condition:
+                    if not session.connected:
+                        raise IPCError('새 채팅의 연결을 확인하지 못했습니다.')
+                self._set_creation_phase(entry, 'applied', session, reopen=options)
+            except AppServerError as error:
+                raise IPCError(str(error)) from error
+            finally:
+                with session.condition:
+                    session.native_attaching = False
+            return session
+
+    def _set_creation_phase(self, entry, phase, session, *, reopen=None):
         # Called under the session action lock; creation never acquires it while
         # holding the ledger lock. Reserve unknown durably before any model write.
         with self.create_lock:
             previous = entry['modelSettingsPhase']
             entry['modelSettingsPhase'] = phase
+            old_model = entry.get('reopenModel')
+            if reopen:
+                entry['reopenModel'] = {key: reopen[key] for key in ('model', 'effort') if key in reopen}
             try:
                 self._save_creations()
             except OSError:
                 entry['modelSettingsPhase'] = previous
+                if old_model is None:
+                    entry.pop('reopenModel', None)
+                else:
+                    entry['reopenModel'] = old_model
                 raise
+            if reopen:
+                self.local_creation_receipts[session.id] = entry
             if phase in ('applied', 'superseded'):
                 self.creation_handoffs.pop((entry['host'], entry['id']), None)
         with session.condition:
@@ -1219,7 +1336,7 @@ class Bridge:
     @operation
     def _complete_creation_settings(self, entry, session, *, verify_only=False):
         registry = self.creation_registry
-        choice = entry['modelOptions']
+        choice = entry.get('reopenModel') or entry['modelOptions']
         with session.action_lock:
             phase = entry['modelSettingsPhase']
             if phase not in ('pending', 'unknown'):
@@ -1627,22 +1744,23 @@ class Bridge:
                 except FutureTimeoutError as exc:
                     raise TaskStateUnavailable(unknown) from exc
             except IPCError as exc:
-                if isinstance(exc.__cause__, FileNotFoundError):
-                    if allow_missing_ipc:
-                        return
-                    if allow_stopped_app and self.host == 'local':
-                        try:
-                            executable = (desktop_executable or self.accounts.index.get('desktopExecutable')
-                                          or DesktopApp.discover(self.catalog_reader.executable))
-                            if not executable:
-                                raise TaskStateUnavailable(unknown)
-                            app = DesktopApp(executable, self.codex_home)
-                            app.validate(self.catalog_reader.executable)
-                            if app.processes():
-                                raise TaskStateUnavailable(unknown)
-                        except (OSError, ValueError, subprocess.SubprocessError) as error:
-                            raise TaskStateUnavailable(unknown) from error
-                        return
+                missing = isinstance(exc.__cause__, FileNotFoundError)
+                refused = sys.platform == 'linux' and isinstance(exc.__cause__, ConnectionRefusedError)
+                if missing and allow_missing_ipc:
+                    return
+                if (missing or refused) and allow_stopped_app and self.host == 'local':
+                    try:
+                        executable = (desktop_executable or self.accounts.index.get('desktopExecutable')
+                                      or DesktopApp.discover(self.catalog_reader.executable))
+                        if not executable:
+                            raise TaskStateUnavailable(unknown)
+                        app = DesktopApp(executable, self.codex_home)
+                        app.validate(self.catalog_reader.executable)
+                        if app.processes():
+                            raise TaskStateUnavailable(unknown)
+                    except (OSError, ValueError, subprocess.SubprocessError) as error:
+                        raise TaskStateUnavailable(unknown) from error
+                    return
                 raise
             def inspect_thread(host, sid, budget):
                 if time.monotonic() >= deadline or disconnected:
@@ -2768,14 +2886,17 @@ class Bridge:
         private_json(self.data_dir / 'cli-daemon-recovery.json', record)
         return True
 
-    def _cli_state(self, thread_id, state):
+    def _cli_state(self, thread_id, state, *, created=False, source=None):
         if not isinstance(state, dict) or state.get('id') != thread_id:
             return
         with self.lock:
             session = self.live.get(thread_id)
-        if session is None or session.origin not in ('cli', 'ide') or self.closed.is_set():
+        if (session is None or self.closed.is_set() or
+                (not session.creation_runtime if created else session.origin not in ('cli', 'ide'))):
             return
         with session.condition:
+            if created and session.creation_runtime is not (source or self.created_desktop_runtime):
+                return
             if (session.origin == 'ide' and session.desktop_owner_probe == 'found' or
                     not session.native_attaching and not (session.runtime == 'cli' and session.connected)):
                 return
@@ -2788,6 +2909,8 @@ class Bridge:
             session.connected = True
             session.discovering = False
             session.error = None
+            session.shared_desktop_error = None
+            session.rebuild_recommended = session.desktop_restart_recommended = False
             if newly_connected:
                 session.cli_recovery = None
             session.access = self._access(session.origin, session)
@@ -2798,17 +2921,23 @@ class Bridge:
             self.notification_dirty.add(thread_id)
         self.notification_event.set()
 
-    def _cli_disconnected(self, thread_id=None):
+    def _cli_disconnected(self, thread_id=None, *, created=False):
         if not self.closed.is_set():
             logging.getLogger(__name__).info("Codex connection transition thread=%s cause=%s",
                                             thread_id or 'all', 'native_thread_revoked' if thread_id else 'native_proxy_disconnected')
         with self.lock:
             sessions = list(self.live.values())
         for session in sessions:
-            if thread_id is None or session.id == thread_id:
-                with session.condition:
+            with session.condition:
+                expected = self.created_desktop_runtime if created else None
+                if (session.creation_runtime is expected and (not created or expected is not None)
+                        and (thread_id is None or session.id == thread_id)):
                     session.native_goal_supported = None
-                self._invalidate(session, 'CLI 연결이 끊어졌습니다. 다시 연결해 주세요. 어떤 작업도 자동으로 다시 전송되지 않습니다.。', runtime='cli')
+                    self._invalidate(session, 'CLI 연결이 끊어졌습니다. 다시 연결해 주세요. 어떤 작업도 자동으로 다시 전송되지 않습니다.。', runtime='cli')
+                    if created:
+                        session.creation_runtime = None
+                        session.origin_verified = False
+                        session.runtime = 'desktop'
         with self.lock:
             observers = list(self.cli_notifications.values())
             self.notification_cursor = 0
@@ -3653,10 +3782,23 @@ class Bridge:
         # Keep SSH/SQLite IO outside the shared live-session lock.
         metadata = self.store.get(session.id)
         parent = self.store.attached_parent(session.id) if self.local and hasattr(self.store, 'attached_parent') else None
+        local_receipt = self.local_creation_receipts.get(session.id)
+        if local_receipt and not session.connected and not parent and self._creation_account(session, local_receipt, metadata):
+            with self.submit_lock:
+                submitted = any(key.startswith(session.id + ':') and row.get('status') in ('accepted', 'unknown', 'queued')
+                                for key, row in self.submissions.items())
+            with self.create_lock:
+                if not submitted and local_receipt.get('modelSettingsPhase') == 'applied':
+                    local_receipt['modelSettingsPhase'] = 'pending'
+                    self.creation_handoffs[(self.host, session.id)] = local_receipt
         with session.condition:
             session.origin = metadata.get("origin", "desktop")
             session.saved_cwd = metadata.get('cwd')
             session.saved_provider = metadata.get('model_provider')
+            if self._creation_entry(session.id):
+                session.creation_origin = {key: metadata.get(key) for key in (
+                    'id', 'origin', 'archived', 'has_user_event', 'first_user_message', 'attached_thread_parent_id', 'agent_path',
+                    'model_provider', 'creator_account_id', 'cwd')}
             session.attached_parent = dict(parent, host=self.host) if parent else None
             session.origin_verified = True
             session.access = self._access(session.origin, session)
@@ -3844,7 +3986,8 @@ class Bridge:
                 try:
                     if sys.platform == 'win32' and self.owner_guard:
                         self.owner_guard(session.id)
-                    self.ipc.connect()
+                    with self.desktop_transport_lock:
+                        self.ipc.connect()
                     if not self.observation_enabled():
                         self.suspend_observation()
                         return
@@ -3853,7 +3996,7 @@ class Bridge:
                     if not isinstance(owner, str) or not owner:
                         raise IPCError("현재 Codex 앱 연결이 이 채팅과 일치하지 않습니다. 연결되지 않았습니다.")
                     with session.condition:
-                        if session.connection_epoch != probe_epoch:
+                        if session.connected or session.connection_epoch != probe_epoch:
                             return
                         session.owner = owner
                         session.revision = None
@@ -3862,10 +4005,11 @@ class Bridge:
                         session.access = self._access(session.origin, session)
                     self.ipc.follow(session.id, owner, host=self.native_host)
                     with session.condition:
-                        session.condition.wait_for(lambda: session.connected or self.closed.is_set(), timeout=timeout)
+                        session.condition.wait_for(lambda: session.connected or session.connection_epoch != probe_epoch or self.closed.is_set(),
+                                                   timeout=timeout)
                 except IPCError as exc:
                     with session.condition:
-                        if session.connection_epoch != probe_epoch:
+                        if session.connected or session.connection_epoch != probe_epoch:
                             return
                         session.discovering = False
                         absent = self._owner_absent(exc, ipc_connected)
@@ -3888,36 +4032,43 @@ class Bridge:
             try:
                 # Owners answer a follow with a fresh snapshot. This also works
                 # for remote/background owners absent from owner-discovery.
-                self.ipc.connect()
+                with self.desktop_transport_lock:
+                    self.ipc.connect()
                 if not self.observation_enabled():
                     self.suspend_observation()
                     return
                 with session.condition:
+                    if session.connected or session.connection_epoch != epoch:
+                        return
                     session.owner = None
                     session.revision = None
                     session.discovering = True
                 self.ipc.follow(session.id, None, host=self.native_host)
                 with session.condition:
-                    session.condition.wait_for(lambda: session.connected or self.closed.is_set(), timeout=timeout)
+                    session.condition.wait_for(lambda: session.connected or session.connection_epoch != epoch or self.closed.is_set(), timeout=timeout)
                     # Keep following: a cold chat can publish after this short
                     # wait. Missing live state does not make saved history fail.
             except IPCError as exc:
                 with session.condition:
+                    if session.connected or session.connection_epoch != epoch:
+                        return
                     session.discovering = False
                     session.connected = False
-                    session.error = None if session.origin in ('cli', 'ide') else str(exc)
+                    session.error = None if session.origin in ('cli', 'ide') else session.shared_desktop_error or str(exc)
                     session.access = self._access(session.origin, session)
                     session.changed()
 
     def desktop_restart_recommended(self):
         with self.lock:
+            if any(s.runtime == 'desktop' and s.connected for s in self.live.values()):
+                return False
             return any(session.desktop_restart_recommended and not session.connected
                        for session in self.live.values())
 
-    def reconnect_session(self, thread_id, *, rebuild=False):
+    def reconnect_session(self, thread_id, *, rebuild=False, prepare_creation=False):
         # Join duplicate phone reconnects before they queue behind the host gate.
         # Only connection reads are shared; writes keep their existing receipts.
-        key = (thread_id, rebuild)
+        key = (thread_id, rebuild, prepare_creation)
         with self.lock:
             pending = self.reconnect_pending.get(key)
             if pending is None:
@@ -3928,7 +4079,11 @@ class Bridge:
         if not leader:
             return pending.result()
         try:
-            result = self.rebuild_connection(thread_id) if rebuild else self.activate(thread_id)
+            result = self._prepare_created_chat(thread_id) if prepare_creation and self._creation_entry(thread_id) else None
+            if result is None:
+                result = self._connect_loaded_desktop(thread_id)
+            if result is None:
+                result = self.rebuild_connection(thread_id) if rebuild else self.activate(thread_id)
             if self._creation_entry(thread_id):
                 self._recover_creation_settings(result)
             pending.set_result(result)
@@ -3940,23 +4095,131 @@ class Bridge:
             with self.lock:
                 self.reconnect_pending.pop(key, None)
 
-    def _rebuild_desktop_transport(self):
+    @operation
+    def _connect_loaded_desktop(self, thread_id):
+        from bridge.clients.codex.desktop_runtime import settings
+        if sys.platform != 'linux' or self.host != 'local' or not self.observation_enabled():
+            return None
+        try:
+            if settings(self.codex_home) is None:
+                return None
+        except (OSError, ValueError):
+            # A broken optional configuration cannot block a working follower.
+            return None
+        session = self.session(thread_id, attach=False, background=True)
+        with session.activation_lock:
+            if session.origin != 'desktop' or session.attached_parent or session.desktop_stream_error:
+                return None
+            with session.condition:
+                if session.connected:
+                    return session if session.creation_runtime else None
+            row = self.store.get(thread_id)
+            if (row.get('id') != thread_id or row.get('origin') != 'desktop' or row.get('archived') != 0 or
+                    row.get('attached_thread_parent_id') or row.get('agent_path') or
+                    row.get('thread_source') == 'subagent' or not row.get('cwd') or
+                    row.get('model_provider') != 'openai'):
+                return None
+            self._attach(session)
+            if session.connected:
+                return None
+            try:
+                self.ipc.owner(thread_id, host=self.native_host)
+            except IPCError as error:
+                if not self._owner_absent(error, connected=self.ipc.client_id is not None):
+                    return None
+            else:
+                return None
+
+            runtime = None
+            initial_update = None
+            detached = False
+            updates = threading.RLock()
+            def publish(identifier, state):
+                nonlocal initial_update
+                if identifier != thread_id:
+                    return
+                with updates:
+                    if runtime is None or detached:
+                        return
+                    if session.creation_runtime is not runtime:
+                        initial_update = state
+                        return
+                    self._cli_state(identifier, state, created=True, source=runtime)
+
+            def disconnected(identifier=None):
+                nonlocal detached
+                if identifier is not None and identifier != thread_id:
+                    return
+                with updates, session.condition:
+                    detached = True
+                    if runtime is None or session.creation_runtime is not runtime:
+                        return
+                    session.creation_runtime = None
+                    self._invalidate(session, CHAT_RECONNECT_ERROR, runtime='cli',
+                                     reason='original_desktop_runtime_disconnected')
+                    session.runtime, session.owner = 'desktop', None
+                runtime.client.close()
+
+            try:
+                try:
+                    runtime = self.cli_sessions.loaded_desktop_runtime(on_state=publish, on_disconnect=disconnected)
+                except AppServerUnavailable as error:
+                    raise IPCError(SHARED_DESKTOP_SETUP) from error
+                with session.condition:
+                    if session.connected or self.closed.is_set():
+                        return None
+                    session.native_attaching = True
+                state = runtime.attach_loaded_desktop(thread_id, cwd=row['cwd'], provider=row['model_provider'])
+                with updates:
+                    with session.condition:
+                        if detached or self.closed.is_set():
+                            raise IPCError(CHAT_RECONNECT_ERROR)
+                        if session.connected:
+                            return session
+                        session.creation_runtime = runtime
+                    self._cli_state(thread_id, initial_update or state, created=True, source=runtime)
+                    if not session.connected:
+                        raise IPCError(CHAT_RECONNECT_ERROR)
+                return session
+            except (AppServerError, IPCError) as error:
+                with session.condition:
+                    if session.connected and session.runtime == 'desktop':
+                        return session
+                    if session.creation_runtime is runtime and runtime is not None:
+                        session.creation_runtime = None
+                        session.connected = False
+                    session.shared_desktop_error = session.error = str(error)
+                    session.rebuild_recommended = True
+                    session.desktop_restart_recommended = False
+                    session.changed()
+                raise IPCError(str(error)) from error
+            finally:
+                with session.condition:
+                    session.native_attaching = False
+                    keep = runtime is not None and session.creation_runtime is runtime and session.connected
+                if runtime is not None and not keep:
+                    runtime.close()
+
+    def _rebuild_desktop_transport(self, thread_id):
         # Caller holds the host operation gate: wait for writes before replacing
         # this follower, and never replay an operation whose result is unknown.
-        self.ipc.reconnect()
-        with self.lock:
-            sessions = list(self.live.values())
-        for followed in sessions:
-            if followed.runtime == 'desktop':
-                with followed.condition:
-                    followed.last_activation = None
-                    followed.retry_at = 0
+        with self.desktop_transport_lock:
+            if self._other_desktop_following(thread_id):
+                return False
+            self.ipc.reconnect()
+            return True
 
-    def _other_desktop_connected(self, thread_id):
-        # A single owner can close a chat while other owners still use this socket.
+    def _other_desktop_following(self, thread_id):
         with self.lock:
-            return any(other.id != thread_id and other.runtime == 'desktop' and other.connected
-                       for other in self.live.values())
+            for other in self.live.values():
+                if other.id == thread_id or other.runtime != 'desktop':
+                    continue
+                if other.connected:
+                    return True
+                if other.origin != 'cli' and (other.attach_lock.locked() or other.owner_probe_inflight or
+                                              other.discovering and (other.viewers or other.watched)):
+                    return True
+        return False
 
     @operation
     def rebuild_connection(self, thread_id):
@@ -3966,12 +4229,17 @@ class Bridge:
             raise IPCError("이 채팅은 데스크톱 연결을 사용하지 않습니다. 계속 채팅을 사용하세요.")
         # The host operation gate drains pending writes before this read-only
         # follower connection is replaced. Native tasks keep their original owner.
-        rebuilt = False
+        rebuilt = None
+        with session.condition:
+            session.last_activation = None
+            session.retry_at = 0
         try:
-            if not self._other_desktop_connected(thread_id):
-                self._rebuild_desktop_transport()
-                rebuilt = True
-            return self.activate(thread_id, _transport_rebuilt=True)
+            rebuilt = self._rebuild_desktop_transport(thread_id)
+            with session.condition:
+                if session.connected:
+                    session.connection_epoch += 1
+                    session.connected = False
+            return self.activate(thread_id, _transport_rebuilt=rebuilt)
         except IPCError as exc:
             with session.condition:
                 if session.connected:
@@ -3980,9 +4248,12 @@ class Bridge:
                     session.error = session.desktop_stream_error
                     raise IPCError(session.error) from exc
                 session.rebuild_recommended = True
-                session.desktop_restart_recommended = True
-                session.error = ('게이트웨이 연결이 다시 설정되었지만 원래 데스크톱 세션은 복원되지 않았습니다. 애플리케이션 관리에서 작업을 확인한 후 다시 시작할 수 있습니다. Codex；작업이 전송되지 않았습니다.。'
-                                 if rebuilt else "원래 데스크톱 세션의 연결이 여전히 끊어졌습니다. 다시 재구축해 보세요. 실패하면 Codex를 다시 시작하기 전에 앱 관리에서 작업을 검토하세요.")
+                session.desktop_restart_recommended = rebuilt is not False and not self._other_desktop_following(thread_id)
+                if not session.desktop_restart_recommended:
+                    session.error = CHAT_RECONNECT_ERROR
+                else:
+                    session.error = ('게이트웨이 연결이 다시 설정되었지만 원래 데스크톱 세션은 복원되지 않았습니다. 애플리케이션 관리에서 작업을 확인한 후 다시 시작할 수 있습니다. Codex；작업이 전송되지 않았습니다.。'
+                                     if rebuilt else "원래 데스크톱 세션의 연결이 여전히 끊어졌습니다. 다시 재구축해 보세요. 실패하면 Codex를 다시 시작하기 전에 앱 관리에서 작업을 검토하세요.")
                 session.changed()
                 raise IPCError(session.error) from exc
 
@@ -3996,6 +4267,22 @@ class Bridge:
     def _verify_cli_submission_account(self, session):
         # Recheck at dispatch admission, regardless of a turn ending after
         # connection lookup. Existing task answers take their own guarded path.
+        with session.condition:
+            desktop_runtime = session.creation_runtime
+            if session.origin == 'desktop' and (not session.connected or not desktop_runtime):
+                raise SubmissionRejected(CHAT_RECONNECT_ERROR)
+        if desktop_runtime:
+            if desktop_runtime is not self.created_desktop_runtime:
+                try:
+                    desktop_runtime._check_joined_identity(session.id)
+                except AppServerError as error:
+                    raise SubmissionRejected(str(error)) from error
+                return
+            row = self.store.get(session.id)
+            if (not row.get('creator_account_id') or row.get('archived') or
+                    codex_account_identity(self.codex_home, session.saved_provider) != draft_identity('chatgpt', row['creator_account_id'])):
+                raise SubmissionRejected('채팅을 만든 계정과 현재 계정이 다릅니다.')
+            return
         try:
             self._recover_cli_environment(session.id, follow_account=True)
         except IPCError as error:
@@ -4007,7 +4294,7 @@ class Bridge:
                 session.changed()
 
     @operation
-    def activate(self, thread_id, *, allow_ide_resume=True, _transport_rebuilt=False, _cli_recovery=None, _expected_cli=None,
+    def activate(self, thread_id, *, allow_ide_resume=True, _transport_rebuilt=None, _cli_recovery=None, _expected_cli=None,
                  _defer_cli_account=False):
         """Explicit phone operation only; reads and notification watches never navigate."""
         from bridge.clients.codex.daemon_network import CliProviderMismatch
@@ -4024,6 +4311,8 @@ class Bridge:
         if self.host.startswith('codex:') and self.store.get(thread_id).get('origin') == 'desktop':
             raise ValueError('이 독립된 입구는 원본으로만 접근할 수 있습니다. VS Code / CLI 대화')
         with session.activation_lock:
+            if session.connected and session.creation_runtime:
+                return session
             self.released_cli.set(thread_id, False)
             follow_account = _cli_recovery is None and _expected_cli is None
             environment_checked = not follow_account or session.runtime == 'cli'
@@ -4044,10 +4333,9 @@ class Bridge:
                     if session.cli_recovery is not None:
                         session.cli_recovery = session.error = None
                         session.changed()
-            endpoint_changed = not _transport_rebuilt and session.runtime == 'desktop' and self.ipc.endpoint_changed()
-            replace_transport = (not _transport_rebuilt and session.runtime == 'desktop'
-                                 and (endpoint_changed or not session.connected and session.rebuild_recommended)
-                                 and not self._other_desktop_connected(thread_id))
+            check_transport = _transport_rebuilt is None and session.runtime == 'desktop'
+            endpoint_changed = check_transport and self.ipc.endpoint_changed()
+            replace_transport = check_transport and (endpoint_changed or not session.connected and session.rebuild_recommended)
             if session.connected and not replace_transport:
                 return session
             with session.condition:
@@ -4063,12 +4351,16 @@ class Bridge:
                         # Another router can coexist with a still-working owner.
                         # Ask for a current snapshot before abandoning that route.
                         with session.condition:
+                            session.connection_epoch += 1
                             session.connected = False
                         self._attach(session)
                         if session.connected:
                             return session
-                    self._rebuild_desktop_transport()
-                    _transport_rebuilt = True
+                    _transport_rebuilt = self._rebuild_desktop_transport(thread_id)
+                    if _transport_rebuilt:
+                        with session.condition:
+                            session.last_activation = None
+                            session.retry_at = 0
                 if session.connected:
                     return session
                 # Reuse this in-flight passive owner probe once. If none is
@@ -4144,10 +4436,14 @@ class Bridge:
                 return session
             except IPCError as exc:
                 with session.condition:
+                    if session.connected:
+                        return session
                     session.rebuild_recommended = not session.desktop_stream_error and session.origin == 'desktop' and self.host == 'local'
+                    session.desktop_restart_recommended = False
                     if session.desktop_stream_error:
                         session.error = session.desktop_stream_error
-                        session.desktop_restart_recommended = False
+                    elif session.rebuild_recommended and (_transport_rebuilt is False or self._other_desktop_following(thread_id)):
+                        session.error = CHAT_RECONNECT_ERROR
                     elif session.rebuild_recommended and _transport_rebuilt:
                         session.desktop_restart_recommended = True
                         session.error = '게이트웨이 연결이 다시 설정되었지만 원래 데스크톱 세션은 복원되지 않았습니다. 애플리케이션 관리에서 작업을 확인한 후 다시 시작할 수 있습니다. Codex；작업이 전송되지 않았습니다.。'
@@ -4165,13 +4461,19 @@ class Bridge:
     def _event(self, message):
         if message.get("method") == "client-status-changed":
             params = message.get("params", {})
+            if not isinstance(params, dict) or params.get("hostId", self.native_host) != self.native_host:
+                return
+            client = params.get("clientId")
             if params.get("status") == "disconnected":
+                if not isinstance(client, str) or not client:
+                    return
                 with self.lock:
                     sessions = list(self.live.values())
                 for session in sessions:
-                    if session.owner == params.get("clientId"):
-                        self._invalidate(session, "데스크톱 세션의 연결이 끊어졌으며 다시 연결되기를 기다리고 있습니다.", runtime='desktop',
-                                         owner=params.get("clientId"), reason='desktop_client_disconnected')
+                    with session.condition:
+                        if session.owner == client and (session.connected or session.discovering):
+                            self._invalidate(session, "데스크톱 세션의 연결이 끊어졌으며 다시 연결되기를 기다리고 있습니다.", runtime='desktop',
+                                             owner=client, reason='desktop_client_disconnected')
             # Owner changes can make previously unanswered probes available.
             self.notification_cursor = 0
             self.notification_boundary.clear()
@@ -4189,8 +4491,10 @@ class Bridge:
         if session is None or self.released_cli.contains(session.id):
             return
         change = params.get("change", {})
+        newly_connected = False
         with session.condition:
-            if session.origin in ('cli', 'ide') and (session.native_attaching or session.runtime == 'cli' and session.connected):
+            if (session.native_attaching or (session.origin in ('cli', 'ide') or session.creation_runtime)
+                    and session.runtime == 'cli' and session.connected):
                 return
             if session.origin in ('cli', 'ide') and session.desktop_owner_probe != 'found':
                 return
@@ -4240,6 +4544,7 @@ class Bridge:
                 if change.get("type") == "snapshot":
                     session.approval_snapshot_sequence += 1
                 session.runtime = 'desktop'
+                session.shared_desktop_error = None
                 session.discovering = False
                 session.connected = True
                 session.rebuild_recommended = False
@@ -4277,9 +4582,23 @@ class Bridge:
                 session.error = "현재 Codex 앱 연결이 이 채팅과 일치하지 않습니다. 연결되지 않았습니다." if session.origin in ('cli', 'ide') else "동기화 상태가 변경되었습니다. 데스크톱 스냅샷을 다시 읽는 중입니다."
                 session.changed()
 
-    def _invalidate(self, session, message, runtime=None, owner=None, reason=None):
+        if newly_connected:
+            # A fresh snapshot rules out an ongoing host-wide outage. Wake any
+            # other open view that still displays advice from that outage.
+            with self.lock:
+                stale = [s for s in self.live.values() if s.desktop_restart_recommended]
+            for other in stale:
+                with other.condition:
+                    if other.runtime == 'desktop' and not other.connected and other.desktop_restart_recommended:
+                        other.desktop_restart_recommended = False
+                        other.error = CHAT_RECONNECT_ERROR
+                        other.changed()
+
+    def _invalidate(self, session, message, runtime=None, owner=None, reason=None, epoch=None):
         with session.condition:
             if (runtime is not None and session.runtime != runtime) or (owner is not None and session.owner != owner):
+                return
+            if epoch is not None and session.connection_epoch != epoch:
                 return
             if session.connected and reason:
                 logging.getLogger(__name__).info(
@@ -4308,7 +4627,12 @@ class Bridge:
         with self.lock:
             sessions = list(self.live.values())
         for session in sessions:
-            if session.origin not in ('cli', 'ide') or session.desktop_owner_probe == 'found':
+            with session.condition:
+                if session.runtime != 'desktop' or not (session.connected or session.discovering):
+                    continue
+                if session.origin in ('cli', 'ide') and session.desktop_owner_probe != 'found':
+                    continue
+                session.discovering = False
                 self._invalidate(session, "데스크톱 연결이 끊어졌습니다. 다시 연결되기를 기다리고 있습니다.", runtime='desktop',
                                  reason='desktop_ipc_disconnected')
 
@@ -4362,9 +4686,12 @@ class Bridge:
                         self._refresh_async(session)
                 elif session.viewers == 0 and not queued and not session.watched and time.monotonic() - session.touched > 300:
                     with self.lock:
-                        if session.viewers != 0 or session.watched:
+                        if (session.viewers != 0 or session.watched or session.connected and
+                                session.creation_runtime is not None and session.creation_runtime is self.created_desktop_runtime):
                             continue
                         self.live.pop(session.id, None)
+                    if session.creation_runtime and session.creation_runtime is not self.created_desktop_runtime:
+                        session.creation_runtime.close()
                     if (session.connected or session.discovering) and session.runtime != "cli":
                         try:
                             self.ipc.follow(session.id, session.owner, False, host=self.native_host)
@@ -4390,6 +4717,10 @@ class Bridge:
             if session.desktop_stream_error:
                 raise IPCError(session.desktop_stream_error)
             target, runtime = session.owner, session.runtime
+            epoch = getattr(session, 'connection_epoch', None)
+            if not target or not getattr(session, 'connected', True):
+                raise IPCError(getattr(session, 'error', None) or CHAT_RECONNECT_ERROR)
+            native = (session.creation_runtime or self.cli_sessions) if runtime == 'cli' else None
             if expected_owner is not None and (not session.connected or runtime != 'desktop' or target != expected_owner):
                 raise IPCError('The desktop owner changed before the settings request.')
         if before_write:
@@ -4399,8 +4730,8 @@ class Bridge:
         if runtime == "cli":
             try:
                 if reviewed_request is not None:
-                    return self.cli_sessions.call(session.id, method, params, timeout=timeout, reviewed_request=reviewed_request)
-                return self.cli_sessions.call(session.id, method, params, timeout=timeout)
+                    return native.call(session.id, method, params, timeout=timeout, reviewed_request=reviewed_request)
+                return native.call(session.id, method, params, timeout=timeout)
             except AppServerError as exc:
                 raise IPCError(str(exc)) from exc
         try:
@@ -4408,7 +4739,7 @@ class Bridge:
         except IPCError as exc:
             if str(exc) in ('no-client-found', 'client-disconnected', 'server-closed', 'request-timeout') or str(exc).startswith(('데스크톱 연결이 끊어졌습니다.', '데스크톱 응답 시간 초과')):
                 self._invalidate(session, "데스크톱 실행 연결을 사용할 수 없습니다. 연결을 다시 구축해 보세요. 확인되지 않은 작업은 자동으로 다시 전송되지 않습니다.",
-                                 runtime='desktop', reason='desktop_owner_unavailable')
+                                 runtime='desktop', owner=target, epoch=epoch, reason='desktop_owner_unavailable')
             raise
 
     def _save_ledger(self):
@@ -4664,7 +4995,8 @@ class Bridge:
     def _agent_connection(self, meta, *, write):
         """부모의 기존 실행 연결만 사용한다. 조회로 스레드를 시작하거나 재개하지 않는다."""
         if meta['rootOrigin'] == 'cli':
-            cli, root = self.cli_sessions, meta['rootId']
+            root = meta['rootId']
+            cli = getattr(self.live.get(root), 'creation_runtime', None) or self.cli_sessions
             cli._require_joined(root)
             if write:
                 cli._check_joined_identity(root)
@@ -5307,7 +5639,7 @@ class Bridge:
     def linux_permission_options(self, thread_id):
         session = self.session(thread_id, attach=False, background=True)
         if session.connected and session.runtime == 'cli':
-            return self.cli_sessions.permission_options(thread_id)[1]
+            return (session.creation_runtime or self.cli_sessions).permission_options(thread_id)[1]
         if not linux_permissions.enabled(self.native_host):
             raise ValueError('이 호스트는 활성화되지 않았습니다. Linux 권한 확인')
         self.store.get(thread_id)
@@ -5329,7 +5661,7 @@ class Bridge:
             if expected_runtime is not None and (not session.connected or session.runtime != expected_runtime):
                 raise ValueError("채팅 런타임이 변경되었습니다. 권한 패널을 다시 엽니다.")
             if session.runtime == 'cli':
-                facts, options = self.cli_sessions.permission_options(thread_id)
+                facts, options = (session.creation_runtime or self.cli_sessions).permission_options(thread_id)
                 linux_permissions.require_permission(options, preset)
                 settings = linux_permissions.permission_settings(preset, facts)
                 with session.condition:
@@ -5367,9 +5699,10 @@ class Bridge:
             raise ValueError("유효한 추론 강도를 선택하세요.")
         if fast_mode is not None and not isinstance(fast_mode, bool):
             raise ValueError("잘못된 빠른 모드 설정")
-        session = self._target(thread_id)
+        session = self._prepare_created_chat(thread_id) if self._creation_entry(thread_id) else None
+        session = session or self._target(thread_id)
         entry = self._creation_entry(thread_id)
-        if not entry or fast_mode is not None:
+        if not entry:
             return self._apply_settings(session, model, effort, fast_mode=fast_mode)
         with session.action_lock:
             entry = self._creation_entry(thread_id)
@@ -5380,7 +5713,7 @@ class Bridge:
                 progressed = self._creation_has_messages(session.state or {})
             if entry and not self._creation_host_current(entry):
                 raise ValueError('Confirm the new chat model before sending. Reconnect or choose a model.')
-            if (entry and not progressed and entry['modelSettingsPhase'] == 'unknown'
+            if (entry and not progressed and fast_mode is None and entry['modelSettingsPhase'] == 'unknown'
                     and model == entry['modelOptions']['model'] and effort == entry['modelOptions'].get('effort')):
                 self._recover_creation_settings(session, verify_only=True)
                 return {'applied': True, 'confirmed': True, 'model': model, 'effort': effort}
@@ -5417,6 +5750,10 @@ class Bridge:
         with session.condition:
             confirmed = session.condition.wait_for(lambda: session.state.get("latestModel") == model and (effort is None or session.view().get("effort") == effort) and
                 (fast_mode is None or (session.state.get('latestThreadSettings') or {}).get('serviceTier') == settings['serviceTier']), timeout=5)
+        if confirmed and session.creation_runtime and session.creation_runtime is self.created_desktop_runtime:
+            receipt = self.local_creation_receipts.get(session.id)
+            if receipt and not self._creation_has_messages(session.state or {}):
+                self._set_creation_phase(receipt, 'applied', session, reopen={'model': model, 'effort': effort})
         return {"applied": True, "confirmed": confirmed, "model": model, "effort": effort,
                 **({'serviceTier': settings['serviceTier']} if fast_mode is not None else {})}
 
@@ -5484,8 +5821,8 @@ class Bridge:
     def _goal_call(self, method, *args):
         """Use the owner when available, otherwise the isolated sidecar."""
         session = self.live.get(args[0]) if args else None
-        if session and session.origin in ('cli', 'ide') and session.runtime == 'cli':
-            return getattr(self.cli_sessions, method)(*args)
+        if session and session.runtime == 'cli':
+            return getattr(session.creation_runtime or self.cli_sessions, method)(*args)
         if self.owner_goal is not None:
             # A configured owner transport is authoritative. Never silently
             # fall back after the owner path was selected: that could create a
@@ -5807,7 +6144,9 @@ class Bridge:
                 result["activation"] = self._send_goal_activation(
                     session, response, "create", ui_locale or activation.get("uiLocale") if activation else ui_locale)
                 return result
-        session = self._target(thread_id, **target_options)
+        session = (self._prepare_created_chat(thread_id) if mode == 'send' and work_mode in (None, 'default')
+                   and self._creation_entry(thread_id) else None)
+        session = session or self._target(thread_id, **target_options)
         access = self._access(session.origin, session)
         if work_mode is not None and not access['canUseModes']:
             raise ValueError("이 채팅에서는 작업 모드를 사용할 수 없습니다.")
@@ -6038,7 +6377,7 @@ class Bridge:
                     if not session.connected or not session.owner:
                         raise ValueError('먼저 원본 세션에 연결한 후 컨텍스트를 압축하세요.')
                 if session.runtime == 'cli':
-                    self.cli_sessions.refresh(thread_id)
+                    (session.creation_runtime or self.cli_sessions).refresh(thread_id)
                 else:
                     try:
                         self.assert_desktop_idle(timeout=8, identifiers=[thread_id])
@@ -6256,6 +6595,8 @@ class Bridge:
         for session in sessions:
             with session.condition:
                 session.condition.notify_all()
+            if session.creation_runtime and session.creation_runtime is not self.created_desktop_runtime:
+                session.creation_runtime.close()
             try:
                 if (session.connected or session.discovering) and session.runtime != "cli":
                     self.ipc.follow(session.id, session.owner, False, host=self.native_host)
@@ -6263,5 +6604,7 @@ class Bridge:
                 pass
         self.ipc.close()
         self.cli_sessions.close()
+        if self.created_desktop_runtime:
+            self.created_desktop_runtime.close()
         if self.goal:
             self.goal.close()

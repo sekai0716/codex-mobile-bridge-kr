@@ -59,6 +59,94 @@ test.beforeEach(async({context,request,baseURL})=>{
   expect(await(await request.get('/__fixture_health')).json()).toEqual({fixture:'cmb-browser-regression'});
 });
 
+test('reconnect warnings belong to the selected chat and clear as soon as it recovers',async({page})=>{
+  await prepare(page);
+  const result=await page.evaluate(async()=>{
+    const first=currentId,second='77777777-1111-4111-8111-111111111111',fixture=sendControlsFixture,original=window.fetch;
+    const access={source:'desktop',runtime:'desktop',canReconnect:true,canSend:true,readOnly:false};
+    const base={...fixture.meta,access};let releaseFailure,releaseHistory;
+    const heldFailure=new Promise(resolve=>releaseFailure=resolve),heldHistory=new Promise(resolve=>releaseHistory=resolve);
+    const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
+    window.fetch=async(url,options={})=>{
+      const path=new URL(url,location.href),parts=path.pathname.split('/'),target=parts.at(-2),action=parts.at(-1);
+      if(action==='reconnect'&&target===first){await heldFailure;return json({error:'Only the first chat failed'},409);}
+      if(action==='timeline'&&target===second){
+        await heldHistory;
+        return json({...fixture.page(),meta:{...base,id:second,title:'Second chat',connected:true}});
+      }
+      return original(url,options);
+    };
+    renderState({...base,connected:false,desktopRestartRecommended:true});
+    const hadWarning=!$('notice').hidden&&!$('reconnect-manager').hidden;
+    const pending=$('reconnect').onclick();
+    listRows.push({id:second,host:'local',access:{...access,canReconnect:false}});
+    const next=openChat(second,'local');
+    const hiddenDuringSwitch=$('notice').hidden&&$('notice-text').textContent===''&&$('reconnect-manager').hidden;
+    releaseFailure();await pending;releaseHistory();await next;
+    const secondClean=$('notice').hidden&&!$('notice-text').textContent.includes('Only the first');
+    fixture.meta={...base,connected:true};
+    if(!listRows.some(row=>row.id===first))listRows.push({id:first,host:'local',access:{...access,canReconnect:false}});
+    await openChat(first,'local');
+    return {hadWarning,hiddenDuringSwitch,secondClean,returnedClean:$('notice').hidden&&$('reconnect-manager').hidden};
+  });
+  expect(result).toEqual({hadWarning:true,hiddenDuringSwitch:true,secondClean:true,returnedClean:true});
+});
+
+test('known desktop connection blockers explain the cause, protect writes and preserve the draft',async({page})=>{
+  await prepare(page);
+  const setup='The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.';
+  const account='The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.';
+  const generic='Could not reconnect this chat to Codex. Try reconnecting this chat again.';
+  await page.evaluate(({setup,account})=>{
+    const fixture=sendControlsFixture,original=window.fetch;
+    fixture.meta={...fixture.meta,connected:false,desktopRestartRecommended:true,rebuildRecommended:true,
+      access:{source:'desktop',readOnly:false,canSend:true,canChangeModel:true,canReconnect:true}};
+    window.fetch=(url,...args)=>new URL(url,location.href).pathname.endsWith('/reconnect')?
+      Promise.resolve(new Response(JSON.stringify({error:account}),{status:409})):original(url,...args);
+    renderState({...fixture.meta,connectionError:setup});
+  },{setup,account});
+  await expect(page.locator('#notice-text')).toContainText('데스크톱 작업이 모두 끝나면');
+  await expect(page.locator('#message')).toBeEnabled();await page.locator('#message').fill('보존할 초안');
+  await expect(page.locator('#send')).toBeDisabled();await expect(page.locator('#model-button')).toBeDisabled();
+  await expect(page.locator('#reconnect-manager')).toBeHidden();
+  await page.locator('#reconnect').click();
+  await expect(page.locator('#notice-text')).toContainText('두 앱에서 같은 계정');
+  await page.evaluate(()=>{renderState(sendControlsFixture.meta);$('composer').requestSubmit();});
+  await expect(page.locator('#send')).toBeDisabled();await expect(page.locator('#model-button')).toBeDisabled();
+  await expect(page.locator('#message')).toHaveValue('보존할 초안');await expect(page.locator('#notice-text')).toContainText('두 앱에서 같은 계정');
+  expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
+  await page.evaluate(()=>renderState({...sendControlsFixture.meta,connected:true}));
+  await expect(page.locator('#notice')).toBeHidden();await expect(page.locator('#send')).toBeEnabled();await expect(page.locator('#model-button')).toBeEnabled();
+  await page.evaluate(generic=>renderState({...sendControlsFixture.meta,connectionError:generic}),generic);
+  await expect(page.locator('#notice-text')).toContainText('다시 연결을 눌러');
+  await expect(page.locator('#send')).toBeEnabled();await expect(page.locator('#message')).toHaveValue('보존할 초안');
+});
+
+test('a verified empty local chat can send its first message while waiting for the owner',async({page})=>{
+  await prepare(page);await page.evaluate(()=>{
+    const fixture=sendControlsFixture;
+    fixture.meta={...fixture.meta,status:'idle',connected:false,activating:true,loadingHistory:true,
+      creationSettings:{status:'pending',model:'fixture',effort:'high',canConnectOnSend:true},
+      access:{source:'desktop',runtime:null,readOnly:false,canSend:true,canReconnect:true}};
+    renderState(fixture.meta);
+  });
+  await expect(page.locator('#message')).toBeEnabled();await expect(page.locator('#send')).toBeEnabled();
+  await expect(page.locator('#send-mode')).toBeDisabled();await expect(page.locator('#work-mode')).toBeDisabled();
+  await expect(page.locator('#reconnect')).toBeHidden();await expect(page.locator('#notice-text')).toContainText('새 채팅을 준비');
+  await page.locator('#message').fill('send once while connecting');
+  await page.locator('#composer').evaluate(form=>{form.requestSubmit();form.requestSubmit();});
+  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
+  const write=await page.evaluate(()=>sendControlsFixture.writes[0]);expect(write.text).toBe('send once while connecting');expect(write.mode).toBe('send');expect(write.workMode).toBe('default');
+  expect(write.id).toMatch(/^[a-f0-9-]{36}$/);
+  const guards=await page.evaluate(()=>{
+    const view=sendControlsFixture.meta;
+    return [ {host:'remote'},{id:'other-thread'},{attachedParent:{id:'parent'}},{temporary:true},{readOnlyReason:'policy'},
+      {access:{...view.access,readOnly:true}},{access:{...view.access,canSend:false}},{access:{...view.access,source:'cli'}},
+      {creationSettings:{...view.creationSettings,canConnectOnSend:false}}].map(change=>{renderState({...view,...change});return $('send').disabled;});
+  });
+  expect(guards.every(Boolean)).toBe(true);
+});
+
 test('shared browser opens at readable scale and maps scaled input to the selected frame',async({page})=>{
   await prepare(page);
   await page.evaluate(()=>{

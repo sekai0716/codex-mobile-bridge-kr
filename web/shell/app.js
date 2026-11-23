@@ -14,10 +14,10 @@ let currentHost='local', listRows=[], listGeneration=0, listHasMore=false, listA
 let listComplete=false, listReadFinished=false, listIdentity='', listFilterKey='';
 const composerDrafts=typeof ComposerDrafts==='function'?new ComposerDrafts():null;
 let codexQuotes=null;
-let draftGateway='',codexDraftScope=null,codexDraftTouched=false,restoringComposer=false,codexActiveAccountId;const codexProvisionalDrafts=new Map();
+let draftGateway='',codexDraftScope=null,codexDraftTouched=false,restoringComposer=false,codexActiveAccountId,codexAccountRevision=0;const codexProvisionalDrafts=new Map();
 let listHostIds=[];
 let sourceFilterStamp='';
-let chatTimeline=null,reconnectFailure=null;
+let chatTimeline=null;
 const dismissedHostFaults=new Map();
 const submittedRequestIds=new Set();
 const sessionActivity=new SessionActivity();
@@ -41,7 +41,7 @@ async function goalAction(action,payload) {
 const workModes=new WorkModes({select:$('work-mode'),hint:$('mode-hint'),goalRoot:$('goal-state'),goalToggle:$('goal-toggle'),newId:uuid,
   onCancel:payload=>goalAction('cancel',payload),onStatus:payload=>goalAction('status',payload),onEdit:payload=>goalAction('edit',payload)});
 const sendModes=new ComposerSendModes({select:$('send-mode'),send:$('send'),
-  isDisabled:()=>sending||!state||state.loadingHistory||state.activating||!attachments.ready()||!currentAccess().canSend});
+  isDisabled:()=>sending||!composerCanSend()||!attachments.ready()});
 document.addEventListener('bridge-language',()=>sendModes.render(state,sending));
 window.addEventListener('focus',()=>{if(!$('app').hidden)accountsPanel?.refresh();});
 function chatKey(id=currentId,host=currentHost){return host+'|'+id;}
@@ -148,7 +148,7 @@ desktopSessions.onListEnter=()=>{clientNavigation.listReadDone=false;clientNavig
 desktopSessions.onListReady=(provider,value)=>{clientNavigation.acknowledgeList(provider,value);window.BridgeFeatures?.prefetchChat();};
 async function uploadAttachment(key,id,file){const separator=key.indexOf('|'),host=key.slice(0,separator),thread=key.slice(separator+1);const response=await fetch(sessionUrl(thread,'uploads',host)+'&id='+encodeURIComponent(id)+'&name='+encodeURIComponent(file.name),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/octet-stream','X-CSRF-Token':csrf},body:file});const result=await response.json();if(!response.ok){if(response.status===401)authLost();const error=Error(result.error||t('첨부파일 업로드에 실패했습니다. 다시 시도해 보세요.'));error.retryable=response.status>=500||response.status===429;throw error;}return result;}
 async function uploadAttachmentWithRetry(key,id,file){if(window.BridgeSharedRelay)return uploadAttachment(key,id,file);let last;for(let attempt=0;attempt<3;attempt++){try{return await uploadAttachment(key,id,file);}catch(error){last=error;if(error.name==='AbortError'||error.retryable===false||attempt===2)throw error;await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));}}if(last instanceof TypeError)last.message=t('첨부파일 업로드가 중단되었습니다. 다시 시도해 보세요.');throw last;}
-const attachments=new ChatAttachments({root:$('attachment-list'),button:$('attach-button'),input:$('attachment-input'),chooseReference:()=>window.BridgeFileActions.pickReference(workbench),paste:$('message'),drop:$('composer'),preview:(key,id)=>{const at=key.indexOf('|'),host=key.slice(0,at),thread=key.slice(at+1);return hostUrl(sessionUrl(thread,'uploads/'+encodeURIComponent(id)+'/preview',host));},onChange:()=>{if(currentId)$('send').disabled=sending||!attachments.ready()||!state||state.loadingHistory||state.activating||!currentAccess().canSend;},thumbnail:async(key,id,file)=>{
+const attachments=new ChatAttachments({root:$('attachment-list'),button:$('attach-button'),input:$('attachment-input'),chooseReference:()=>window.BridgeFileActions.pickReference(workbench),paste:$('message'),drop:$('composer'),preview:(key,id)=>{const at=key.indexOf('|'),host=key.slice(0,at),thread=key.slice(at+1);return hostUrl(sessionUrl(thread,'uploads/'+encodeURIComponent(id)+'/preview',host));},onChange:()=>{if(currentId)$('send').disabled=sending||!composerCanSend()||!attachments.ready();},thumbnail:async(key,id,file)=>{
   const separator=key.indexOf('|'),host=key.slice(0,separator),thread=key.slice(separator+1);
   const image=await attachments.thumbnailBlob(file);
   const response=await fetch(sessionUrl(thread,'uploads/'+encodeURIComponent(id)+'/thumb',host)+'&width='+image.width+'&height='+image.height,{method:'POST',credentials:'same-origin',headers:{'Content-Type':image.mime,'X-CSRF-Token':csrf},body:image.data});
@@ -316,6 +316,7 @@ function sessionAccess(access){
 }
 function currentAccess(){
   const access=sessionAccess(state?.access||listRows.find(row=>row.id===currentId&&row.host===currentHost)?.access);
+  if(desktopConnectionBlock(state,chatTimeline?.reconnectFailure))return {...access,canSend:false,canChangeModel:false};
   return awaitingCreationSettings(state)?{...access,canSend:false}:access;
 }
 function sourceLabel(access){return access?.runtime==='wsl'?'WSL':access?.source==='cli'?'CLI':access?.source==='ide'?'VS Code':access?.source==='unknown'?t('기타 소스'):'APP';}
@@ -350,7 +351,7 @@ function renderList(){
     button.append(el('span','session-source',sourceLabel(sessionAccess(chat.access))||t('기타 소스')));
     const meta=el('small');meta.append(el('span','',(chat.orphanedSideChat?t('보조 채팅(기본 채팅 사용 불가)')+' · ':'')+chat.projectName+' · '+(chat.host==='local'?t('이 컴퓨터'):chat.hostLabel)),el('time','',dateText(chat.recency/1000)));
     if(chat.pinPending)button.append(el('span','session-source',t('동기화 보류 중인 고정 환경설정')));
-    button.append(meta);button.onclick=()=>openChat(chat.id,chat.host).catch(e=>toast(e.message));bindSessionMenu(button,chat);parent.append(button);
+    button.append(meta);button.onclick=()=>openChat(chat.id,chat.host,null,null,true).catch(e=>toast(e.message));bindSessionMenu(button,chat);parent.append(button);
   }
   if(listHasMore){const more=el('button','plain',t('더 많은 채팅 로드'));more.id='sessions-more';more.type='button';more.onclick=()=>loadList().catch(error=>toast(error.message));$('sessions').append(more);}
   if(!listRows.length)$('sessions').append(el('p','muted',t(listComplete?'채팅을 찾을 수 없습니다.':listReadFinished?'없는':'로드 중…')));renderActivity();$('sessions').scrollTop=scrollTop;
@@ -766,9 +767,10 @@ $('new-chat-form').onsubmit=async event=>{
   const attemptKind=kind==='wsl'?undefined:kind;
   const host=newChatEnvironment().host,account=codexActiveAccountId,gateway=listIdentity,provider=clientNavigation.provider,token=csrf;
   const scope=JSON.stringify([gateway,host,modelOptions.modelCatalogIdentity||account||null]);
-  const navigation=chatOpenGeneration,originHost=currentHost;
+  const navigation=chatOpenGeneration,originHost=currentHost,accountRevision=codexAccountRevision;
   const request=++newChatRequest;
-  const stillCurrent=()=>request===newChatRequest&&csrf===token&&listIdentity===gateway&&codexActiveAccountId===account&&
+  const stillCurrent=()=>request===newChatRequest&&csrf===token&&listIdentity===gateway&&codexAccountRevision===accountRevision&&
+    (account===undefined||codexActiveAccountId===account)&&
     clientNavigation.provider===provider&&currentHost===originHost&&chatOpenGeneration===navigation&&$('new-chat-dialog').open;
   if(!attempt||(attempt.scope&&attempt.scope!==scope)||attempt.selection!==selection||attempt.title!==title||attempt.entry!==newChatEntry||attempt.kind!==attemptKind||JSON.stringify(window.BridgeCreationModelPicker?.intent(attempt.modelOptions||{})||attempt.modelOptions||{})!==JSON.stringify(window.BridgeCreationModelPicker?.intent(modelOptions)||modelOptions))attempt={id:uuid(),scope,selection,project,title,entry:newChatEntry,modelOptions,...(attemptKind?{kind:attemptKind}:{})};
   attempt.scope=scope;attempt.modelOptions=modelOptions;sessionStorage.setItem('new-chat-attempt',JSON.stringify(attempt));
@@ -995,7 +997,7 @@ $('work-mode').addEventListener('change',()=>{codexDraftTouched=true;saveDraft()
 
 let catalogStarted=false;
 let chatOpenGeneration=0;
-async function openChat(id,host="local",sideWorkspace=null,created=null){
+async function openChat(id,host="local",sideWorkspace=null,created=null,selected=false){
   sharedSessionMenu?.close();
   if(messageActions.pending&&messageActions.dialog.open)return;
   const openGeneration=++chatOpenGeneration,routeProvider=clientNavigation.provider;
@@ -1014,7 +1016,8 @@ async function openChat(id,host="local",sideWorkspace=null,created=null){
   catch(error) {if(openGeneration===chatOpenGeneration)toast(t(error.message));return;}
   if(openGeneration!==chatOpenGeneration||clientNavigation.provider!==routeProvider)return;
   messageActions.dialog.close();workbench.open(id,host,route);saveDraft();chatTimeline?.dispose();codexQuotes?.reset();currentId=id;currentHost=host;refreshEntryAccounts();codexDraftScope=null;codexDraftTouched=false;state=null;catalogStarted=false;workbench.current.access=sessionAccess(listRows.find(row=>row.id===id&&row.host===host)?.access);contextUsageControl.update(null);accountUsageControl.update(null);renderFastModeToggle();workModes.open(chatKey(id,host));$('send-mode').value='auto';attachments.open(chatKey(id,host));modelCatalogGeneration++;catalogData={models:null,skills:null};catalogResults={models:null,skills:null};catalogTasks={models:null,skills:null};skillIndex=new Map();skillTotal=0;skillPages=[];skillQuery={q:'',offset:0,limit:200};invalidSkills=new Set();skillRequest++;modelRequest++;modelTarget=null;fastModeControl.reset();$('model-dialog').close();notificationState={available:false,watching:false,notifyOnCompletion:false};notificationRequest++;$('notify-dialog').close();try{selectedSkills=new Set(JSON.parse(!draftGateway?sessionStorage.getItem('skills:'+chatKey(id,host))||'[]':'[]'));}catch{selectedSkills=new Set();}renderSkillPills();approvalStamp='';submittedRequestIds.clear();$('messages').replaceChildren();$('approvals').replaceChildren();$('queued').replaceChildren();$('message').value=!draftGateway?sessionStorage.getItem('draft:'+chatKey(id,host))||'':'';$('send-error').textContent='';$('chat-title').textContent=t('연결 중…');$('status').textContent=t('연결 중');$('welcome').hidden=true;$('chat').hidden=false;$('app').classList.add('chat-open');$('send').disabled=true;if(!browserNavigation.sync({provider:'codex',id,host}))history.replaceState(null,'','#'+id+'~'+encodeURIComponent(host));document.querySelectorAll('.session').forEach(n=>n.classList.toggle('selected',n.dataset.id===id&&n.dataset.host===host));const opening=workbench.current;
-  if(fresh&&created.title)$('chat-title').textContent=created.title;
+  $('notice').hidden=true;$('notice-text').textContent='';$('reconnect').disabled=true;$('reconnect-manager').hidden=true;
+  if(fresh){$('message').disabled=false;if(created.title)$('chat-title').textContent=created.title;}
   renderModelSummary(fresh?created:{});
   $('model-button').disabled=true;
 try{if(window.BridgeFeatures)await window.BridgeFeatures.load('chat');}catch(error){if(openGeneration===chatOpenGeneration&&workbench.current===opening&&$('app').classList.contains('chat-open')){$('status').textContent=t('연결 실패');$('send-error').textContent=t(error.message);}return;}
@@ -1038,14 +1041,16 @@ const timeline=chatTimeline=new ChatTimeline({cacheKey:listIdentity?JSON.stringi
     const directory=await api(sessionUrl(opening.id,'subagents',host),undefined,timeline.abort.signal);
     if(agentTabScope()&&Array.isArray(directory.agents))workbench.updateAgentTabs(opening.id,directory.agents,directory);
   };
-  reconnectFailure=null;
   $('reconnect').disabled=false;
   window.BridgePresentation?.openChat();
+  // A verified create response can authorize the first send before history has loaded.
+  if(fresh&&created.meta?.id===id&&created.meta.host===host){
+    renderState({title:created.title||t('연결 중…'),status:'notLoaded',loadingHistory:true,connected:false,
+      requests:[],submissions:[],...created.meta});
+  }
   const reading=timeline.start();
   const openingAccess=sessionAccess(known?.access||routeAccess);
-  if((!fresh||created.kind==='desktop')&&openingAccess.source==='desktop'&&openingAccess.canReconnect)api(sessionUrl(id,'reconnect',host),{activate:true},timeline.abort.signal).catch(error=>{
-    if(!timeline.abort.signal.aborted&&chatTimeline===timeline&&!state?.connected)toast(error.message);
-  });
+  if((!fresh||created.kind==='desktop')&&openingAccess.source==='desktop'&&openingAccess.canReconnect)reconnectChat(id,host,timeline,false,host==='local'&&(fresh||selected));
   await reading;
   if(!timeline.abort.signal.aborted&&workbench.current?.chatScroll?.has(id))$('timeline').scrollTop=workbench.current.chatScroll.get(id);
   if(!timeline.abort.signal.aborted){scheduleCatalog();loadNotificationState(id,host);}
@@ -1125,6 +1130,21 @@ function applyEntryCapabilities(view){
 function awaitingCreationSettings(view){
   return ['pending','unknown'].includes(view?.creationSettings?.status);
 }
+function connectOnFirstSend(view){
+  const access=view?.access;
+  return view?.creationSettings?.canConnectOnSend===true&&currentHost==='local'&&view.host===currentHost&&view.id===currentId&&
+    access?.source==='desktop'&&access.readOnly===false&&access.canSend===true&&!view.readOnlyReason&&
+    !view.attachedParent&&!view.temporary&&!view.archived&&view.status!=='active'&&!view.requests?.length;
+}
+function desktopConnectionBlock(view,failure){
+  if(view?.connected!==false||currentHost!=='local'||(view.access?.source&&view.access.source!=='desktop')||connectOnFirstSend(view))return null;
+  return [failure,view.connectionError].find(message=>
+    message==='The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.'||
+    message==='The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.')||null;
+}
+function composerCanSend(){
+  return !!state&&(connectOnFirstSend(state)||(!state.loadingHistory&&!state.activating&&currentAccess().canSend));
+}
 function renderModelSummary(view){
   const pending=awaitingCreationSettings(view);
   const settings=pending||view.creationSettings?.status==='applied'?view.creationSettings:view;
@@ -1136,6 +1156,8 @@ function renderModelSummary(view){
   $('model-button').title=[model,detail].filter(Boolean).join(' · ');
 }
 function renderState(view){
+  const recovered=!state?.connected&&view.connected;
+  const accountChanged=state?.draftAccountIdentity&&view.draftAccountIdentity!==state.draftAccountIdentity;
   applyEntryCapabilities(view);
   contextUsageControl.update({...view,busy:contextCompacting.has(chatKey(currentId,currentHost))});state=view;renderAccountUsage(view);if(typeof bindCodexDraft==='function')bindCodexDraft(view);renderFastModeToggle(view);
   if(typeof messageManagement!=='undefined')messageManagement?.reconcile();
@@ -1143,8 +1165,12 @@ function renderState(view){
     if(!view.connected||dialog.dataset.permissionThread!==currentId||dialog.dataset.permissionHost!==currentHost||
        dialog.dataset.permissionRuntime!==(view.access?.runtime||'desktop'))dialog.close();
   }
-  const applying=awaitingCreationSettings(view);
-  if(view.connected&&!applying)reconnectFailure=null;
+  const applying=awaitingCreationSettings(view),firstSend=connectOnFirstSend(view);
+  if(chatTimeline&&(accountChanged||view.connected&&(recovered||!applying))){
+    chatTimeline.reconnectFailure=null;chatTimeline.reconnectAttempt=null;
+  }
+  const reconnectFailure=chatTimeline?.reconnectFailure;
+  const connectionBlock=desktopConnectionBlock(view,reconnectFailure);
   const access=sessionAccess(view.access),limited=!!view.access;
   $('permissions-button').textContent=t({'ask':'승인 요청','auto-review':'승인해 주세요','full-access':'전체 액세스'}[view.permissionMode]||'권한');
   $('permissions-button').disabled=!view.connected||!access.canChangePermissions;
@@ -1152,30 +1178,48 @@ function renderState(view){
   if(visibleChat()){sessionActivity.read(chatKey());renderActivity();}
   $('chat-title').textContent=view.loadingHistory?t('채팅 로드 중…'):view.title;
   renderModelSummary(view);
-  $('status').textContent=!view.connected?(view.loadingHistory?t('로딩 내역'):view.activating?t('대화를 재개하는 중…'):access.source==='cli'?t('저장된 기록'):view.connecting?t('데스크톱에 연결 중'):t('저장된 기록')):view.requests.length?t('귀하의 답변을 기다리고 있습니다'):view.status==='active'?t('실행 중'):t('연결됨');
+  $('status').textContent=!view.connected?(firstSend?t('데스크톱에 연결 중'):view.loadingHistory?t('로딩 내역'):view.activating?t('대화를 재개하는 중…'):access.source==='cli'?t('저장된 기록'):view.connecting?t('데스크톱에 연결 중'):t('저장된 기록')):view.requests.length?t('귀하의 답변을 기다리고 있습니다'):view.status==='active'?t('실행 중'):t('연결됨');
   $('status').classList.toggle('offline',!view.connected);
-  $('notice').hidden=view.connected&&!applying;
-  $('notice-text').textContent=applying?t(reconnectFailure||(view.creationSettings.status==='unknown'?
-    'Confirm the new chat model before sending. Reconnect or choose a model.':'요청한 모델 설정의 적용을 기다리고 있습니다.')):view.readOnlyReason?t(view.readOnlyReason):access.source==='cli'?(t(reconnectFailure||view.connectionError)||t(access.canReconnect?'먼저 채팅 기록을 읽어보세요. 원래 CLI 세션에 계속 연결하거나 재개합니다.':access.reason||'CLI 채팅 기록을 사용할 수 있습니다. 지금은 이 채팅을 계속할 수 없습니다.')):limited&&!access.canReconnect?(t(access.reason)||t('저장된 이력을 보실 수 있습니다. 이 소스에는 원격 제어를 사용할 수 없습니다.')):view.desktopRestartRecommended?t('원래 데스크톱 세션의 연결이 여전히 끊어졌습니다. 다시 재구축해 보세요. 실패하면 Codex를 다시 시작하기 전에 앱 관리에서 작업을 검토하세요.'):view.activating?t('자동으로 연결; 컴퓨터의 Codex에서 채팅이 열릴 수 있습니다.'):view.connecting?t('데스크탑에 연결 중입니다. 그동안 저장된 기록을 읽을 수 있습니다.'):reconnectFailure?t(reconnectFailure):view.rebuildRecommended?t('데스크톱 연결을 더 이상 사용할 수 없습니다. 연결을 다시 구축하십시오. 채팅 기록과 초안은 보관됩니다.'):t(view.connectionError)||t('아직 연결되지 않았습니다. 기록을 읽거나 다시 연결할 수 있습니다.');
-  $('reconnect').hidden=limited&&!access.canReconnect;
-  $('reconnect').textContent=t(access.source==='cli'?'계속 채팅':!applying&&(view.rebuildRecommended||view.desktopRestartRecommended)?'연결 재구축':'다시 연결');
-  $('reconnect-manager').hidden=view.connected||!view.desktopRestartRecommended;
+  const restart=!connectionBlock&&view.desktopRestartRecommended&&currentHost==='local'&&access.source==='desktop'&&access.canReconnect&&
+    !view.connected&&!view.connecting&&!view.activating&&!applying&&!firstSend;
+  $('notice').hidden=view.connected&&!applying&&!firstSend;
+  let notice=connectionBlock||reconnectFailure;
+  if(!notice){
+    if(firstSend)notice='선택한 모델로 새 채팅을 준비하고 있습니다.';
+    else if(applying)notice=view.creationSettings.status==='unknown'?'Confirm the new chat model before sending. Reconnect or choose a model.':'요청한 모델 설정의 적용을 기다리고 있습니다.';
+    else if(view.readOnlyReason)notice=view.readOnlyReason;
+    else if(access.source==='cli')notice=view.connectionError||(access.canReconnect?'먼저 채팅 기록을 읽어보세요. 원래 CLI 세션에 계속 연결하거나 재개합니다.':access.reason||'CLI 채팅 기록을 사용할 수 있습니다. 지금은 이 채팅을 계속할 수 없습니다.');
+    else if(limited&&!access.canReconnect)notice=access.reason||'저장된 이력을 보실 수 있습니다. 이 소스에는 원격 제어를 사용할 수 없습니다.';
+    else if(view.connectionError==='Could not reconnect this chat to Codex. Try reconnecting this chat again.')notice=view.connectionError;
+    else if(restart)notice='원래 데스크톱 세션의 연결이 여전히 끊어졌습니다. 다시 재구축해 보세요. 실패하면 Codex를 다시 시작하기 전에 앱 관리에서 작업을 검토하세요.';
+    else if(view.activating)notice='자동으로 연결; 컴퓨터의 Codex에서 채팅이 열릴 수 있습니다.';
+    else if(view.connecting)notice='데스크탑에 연결 중입니다. 그동안 저장된 기록을 읽을 수 있습니다.';
+    else if(view.rebuildRecommended)notice='데스크톱 연결을 더 이상 사용할 수 없습니다. 연결을 다시 구축하십시오. 채팅 기록과 초안은 보관됩니다.';
+    else notice=view.connectionError||'아직 연결되지 않았습니다. 기록을 읽거나 다시 연결할 수 있습니다.';
+  }
+  $('notice-text').textContent=t(notice);
+  $('reconnect').hidden=(firstSend&&!reconnectFailure)||limited&&!access.canReconnect;
+  $('reconnect').disabled=!!chatTimeline?.reconnectAttempt;
+  $('reconnect').textContent=t(access.source==='cli'?'계속 채팅':!connectionBlock&&!applying&&(view.rebuildRecommended||restart)?'연결 재구축':'다시 연결');
+  $('reconnect-manager').hidden=!restart;
   $('history').hidden=view.historyComplete||!view.connected;
   renderCodexProgress(view);$('stop').hidden=view.status!=='active'||!view.connected||!access.canInterrupt;
-  $('send').disabled=view.loadingHistory||view.activating||sending||!attachments.ready()||!currentAccess().canSend;
+  $('send').disabled=sending||!composerCanSend()||!attachments.ready();
   $('message').disabled=limited&&!access.canSend;
   $('attach-button').disabled=limited&&!access.canSend;
-  $('model-button').disabled=limited&&!access.canChangeModel;
+  $('model-button').disabled=!!connectionBlock||limited&&!access.canChangeModel;
+  if(connectionBlock&&$('model-dialog').open)$('model-dialog').close();
   $('skills-button').disabled=limited&&!access.canSelectSkills;
   if(access.canChangeModel||access.canSelectSkills)scheduleCatalog();
-  $('send-mode').disabled=limited&&!access.canSend;
+  $('send-mode').disabled=firstSend||limited&&!access.canSend;
+  if(firstSend)$('send-mode').value='auto';
   $('send-mode').querySelector('[value=steer]').disabled=view.status!=='active'||!access.canSend;
   if((view.status!=='active'||!access.canSend)&&$('send-mode').value==='steer')$('send-mode').value='auto';
   sendModes.render(view,sending);
   const modesView=limited&&!access.canUseGoal?{...view,goalRuntimeAvailable:false}:view;
   workModes.render(modesView,$('send-mode').value,sending);
-  $('work-mode').disabled=limited&&!access.canUseModes;
-  if(limited&&!access.canUseModes)$('work-mode').value='default';
+  $('work-mode').disabled=firstSend||limited&&!access.canUseModes;
+  if(firstSend||limited&&!access.canUseModes)$('work-mode').value='default';
   workbench.current.access=access;
   // Parent workspace identity is resolved before opening the native child route.
   chatTimeline?.refreshActions();
@@ -1519,12 +1563,13 @@ function renderQueue(rows){
 function uuid(){const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const h=[...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);}
 $('composer').onsubmit=async event=>{
   event.preventDefault();
-  if(sending||!currentId||!state||state.loadingHistory||state.activating||!currentAccess().canSend)return;
+  if(sending||!currentId||!composerCanSend())return;
   const rawText=$('message').value,submittedQuotes=JSON.stringify(codexQuotes?.quotes||[]),text=codexQuotes?codexQuotes.serialize(rawText):rawText;
   if(text.length>100000){$('send-error').textContent=t('따옴표를 포함한 메시지가 100,000자를 초과합니다. 보내기 전에 짧게 하세요.');return;}
   if(!attachments.ready()){toast('첨부파일 업로드가 완료될 때까지 기다리세요.');return;}
   const attachmentIds=attachments.ids(),references=attachments.references(),submittedAttachmentIds=attachments.rows.map(row=>row.id);if(!text.trim()&&!submittedAttachmentIds.length)return;
   const mode=sendModes.value(state),workMode=workModes.value(mode);
+  if(connectOnFirstSend(state)&&(mode!=='send'||workMode!=='default'))return;
   if(!mode){$('send-error').textContent=t('이 연결은 대기열을 지원하지 않습니다.');return;}
   if(workMode==='goal'&&submittedAttachmentIds.length){$('send-error').textContent=t('목표 모드는 아직 첨부 파일을 지원하지 않습니다.');return;}
   if(invalidSkills.size){$('send-error').textContent=t('선택한 스킬을 사용할 수 없습니다. 새로고침하고 다시 선택하세요.');return;}
@@ -1572,7 +1617,7 @@ $('composer').onsubmit=async event=>{
     if(currentId===target&&currentHost===targetHost){$('send-error').textContent=t(error.message);window.BridgePresentation?.showError();}
     if(error.code!=='send_not_submitted'&&currentId===target&&currentHost===targetHost)await messageManagement?.reconcile();
   }
-  finally{sending=false;attachments.setLocked(false);workModes.render(state,$('send-mode').value,false);$('send').disabled=!state||state.loadingHistory||state.activating||!attachments.ready()||!currentAccess().canSend;sendModes.render(state,false);}
+  finally{sending=false;attachments.setLocked(false);workModes.render(state,$('send-mode').value,false);$('send').disabled=!composerCanSend()||!attachments.ready();sendModes.render(state,false);}
 };
 $('message').onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();$('composer').requestSubmit();}};
 function chatCommandActions(chat,provider,button){
@@ -1592,17 +1637,25 @@ desktopSessions.commandActions=()=>[...chatCommandActions({...desktopSessions.st
 $('stop').onclick=async()=>{if(!currentAccess().canInterrupt)return;try{await api(sessionUrl(currentId,'stop'),{});toast('중지 요청됨');}catch(e){toast(e.message);}};
 $('history').onclick=async()=>{$('history').disabled=true;try{await api('/api/sessions/'+currentId+'/history',{});}catch(e){toast(e.message);}finally{$('history').disabled=false;}};
 $('reconnect').onclick=async()=>{
-  const access=currentAccess();if(!access.canReconnect||$('reconnect').disabled)return;
-  const id=currentId,host=currentHost,timeline=chatTimeline,rebuild=!awaitingCreationSettings(state)&&(state?.rebuildRecommended||state?.desktopRestartRecommended);
-  $('reconnect').disabled=true;reconnectFailure=null;
-  try{await api(sessionUrl(id,'reconnect',host),{activate:true,...(rebuild?{rebuild:true}:{})});}
-  catch(e){
-    if(timeline===chatTimeline&&!timeline?.abort.signal.aborted&&id===currentId&&host===currentHost&&(!state?.connected||awaitingCreationSettings(state))){
-      reconnectFailure=e.message;$('notice').hidden=false;$('notice-text').textContent=t(e.message);toast(e.message);
-    }
-  }
-  finally{if(timeline===chatTimeline)$('reconnect').disabled=false;}
+  const access=currentAccess();if(!access.canReconnect||$('reconnect').disabled||!chatTimeline)return;
+  const rebuild=!awaitingCreationSettings(state)&&(state?.rebuildRecommended||!$('reconnect-manager').hidden);
+  await reconnectChat(currentId,currentHost,chatTimeline,rebuild,currentHost==='local'&&(connectOnFirstSend(state)||awaitingCreationSettings(state)));
 };
+async function reconnectChat(id,host,timeline,rebuild,prepareCreation=false){
+  if(timeline.reconnectAttempt)return;
+  const attempt=timeline.reconnectAttempt={};
+  const current=()=>chatTimeline===timeline&&!timeline.abort.signal.aborted&&id===currentId&&host===currentHost;
+  $('reconnect').disabled=true;
+  try{await api(sessionUrl(id,'reconnect',host),{activate:true,...(prepareCreation?{prepareCreation:true}:{}),...(rebuild?{rebuild:true}:{})},timeline.abort.signal,current);}
+  catch(error){
+    if(!current()||timeline.reconnectAttempt!==attempt||state?.connected&&!awaitingCreationSettings(state))return;
+    timeline.reconnectFailure=error.message;
+    if(state)renderState(state);
+  }finally{
+    if(timeline.reconnectAttempt===attempt)timeline.reconnectAttempt=null;
+    if(current())$('reconnect').disabled=!!timeline.reconnectAttempt;
+  }
+}
 $('reconnect-manager').onclick=()=>clientNavigation.openManager();
 document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>$(button.dataset.close).close());
 async function loadCatalogKind(kind,refresh=false){
@@ -2118,7 +2171,7 @@ function renderAccountEntries(){
   if(codexCliDetails.hidden)codexCliAccessPanel?.clear();
 }
 
-const accountsPanel=window.BridgeSharedRelay||typeof AccountsPanel==='undefined'?null:new AccountsPanel({root:$('accounts-content'),toolbar:$('accounts-heading'),read:force=>api(accountUrl('/api/accounts'+(accountsPanel?.visible()&&accountsPanel?.value?.resetDynamicEnabled?'?resetForecast='+(force?'refresh':'1'):''))),request:({action,...value})=>action==='ignoreSubmission'?ignoreSubmission(value):api(accountUrl(['initializeDesktopRuntime','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?'/api/accounts/desktop-runtime':action==='retrySsh'?'/api/accounts/ssh-retry':action==='account'?'/api/accounts/account':action==='details'?'/api/accounts/details':action==='reminders'?'/api/accounts/reminders':action==='checkDesktopUpdate'||action==='requestDesktopUpdate'?'/api/accounts/desktop-update':'/api/accounts/switch'),['checkDesktopUpdate','requestDesktopUpdate','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?{action,...value}:value),onChanged:value=>{if(codexActiveAccountId!==undefined&&codexActiveAccountId!==value.activeId){browserNavigation.invalidate();if(typeof ChatTimeline!=='undefined')ChatTimeline.clearCache?.();clearCodexProvisionalDrafts();clearQuoteComposer();codexDraftScope=null;codexDraftTouched=false;}resetModelCatalog();},onUpdate:value=>{codexActiveAccountId=value.activeId;const label='계정';$('accounts-button').setAttribute('data-i18n',label);$('accounts-button').textContent=t(label);}});
+const accountsPanel=window.BridgeSharedRelay||typeof AccountsPanel==='undefined'?null:new AccountsPanel({root:$('accounts-content'),toolbar:$('accounts-heading'),read:force=>api(accountUrl('/api/accounts'+(accountsPanel?.visible()&&accountsPanel?.value?.resetDynamicEnabled?'?resetForecast='+(force?'refresh':'1'):''))),request:({action,...value})=>action==='ignoreSubmission'?ignoreSubmission(value):api(accountUrl(['initializeDesktopRuntime','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?'/api/accounts/desktop-runtime':action==='retrySsh'?'/api/accounts/ssh-retry':action==='account'?'/api/accounts/account':action==='details'?'/api/accounts/details':action==='reminders'?'/api/accounts/reminders':action==='checkDesktopUpdate'||action==='requestDesktopUpdate'?'/api/accounts/desktop-update':'/api/accounts/switch'),['checkDesktopUpdate','requestDesktopUpdate','deferDesktopRuntime','cancelDeferredDesktopRuntime'].includes(action)?{action,...value}:value),onChanged:value=>{if(codexActiveAccountId!==undefined&&codexActiveAccountId!==value.activeId){codexAccountRevision++;browserNavigation.invalidate();if(typeof ChatTimeline!=='undefined')ChatTimeline.clearCache?.();clearCodexProvisionalDrafts();clearQuoteComposer();codexDraftScope=null;codexDraftTouched=false;}resetModelCatalog();},onUpdate:value=>{codexActiveAccountId=value.activeId;const label='계정';$('accounts-button').setAttribute('data-i18n',label);$('accounts-button').textContent=t(label);}});
 accountsPanel?.attachApiAccess(codexCliAccessPanel,codexCliDetails);
 function openCurrentAccounts(){
   const activeProvider=clientNavigation.provider,provider=ClientIdentity.family(activeProvider),entry=ClientIdentity.entry(activeProvider)?activeProvider:provider;

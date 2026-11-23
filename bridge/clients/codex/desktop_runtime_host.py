@@ -20,7 +20,7 @@ from bridge.clients.codex.app_server import AppServerMessageTooLarge as MessageT
 MAX_LINE = 64 * 1024 * 1024
 
 
-def _forward_input(stream, transport, emit, stop):
+def _forward_input(stream, transport, emit, stop, subscriptions=None):
     """Reject one invalid/oversized request without disconnecting the App."""
     while not stop.is_set():
         line = stream.readline(MAX_LINE + 2)
@@ -43,6 +43,8 @@ def _forward_input(stream, transport, emit, stop):
             emit({'id': None, 'error': {'code': -32600, 'message': 'Invalid Desktop request'}})
             continue
         try:
+            if subscriptions:
+                subscriptions.outgoing(packet)
             transport.send(packet)
         except MessageTooLarge:
             if 'id' in packet and 'method' in packet:
@@ -138,12 +140,18 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
     _write(active, json.dumps(record))
     native = None
     proxy = None
+    subscriptions = None
     stop = threading.Event()
     errors = []
     output_lock = threading.Lock()
     record_lock = threading.Lock()
     previous = {sig: signal.signal(sig, lambda *_: stop.set()) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
+        if sys.platform == 'linux':
+            from bridge.clients.codex.desktop_subscriptions import DesktopSubscriptions
+            tracker = DesktopSubscriptions(endpoint)
+            tracker.directory.mkdir(mode=0o700)
+            subscriptions = tracker
         # The native runtime inherits the App's environment and working dir.
         # Only transport changes. Its stderr belongs to the original App.
         native = subprocess.Popen([config['cli'], *arguments], stdin=subprocess.DEVNULL,
@@ -182,6 +190,8 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
             try:
                 while not stop.is_set():
                     packet = transport.receive()
+                    if subscriptions:
+                        subscriptions.incoming(packet)
                     if packet.get('id') == initialize.get('id') and 'result' in packet:
                         if Path(packet['result']['codexHome']).resolve() != Path(config['home']):
                             raise ValueError('Native Desktop initialized a different home')
@@ -202,7 +212,7 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
         def input_loop():
             try:
                 transport.send(initialize)
-                _forward_input(sys.stdin.buffer, transport, emit, stop)
+                _forward_input(sys.stdin.buffer, transport, emit, stop, subscriptions)
             except (OSError, ValueError, RuntimeError) as exc:
                 if not stop.is_set():
                     errors.append(exc)
@@ -234,6 +244,8 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
                 active.unlink()
         if exited:
             endpoint.unlink(missing_ok=True)
+            if subscriptions:
+                subscriptions.close()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
     if errors:
