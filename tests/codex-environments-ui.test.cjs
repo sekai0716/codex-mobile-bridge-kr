@@ -28,7 +28,7 @@ function fixture({native=true,listSource='all',host='local',wslSupported=true}={
  class CliAccessPanel{constructor(options){Object.assign(this,options);this.clears=0;this.refreshes=0;}clear(){this.clears++;}refresh(){this.refreshes++;return this.read();}}
  class WslAccountsPanel{constructor(options){Object.assign(this,options);}clear(){}select(entry){this.entry=entry;return this.read(entry);}}
  const close=node('button'),context=vm.createContext({$,api,Option,AccountsPanel,CliAccessPanel,WslAccountsPanel,URL,Event:class{constructor(type){this.type=type;}},window:{BridgeFeatures:{load:async name=>{calls.push({feature:name});}}},BridgeI18n:{t:value=>value,locale:()=> 'ko'},document:{getElementById:$,createElement:node,querySelector:()=>close},
-  workbench:{},t:value=>value,el:(tag,_class='',text='')=>Object.assign(node(tag),{textContent:text}),
+  workbench:{},csrf:'fixture-token',listIdentity:'fixture-gateway',codexActiveAccountId:'fixture-account',chatOpenGeneration:0,t:value=>value,el:(tag,_class='',text='')=>Object.assign(node(tag),{textContent:text}),
   clientNavigation:{wslSupported,provider:'codex',clients:[{id:'codex',entries}]},currentHost:host,currentId:null,listSource,listRows:[],
   renderSourceFilter(){},uuid:()=> '11111111-1111-4111-8111-111111111111',setLanguageBusy(){},loadList:async()=>{},openChat:async(id,where)=>opened.push({id,host:where}),toast:message=>notices.push(message),isCodexClient:id=>id==='codex',
   sessionStorage:{getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,value),removeItem:key=>store.delete(key)}});
@@ -104,6 +104,22 @@ test('submitting an independent chat invalidates an outstanding project read',as
  resolveProjects({projects:[project(ubuntu,'late-project')]});await opening;assert.equal(ui.$('new-chat-project').options.some(option=>option.value==='late-project'),false);assert.equal(ui.run('creatingChat'),true);
  resolveCreate({id:'created',host:ubuntu});await creating;assert.deepEqual(ui.opened,[{id:'created',host:ubuntu}]);
 });
+test('a late creation response cannot switch the active account or open another host',async()=>{
+ for(const change of ['account','host','navigation','auth','switchHost']){
+  const ui=fixture({listSource:'wsl'});let created;
+  ui.setHandler(url=>url.startsWith('/api/projects')?{projects:[]}:new Promise(resolve=>created=resolve));
+  await ui.$('new-chat').onclick();
+  const pending=ui.$('new-chat-form').onsubmit({preventDefault(){}});
+  await ui.$('new-chat-form').onsubmit({preventDefault(){}});
+  if(change==='account')ui.context.codexActiveAccountId='other-account';
+  if(change==='navigation')ui.context.chatOpenGeneration++;
+  if(change==='auth')ui.context.csrf='new-token';
+  if(change==='switchHost')ui.context.currentHost=debian;
+  created({id:'new-child',host:change==='host'?debian:ubuntu});await pending;
+  assert.equal(ui.opened.length,0);assert.equal(ui.calls.filter(row=>row.url.startsWith('/api/sessions')).length,1);
+ }
+});
+
 test('stopping the current environment returns to the list without affecting another environment',()=>{
  const ui=fixture({host:ubuntu});let left=0;ui.run("currentId='active-thread';");ui.context.clientNavigation.onApplicationChange=()=>left++;
  vm.runInContext(section('clientNavigation.onClientStates=', 'desktopSessions.onListEnter='),ui.context);

@@ -512,6 +512,15 @@ test('model identity change is not treated as an editable directory outage',asyn
  ui.nodes.get('custom-model').value='old-model';ui.nodes.get('custom-model').oninput();assert.equal(ui.nodes.get('model-save').disabled,true);
  await ui.nodes.get('model-form').onsubmit({preventDefault(){}});assert.equal(ui.responses.length,0);
 });
+test('a connected chat without a known model starts with no preselected model',async()=>{
+ const ui=await fixture(r=>r(official),'chatgpt',{models:[{id:'real-model',name:'Real model'}]});
+ ui.run("currentId='thread';state={connected:true,model:'',provider:'openai'}");await ui.nodes.get('model-button').onclick();
+ assert.equal(ui.nodes.get('model-select').value,'');assert.equal(ui.nodes.get('model-save').disabled,true);
+ assert.equal(ui.nodes.get('custom-model-label').hidden,true);
+ ui.nodes.get('model-select').value='__custom__';ui.nodes.get('model-select').onchange();
+ assert.equal(ui.nodes.get('custom-model-label').hidden,false);
+});
+
 test('model submission rejects a changed account even before its detail repaint',async()=>{
  const ui=await fixture(r=>r(official),'chatgpt',{models:[{id:'old-model',efforts:[]}],cache:{identity:'account-a'}});
  ui.run("currentId='thread';state={connected:true,model:'old-model',modelCatalogIdentity:'account-a'}");await ui.nodes.get('model-button').onclick();

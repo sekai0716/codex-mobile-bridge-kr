@@ -2,6 +2,11 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "요청한 모델 설정의 적용을 기다리고 있습니다.": "Waiting for the requested model settings to take effect.",
+  "Confirm the new chat model before sending. Reconnect or choose a model.": "Confirm the new chat model before sending. Reconnect or choose a model.",
+  "생성된 채팅을 확인할 수 없습니다.": "The created chat could not be verified.",
+  "설정 확인 필요": "Confirmation needed",
+  "적용 대기": "Pending",
   "기본 사이드 채팅 연결이 준비되었습니다.": "The side chat connection is ready.",
   "기본 사이드 채팅 연결 자동 확인": "Checking the shared desktop connection.",
   "기본 사이드 채팅 연결을 자동으로 준비하는 중": "Preparing the shared desktop connection.",

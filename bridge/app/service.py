@@ -388,6 +388,9 @@ class Bridge:
         self.message_actions = json.loads(self.actions_path.read_text(encoding='utf-8')) if self.actions_path.exists() else {}
         self.creations_path = self.data_dir / 'creations.json'
         self.creations = json.loads(self.creations_path.read_text(encoding='utf-8')) if self.creations_path.exists() else {}
+        self.creation_registry = self
+        self.creation_handoffs = {(entry['host'], entry['id']): entry for entry in self.creations.values()
+                                  if entry.get('id') and entry.get('host') and entry.get('modelSettingsPhase') in ('pending', 'unknown')}
         self.submissions = json.loads(self.ledger_path.read_text(encoding='utf-8')) if self.ledger_path.exists() else {}
         self.goal_commands_path = self.data_dir / 'goal-commands.json'
         self.goal_commands = json.loads(self.goal_commands_path.read_text(encoding='utf-8')) if self.goal_commands_path.exists() else {}
@@ -968,7 +971,7 @@ class Bridge:
     @operation(project='project_key')
     def create_chat(self, project_key, title, request_id, kind='desktop', model_options=None):
         from bridge.features.sessions.creation_models import intent
-        model_options = model_options or {}
+        model_options = dict(model_options or {})
         if self.host.startswith('codex:'):
             kind = 'cli'
         if not isinstance(request_id, str):
@@ -1014,6 +1017,11 @@ class Bridge:
                          'directoryIdentity': project.get('directoryIdentity'), 'at': time.time()}
                 if model_options:
                     entry['modelOptions'] = model_options
+                    if kind == 'desktop':
+                        independent = self.data_dir/'independent-chats'
+                        entry['catalogCwd'] = project['cwd'] or str((independent if independent.is_dir() else self.data_dir).resolve())
+                        if project['host'] != self.host:
+                            entry['hostIdentity'] = self.hosts.hosts()[project['host']]['alias']
                 self.creations[request_id] = entry
                 self._save_creations()
             if not entry.get('id'):
@@ -1090,6 +1098,8 @@ class Bridge:
                 if kind == 'desktop' and model_options:
                     entry['modelSettingsPhase'] = 'pending'
                 self._save_creations()
+                if entry.get('modelSettingsPhase') == 'pending':
+                    self.creation_handoffs[(entry['host'], thread_id)] = entry
                 if kind == 'cli':
                     bridge = cli_bridge
                     with bridge.lock:
@@ -1105,75 +1115,165 @@ class Bridge:
                         session.state = state
                         session.access = bridge._access('cli', session)
                         session.changed()
-            bridge = self.for_host(entry['host'])
-            if isinstance(bridge.store, RemoteStore):
+            try:
+                bridge = self.for_host(entry['host'])
+            except (RemoteUnavailable, KeyError):
+                if kind != 'desktop':
+                    raise
+                bridge = None
+            if bridge and isinstance(bridge.store, RemoteStore):
                 with bridge.store.lock:
                     bridge.store.cache.clear()
             if kind == 'cli':
                 return {'id': entry['id'], 'host': entry['host'], 'opened': False,
                         'message': "CLI 채팅이 생성되었습니다. 여기에서 계속하세요."}
-            try:
-                open_in_desktop(entry['id'], entry['host'])
-                opened = True
-            except (OSError, CreationError, subprocess.SubprocessError):
-                opened = False
-            self._complete_creation_settings(entry, bridge)
-            return {'id': entry['id'], 'host': entry['host'], 'opened': opened,
-                    'message': '생성되었습니다. 데스크톱에 연결 중입니다. App' if opened else '채팅이 생성되었습니다. 컴퓨터로 이동하세요. App 열고 다시 연결'}
+        # The native ID is durable. An unavailable composer must not send the web
+        # client back through project creation or wait for a cold owner probe.
+        try:
+            open_in_desktop(entry['id'], entry['host'])
+            opened = True
+        except (OSError, CreationError, subprocess.SubprocessError):
+            opened = False
+        if bridge:
+            with bridge.lock:
+                session = bridge.live.get(entry['id'])
+            if session and session.connected:
+                bridge._recover_creation_settings(session)
+        result = {'id': entry['id'], 'host': entry['host'], 'opened': opened,
+                  'message': '생성되었습니다. 데스크톱에 연결 중입니다. App' if opened else '채팅이 생성되었습니다. 컴퓨터로 이동하세요. App 열고 다시 연결'}
+        if entry.get('modelSettingsPhase') in ('pending', 'unknown', 'applied'):
+            result['creationSettings'] = self._creation_choice(entry)
+        return result
 
-    def _complete_creation_settings(self, entry, bridge):
-        # An empty thread's temporary creator does not own Desktop's composer.
-        # Complete the explicit creation through that original owner, never from
-        # passive history/attachment or by overriding the account's defaults.
-        phase = entry.get('modelSettingsPhase')
-        if phase not in ('pending', 'unknown'):
+    @staticmethod
+    def _creation_choice(entry):
+        options = entry['modelOptions']
+        return {'status': entry['modelSettingsPhase'], 'model': options['model'],
+                **({'effort': options['effort']} if options.get('effort') is not None else {})}
+
+    def _creation_entry(self, thread_id):
+        registry = getattr(self, 'creation_registry', None)
+        entry = registry.creation_handoffs.get((self.host, thread_id)) if registry else None
+        return entry if entry and entry.get('modelSettingsPhase') in ('pending', 'unknown') else None
+
+    def _creation_owner_matches(self, session, entry):
+        state = session.state or {}
+        return (session.connected and session.owner and session.runtime == 'desktop'
+                and session.id == state.get('id') == entry['id'] and self.host == entry['host']
+                and (not entry.get('hostIdentity') or entry['hostIdentity'] == getattr(self.store, 'alias', None))
+                and same_cwd(entry.get('runtimeCwd') or entry.get('cwd'), state.get('cwd'), self.local and os.name == 'nt')
+                and state.get('modelProvider') and (not session.saved_provider or session.saved_provider == state['modelProvider']))
+
+    def _creation_host_current(self, entry):
+        if self.local:
+            return True
+        alias = self.creation_registry.hosts.hosts().get(entry['host'], {}).get('alias')
+        return bool(alias and alias == self.store.alias and entry.get('hostIdentity', alias) == alias)
+
+    @staticmethod
+    def _creation_has_messages(state):
+        # A real user turn supersedes a first-turn choice, including receipts
+        # written by older gateways. A provisional/empty native turn is not proof.
+        return any((turn.get('params') or {}).get('input') or
+                   any(item.get('type') == 'userMessage' or item.get('type') == 'message' and item.get('role') == 'user'
+                       for item in items_array(turn.get('items'))) for turn in ordered_turns(state))
+
+    def _creation_meta(self, session, meta):
+        entry = self._creation_entry(session.id)
+        if entry:
+            with session.condition:
+                choice = self._creation_choice(entry)
+                if choice['status'] in ('pending', 'unknown') and (
+                        not self._creation_owner_matches(session, entry) or not self._creation_has_messages(session.state)):
+                    meta['creationSettings'] = choice
+
+    def _set_creation_phase(self, entry, phase, session):
+        # Called under the session action lock; creation never acquires it while
+        # holding the ledger lock. Reserve unknown durably before any model write.
+        with self.create_lock:
+            previous = entry['modelSettingsPhase']
+            entry['modelSettingsPhase'] = phase
+            try:
+                self._save_creations()
+            except OSError:
+                entry['modelSettingsPhase'] = previous
+                raise
+            if phase in ('applied', 'superseded'):
+                self.creation_handoffs.pop((entry['host'], entry['id']), None)
+        with session.condition:
+            session.changed()
+
+    def _recover_creation_settings(self, session, *, verify_only=False):
+        entry = self._creation_entry(session.id)
+        if not entry:
             return
         try:
-            session = bridge._target(entry['id'])
-        except (IPCError, StoreUnavailable) as exc:
-            raise CreationError('채팅이 생성되었으나 선택한 모델이 적용되지 않았습니다. 동일한 채팅에 계속 연결하려면 이 생성을 다시 시도하세요. 그러면 다시 생성되지 않습니다.') from exc
+            self._complete_creation_settings(entry, session, verify_only=verify_only)
+        except (IPCError, StoreUnavailable, CatalogError, RemoteUnavailable, CreationError, KeyError, ValueError, OSError):
+            # Subsequent opens/reconnects can inspect this exact receipt. A lost
+            # settings response may only be observed, never blindly submitted again.
+            pass
+        if verify_only and self._creation_entry(session.id):
+            raise SubmissionRejected('Confirm the new chat model before sending. Reconnect or choose a model.')
+
+    @operation
+    def _complete_creation_settings(self, entry, session, *, verify_only=False):
+        registry = self.creation_registry
         choice = entry['modelOptions']
-        effort = choice.get('effort')
         with session.action_lock:
+            phase = entry['modelSettingsPhase']
+            if phase not in ('pending', 'unknown'):
+                return
             with session.condition:
                 state = session.state or {}
                 expected_cwd = entry.get('runtimeCwd') or entry.get('cwd')
-                if (session.runtime != 'desktop' or state.get('id') != entry['id'] or
-                        not same_cwd(expected_cwd, state.get('cwd'), bridge.local and os.name == 'nt') or
-                        not state.get('modelProvider') or
-                        session.saved_provider and session.saved_provider != state['modelProvider']):
-                    raise CreationError('채팅이 생성되었지만 원래 데스크톱 세션의 ID가 확인되지 않았습니다. 동일한 채팅에 다시 연결하고 다시 생성하지 마세요.')
+                provider, owner = state.get('modelProvider'), session.owner
+                if not self._creation_owner_matches(session, entry):
+                    return
+                progressed = self._creation_has_messages(state)
+            if not self._creation_host_current(entry):
+                return
+            if progressed:
+                registry._set_creation_phase(entry, 'superseded', session)
+                return
+            # The catalog identity includes the account and the directory used
+            # by the picker. Independent chats have a separate runtime directory.
+            catalog_cwd = entry.get('catalogCwd') or expected_cwd
+            if not entry.get('catalogCwd') and entry.get('project') == 'local|independent' and self.local:
+                # Older independent-chat receipts stored only the newly created
+                # directory. Recover the picker scope only if its digest matches.
+                for path in (registry.data_dir/'independent-chats', registry.data_dir):
+                    if self.catalog_reader.model_identity(str(path), provider) == choice.get('modelCatalogIdentity'):
+                        catalog_cwd = str(path)
+                        break
+            if catalog_cwd == expected_cwd:
+                catalog = self.catalog(session.id, kind='models')
+            else:
+                catalog = self.catalog_reader.get_kind('models', catalog_cwd, provider=provider)
+            identity = (catalog.get('cache') or {}).get('identity')
+            if not identity or identity != choice.get('modelCatalogIdentity'):
+                return
+            with session.condition:
+                state = session.state or {}
+                if not self._creation_owner_matches(session, entry) or session.owner != owner or state['modelProvider'] != provider:
+                    return
+                effort = choice.get('effort')
                 confirmed = state.get('latestModel') == choice['model'] and (effort is None or session.view().get('effort') == effort)
-                if not confirmed and phase == 'unknown':
-                    raise CreationError('채팅이 생성되었지만 이전 모델 설정 결과는 여전히 확인이 필요합니다. 이 채팅에서 모델을 확인해 주시면 다시 제출하지 않겠습니다.')
-                if not confirmed and (ordered_turns(state) or
-                        state.get('threadRuntimeStatus', {}).get('type') != 'idle'):
-                    raise CreationError('채팅에 이미 콘텐츠가 있거나 실행 중이며 기본 모델 설정을 덮어쓰지 않았습니다. 이 채팅에서 모델을 확인해주세요')
+                ready = (not ordered_turns(state) and not session.pending_requests() and
+                         (state.get('threadRuntimeStatus') or {}).get('type') == 'idle')
             if not confirmed:
-                entry['modelSettingsPhase'] = 'unknown'
-                self._save_creations()
-                try:
-                    if effort is not None:
-                        result = bridge._apply_settings(session, choice['model'], effort)
-                    else:
-                        # API catalogs can explicitly omit reasoning controls.
-                        # Preserve native effort rather than inventing a default.
-                        result = bridge._call(session, 'thread-follower-update-thread-settings',
-                                              {'threadSettings': {'model': choice['model']}})
-                        with session.condition:
-                            result['confirmed'] = bool(result.get('applied')) and session.condition.wait_for(
-                                lambda: session.state.get('latestModel') == choice['model'], timeout=5)
-                except ValueError as exc:
-                    # Model/catalog validation rejects before dispatching a write.
-                    entry['modelSettingsPhase'] = 'pending'
-                    self._save_creations()
-                    raise CreationError('채팅이 생성되었지만 선택한 모델이 아직 적용되지 않았습니다.：' + str(exc)) from exc
-                except IPCError as exc:
-                    raise CreationError('채팅이 생성되었지만 모델 설정 결과를 아직 확인해야 합니다. 이 채팅에서 모델을 확인해 주시면 다시 제출하지 않겠습니다.') from exc
+                if verify_only or phase == 'unknown' or not ready:
+                    return
+                from bridge.features.sessions.creation_models import validate
+                validate(choice, {**catalog, 'capabilities': {'manualModels': True, 'manualEffort': True}})
+                result = self._apply_settings(session, choice['model'], effort, catalog=catalog, expected_owner=owner,
+                                              before_write=lambda: registry._set_creation_phase(entry, 'unknown', session))
                 if not result.get('confirmed'):
-                    raise CreationError('채팅이 생성되었으나 모델 설정이 아직 확인되지 않았습니다. 이 채팅에서 모델을 확인하고 반복적으로 제출하지 않습니다.')
-            entry['modelSettingsPhase'] = 'applied'
-            self._save_creations()
+                    return
+            with session.condition:
+                if not self._creation_owner_matches(session, entry) or session.owner != owner or session.state['modelProvider'] != provider:
+                    return
+            registry._set_creation_phase(entry, 'applied', session)
 
     def _save_actions(self):
         target = self.actions_path.with_suffix('.tmp')
@@ -1322,6 +1422,7 @@ class Bridge:
                 self.remote_bridges[host] = Bridge(self.codex_home, folder, host, available[host]['alias'], ipc_path=self.ipc.path,
                                                   observation_enabled=lambda: self.observation_enabled())
                 self.remote_bridges[host].accounts = self.accounts
+                self.remote_bridges[host].creation_registry = self
             return self.remote_bridges[host]
 
     def ssh_status(self):
@@ -3828,6 +3929,8 @@ class Bridge:
             return pending.result()
         try:
             result = self.rebuild_connection(thread_id) if rebuild else self.activate(thread_id)
+            if self._creation_entry(thread_id):
+                self._recover_creation_settings(result)
             pending.set_result(result)
             return result
         except Exception as exc:
@@ -4282,13 +4385,18 @@ class Bridge:
         return session
 
     @operation
-    def _call(self, session, method, params, timeout=30, *, reviewed_request=None):
+    def _call(self, session, method, params, timeout=30, *, reviewed_request=None, expected_owner=None, before_write=None):
         with session.condition:
             if session.desktop_stream_error:
                 raise IPCError(session.desktop_stream_error)
+            target, runtime = session.owner, session.runtime
+            if expected_owner is not None and (not session.connected or runtime != 'desktop' or target != expected_owner):
+                raise IPCError('The desktop owner changed before the settings request.')
+        if before_write:
+            before_write()
         # The existing desktop owner retains this thread's provider and credentials.
         # A newly selected default account must not gate unrelated existing providers.
-        if session.runtime == "cli":
+        if runtime == "cli":
             try:
                 if reviewed_request is not None:
                     return self.cli_sessions.call(session.id, method, params, timeout=timeout, reviewed_request=reviewed_request)
@@ -4296,7 +4404,7 @@ class Bridge:
             except AppServerError as exc:
                 raise IPCError(str(exc)) from exc
         try:
-            return self.ipc.request(method, {"conversationId": session.id, **params}, target=session.owner, host=self.native_host, timeout=timeout)["result"]
+            return self.ipc.request(method, {"conversationId": session.id, **params}, target=target, host=self.native_host, timeout=timeout)["result"]
         except IPCError as exc:
             if str(exc) in ('no-client-found', 'client-disconnected', 'server-closed', 'request-timeout') or str(exc).startswith(('데스크톱 연결이 끊어졌습니다.', '데스크톱 응답 시간 초과')):
                 self._invalidate(session, "데스크톱 실행 연결을 사용할 수 없습니다. 연결을 다시 구축해 보세요. 확인되지 않은 작업은 자동으로 다시 전송되지 않습니다.",
@@ -4374,6 +4482,7 @@ class Bridge:
                     view["permissionMode"] = linux_permissions.current_mode(session.state)
         view["host"] = self.host
         view['draftAccountIdentity'] = self._draft_account_identity(view)
+        self._creation_meta(session, view)
         view["hostLabel"] = self.host_label
         if self.host == 'local' and session.origin not in ('cli', 'ide'):
             cwd = view.get('cwd')
@@ -4835,6 +4944,7 @@ class Bridge:
         # retained separately from the paged message text.
         if mode != 'detail':
             result['meta']['draftAccountIdentity'] = self._draft_account_identity(authoritative_view)
+            self._creation_meta(session, result['meta'])
         file_state = {'cwd': cwd, 'turns': [
             {'items': file_items},
             {'items': media_items},
@@ -5258,16 +5368,39 @@ class Bridge:
         if fast_mode is not None and not isinstance(fast_mode, bool):
             raise ValueError("잘못된 빠른 모드 설정")
         session = self._target(thread_id)
-        return self._apply_settings(session, model, effort, fast_mode=fast_mode)
+        entry = self._creation_entry(thread_id)
+        if not entry or fast_mode is not None:
+            return self._apply_settings(session, model, effort, fast_mode=fast_mode)
+        with session.action_lock:
+            entry = self._creation_entry(thread_id)
+            with session.condition:
+                owner = session.owner
+                if entry and not self._creation_owner_matches(session, entry):
+                    raise ValueError('Confirm the new chat model before sending. Reconnect or choose a model.')
+                progressed = self._creation_has_messages(session.state or {})
+            if entry and not self._creation_host_current(entry):
+                raise ValueError('Confirm the new chat model before sending. Reconnect or choose a model.')
+            if (entry and not progressed and entry['modelSettingsPhase'] == 'unknown'
+                    and model == entry['modelOptions']['model'] and effort == entry['modelOptions'].get('effort')):
+                self._recover_creation_settings(session, verify_only=True)
+                return {'applied': True, 'confirmed': True, 'model': model, 'effort': effort}
+            result = self._apply_settings(session, model, effort, fast_mode=fast_mode, expected_owner=owner)
+            with session.condition:
+                original = entry and self._creation_owner_matches(session, entry) and session.owner == owner
+            if original and result.get('confirmed'):
+                self.creation_registry._set_creation_phase(entry, 'superseded', session)
+            return result
 
-    def _apply_settings(self, session, model, effort, *, fast_mode=None):
+    def _apply_settings(self, session, model, effort, *, fast_mode=None, catalog=None, expected_owner=None,
+                        before_write=None):
         # Callers already hold the host gate and resolved/activated this session.
         # Re-entering _target under action_lock reverses release's lock order.
         if not self._access(session.origin, session)['canChangeModel']:
             raise ValueError("이 채팅에는 모델 설정을 사용할 수 없습니다.")
         with session.action_lock:
             # Recheck login/model/policy on the execution host before a speed change.
-            catalog = self.catalog(session.id, refresh=fast_mode is not None, kind='models')
+            if catalog is None:
+                catalog = self.catalog(session.id, refresh=fast_mode is not None, kind='models')
             known = next((m for m in catalog["models"] if m["id"] == model), None)
             if effort is not None and known and known["efforts"] and effort not in known["efforts"]:
                 raise ValueError("이 모델은 선택한 추론 강도를 지원하지 않습니다.")
@@ -5277,7 +5410,8 @@ class Bridge:
                     raise ValueError("이 계정, 모델 또는 작업 공간에서는 빠른 모드를 사용할 수 없습니다. 모델 설정을 새로 고칩니다.")
                 # null can inherit a default; "default" explicitly opts out of Fast.
                 settings['serviceTier'] = known['fastTier'] if fast_mode else 'default'
-            result = self._call(session, "thread-follower-update-thread-settings", {"threadSettings": settings})
+            dispatch = {'expected_owner': expected_owner, 'before_write': before_write} if expected_owner is not None else {}
+            result = self._call(session, "thread-follower-update-thread-settings", {"threadSettings": settings}, **dispatch)
         if not result.get("applied"):
             raise IPCError("Codex가 모델 설정을 적용하지 않았습니다. 새로고침하고 다시 시도해 보세요.")
         with session.condition:
@@ -5548,6 +5682,7 @@ class Bridge:
                 entry = copy.deepcopy(prior)
             if self._settle_scope_queued(session, key):
                 return {'id': submission_id, 'status': 'cancelled'}
+            self._recover_creation_settings(session, verify_only=True)
             if session.runtime == 'cli':
                 self._verify_cli_submission_account(session)
             with session.condition:
@@ -5661,6 +5796,7 @@ class Bridge:
             if session.origin in ('cli', 'ide') and not self._session_goal_available(session):
                 raise ValueError("이 Codex 채팅에서는 목표 모드를 사용할 수 없습니다.")
             with session.action_lock, self.goal_lock:
+                self._recover_creation_settings(session, verify_only=True)
                 if session.runtime == 'cli':
                     self._verify_cli_submission_account(session)
                 response = self._goal_command(session, thread_id, submission_id, "create", objective=text,
@@ -5689,6 +5825,7 @@ class Bridge:
                             prior.get("goalActivation") != activation):
                         raise ValueError("ID 메시지는 다른 콘텐츠에 재사용할 수 없습니다.")
                     return {"status": prior["status"], "duplicate": True, "id": submission_id}
+            self._recover_creation_settings(session, verify_only=True)
             with session.condition:
                 if _async_response is not None:
                     request_id, response = _async_response
@@ -5802,8 +5939,13 @@ class Bridge:
         with session.action_lock:
             if self._settle_scope_queued(session, key):
                 return
+            creation = self._creation_entry(session.id)
             with session.condition:
                 if not session.connected or session.state.get("threadRuntimeStatus", {}).get("type") != "idle":
+                    return
+                if creation and not (self._creation_owner_matches(session, creation) and self._creation_has_messages(session.state)):
+                    # Keep a queued first message from an older gateway intact
+                    # until an explicit reconnect or model choice releases it.
                     return
             with self.goal_lock:
                 with self.submit_lock:
