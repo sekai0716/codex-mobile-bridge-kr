@@ -1061,6 +1061,19 @@ class CliSessionTests(unittest.TestCase):
             self.sessions.call('thread-a','direct-option-picker-response',payload)
         self.assertEqual(self.fake.replies,[(45,result)])
 
+    def test_first_command_output_can_follow_a_null_native_output(self):
+        self.sessions.attach('thread-a', explicit=True)
+        target = {'threadId': 'thread-a', 'turnId': 'turn-1'}
+        self.sessions._event({'method': 'turn/started', 'params': {
+            **target, 'turn': {'id': 'turn-1', 'status': 'inProgress', 'items': []}}})
+        self.sessions._event({'method': 'item/started', 'params': {**target, 'item': {
+            'type': 'commandExecution', 'id': 'cmd', 'aggregatedOutput': None}}})
+        for delta in ('first', ' line'):
+            self.sessions._event({'method': 'item/commandExecution/outputDelta',
+                                  'params': {**target, 'itemId': 'cmd', 'delta': delta}})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['aggregatedOutput'], 'first line')
+        self.assertIn('thread-a', self.sessions.joined)
+
     def test_reasoning_deltas_stream_before_completion(self):
         # Third-party Responses backends stream chain of thought as raw text
         # deltas and leave `summary` empty until (never) filled upstream.

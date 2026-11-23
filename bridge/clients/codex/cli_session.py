@@ -1376,8 +1376,10 @@ class CliSessions:
                 turn = next((item for item in state['turns'] if item['turnId'] == params.get('turnId')), None)
                 if turn:
                     item = next((item for item in turn['items'] if item.get('id') == params.get('itemId')), None)
-                    if item is not None and isinstance(params.get('delta'), str):
-                        item['aggregatedOutput'] = item.get('aggregatedOutput', '') + params['delta']
+                    if item is not None and item.get('type') == 'commandExecution' and isinstance(params.get('delta'), str):
+                        output = item.get('aggregatedOutput')
+                        if output is None or isinstance(output, str):
+                            item['aggregatedOutput'] = (output or '') + params['delta']
             elif method in ('item/reasoning/textDelta', 'item/reasoning/summaryTextDelta'):
                 # Third-party Responses backends stream raw chain of thought and
                 # never fill `summary`; keep both streams so the phone can show
