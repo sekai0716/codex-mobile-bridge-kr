@@ -32,6 +32,7 @@ test('merged controls send queue and steer through the real submit handler and s
           send: true,
           queue: true,
           steer: true,
+          sendModes: fixture.sendModes,
           stop: true,
           attachments: true,
           projectReferences: true,
@@ -134,9 +135,9 @@ test('merged controls send queue and steer through the real submit handler and s
   await expect(send).not.toContainText('正在发送');
   await expect(caret).toBeDisabled();
   await page.evaluate(() => {
-    const v = mergedLive.view;
+    const f = mergedLive, v = f.view;
     v.busy = false;
-    v.state.capabilities.sendModes = { send: false, queue: false, steer: true };
+    f.sendModes = v.state.capabilities.sendModes = { send: false, queue: false, steer: true };
     v.toolbar.preferences.update({ followUpMode: 'queue' });
     v.updateComposer();
   });
@@ -154,8 +155,8 @@ test('merged controls send queue and steer through the real submit handler and s
   ).toBe(true);
   await page.keyboard.press('Escape');
   await page.evaluate(() => {
-    const v = mergedLive.view;
-    v.state.status = 'idle';
+    const f = mergedLive, v = f.view;
+    f.status = v.state.status = 'idle';
     v.updateComposer();
     v.form.requestSubmit();
   });
@@ -164,9 +165,9 @@ test('merged controls send queue and steer through the real submit handler and s
   expect(await page.evaluate(() => mergedLive.writes.length)).toBe(4);
   await expect(input).toHaveValue('操作期间保留的草稿');
   await page.evaluate(() => {
-    const v = mergedLive.view;
-    v.state.status = 'active';
-    v.state.capabilities.sendModes = { send: true, queue: true, steer: true };
+    const f = mergedLive, v = f.view;
+    f.status = v.state.status = 'active';
+    f.sendModes = v.state.capabilities.sendModes = { send: true, queue: true, steer: true };
     v.updateComposer();
   });
   await expect(send).toHaveText('排队');
