@@ -803,6 +803,12 @@ test('native compaction source and completed update the same activity before its
 test('account quota keeps all toolbar buttons on one row and exposes refresh and reset times',async({page},testInfo)=>{
   await prepare(page);const quota=page.locator('#composer .account-usage');
   await expect(quota).toContainText('0%');await expect(quota).toContainText('75%');
+  const fast=page.locator('#composer .fast-mode-toggle');
+  for(const theme of ['light','dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+    await expect(fast).toHaveCSS('border-top-width','0px');
+    await expect(quota).toHaveCSS('border-top-width','0px');
+  }
   for(const width of [320,390,430,1280]){
     await page.setViewportSize({width,height:844});
     const q=await quota.boundingBox(),c=await page.locator('#composer .context-usage').boundingBox();
