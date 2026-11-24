@@ -25,7 +25,7 @@ def is_type2(path):
 def file_identity(path):
     info = Path(path).stat()
     if not stat.S_ISREG(info.st_mode):
-        raise ValueError('AppImage 일반 파일이어야 합니다.')
+        raise ValueError('AppImage 必须是普通文件')
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
@@ -84,7 +84,7 @@ def _parser():
 
 def _read_desktop(parser, path, offset, member, *, timeout=4):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*\.desktop', member):
-        raise ValueError('AppImage 잘못된 메타데이터 경로')
+        raise ValueError('AppImage 元数据路径无效')
     process = subprocess.Popen([parser, '-o', str(offset), '-cat', str(path), member],
         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         env={'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C'})
@@ -96,15 +96,15 @@ def _read_desktop(parser, path, offset, member, *, timeout=4):
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0 or not selector.select(remaining):
-                    raise ValueError('AppImage 메타데이터 읽기 시간 초과')
+                    raise ValueError('AppImage 元数据读取超时')
                 chunk = os.read(process.stdout.fileno(), min(16384, METADATA_LIMIT + 1 - len(data)))
                 if not chunk:
                     break
                 data.extend(chunk)
                 if len(data) > METADATA_LIMIT:
-                    raise ValueError('AppImage 메타데이터가 너무 큼')
+                    raise ValueError('AppImage 元数据过大')
         if process.wait(timeout=max(.01, deadline-time.monotonic())):
-            raise ValueError('읽을 수 없음 AppImage 메타데이터')
+            raise ValueError('无法读取 AppImage 元数据')
         return bytes(data)
     finally:
         process.stdout.close()
@@ -123,7 +123,7 @@ def _metadata(path, identity, parser, member):
     config.read_string(_read_desktop(parser, path, offset, member).decode('utf-8'))
     entry = config['Desktop Entry']
     if file_identity(path) != identity:
-        raise ValueError('AppImage 스캔 중에 변경됨')
+        raise ValueError('AppImage 在扫描期间已变化')
     # Exec is deliberately never used: the upstream entry can include flags
     # such as --no-sandbox. Launch only the explicitly selected original image.
     return dict(entry)
@@ -188,7 +188,7 @@ def _mounts():
 def runtime_candidates(application, payload_name):
     """Source image fd → FUSE keeper pipe → original payload; no name-only pairing."""
     if not isinstance(payload_name, str) or Path(payload_name).name != payload_name or payload_name in ('', '.', '..'):
-        raise ValueError('AppImage 잘못된 실행자 이름')
+        raise ValueError('AppImage 运行程序名称无效')
     path = Path(application).resolve(strict=True)
     if not is_type2(path):
         return []

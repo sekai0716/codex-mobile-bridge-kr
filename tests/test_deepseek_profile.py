@@ -74,7 +74,7 @@ class NativeDshProfileTests(unittest.TestCase):
 
     def test_unsupported_windows_initializer_fails_before_gui_or_partial_files(self):
         (self.package/'lib/profile.js').unlink()
-        with patch('subprocess.run') as run, self.assertRaisesRegex(ValueError, '초기화 항목'):
+        with patch('subprocess.run') as run, self.assertRaisesRegex(ValueError, '初始化入口'):
             prepare_deepseek_profile(self.profile, self.descriptor)
         run.assert_not_called()
         self.assertFalse(self.native.exists())
@@ -87,7 +87,7 @@ class NativeDshProfileTests(unittest.TestCase):
 
     def test_timeout_does_not_claim_prepared(self):
         with patch('subprocess.run', side_effect=subprocess.TimeoutExpired('helper',25)), \
-             self.assertRaisesRegex(ValueError, "DSH\\ 독립\\ 구성\\ 초기화\\ 시간이\\ 초과되어\\ 데스크탑\\ 애플리케이션이\\ 시작되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\."):
+             self.assertRaisesRegex(ValueError, '初始化超时'):
             prepare(self.profile, self.descriptor)
         self.assertFalse((self.native/'package.json').exists())
 
@@ -96,14 +96,14 @@ class NativeDshProfileTests(unittest.TestCase):
             value = self.native_success(*args, **kwargs)
             self.app.write_bytes(b'updated app identity')
             return value
-        with patch('subprocess.run', side_effect=changed), self.assertRaisesRegex(ValueError, "DSH\\ 초기화\\ 중에\\ 애플리케이션이\\ 변경되었습니다\\.\\ 다시\\ 스캔해\\ 주세요\\."):
+        with patch('subprocess.run', side_effect=changed), self.assertRaisesRegex(ValueError, '发生变化'):
             prepare(self.profile, self.descriptor)
 
     def test_receipt_must_name_exact_registered_profile(self):
         def wrong(*args, **kwargs):
             self.native_success(*args, **kwargs)
             return SimpleNamespace(returncode=0, stdout=b'{"prepared":true,"directory":"/wrong"}')
-        with patch('subprocess.run', side_effect=wrong), self.assertRaisesRegex(ValueError, "DSH\\ 독립\\ 구성\\ 준비가\\ 확인되지\\ 않았으며\\ 데스크톱\\ 응용\\ 프로그램이\\ 시작되지\\ 않았습니다\\."):
+        with patch('subprocess.run', side_effect=wrong), self.assertRaisesRegex(ValueError, '未确认'):
             prepare(self.profile, self.descriptor)
 
     def test_install_into_native_empty_array_preserves_comments_and_roundtrips(self):

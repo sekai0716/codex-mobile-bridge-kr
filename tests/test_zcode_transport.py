@@ -41,13 +41,13 @@ class ZCodeTransportTests(unittest.TestCase):
         self.assertEqual(calls[-1][0], 'Runtime.releaseObjectGroup')
         self.assertEqual(sum(m == 'Runtime.callFunctionOn' for m, _ in calls), 1)
         duplicates = True
-        with self.assertRaisesRegex(ValueError, "ZCode\\ 기본\\ 작업공간\\ 레지스트리가\\ 고유하지\\ 않거나\\ 버전이\\ 변경되었습니다\\."):
+        with self.assertRaisesRegex(ValueError, '不唯一'):
             bind_workspace_registry(rpc, {})
         self.assertEqual(sum(m == 'Runtime.callFunctionOn' for m, _ in calls), 1)
         self.assertEqual(calls[-1][0], 'Runtime.releaseObjectGroup')
 
     def test_renderer_function_is_self_contained_and_request_is_json_encoded(self):
-        source = expression({'text': "'` ${danger}\n중국어"})
+        source = expression({'text': "'` ${danger}\n中文"})
         self.assertNotIn('export async function', source)
         self.assertIn('async function nativeRequest', source)
-        self.assertIn('\\n중국어', source)
+        self.assertIn('\\n中文', source)

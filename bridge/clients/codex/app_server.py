@@ -77,7 +77,7 @@ class CodexAppServer:
 
     def __init__(self, socket_path, cli='codex', on_event=None,
                  on_server_request=None, on_disconnect=None, process_factory=None,
-                 command=None, check_socket=True, client_name='codex-mobile-bridge', transport_factory=None):
+                 command=None, check_socket=True, client_name='codex-mobile-bridge'):
         if not socket_path or not (Path(socket_path).is_absolute() or
                                    not check_socket and PurePosixPath(str(socket_path)).is_absolute()):
             raise ValueError('An absolute existing control socket path is required')
@@ -86,14 +86,12 @@ class CodexAppServer:
         self.command = list(command) if command is not None else [
             self.cli, 'app-server', 'proxy', '--sock', self.socket_path]
         self.check_socket = check_socket
-        self.transport_factory = transport_factory
         self.client_name = client_name
         self.on_event = on_event or (lambda event: None)
         self.on_server_request = on_server_request or (lambda request: None)
         self.on_disconnect = on_disconnect or (lambda: None)
         self.process_factory = process_factory or subprocess.Popen
         self.process = None
-        self.pinned_process = None
         self.shutting_down_process = None
         self.transport = None
         self.server_info = None
@@ -110,8 +108,6 @@ class CodexAppServer:
 
     def connect(self, timeout=5):
         with self.connect_lock:
-            if self.pinned_process is not None and self.process is not self.pinned_process:
-                raise AppServerUnavailable('Original desktop connection is closed')
             if self.process is not None and self.server_info is not None:
                 return self.server_info
             if self.check_socket and not Path(self.socket_path).exists():
@@ -128,12 +124,12 @@ class CodexAppServer:
                 self.shutting_down_process = None
                 self.process = process
             handshake = Future()
-            def open_transport():
+            def open_websocket():
                 try:
-                    handshake.set_result((self.transport_factory or _WebSocket)(process.stdout, process.stdin))
+                    handshake.set_result(_WebSocket(process.stdout, process.stdin))
                 except Exception as exc:
                     handshake.set_exception(exc)
-            threading.Thread(target=open_transport, daemon=True).start()
+            threading.Thread(target=open_websocket, daemon=True).start()
             try:
                 transport = handshake.result(timeout=timeout)
                 self.transport = transport
@@ -260,7 +256,7 @@ class CodexAppServer:
                 self.on_disconnect()
 
     def close(self, *, expected_process=None):
-        """Close this client's proxy or private stdio runtime."""
+        """Disconnect this proxy client; never stop or restart the daemon."""
         with self.lock:
             if expected_process is not None and self.process is not expected_process:
                 return False

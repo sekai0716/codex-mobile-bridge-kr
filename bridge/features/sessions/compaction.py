@@ -19,14 +19,14 @@ class CompactCommands:
             prior = entries.get(request_id)
             if prior:
                 if prior['sessionId'] != session_id:
-                    raise ValueError('동일한 요청 ID를 다른 세션에서 사용할 수 없습니다.')
+                    raise ValueError('相同请求标识不能用于不同会话')
                 return dict(prior)
             if any(row['sessionId'] == session_id and row['status'] == 'unknown' for row in entries.values()):
-                raise ValueError('이전에 압축 결과가 확인되지 않았습니다. 먼저 원본 클라이언트를 확인하세요. 중복 제출은 되지 않습니다.')
+                raise ValueError('此前压缩结果尚未确认，请先在原客户端核对；不会重复提交')
             # Fresh native idle/identity checks precede the durable write intent.
             dispatch = prepare()
             receipt = {'id': request_id, 'sessionId': session_id, 'status': 'unknown',
-                       'message': '압축 결과는 아직 확인되지 않았습니다. 원본 세션을 확인하세요. 자동으로 다시 제출되지는 않습니다.'}
+                       'message': '压缩结果尚未确认，请检查原会话；不会自动重复提交'}
             entries[request_id] = receipt
             self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             self.save(self.path, entries)
@@ -34,6 +34,6 @@ class CompactCommands:
                 dispatch()
             except Exception:
                 return dict(receipt)
-            receipt.update(status='accepted', message="컨텍스트 압축이 제출되었습니다.")
+            receipt.update(status='accepted', message='已提交上下文压缩')
             self.save(self.path, entries)
             return dict(receipt)

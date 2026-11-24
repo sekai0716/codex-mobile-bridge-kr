@@ -10,7 +10,7 @@ class QuotaTests(unittest.TestCase):
     def test_proto_default_zero_requires_quota_message_presence(self):
         self.assertIsNone(AntigravityCli._quota_info({}))
         self.assertEqual(AntigravityCli._quota_info({'quotaInfo': {}})['quotaStatus'], 'exhausted')
-        self.assertEqual(AntigravityCli._quota_info({'quotaInfo': {'remainingFraction': 0}})['quotaTag'], '탈진한')
+        self.assertEqual(AntigravityCli._quota_info({'quotaInfo': {'remainingFraction': 0}})['quotaTag'], '已用尽')
 
     @unittest.skipUnless(hasattr(time, 'tzset'), 'requires POSIX timezone selection')
     def test_reset_time_retains_the_timezone_meaning(self):
@@ -18,7 +18,7 @@ class QuotaTests(unittest.TestCase):
         try:
             os.environ['TZ'] = 'Asia/Shanghai'
             time.tzset()
-            self.assertEqual(AntigravityCli._format_reset_note('2026-11-14T12:30:00Z'), '될 것이다 11/14 20:30 CST 다시 놓기')
+            self.assertEqual(AntigravityCli._format_reset_note('2026-11-14T12:30:00Z'), '将于 11/14 20:30 CST 重置')
         finally:
             if original is None:
                 os.environ.pop('TZ', None)
@@ -31,5 +31,5 @@ class QuotaTests(unittest.TestCase):
         with mock.patch.object(cli, 'user_status', return_value={}) as read:
             self.assertNotIn('usageSummary', cli.catalog_models())
             read.return_value = {'planStatus': {}}
-            self.assertEqual(cli.catalog_models()['usageSummary']['credits'], '사용 가능 Prompt 전철기: 0 · Flow 전철기: 0')
+            self.assertEqual(cli.catalog_models()['usageSummary']['credits'], '可用 Prompt 点数: 0 · Flow 点数: 0')
 

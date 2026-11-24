@@ -30,24 +30,24 @@ def events(account, previous, now, preferences):
             if remaining is None or reset is None:
                 continue
             if preferences['lowQuota'] and remaining <= 10 and reset > now:
-                result.append(('lowQuota', f'{key}:{reset}', 'Codex 사용량 한도 부족', '일부 사용량 한도의 잔여량이 10% 이하입니다. 계정과 사용량 한도에서 확인하세요.'))
+                result.append(('lowQuota', f'{key}:{reset}', 'Codex 额度不足', '某个额度窗口剩余不超过 10%，请打开账号与额度查看。'))
             if (preferences['quotaReset'] and before.get('resetsAt')
                     and reset > before['resetsAt'] and remaining > before.get('remainingPercent', 100)):
-                result.append(('quotaReset', f'{key}:{reset}', 'Codex 사용량 한도 갱신', '사용량 한도 기간이 갱신되었고, 조회 결과 사용 가능한 잔여량이 늘어났습니다.'))
+                result.append(('quotaReset', f'{key}:{reset}', 'Codex 额度已恢复', '额度窗口已更新，查询已确认可用额度增加。'))
     if preferences['resetExpiry']:
         for card in (account.get('resetCredits') or {}).get('credits') or []:
             expiry = card.get('expiresAt')
             if card.get('status') == 'available' and isinstance(expiry, (int, float)) and 0 < expiry-now <= 86400:
-                result.append(('resetExpiry', str(card['id'])+':'+str(expiry), 'Codex 재설정 카드가 곧 만료됩니다', '24시간 내에 만료되는 재설정 카드가 있습니다. 내용을 확인한 뒤 사용 여부를 결정하세요.'))
+                result.append(('resetExpiry', str(card['id'])+':'+str(expiry), 'Codex 重置卡即将到期', '有一张重置卡将在 24 小时内到期，请查看后决定是否使用。'))
     if preferences['subscriptionExpiry']:
         period = (account.get('subscription') or {}).get('periodEndsAt')
         if period and 0 < period-now <= 7*86400:
             days = math.ceil((period-now)/86400)
             stage = 1 if days <= 1 else 3 if days <= 3 else 7
-            result.append(('subscriptionExpiry', f'{period}:{stage}', '구독 기간 알림' if account['subscription'].get('source') == 'online' else '로그인 기록의 구독 기간 알림',
-                           (f'온라인으로 조회한 구독 기간이 {days}일 내에 종료됩니다. 갱신 여부는 ChatGPT 구독 페이지에서 확인하세요.'
+            result.append(('subscriptionExpiry', f'{period}:{stage}', '订阅周期提醒' if account['subscription'].get('source') == 'online' else '订阅登录记录提醒',
+                           (f'在线查询的订阅周期将在 {days} 天内截止，续订状态请以 ChatGPT 订阅页面为准。'
                             if account['subscription'].get('source') == 'online' else
-                            f'로그인 기록의 구독 종료일이 {days}일 남았습니다. 실시간 결제 정보가 아니므로 ChatGPT 구독 페이지에서 확인하세요.')))
+                            f'登录记录中的订阅日期将在 {days} 天内到达。该记录并非实时账单信息，请以 ChatGPT 订阅页面为准。')))
     return result
 
 
@@ -98,7 +98,7 @@ class AccountMonitor:
 
     def configure(self, value):
         if not isinstance(value, dict) or set(value)-set(DEFAULTS) or any(type(v) is not bool for v in value.values()):
-            raise ValueError('알림 설정이 잘못되었습니다.')
+            raise ValueError('提醒设置无效')
         if any(k in value for k in GLOBAL_REMINDERS):
             enabled = any(value.get(k, False) for k in GLOBAL_REMINDERS)
             value = {**value, **{k: enabled for k in GLOBAL_REMINDERS}}
@@ -142,7 +142,7 @@ class AccountMonitor:
             except Exception:
                 delivered = False
                 self.ledger[ledger_key] = {'sent':False, 'time':now, 'next':now+300}
-                self.last_error = "계정 알림 전송에 실패했습니다. 전화 알림 설정을 확인하세요."
+                self.last_error = '账号提醒发送失败，请检查手机通知配置'
         self.ledger = {k:v for k,v in self.ledger.items() if v.get('time', 0) > now-35*86400}
         if self.ledger != before:
             write_json(self.ledger_path, self.ledger)
@@ -166,13 +166,13 @@ class AccountMonitor:
                     write_json(self.global_watch_path, self.global_watch)
             reset = value.get('lastResetAt')
             if self.preferences['globalReset'] and reset and reset > self.global_watch['globalReset']:
-                pending.append(('globalReset', str(reset), 'Codex 활동 재설정',
-                                '타사 소스에서 전역 재설정이 보고되었습니다. 개인잔액은 계좌카드에서 확인하시기 바랍니다.。\n데이터：' + value['source']))
+                pending.append(('globalReset', str(reset), 'Codex 重置动态',
+                                '第三方来源报告了全局重置。个人剩余额度请查看账号卡片。\n数据：' + value['source']))
             signal = value.get('officialSignal')
             if (self.preferences['globalResetSignal'] and signal and signal.get('at') and
                     signal['at'] > self.global_watch['globalResetSignal']):
-                pending.append(('globalResetSignal', str(signal['at']), 'Codex 미리보기 역학 재설정',
-                                '타사 소스에 재설정 미리보기가 포함되어 있지만 아직 완료되었는지 확인되지 않았습니다.。\n데이터：' + value['source']))
+                pending.append(('globalResetSignal', str(signal['at']), 'Codex 重置预告动态',
+                                '第三方来源收录了重置预告，尚未确认完成。\n数据：' + value['source']))
         for event in pending:
             self.deliver('global', event)
 
@@ -190,8 +190,8 @@ class AccountMonitor:
             self.manager.updates.check(background=True)
             update = self.manager.updates.status()
             if update.get('state') == 'available':
-                self.deliver('desktop', ('desktopUpdate', str(update['targetBuild']), 'Codex Desktop 새 버전 출시',
-                                        '공식 업데이트 채널에 새 버전이 출시되었습니다. 클라이언트 관리에서 Codex 버전과 업데이트를 확인하세요.'))
+                self.deliver('desktop', ('desktopUpdate', str(update['targetBuild']), 'Codex Desktop 有新版本',
+                                        '官方更新渠道发布了新版本，请在客户端管理的 Codex 版本与更新中查看。'))
         if not any(self.preferences[k] for k in DEFAULTS if k not in (*GLOBAL_REMINDERS, 'desktopUpdate')):
             return
         with self.manager.lock:
@@ -238,7 +238,7 @@ class AccountMonitor:
                 try:
                     self.scan()
                 except Exception:
-                    self.last_error = '계정 알림을 일시적으로 사용할 수 없으며 다음 확인 시 다시 시도됩니다.'
+                    self.last_error = '账号提醒暂不可用，将在下一次检查时重试'
                 self.closed.wait(30)
         self.worker = threading.Thread(target=run, name='account-reminders', daemon=True)
         self.worker.start()

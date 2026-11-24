@@ -14,7 +14,7 @@ def file_mentions(text, files, *, quote=True):
     for file in files:
         path = file.get('path')
         if not isinstance(path, str) or not _absolute(path) or re.search(r'[\x00-\x1f\x7f-\x9f"]', path):
-            raise ResumePreflightBlocked('기본 파일 참조는 이 경로를 지원하지 않습니다. 파일 이름을 확인하고 다시 선택하세요.')
+            raise ResumePreflightBlocked('原生文件引用不支持此路径，请检查文件名后重新选择')
         if file.get('kind') == 'directory':
             path = path.rstrip('/\\') + '/'
         tokens.append('@' + ('"' + path + '"' if quote and re.search(r'\s', path) else path))

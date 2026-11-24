@@ -32,8 +32,8 @@ test('native login card survives an empty saved list without enrollment or switc
 test('web exposes saved account selection without enrollment or credential inputs',async()=>{
  const ui=fixture();await ui.panel.refresh();assert.equal(ui.all().some(n=>n.tag==='input'&&n.type!=='checkbox'),false);assert.match(ui.text(),/API <script>/);assert.equal(ui.all().some(n=>n.tag==='script'),false);
  ui.confirm(false);await ui.panel.choose(ui.value().accounts[0]);assert.equal(ui.requests.length,0);
- ui.confirm(true);await ui.panel.choose(ui.value().accounts[0]);assert.deepEqual(Object.keys(ui.requests[0]).sort(),['action','confirmed','id','requestId','syncLocalCli','tasksConfirmed']);
- assert.equal(ui.requests[0].tasksConfirmed,true);assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
+ ui.confirm(true);await ui.panel.choose(ui.value().accounts[0]);assert.deepEqual(Object.keys(ui.requests[0]).sort(),['action','confirmed','id','requestId','sharedDaemonConfirmed','syncLocalCli','tasksConfirmed']);
+ assert.equal(ui.requests[0].tasksConfirmed,true);assert.match(ui.prompts[0],/화면에 나오지 않은 작업까지 모두 끝났는지/);
 });
 
 for(const desktop of [false,true])test(`${desktop?'desktop':'web'} retries the selected offline SSH host from accounts`,async()=>{
@@ -50,6 +50,13 @@ test('Codex switch always requests CLI verification without an opt-in checkbox',
  assert.match(ui.text(),/Codex 데스크톱 및 CLI는 이 컴퓨터에 대한 액세스를 공유합니다\. 전환하면 Desktop이 실행 중일 때 다시 시작됩니다\./);
  assert.equal(ui.all().some(n=>n.textContent==='로컬 CLI에도 적용'),false);
  await ui.panel.choose(ui.value().accounts[0]);assert.equal(ui.requests[0].syncLocalCli,true);
+ assert.equal(ui.requests[0].sharedDaemonConfirmed,true);assert.match(ui.prompts[0],/유휴 상태인 공유 CLI를 정상 종료/);
+});
+
+test('shared daemon shutdown is included in the existing account confirmation in English',async()=>{
+ const ui=fixture(true);await ui.panel.refresh();ui.language();
+ await ui.panel.choose(ui.value().accounts[0]);
+ assert.match(ui.prompts[0],/shared CLI service/);assert.equal(ui.requests[0].sharedDaemonConfirmed,true);
 });
 
 
@@ -88,32 +95,8 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} explicitly in
  ui.panel.clear();assert.equal(ui.panel.desktopRuntime.hidden,true);
 });
 test('native initialization remains unavailable for passwordless remote access',async()=>{
- const ui=fixture();ui.panel.accept({...ui.value(),canSwitch:false,desktopRuntime:{supported:true,configured:false}});assert.equal(ui.panel.initializeRuntime.disabled,true);
+ const ui=fixture();ui.panel.accept({...ui.value(),canSwitch:false,canManageDesktop:false,desktopRuntime:{supported:true,configured:false}});assert.equal(ui.panel.initializeRuntime.disabled,true);
  ui.panel.accept({...ui.value(),desktopRuntime:{supported:false}});assert.equal(ui.panel.desktopRuntime.hidden,true);
-});
-for(const desktop of [false,true])test(`${desktop?'desktop':'web'} schedules and cancels the recorded request after confirmation`,async()=>{
- const ui=fixture(desktop),requestId='22222222-2222-4222-8222-222222222222';
- const runtime=state=>({...ui.value(),desktopRuntime:{supported:true,deferred:{state,requestId}}});
- ui.panel.accept(runtime('available'));
- assert.equal(ui.panel.deferRuntime.hidden,false);
- assert.equal(ui.panel.cancelDeferredRuntime.hidden,true);
- ui.confirm(false);await ui.panel.deferRuntime.onclick();assert.equal(ui.requests.length,0);
- ui.confirm(true);await ui.panel.deferRuntime.onclick();
- assert.deepEqual({...ui.requests[0]},{action:'deferDesktopRuntime',requestId,confirmed:true});
- ui.panel.accept(runtime('waiting'));
- assert.equal(ui.panel.deferRuntime.hidden,true);
- assert.equal(ui.panel.cancelDeferredRuntime.hidden,false);
- assert.equal(ui.panel.initializeRuntime.disabled,true);
- assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
- await ui.panel.cancelDeferredRuntime.onclick();
- assert.deepEqual({...ui.requests[1]},{action:'cancelDeferredDesktopRuntime',requestId});
- ui.panel.accept(runtime('cancelled'));
- assert.equal(ui.panel.cancelDeferredRuntime.hidden,true);
- assert.equal(ui.panel.deferRuntime.hidden,true);
- if(!desktop){
-   ui.panel.accept({...runtime('available'),canSwitch:false});
-   assert.equal(ui.panel.deferRuntime.disabled,true);
- }
 });
 test('automatic native preparation stays passive and offers unknown-task recovery',()=>{
  const ui=fixture();ui.panel.accept({...ui.value(),desktopRuntime:{supported:true,preparation:{state:'checking'}}});
@@ -132,8 +115,8 @@ for(const desktop of [false,true])test(`${desktop?'desktop':'web'} offers a conf
  ui.confirm(true);await ui.panel.forceInitializeRuntime.onclick();assert.equal(ui.requests[0].acknowledgeUnavailable,true);assert.match(ui.prompts[0],/일부 작업 상태를 확인하지 못했습니다\. 계속하면 Codex 앱이 정상 종료 후 재시작되며, 해당 작업이나 대기 중인 승인이 중단될 수 있습니다\. 채팅 기록은 보존되며 나중에 이어갈 수 있습니다\. 계속하시겠습니까\?/);
  ui.panel.accept({...state,switch:{phase:'failed',operation:'desktopRuntime',error:'known busy'}});assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
  ui.panel.accept({...state,switch:{...state.switch,phase:'verifying'}});assert.equal(ui.panel.forceInitializeRuntime.hidden,true);
- if(!desktop){ui.panel.accept({...state,canSwitch:false});assert.equal(ui.panel.forceInitializeRuntime.disabled,true);}
- ui.panel.accept({...state,management:{external:true}});assert.equal(ui.panel.forceInitializeRuntime.disabled,true);
+ if(!desktop){ui.panel.accept({...state,canManageDesktop:false});assert.equal(ui.panel.forceInitializeRuntime.disabled,true);}
+ ui.panel.accept({...state,canSwitch:false,canManageDesktop:true,management:{external:true}});assert.equal(ui.panel.forceInitializeRuntime.disabled,false);
 });
 
 test('external Magpie management disables configuration replacement on both surfaces',async()=>{
@@ -581,6 +564,6 @@ test('unknown API auth exposes only a same-request read-only verification on web
 
 test('shared account confirmation keeps other clients quiet until synchronization completes',async()=>{
  const ui=fixture();await ui.panel.refresh();await ui.panel.choose(ui.value().accounts[0]);
- assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
- assert.match(ui.prompts[0],/모든 작업\(이 웹 페이지에 표시되지 않는 작업 포함\)이 끝났는지 확인하고 공유 Codex 접속 설정을 전환하시겠습니까\? 전환이 끝나기 전까지 다른 클라이언트에서 작업을 시작하지 마세요\. 필요한 경우에만 데스크톱 런타임을 정상 종료 후 다시 시작합니다\./);
+ assert.match(ui.prompts[0],/화면에 나오지 않은 작업까지 모두 끝났는지 확인하고/);
+ assert.match(ui.prompts[0],/전환이 끝난 뒤 다른 클라이언트에서 작업을 시작하세요/);
 });

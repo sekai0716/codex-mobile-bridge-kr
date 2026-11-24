@@ -71,7 +71,7 @@ def session_custom_title(event, native):
 def image_event(path, source):
     """Read only an evidenced event; never resolve an image's arbitrary path."""
     if not isinstance(source, dict) or not isinstance(source.get('event'), str):
-        raise ValueError('잘못된 이미지 참조')
+        raise ValueError('图片引用无效')
     with Path(path).open('rb') as stream:
         while True:
             offset = stream.tell()
@@ -79,7 +79,7 @@ def image_event(path, source):
             if not line:
                 break
             if len(line) > 32 * 1024 * 1024:
-                raise ValueError('기본 이미지 기록이 미리보기 크기 제한을 초과했습니다.')
+                raise ValueError('原生图片记录超出预览大小限制')
             try:
                 event = json.loads(line)
             except ValueError:
@@ -90,7 +90,7 @@ def image_event(path, source):
             identity = event.get('uuid') or message.get('id') or 'file:' + str(offset)
             if identity == source['event'] and event.get('type') in ('user', 'assistant'):
                 return {**event, 'uuid': identity}
-    raise ValueError('기본 역사에서 미리보기 이미지를 찾을 수 없습니다.')
+    raise ValueError('原生历史中未找到可预览图片')
 
 
 def _stamp(stat, fd=None):
@@ -120,7 +120,7 @@ def page(path, identity, before=None, limit=40):
     require a new recent page. No partial page is returned after the byte cap.
     """
     if type(limit) is not int or not 1 <= limit <= 100:
-        raise ValueError('Claude 기록 페이징 크기가 잘못되었습니다.')
+        raise ValueError('Claude 历史分页大小无效')
     path = Path(path)
     with path.open('rb') as stream:
         stamp = _stamp(os.fstat(stream.fileno()), stream.fileno())
@@ -130,25 +130,25 @@ def page(path, identity, before=None, limit=40):
                 raw = base64.urlsafe_b64decode(before + '=' * (-len(before) % 4))
                 source, version, end = json.loads(raw)
             except (ValueError, TypeError, UnicodeError) as exc:
-                raise ValueError('Claude 기록 커서가 잘못되었습니다.') from exc
+                raise ValueError('Claude 历史游标无效') from exc
             if source != identity or version != stamp or type(end) is not int or not 0 <= end <= stamp[2]:
-                raise ValueError('Claude 기록이 변경되었습니다. 최근 기록을 다시 로드하세요.')
+                raise ValueError('Claude 历史已变化，请重新加载最近记录')
             if end:
                 stream.seek(end - 1)
                 if stream.read(1) != b'\n':
-                    raise ValueError('Claude 기록 커서가 잘못되었습니다.')
+                    raise ValueError('Claude 历史游标无效')
         pos, pending, consumed, events, boundary, visible = end, b'', 0, [], end, 0
         has_more = False
         while pos or pending:
             if pos:
                 size = min(65536, pos, MAX_PAGE_BYTES - consumed)
                 if size <= 0:
-                    raise ValueError('Claude 기록 단일 페이지 스캔이 한도를 초과했습니다. 페이징 범위를 좁혀주세요.')
+                    raise ValueError('Claude 历史单页扫描超过限制，请缩小分页范围')
                 pos -= size
                 stream.seek(pos)
                 block = stream.read(size)
                 if len(block) != size:
-                    raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
+                    raise ValueError('Claude 历史读取期间发生变化')
                 consumed += size
                 pending = block + pending
             lines = pending.splitlines(keepends=True)
@@ -182,11 +182,11 @@ def page(path, identity, before=None, limit=40):
             if has_more:
                 break
         if _stamp(os.fstat(stream.fileno()), stream.fileno()) != stamp:
-            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
+            raise ValueError('Claude 历史读取期间发生变化')
         try:
             current = file_stamp(path)
         except OSError as exc:
-            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.') from exc
+            raise ValueError('Claude 历史读取期间发生变化') from exc
         if current != stamp:
-            raise ValueError('Claude 기록을 읽는 동안 변경사항이 발생했습니다.')
+            raise ValueError('Claude 历史读取期间发生变化')
         return list(reversed(events)), (_cursor(identity, stamp, boundary) if has_more else None), has_more

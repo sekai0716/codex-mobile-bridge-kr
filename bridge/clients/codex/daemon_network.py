@@ -67,7 +67,7 @@ def graceful_restart_supported(info, *, platform=None):
 
 class CliProviderMismatch(IPCError):
     def __init__(self, provider, current):
-        super().__init__('원래 세션 및 현재 CLI 구성된 공급자가 다릅니다. 계속하기 전에 원래 클라이언트에서 원래 공급자를 선택하십시오. 기록과 초안은 유지됩니다.。')
+        super().__init__('原会话与当前 CLI 配置的提供商不同。请在原客户端选回原提供商再继续；历史与草稿保留。')
         self.details = {'reason': 'modelProviderMismatch', 'modelProvider': provider, 'currentModelProvider': current}
 
     @classmethod
@@ -89,7 +89,7 @@ def native_recovery_target(home, config, source_provider, environment, layers=()
     provider = effective.get('model_provider') or 'openai'
     definitions = effective.get('model_providers') or {}
     if provider != 'openai' and not definitions.get(provider):
-        raise ValueError('현재 기본 구성은 대상 공급자를 정의하지 않으며 서비스가 복원되지 않았습니다.。')
+        raise ValueError('当前原生配置未定义目标提供商，未恢复服务。')
     def route(identifier):
         row = definitions.get(identifier) or {}
         return {**{key: row.get(key) for key in ('env_key', 'experimental_bearer_token',
@@ -109,8 +109,8 @@ def native_recovery_target(home, config, source_provider, environment, layers=()
     if source_provider not in aliases:
         missing += sorted(required & (old_names | set(AUTH_ENV_NAMES)))
     if missing:
-        raise ValueError('대상 액세스에 검증 가능한 변수 소스가 부족함：' + '、'.join(sorted(set(missing))) +
-                         '；기존 액세스 또는 게이트웨이 단말기에서 값을 빌려주지 않으며 서비스가 시작되지 않습니다.。')
+        raise ValueError('目标接入缺少可核验的变量来源：' + '、'.join(sorted(set(missing))) +
+                         '；不会借用旧接入或网关终端的值，未启动服务。')
     clear = set(AUTH_ENV_NAMES)
     for identifier in {*definitions, source_provider, provider}:
         clear.update(CliSessions._required_model_environment(effective, identifier))
@@ -135,7 +135,7 @@ def native_recovery_target(home, config, source_provider, environment, layers=()
         elif source_provider in aliases and any(environment.get(name) for name in AUTH_ENV_NAMES[1:]):
             values.update({name: environment.get(name) for name in AUTH_ENV_NAMES[1:]})
         else:
-            raise ValueError('대상 액세스에 이 항목이 없습니다. home 명확한 인증 소스 이전 계정은 사용되지 않습니다 API Key。')
+            raise ValueError('目标接入缺少此 home 的明确认证来源；不会沿用旧账号的 API Key。')
     if provider == source_provider == 'openai' and not effective.get('openai_base_url') and not definition.get('base_url'):
         values['OPENAI_BASE_URL'] = environment.get('OPENAI_BASE_URL')
     # File identities bind the confirmation without publishing a key verifier.
@@ -173,7 +173,7 @@ def verify_file_auth(probe, home, config, provider, *, known_factory=False):
         return
     cached = status.get('authToken')
     if status.get('authMethod') == 'apikey' and isinstance(cached, str) and cached and cached != key:
-        raise IPCError('네이티브 CLI 여전히 오래된 캐시 API 인증, 현재 auth.json 아직 동기화되지 않았습니다. 확인해주세요 CLI 네트워크를 구축하고 복구를 명시적으로 확인합니다. 읽기 및 중지 작업은 계속 사용할 수 있습니다.。')
+        raise IPCError('原生 CLI 仍缓存旧 API 认证，当前 auth.json 尚未同步；请检查 CLI 网络并明确确认恢复。阅读和停止任务仍可用。')
 
 
 def system_proxy_user_layer(snapshot, home):
@@ -191,14 +191,14 @@ def system_proxy_user_layer(snapshot, home):
     if (len(matches) != 1 or not isinstance(matches[0].get('version'), str)
             or not matches[0]['version'] or matches[0].get('disabledReason')
             or not isinstance(matches[0].get('config'), dict)):
-        raise ValueError('이를 확인할 수 없습니다. CLI 구성된 사용자 설정 버전. 서비스가 복원되지 않았습니다。')
+        raise ValueError('无法核验此 CLI 配置的用户设置版本；未恢复服务。')
     return matches[0]
 
 
 def _system_proxy_enabled(snapshot, layer):
     config = snapshot.get('config')
     if not isinstance(config, dict):
-        raise ValueError('기본 시스템 프록시 설정을 확인할 수 없습니다. 서비스가 복원되지 않았습니다。')
+        raise ValueError('无法核验原生系统代理设置；未恢复服务。')
     features = config.get('features')
     effective = features.get('respect_system_proxy') if isinstance(features, dict) else None
     origins = snapshot.get('origins')
@@ -216,7 +216,7 @@ def _system_proxy_enabled(snapshot, layer):
             return effective
     # An absent origin can mean the native default, but cannot prove that
     # a persisted true value has overcome requirements or another layer.
-    raise ValueError('기본 시스템 프록시 설정은 다른 구성이나 정책에 의해 제한됩니다. 서비스가 복원되지 않았습니다。')
+    raise ValueError('原生系统代理设置受其他配置或策略限制；未恢复服务。')
 
 
 def enable_system_proxy_following(probe, home, expected_version=None, before_write=None):
@@ -224,7 +224,7 @@ def enable_system_proxy_following(probe, home, expected_version=None, before_wri
     snapshot = probe.request('config/read', {'includeLayers': True})
     layer = system_proxy_user_layer(snapshot, home)
     if expected_version is not None and layer['version'] != expected_version:
-        raise ValueError('CLI 구성이 변경되었습니다. 다시 확인하고 확인하세요. 서비스가 복원되지 않았습니다.。')
+        raise ValueError('CLI 配置已变化，请重新检查并确认；未恢复服务。')
     _system_proxy_enabled(snapshot, layer)
     features = layer['config'].get('features')
     if isinstance(features, dict) and features.get('respect_system_proxy') is True:
@@ -243,7 +243,7 @@ def enable_system_proxy_following(probe, home, expected_version=None, before_wri
     if (not isinstance(response, dict) or response.get('status') not in ('ok', 'okOverridden')
             or not isinstance(response.get('version'), str) or not response['version']
             or response.get('filePath') != str((Path(home) / 'config.toml').resolve())):
-        error = IPCError('기본 시스템 프록시 설정의 쓰기 결과는 아직 확인되지 않았습니다. 먼저 확인하시고 다시 제출하지 마세요.。')
+        error = IPCError('原生系统代理设置的写入结果尚未确认；请先核验，不要重复提交。')
         error.system_proxy_unknown = True
         raise error
     try:
@@ -252,7 +252,7 @@ def enable_system_proxy_following(probe, home, expected_version=None, before_wri
         features = current['config'].get('features')
         if (current['version'] != response['version'] or not isinstance(features, dict)
                 or features.get('respect_system_proxy') is not True):
-            raise ValueError('시스템 프록시 설정이 저장되었지만 구성 확인에 실패했습니다. 서비스가 복원되지 않았습니다.。')
+            raise ValueError('系统代理设置已保存，但配置核验未通过；未恢复服务。')
         _system_proxy_enabled(updated, current)
     except Exception as error:
         error.system_proxy_saved = True

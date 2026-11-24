@@ -290,25 +290,25 @@ class SkillStore:
             for identifier in ids:
                 row = by_id.get(identifier)
                 if not row:
-                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
+                    raise ValueError('Skill 不可用，请刷新列表')
                 try:
                     path = Path(row['path']).resolve(strict=True)
                 except (OSError, RuntimeError):
-                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.') from None
+                    raise ValueError('Skill 不可用，请刷新列表') from None
                 # Trust the exact file discovered by native skills/list, including
                 # installed links and plugins outside CODEX_HOME. Do not silently
                 # authorize a changed target during send-time cache refresh.
                 if row['resolved_path'] is None:
-                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.')
+                    raise ValueError('Skill 不可用，请刷新列表')
                 if str(path) != row['resolved_path']:
-                    raise SkillPathChanged("스킬링크 대상이 변경되었습니다. 목록을 새로 고치고 다시 선택하세요.")
+                    raise SkillPathChanged('Skill 链接目标已变化，请刷新列表后重新选择')
                 try:
                     stat = path.stat()
                     data = path.read_bytes()
                 except OSError:
-                    raise ValueError('Skill 사용할 수 없습니다. 목록을 새로고침하세요.') from None
+                    raise ValueError('Skill 不可用，请刷新列表') from None
                 if row['size'] != stat.st_size or row['mtime_ns'] != stat.st_mtime_ns or row['content_hash'] != hashlib.sha256(data).hexdigest():
-                    raise ValueError('Skill 수정되었습니다. 목록을 새로고침하세요.')
+                    raise ValueError('Skill 已修改，请刷新列表')
                 result.append(self._public({**row, 'path': str(path)}))
             return result
         finally:
@@ -337,10 +337,15 @@ class Catalog:
 
     METHODS = {"initialize", "model/list", "skills/list", "config/read", "account/read", "getAuthStatus", "configRequirements/read"}
 
-    def __init__(self, codex_home, executable=None, allow_background_refresh=True, auth_status_only=False, observation_enabled=None):
+    def __init__(self, codex_home, executable=None, allow_background_refresh=True, auth_status_only=False,
+                 observation_enabled=None, executable_getter=None):
         self.home = Path(codex_home)
-        self._automatic_runtime = not executable
-        self._executable = Path(executable) if executable else self.find_runtime()
+        self.executable_getter = executable_getter
+        self._automatic_runtime = not executable and executable_getter is None
+        self._executable = Path(executable) if executable else None
+        if self._automatic_runtime:
+            self._executable = self.find_runtime()
+        self._runtime_directory_stamp = self._windows_runtime_stamp()
         self.cache = {}
         self.lock = threading.Lock()
         self.kind_locks = {'models': threading.Lock(), 'skills': threading.Lock()}
@@ -359,16 +364,51 @@ class Catalog:
 
     @property
     def executable(self):
-        # Desktop updates remove versioned Windows runtimes while the gateway
-        # stays running. Refresh automatic selection before the next operation.
-        if self._automatic_runtime and (not self._executable or not self._executable.is_file()):
-            self._executable = self.find_runtime()
+        if self.executable_getter is not None:
+            value = self.executable_getter()
+            return Path(value) if value else None
+        # A Windows updater can retain the old version while adding a new one.
+        if self._automatic_runtime:
+            stamp = self._windows_runtime_stamp()
+            try:
+                available = self._executable and self._executable.is_file()
+            except OSError:
+                return self._executable
+            if not available or stamp != self._runtime_directory_stamp:
+                discovered = self.find_runtime()
+                if discovered or not available:
+                    self._executable = discovered
+                self._runtime_directory_stamp = self._windows_runtime_stamp()
         return self._executable
 
     @executable.setter
     def executable(self, value):
+        self.executable_getter = None
         self._automatic_runtime = not value
         self._executable = Path(value) if value else None
+        self._runtime_directory_stamp = self._windows_runtime_stamp()
+
+    def follow_runtime(self, previous, current):
+        """Adopt a known installation update without replacing an explicit path."""
+        previous = Path(previous) if previous else None
+        if not self._automatic_runtime or self._executable != previous or not current:
+            return False
+        current = Path(current)
+        try:
+            available = current.is_file()
+        except OSError:
+            return False
+        if not available or current == self._executable:
+            return False
+        self._executable = current
+        self._runtime_directory_stamp = self._windows_runtime_stamp()
+        return True
+
+    def _windows_runtime_stamp(self):
+        if os.name != 'nt' or not self._automatic_runtime or not self._executable:
+            return None
+        from bridge.platforms.windows.discovery import codex_runtime_stamp
+        return codex_runtime_stamp(self._executable, getattr(self, '_runtime_directory_stamp', None), env=os.environ)
 
     def invalidate_models(self):
         with self.lock:
@@ -587,7 +627,7 @@ class Catalog:
     def _fetch(self, cwd, provider=None, kind='catalog', request_timeout=90, permission_reader=None):
         executable = self.executable
         if not executable:
-            raise CatalogError("데스크톱 Codex 런타임을 찾을 수 없습니다.")
+            raise CatalogError("找不到桌面 App 的 Codex 运行时")
         env = dict(os.environ)
         env['CODEX_HOME'] = str(self.home)
         options = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
@@ -601,7 +641,7 @@ class Catalog:
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                        text=True, encoding='utf-8', **options)
         except OSError as exc:
-            raise CatalogError('시작할 수 없습니다 Codex 실행 시 실행 구성에서 프로그램 경로, 프로젝트 디렉터리, 접근 권한을 확인하세요.') from exc
+            raise CatalogError('无法启动 Codex 运行时，请检查运行配置中的程序路径、项目目录和访问权限') from exc
         messages = queue.Queue()
         def read():
             try:
@@ -626,7 +666,7 @@ class Catalog:
             linux_permission_read = (sys.platform == 'linux' and kind == 'linux-permissions' and
                                      method in ('permissionProfile/list', 'experimentalFeature/list'))
             if method not in self.METHODS and not linux_permission_read:
-                raise ValueError("카탈로그 인터페이스에서는 모델 읽기만 허용됩니다.、Skill 및 기능 구성")
+                raise ValueError("目录接口只允许读取模型、Skill 与能力配置")
             counter += 1
             process.stdin.write(json.dumps({'id': counter, 'method': method, 'params': params}) + '\n')
             process.stdin.flush()
@@ -635,15 +675,15 @@ class Catalog:
                 try:
                     value = messages.get(timeout=max(.01, deadline - time.monotonic()))
                 except queue.Empty as exc:
-                    raise CatalogError("데스크탑 모델/Skill 디렉터리 읽기 시간 초과") from exc
+                    raise CatalogError("桌面模型/Skill 目录读取超时") from exc
                 if value is None:
-                    raise CatalogError("데스크톱 디렉터리 쿼리가 손상되었습니다.")
+                    raise CatalogError("桌面目录查询已断开")
                 if value.get('id') != counter:
                     if time.monotonic() >= deadline:
-                        raise CatalogError("데스크톱 디렉터리 읽기 시간 초과")
+                        raise CatalogError("桌面目录读取超时")
                     continue
                 if 'error' in value:
-                    raise CatalogError(value['error'].get('message', '디렉터리 읽기 실패'))
+                    raise CatalogError(value['error'].get('message', '目录读取失败'))
                 return value['result']
         started = time.monotonic()
         logger.info('catalog fetch start kind=%s executable=%s cwd=%s provider=%s', kind, executable, cwd, provider)
@@ -667,21 +707,23 @@ class Catalog:
                 # A runtime busy with an active task can stall a Skill scan. Run
                 # this request independently from models so the model picker is
                 # never blocked by it.
-                skills = request('skills/list', {'cwds': [cwd], 'forceReload': False}, timeout=request_timeout)
-                logger.info('catalog skills elapsed=%.3fs count=%d', time.monotonic()-phase, len(skills.get('data', [])))
+                skills = self._dict(request('skills/list', {'cwds': [cwd], 'forceReload': False}, timeout=request_timeout))
+                skill_entries = self._list(skills.get('data'))
+                logger.info('catalog skills elapsed=%.3fs count=%d', time.monotonic()-phase, len(skill_entries))
                 logger.info('catalog fetch complete elapsed=%.3fs', time.monotonic()-started)
-                return {'models': [], 'kind': 'skills', 'skillEntries': skills.get('data', []), 'fastMode': {'allowed': False},
+                return {'models': [], 'kind': 'skills', 'skillEntries': skill_entries, 'fastMode': {'allowed': False},
                         'modelSource': 'codex'}
             phase = time.monotonic();catalog = self.read_models(request, cwd, provider,
                 metadata_request=lambda method, params: request(method, params, timeout=2))
             logger.info('catalog models elapsed=%.3fs source=%s count=%d error=%r',
                         time.monotonic()-phase, catalog.get('modelSource'), len(catalog.get('models', [])), catalog.get('modelError'))
-            phase = time.monotonic();skills = request('skills/list', {'cwds': [cwd], 'forceReload': False}, timeout=request_timeout)
-            logger.info('catalog skills elapsed=%.3fs count=%d', time.monotonic()-phase, len(skills.get('data', [])))
+            phase = time.monotonic();skills = self._dict(request('skills/list', {'cwds': [cwd], 'forceReload': False}, timeout=request_timeout))
+            skill_entries = self._list(skills.get('data'))
+            logger.info('catalog skills elapsed=%.3fs count=%d', time.monotonic()-phase, len(skill_entries))
             phase = time.monotonic();fast = self.fast_mode(request, cwd, provider) if catalog['modelSource'] == 'codex' else {'allowed': False}
             logger.info('catalog fast-mode elapsed=%.3fs allowed=%s', time.monotonic()-phase, fast.get('allowed'))
             logger.info('catalog fetch complete elapsed=%.3fs', time.monotonic()-started)
-            return {**catalog, 'kind': kind, 'skillEntries': skills.get('data', []), 'fastMode': fast}
+            return {**catalog, 'kind': kind, 'skillEntries': skill_entries, 'fastMode': fast}
         except Exception:
             logger.exception('catalog fetch failed elapsed=%.3fs', time.monotonic()-started)
             raise
@@ -699,9 +741,33 @@ class Catalog:
             reader.join(timeout=1)
 
     @staticmethod
+    def _dict(value):
+        # 运行时配置与响应体里的可选子对象可能显式为 JSON null，不能只靠 .get(k, {}) 兜底。
+        return value if isinstance(value, dict) else {}
+
+    @staticmethod
+    def _list(value):
+        return value if isinstance(value, list) else []
+
+    @staticmethod
+    def _config(request, cwd):
+        response = request('config/read', {'includeLayers': False, 'cwd': cwd})
+        if not isinstance(response, dict) or not isinstance(response.get('config'), dict):
+            raise CatalogError('无法确认模型接入配置，请重试')
+        config = response['config']
+        profiles = config.get('profiles')
+        if profiles is not None and not isinstance(profiles, dict):
+            raise CatalogError('无法确认模型接入配置，请重试')
+        profile = Catalog._dict(profiles).get(config.get('profile'))
+        if profile is not None and not isinstance(profile, dict):
+            raise CatalogError('无法确认模型接入配置，请重试')
+        return config, Catalog._dict(profile)
+
+    @staticmethod
     def custom_provider(effective, provider=None):
+        effective = Catalog._dict(effective)
         provider = provider or effective.get('model_provider') or 'openai'
-        definition = (effective.get('model_providers') or {}).get(provider) or {}
+        definition = Catalog._dict(Catalog._dict(effective.get('model_providers')).get(provider))
         # openai_base_url (and OPENAI_BASE_URL) only overrides routing. The
         # native account still decides whether that route uses ChatGPT or a key.
         return provider != 'openai' or any(definition.get(key) for key in
@@ -713,7 +779,7 @@ class Catalog:
         # Preserve the distinction used by upstream model discovery and Fast mode.
         mode = status.get('authMethod')
         if 'authMethod' not in status or mode not in (None, 'apikey', 'chatgpt', 'chatgptAuthTokens'):
-            raise CatalogError('확인할 수 없습니다 SSH 모델 카탈로그의 인증 유형')
+            raise CatalogError('无法确认 SSH 模型目录的认证类型')
         account = None if mode is None else {'type': 'apiKey' if mode == 'apikey' else 'chatgpt'}
         return {'account': account, 'requiresOpenaiAuth': status.get('requiresOpenaiAuth')}
 
@@ -721,17 +787,18 @@ class Catalog:
         # Desktop catalog reads have no verified owner environment. Only the
         # native CLI path supplies a verified environment explicitly.
         environment = {} if environment is None else environment
-        config = request('config/read', {'includeLayers': False, 'cwd': cwd}).get('config', {})
-        profile = (config.get('profiles') or {}).get(config.get('profile')) or {}
+        config, profile = self._config(request, cwd)
         effective = {**config, **profile}
         default_provider = effective.get('model_provider') or 'openai'
         provider = provider or default_provider
-        definition = (effective.get('model_providers') or {}).get(provider) or {}
+        definition = self._dict(self._dict(effective.get('model_providers')).get(provider))
         if magpie_managed(config=effective) and provider == (effective.get('model_provider') or 'openai'):
             models, cursor = [], None
             for _ in range(10):
                 response = request('model/list', {'cursor': cursor, 'limit': 100, 'includeHidden': False})
-                models.extend(response.get('data', []))
+                if not isinstance(response, dict) or not isinstance(response.get('data'), list):
+                    raise CatalogError('模型目录响应无效，请重试或手动填写模型')
+                models.extend(self._list(response.get('data')))
                 cursor = response.get('nextCursor')
                 if not cursor:
                     break
@@ -741,25 +808,25 @@ class Catalog:
         custom = self.custom_provider(effective, provider)
         # The runtime resolves explicit catalog paths and applies model visibility rules.
         configured_catalog = bool(effective.get('model_catalog_json')) and provider == (effective.get('model_provider') or 'openai')
-        auth = {} if custom or configured_catalog else request('account/read', {'refreshToken': False}).get('account') or {}
+        auth = {} if custom or configured_catalog else self._dict(self._dict(request('account/read', {'refreshToken': False})).get('account'))
         if not configured_catalog and (custom or auth.get('type') == 'apiKey'):
             result = {'models': [], 'modelSource': 'api', '_defaultProvider': default_provider,
                       'currentEffort': effective.get('model_reasoning_effort')}
             try:
                 if any(definition.get(k) for k in ('auth', 'gateway_oauth', 'aws')):
-                    raise ValueError("이 API 연결은 추가 인증 설정을 사용합니다. 모델 ID를 수동으로 입력합니다.")
+                    raise ValueError('此 API 接入使用额外认证配置，请手动填写模型 ID')
                 if not base and custom:
-                    raise ValueError("현재 API 주소가 누락되었습니다. 연결 설정을 확인하세요.")
-                headers = {name.lower(): value for name, value in (definition.get('http_headers') or {}).items()}
-                for name, variable in (definition.get('env_http_headers') or {}).items():
+                    raise ValueError('未找到当前 API 地址，请检查接入配置')
+                headers = {name.lower(): value for name, value in self._dict(definition.get('http_headers')).items()}
+                for name, variable in self._dict(definition.get('env_http_headers')).items():
                     value = environment.get(variable)
                     if not value:
-                        raise ValueError('현재를 찾을 수 없습니다 API 인증 요청 헤더, 접속 환경 변수를 확인해주세요')
+                        raise ValueError('未找到当前 API 认证请求头，请检查接入环境变量')
                     headers[name.lower()] = value
                 key = (environment.get(definition['env_key'], '') if definition.get('env_key')
                        else definition.get('experimental_bearer_token') or '')
                 if definition.get('env_key') and not key:
-                    raise ValueError("현재 API 키를 사용할 수 없습니다. 연결 설정을 확인하세요.")
+                    raise ValueError('未找到当前 API Key，请检查接入配置')
                 if not key and (definition.get('requires_openai_auth') or (provider == 'openai' and not headers)):
                     try:
                         saved = json.loads((self.home/'auth.json').read_text(encoding='utf-8'))
@@ -767,32 +834,37 @@ class Catalog:
                         saved = {}
                     key = saved.get('OPENAI_API_KEY') or environment.get('OPENAI_API_KEY', '')
                     if not key:
-                        raise ValueError("현재 API 키를 사용할 수 없습니다. 연결 설정을 확인하세요.")
+                        raise ValueError('未找到当前 API Key，请检查接入配置')
                 base = base or 'https://api.openai.com/v1'
                 endpoint = urlsplit(base)
                 if (endpoint.scheme not in ('https', 'http') or not endpoint.hostname or
                         endpoint.username or endpoint.password or endpoint.query or endpoint.fragment):
-                    raise ValueError("현재 API 주소가 누락되었습니다. 연결 설정을 확인하세요.")
+                    raise ValueError('未找到当前 API 地址，请检查接入配置')
                 if key and headers:
                     headers['authorization'] = 'Bearer ' + key
                 options = {}
                 if headers:
                     options['headers'] = headers
                 if definition.get('query_params'):
-                    options['query_params'] = definition['query_params']
+                    options['query_params'] = definition.get('query_params')
                 models = model_catalog(base, key, **options)
                 # The upstream remains the authority for availability. Native
                 # capabilities may fill missing metadata only for exact IDs;
                 # never replace a failed upstream list with bundled models.
                 if any(not row['efforts'] for row in models):
                     try:
-                        response = (metadata_request or request)('model/list', {
-                            'cursor': None, 'limit': 100, 'includeHidden': False})
-                        native = {row.get('model', row.get('id')): row for row in response.get('data', [])}
+                        response = self._dict((metadata_request or request)('model/list', {
+                            'cursor': None, 'limit': 100, 'includeHidden': False}))
+                        # model 字段显式为 null 时需回退到 id，且跳过 null 条目避免写入 None 键。
+                        native = {model_id: row for row in self._list(response.get('data'))
+                                  if isinstance(row, dict)
+                                  for model_id in (row.get('model') or row.get('id'),) if model_id}
                         for row in models:
-                            info = native.get(row['id'], {})
+                            info = self._dict(native.get(row['id']))
                             if not row['efforts']:
-                                row['efforts'] = [level['reasoningEffort'] for level in info.get('supportedReasoningEfforts', [])]
+                                row['efforts'] = [level['reasoningEffort']
+                                                  for level in self._list(info.get('supportedReasoningEfforts'))
+                                                  if isinstance(level, dict) and level.get('reasoningEffort')]
                                 row['defaultEffort'] = info.get('defaultReasoningEffort')
                     except CatalogError:
                         pass  # Optional metadata must not discard a valid upstream list.
@@ -805,7 +877,9 @@ class Catalog:
         models, cursor = [], None
         for _ in range(10):
             response = request('model/list', {'cursor': cursor, 'limit': 100, 'includeHidden': False})
-            models.extend(response.get('data', []))
+            if not isinstance(response, dict) or not isinstance(response.get('data'), list):
+                raise CatalogError('模型目录响应无效，请重试或手动填写模型')
+            models.extend(self._list(response.get('data')))
             cursor = response.get('nextCursor')
             if not cursor:
                 break
@@ -817,22 +891,30 @@ class Catalog:
         # Return capability metadata only; credentials/config contents stay in the runtime.
         unavailable = {'allowed': False}
         try:
-            config = request('config/read', {'includeLayers': False, 'cwd': cwd}).get('config', {})
-            profile = (config.get('profiles') or {}).get(config.get('profile'), {})
+            config, profile = Catalog._config(request, cwd)
             effective = {**config, **profile}
             configured_provider = effective.get('model_provider') or 'openai'
             provider = provider or configured_provider
-            definition = (effective.get('model_providers') or {}).get(provider) or {}
             configured_catalog = bool(effective.get('model_catalog_json')) and provider == configured_provider
             if not configured_catalog:
                 if Catalog.custom_provider(effective, provider):
                     return unavailable
-                auth = request('account/read', {'refreshToken': False})
-                if (auth.get('account') or {}).get('type') != 'chatgpt' or auth.get('requiresOpenaiAuth') is not True:
+                auth = Catalog._dict(request('account/read', {'refreshToken': False}))
+                if Catalog._dict(auth.get('account')).get('type') != 'chatgpt' or auth.get('requiresOpenaiAuth') is not True:
                     return unavailable
-            requirements = request('configRequirements/read', {}).get('requirements') or {}
-            features = {**(config.get('features') or {}), **(profile.get('features') or {})}
-            allowed = features.get('fast_mode') is not False and (requirements.get('featureRequirements') or {}).get('fast_mode') is not False
+            response = request('configRequirements/read', {})
+            if not isinstance(response, dict) or 'requirements' not in response:
+                return unavailable
+            requirements = response['requirements']
+            if requirements is not None and not isinstance(requirements, dict):
+                return unavailable
+            requirements = Catalog._dict(requirements)
+            if any(value is not None and not isinstance(value, dict) for value in (
+                    config.get('features'), profile.get('features'), requirements.get('featureRequirements'))):
+                return unavailable
+            features = {**Catalog._dict(config.get('features')), **Catalog._dict(profile.get('features'))}
+            allowed = (features.get('fast_mode') is not False and
+                       Catalog._dict(requirements.get('featureRequirements')).get('fast_mode') is not False)
             return {'allowed': allowed, 'provider': provider, 'defaultServiceTier': effective.get('service_tier')}
         except CatalogError:
             # Older/offline runtimes still expose their existing model and Skill list.
@@ -840,9 +922,10 @@ class Catalog:
 
     @staticmethod
     def fast_tier(model):
-        return next((tier['id'] for tier in model.get('serviceTiers') or []
-                     if isinstance(tier.get('id'), str) and (tier['id'] in ('fast', 'priority') or
-                         str(tier.get('name', '')).strip().lower() in ('fast', 'priority'))), None)
+        model = Catalog._dict(model)
+        return next((tier['id'] for tier in Catalog._list(model.get('serviceTiers'))
+                     if isinstance(tier, dict) and isinstance(tier.get('id'), str) and (tier['id'] in ('fast', 'priority') or
+                         str(tier.get('name') or '').strip().lower() in ('fast', 'priority'))), None)
 
     def _runtime_version(self):
         try:
@@ -915,7 +998,7 @@ class Catalog:
     def get_kind(self, kind, cwd, refresh=False, provider=None, query='', offset=0,
                  limit=SKILL_PAGE_LIMIT, ids=None):
         if kind not in self.kind_locks:
-            raise ValueError("알 수 없는 카탈로그 유형")
+            raise ValueError('未知目录类型')
         cwd = str(Path(cwd).resolve())
         offset = max(0, int(offset))
         limit = min(SKILL_MAX_PAGE_LIMIT, max(1, int(limit)))
@@ -949,14 +1032,14 @@ class Catalog:
                     raw = self._fetch(cwd, provider, kind)
                 except CatalogError as exc:
                     if self._model_scope(cwd) != scope:
-                        raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.') from exc
+                        raise CatalogIdentityChanged('模型接入已变化，请重试') from exc
                     if persisted:
                         return {**ModelStore.directory(persisted[1]), 'kind': 'models', 'modelError': str(exc),
                                 'cache': {'state': 'stale', 'updatedAt': persisted[0], 'identity': identity}}
                     return {'models': [], 'kind': 'models', 'modelError': str(exc),
                             'fastMode': {'allowed': False}, 'cache': {'state': 'unavailable', 'identity': identity}}
                 if self._model_scope(cwd) != scope:
-                    raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
+                    raise CatalogIdentityChanged('模型接入已变化，请重试')
                 self._remember_model_provider(scope, raw)
                 identity = self.model_identity(cwd, provider)
                 models = self.normalize_models(raw['models'])
@@ -965,9 +1048,9 @@ class Catalog:
                          'modelError': raw.get('modelError'), 'currentModel': raw.get('currentModel'),
                          'currentEffort': raw.get('currentEffort')}
                 if self.model_identity(cwd, provider) != identity:
-                    raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
+                    raise CatalogIdentityChanged('模型接入已变化，请重试')
                 if value.get('modelError') or not models:
-                    value['modelError'] = value.get('modelError') or '모델 디렉터리를 일시적으로 사용할 수 없습니다. 모델을 수동으로 채울 수 있습니다.'
+                    value['modelError'] = value.get('modelError') or '模型目录暂不可用，可手动填写模型'
                     return ({**ModelStore.directory(persisted[1]), 'kind': 'models', 'modelError': value['modelError'],
                              'cache': {'state': 'stale', 'updatedAt': persisted[0], 'identity': identity}} if persisted else
                             {**value, 'cache': {'state': 'unavailable', 'identity': identity}})
@@ -1071,7 +1154,7 @@ class Catalog:
                 self.cache.pop(key, None)
                 raise
             if self._model_scope(cwd) != scope:
-                raise CatalogIdentityChanged('모델 액세스 권한이 변경되었습니다. 다시 시도해 주세요.')
+                raise CatalogIdentityChanged('模型接入已变化，请重试')
             self._remember_model_provider(scope, raw)
             identity = self.model_identity(cwd, provider)
             key = (cwd, identity)

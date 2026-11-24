@@ -86,7 +86,7 @@ class RecordFileLocationTests(TestCase):
         manager = DesktopSessions(self.root/'gateway'); self.addCleanup(manager.close)
         manager.config['enabled'] = {'claude': True}
         adapter = Mock(); adapter.call.return_value = {'sessions': [{'id':'native','cwd':str(self.root),'host':'ssh:fixture'}]}; manager.adapters['claude'] = adapter
-        with self.assertRaisesRegex(ValueError, '호스트 파일 탐색'):
+        with self.assertRaisesRegex(ValueError, '宿主机文件浏览'):
             manager.workspace_bridge('claude','native',host_files=True)
         adapter.record_path.assert_not_called()
 

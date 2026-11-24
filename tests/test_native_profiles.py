@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 class NativeProfilesTests(unittest.TestCase):
     def test_dsh_uses_separate_data_and_singleton_roots_without_creating_them(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as directory:
-            home = Path(directory)/'독립적인 DSH'
+            home = Path(directory)/'独立 DSH'
             first = resolve_profile('deepseek', home, platform='darwin')
-            second = resolve_profile('deepseek', home.with_name('또 다른 DSH'), platform='darwin')
+            second = resolve_profile('deepseek', home.with_name('另一个 DSH'), platform='darwin')
             for profile in (first, second):
                 options = launch_parameters(profile, platform='darwin')
                 self.assertEqual(options['environment'], {'DSH_HOME': str(profile.home)})
@@ -77,7 +77,7 @@ class NativeProfilesTests(unittest.TestCase):
             profile = resolve_profile('deepseek', Path(directory)/'profile', platform='darwin')
             changed = NativeProfile(profile.family, profile.kind, profile.home,
                                     {**profile.roots, 'userData': Path(directory)/'other'})
-            with self.assertRaisesRegex(ValueError, "독립적으로\\ 구성된\\ 기본\\ 디렉터리가\\ 일치하지\\ 않습니다\\.\\ 다시\\ 로드하여\\ 액세스하세요\\."):
+            with self.assertRaisesRegex(ValueError, '不一致'):
                 launch_parameters(changed, platform='darwin')
 
     def test_new_profiles_remove_native_account_inputs_without_removing_network_environment(self):

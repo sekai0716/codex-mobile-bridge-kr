@@ -78,7 +78,7 @@ class ExternalApplicationLabels(unittest.TestCase):
             ('    static bool MainShape(', '    static bool PendingDialog(', ['\u5f00\u53d1\u8005\u5de5\u5177']),
             ('    static readonly string[] QuitLabels=', '    static bool QuitLabel(', ['\u9000\u51fa Codex', '\u9000\u51fa ChatGPT', 'Quit Codex', 'Quit ChatGPT']),
             ('    static void QuitTray(', '    static void Quit(Process ', ['\u6253\u5f00 ZCode', '\u9000\u51fa', 'Open ZCode', 'Quit']),
-            ('    static void SelfCheck()', '    static int Main(', ['\u9000\u51fa Codex Ctrl+Q', '\u9000\u51fa ChatGPT Ctrl+Q', '\u6ce8\u9500 Ctrl+Q']),
+            ('    static void SelfCheck()', '    static int Main(', ['退出 Codex Ctrl+Q', '退出 ChatGPT Ctrl+Q', '退出登录 Ctrl+Q']),
         ])
 
 

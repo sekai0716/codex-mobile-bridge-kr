@@ -83,9 +83,9 @@ class RemoteDurableAckTests(unittest.TestCase):
                 cli, owner, _, host_id, host, _ = self.adapter(kind, save=False, finished=True)
                 row = cli._row(host_id, host, cli._remote('fixture', {'operation': 'detail'}))
                 cli.index[row['id']] = row; cli.owned[row['id']] = owner
-                with self.assertRaisesRegex(BridgeUnavailable, "SSH\\ Claude\\ Code\\ 알\\ 수\\ 없는\\ 전송\\ 결과입니다\\.\\ 원래\\ 대화를\\ 확인하세요\\."):
+                with self.assertRaisesRegex(BridgeUnavailable, '结果不明'):
                     cli.call('send', row['id'], {'text': 'once'})
-                with self.assertRaisesRegex(BridgeUnavailable, '기다리세요.'):
+                with self.assertRaisesRegex(BridgeUnavailable, '请等待'):
                     cli.call('send', row['id'], {'text': 'once'})
                 owner.write.assert_called_once()
 
@@ -96,7 +96,7 @@ class RemoteDurableAckTests(unittest.TestCase):
             return owner
         with patch('bridge.clients.claude.remote.subprocess.Popen', return_value=process), \
              patch('bridge.clients.claude.remote._Owned', side_effect=new_owner):
-            with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Code\\ 새\\ 메시지\\ 생성\\ 결과를\\ 알\\ 수\\ 없습니다\\.\\ 대화\\ 목록을\\ 확인하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '结果不明'):
                 cli.create(host_id, 'fixture', owner.origin, owner.cwd, 'first request')
         owner.write.assert_called_once()
         owner.close.assert_not_called()
@@ -110,7 +110,7 @@ class RemoteDurableAckTests(unittest.TestCase):
                 row = cli._row(host_id, host, cli._remote('fixture', {'operation': 'detail'}))
                 cli.index[row['id']] = row; cli.owned[row['id']] = owner
                 saved['overrides'][key] = 'changed'
-                with self.assertRaisesRegex(BridgeUnavailable, 'ID 또는 작업 디렉터리가 변경되었습니다.'):
+                with self.assertRaisesRegex(BridgeUnavailable, '身份或工作目录已变化'):
                     cli.call('send', row['id'], {'text': 'once'})
                 owner.write.assert_called_once()
                 self.assertFalse(any(c.args[1]['operation']=='history' for c in cli._remote.call_args_list))
@@ -143,7 +143,7 @@ class RemoteDurableAckTests(unittest.TestCase):
                 result['stamp'] = [1, 9, 3, 4, 5]
             return result
         cli._remote.side_effect = changed_file
-        with self.assertRaisesRegex(BridgeUnavailable, "SSH\\ Claude\\ Code\\ 알\\ 수\\ 없는\\ 전송\\ 결과입니다\\.\\ 원래\\ 대화를\\ 확인하세요\\."):
+        with self.assertRaisesRegex(BridgeUnavailable, '结果不明'):
             cli.call('send', row['id'], {'text': 'once'})
         owner.write.assert_called_once()
 
@@ -174,6 +174,6 @@ class RemoteDurableAckTests(unittest.TestCase):
             original(frame)
             saved['events'][0]['cwd'] = '/changed/project'
         owner.write.side_effect = wrong_cwd
-        with self.assertRaisesRegex(BridgeUnavailable, "SSH\\ Claude\\ Code\\ 알\\ 수\\ 없는\\ 전송\\ 결과입니다\\.\\ 원래\\ 대화를\\ 확인하세요\\."):
+        with self.assertRaisesRegex(BridgeUnavailable, '结果不明'):
             cli.call('send', row['id'], {'text': 'once'})
         owner.write.assert_called_once()

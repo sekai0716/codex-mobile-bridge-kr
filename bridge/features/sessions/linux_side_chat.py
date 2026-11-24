@@ -67,7 +67,7 @@ class LinuxSideChat(SideChat):
         if preset not in ('ask', 'auto-review', 'full-access'):
             raise ValueError('잘못된 권한 설정')
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError("전체 액세스 확인")
+            raise ValueError('请确认完全访问权限')
         with self.actions:
             facts, options = self._permission_options()
             require_permission(options, preset)
@@ -83,5 +83,5 @@ class LinuxSideChat(SideChat):
                     timeout=PERMISSION_CONFIRM_TIMEOUT)
                 if (self.error or self.closed or self.permission_revision <= revision
                         or self.view()['permissionMode'] != preset):
-                    raise SideChatError("런타임이 권한 변경을 확인하지 않았습니다. 다시 시도하기 전에 상태를 새로 고치세요.")
+                    raise SideChatError('权限设置尚未获运行时确认，请刷新状态后重试。')
                 return self.view()

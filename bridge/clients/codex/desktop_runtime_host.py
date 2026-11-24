@@ -20,7 +20,7 @@ from bridge.clients.codex.app_server import AppServerMessageTooLarge as MessageT
 MAX_LINE = 64 * 1024 * 1024
 
 
-def _forward_input(stream, transport, emit, stop, subscriptions=None):
+def _forward_input(stream, transport, emit, stop):
     """Reject one invalid/oversized request without disconnecting the App."""
     while not stop.is_set():
         line = stream.readline(MAX_LINE + 2)
@@ -43,8 +43,6 @@ def _forward_input(stream, transport, emit, stop, subscriptions=None):
             emit({'id': None, 'error': {'code': -32600, 'message': 'Invalid Desktop request'}})
             continue
         try:
-            if subscriptions:
-                subscriptions.outgoing(packet)
             transport.send(packet)
         except MessageTooLarge:
             if 'id' in packet and 'method' in packet:
@@ -77,8 +75,11 @@ def run(configuration, arguments):
     # All unrelated native CLI calls retain their original behavior and IO.
     if server_args is None or Path(os.environ.get('CODEX_HOME', '')).resolve() != home:
         os.execv(cli, [cli, *arguments])
-    app = process_identity(os.getppid())
-    if app['image'] != value['application']:
+    parent = process_identity(os.getppid())
+    from bridge.clients.codex.desktop_runtime import desktop_owner
+    try:
+        app, host = desktop_owner(parent, value['application'])
+    except ValueError:
         os.execv(cli, [cli, *arguments])
     first = sys.stdin.buffer.readline(MAX_LINE + 1)
     if len(first) > MAX_LINE:
@@ -95,6 +96,12 @@ def run(configuration, arguments):
         # A different storage boundary is not an authorized default-home runtime.
         return _passthrough(cli, arguments, first)
     with exclusive_lock(home, 'runtime'):
+        if sys.platform == 'linux':
+            if value.get('transport') != 'desktop-stdio' or _read(config_path) != value:
+                raise ValueError('Linux shared Desktop configuration changed; prepare the connection again')
+        if host is not None or sys.platform == 'linux':
+            from bridge.clients.codex.desktop_host import serve
+            return serve(value, app, host, arguments, initialize)
         private_directory(endpoint.parent)
         return _serve(value, app, server_args, endpoint, initialize, generation)
 
@@ -140,18 +147,12 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
     _write(active, json.dumps(record))
     native = None
     proxy = None
-    subscriptions = None
     stop = threading.Event()
     errors = []
     output_lock = threading.Lock()
     record_lock = threading.Lock()
     previous = {sig: signal.signal(sig, lambda *_: stop.set()) for sig in (signal.SIGTERM, signal.SIGINT)}
     try:
-        if sys.platform == 'linux':
-            from bridge.clients.codex.desktop_subscriptions import DesktopSubscriptions
-            tracker = DesktopSubscriptions(endpoint)
-            tracker.directory.mkdir(mode=0o700)
-            subscriptions = tracker
         # The native runtime inherits the App's environment and working dir.
         # Only transport changes. Its stderr belongs to the original App.
         native = subprocess.Popen([config['cli'], *arguments], stdin=subprocess.DEVNULL,
@@ -190,8 +191,6 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
             try:
                 while not stop.is_set():
                     packet = transport.receive()
-                    if subscriptions:
-                        subscriptions.incoming(packet)
                     if packet.get('id') == initialize.get('id') and 'result' in packet:
                         if Path(packet['result']['codexHome']).resolve() != Path(config['home']):
                             raise ValueError('Native Desktop initialized a different home')
@@ -212,7 +211,7 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
         def input_loop():
             try:
                 transport.send(initialize)
-                _forward_input(sys.stdin.buffer, transport, emit, stop, subscriptions)
+                _forward_input(sys.stdin.buffer, transport, emit, stop)
             except (OSError, ValueError, RuntimeError) as exc:
                 if not stop.is_set():
                     errors.append(exc)
@@ -244,8 +243,6 @@ def _serve(config, app, arguments, endpoint, initialize, generation):
                 active.unlink()
         if exited:
             endpoint.unlink(missing_ok=True)
-            if subscriptions:
-                subscriptions.close()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
     if errors:

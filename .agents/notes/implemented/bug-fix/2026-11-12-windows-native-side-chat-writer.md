@@ -2,7 +2,9 @@
 
 Status: implemented
 
-## 문제
+utility host 进程拓扑及新增控制端点见[宿主进程与旧 IPC 并存](2026-11-21-hosted-codex-desktop.md)；旧版的本篇路径保持，新版 Windows 成品仍需单独实测。
+
+## 问题
 
 Windows 기존 App 상위 채팅이 이미 보류된 경우 메타데이터가 다시 실행될 때 트리거됩니다. `already has an active writer`。Mac 공유의 Unix transport 직접 복사할 수 없습니다.：Windows App 닫기 stdio 하위 프로세스는 어댑터를 직접 종료합니다.，Python 의 `finally` 실행이 보장되지 않으며 독립적인 기본 서비스가 남을 수 있습니다.。
 

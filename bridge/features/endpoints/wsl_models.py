@@ -73,10 +73,10 @@ class WslModelCatalog:
             try:
                 value = fetch()
                 if self.identity(metadata, thread, config) != identity:
-                    raise ValueError('계정 ID가 변경되었습니다. 모델 목록을 다시 읽어보세요.')
+                    raise ValueError('账号身份已变化，请重新读取模型列表')
             except (IPCError, RemoteUnavailable, OSError):
                 if record:
-                    return self._public(record, identity, error='모델 목록 새로 고침에 실패했습니다. 마지막 결과가 유지되었습니다.')
+                    return self._public(record, identity, error='模型列表刷新失败，已保留上次结果')
                 raise
             stable = {key: copy.deepcopy(v) for key, v in value.items()
                       if key not in ('currentModel', 'currentEffort')}

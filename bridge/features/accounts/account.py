@@ -36,7 +36,7 @@ class AccountRPC:
 
     def __enter__(self):
         if not self.executable:
-            raise AccountError("데스크톱 Codex 런타임을 찾을 수 없습니다.")
+            raise AccountError('找不到桌面 App 的 Codex 运行时')
         options = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
         try:
             # Use the account's home, not a chat's project/configuration layer.
@@ -63,11 +63,11 @@ class AccountRPC:
             return self
         except Exception:
             self.__exit__(None, None, None)
-            raise AccountError("Codex 계정 서비스에 연결할 수 없습니다. 데스크톱 로그인을 확인하세요.") from None
+            raise AccountError('无法连接 Codex 账号服务，请检查电脑端登录状态') from None
 
     def request(self, method, params=None):
         if method not in self.METHODS:
-            raise ValueError("지원되지 않는 계정 작업입니다.")
+            raise ValueError('不支持的账号操作')
         self.counter += 1
         try:
             self.process.stdin.write(json.dumps({'id': self.counter, 'method': method, 'params': params}) + '\n')
@@ -76,16 +76,16 @@ class AccountRPC:
             while True:
                 result = self.messages.get(timeout=max(.01, deadline - time.monotonic()))
                 if result is None:
-                    raise AccountError("Codex 계정 서비스 연결이 끊어졌습니다. 새로고침하고 다시 시도하세요.")
+                    raise AccountError('Codex 账号服务已断开，请刷新后重试')
                 if result.get('id') == self.counter:
                     if 'error' in result:
                         # RPC errors may include upstream responses; never forward them to the phone.
-                        raise AccountError("계정 작업이 실패했습니다. 데스크톱 로그인을 확인하거나 데스크톱 앱을 업데이트하세요.")
+                        raise AccountError('Codex 账号操作未完成，请检查电脑端登录状态或更新桌面 App')
                     return result['result']
                 if time.monotonic() >= deadline:
                     raise queue.Empty()
         except (queue.Empty, OSError, KeyError):
-            raise AccountError("계정 요청 시간이 초과되었거나 연결이 끊어졌습니다. 새로고침하고 다시 시도하세요.") from None
+            raise AccountError('Codex 账号操作超时或连接中断，请刷新后重试') from None
 
     def __exit__(self, *_):
         process = self.process
@@ -267,46 +267,46 @@ class Account:
 
     def consume(self, value):
         if value.get('confirmed') is not True:
-            raise ValueError("재설정을 사용하기 전에 확인하세요.")
+            raise ValueError('请先确认使用重置卡')
         request_id, account_key, credit_id = (value.get(key) for key in ('requestId', 'accountKey', 'creditId'))
         if not isinstance(request_id, str) or str(uuid.UUID(request_id)) != request_id:
-            raise ValueError('잘못된 재설정 요청 ID')
+            raise ValueError('重置请求标识无效')
         if not isinstance(account_key, str) or len(account_key) != 64:
-            raise ValueError("계정 정보를 새로고침하고 다시 시도하세요.")
+            raise ValueError('请刷新账号信息后重试')
         if credit_id is not None and (not isinstance(credit_id, str) or not 1 <= len(credit_id) <= 1024):
-            raise ValueError("잘못된 사용량 재설정 ID")
+            raise ValueError('重置卡标识无效')
         with self.lock, self.rpc() as rpc:
             self.usage_cache.clear()
             context = self.context(rpc)
             if not context.get('accountKey'):
-                raise PermissionError("사용량을 재설정하려면 네이티브 ChatGPT 로그인이 필요합니다.")
+                raise PermissionError('仅官方 ChatGPT 账号可使用重置卡')
             if context['accountKey'] != account_key:
-                raise PermissionError("데스크톱 계정이 변경되었습니다. 새로고침하고 다시 확인하세요.")
+                raise PermissionError('电脑端账号已变化，请刷新后重新确认')
             ledger = read_json(self.path, {})
             previous = ledger.get(request_id)
             if previous and (previous['accountKey'] != account_key or previous['creditId'] != credit_id):
-                raise ValueError("재설정 요청은 다른 계정에 재사용하거나 재설정할 수 없습니다.")
+                raise ValueError('同一重置请求不能用于不同账号或卡片')
             if previous and previous.get('outcome'):
                 return {'outcome': previous['outcome'], 'account': self._status(rpc, context)}
             if not previous:
                 if any(row['accountKey'] == account_key and not row.get('outcome') for row in ledger.values()):
-                    raise AccountError("마지막 재설정이 확인되지 않았습니다. 동일한 요청을 새로 고치고 다시 시도하세요.")
+                    raise AccountError('上次重置结果尚未确认，请刷新并重试原请求')
                 status = self._status(rpc, context)
                 if not status.get('visible') or not status.get('canReset'):
-                    raise PermissionError("데스크톱 계정 또는 재설정 권한이 변경되었습니다. 새로고침하고 다시 확인하세요.")
+                    raise PermissionError('电脑端账号或重置权限已变化，请刷新后重新确认')
                 cards = status['resetCredits']
                 if status['error'] or cards is None or not cards['availableCount']:
-                    raise AccountError("재설정을 사용할 수 없거나 재설정 정보를 읽을 수 없습니다.")
+                    raise AccountError('没有可用重置卡，或暂时无法读取卡片信息')
                 if credit_id is not None and not any(
                         row['id'] == credit_id and row['status'] == 'available' and
                         row['resetType'] == 'codexRateLimits' and
                         (row['expiresAt'] is None or number(row['expiresAt']) and row['expiresAt'] > time.time())
                         for row in cards['credits'] or []):
-                    raise ValueError("이 재설정은 더 이상 사용할 수 없습니다. 새로고침하고 다시 선택하세요.")
+                    raise ValueError('此重置卡已不可用，请刷新后重新选择')
             current = self.context(rpc)
             if (current.get('accountKey') != account_key or
                     current.get('_routeCacheKey') != context.get('_routeCacheKey') or not current['canReset']):
-                raise PermissionError("데스크톱 계정 또는 재설정 권한이 변경되었습니다. 새로고침하고 다시 확인하세요.")
+                raise PermissionError('电脑端账号或重置权限已变化，请刷新后重新确认')
             if not previous:
                 ledger[request_id] = {'accountKey': account_key, 'creditId': credit_id, 'at': time.time()}
                 write_json(self.path, ledger)
@@ -317,7 +317,7 @@ class Account:
             result = rpc.request('account/rateLimitResetCredit/consume', params)
             outcome = result.get('outcome')
             if outcome not in ('reset', 'alreadyRedeemed', 'nothingToReset', 'noCredit'):
-                raise AccountError("재설정 결과가 확인되지 않았습니다. 동일한 요청을 새로 고치고 다시 시도하세요.")
+                raise AccountError('重置结果尚未确认，请刷新并重试原请求')
             ledger[request_id]['outcome'] = outcome
             write_json(self.path, ledger)
             self.usage_cache.pop(context.get('_routeCacheKey', account_key), None)
@@ -329,4 +329,4 @@ class Account:
             return self.read(refresh=value.get('refresh', True) is not False)
         if action == 'consume':
             return self.consume(value)
-        raise ValueError("지원되지 않는 계정 작업입니다.")
+        raise ValueError('不支持的账号操作')

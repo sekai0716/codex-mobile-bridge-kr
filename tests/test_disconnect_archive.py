@@ -86,10 +86,10 @@ class DisconnectArchive(unittest.TestCase):
                 self.assertEqual(json.loads(commands.path.read_text())[request_id]['status'], 'unknown')
             return request(method, params)
         prepare = Mock(return_value=lambda: stop_archive_runtime(recorded, [self.sid], timeout=0))
-        with self.assertRaisesRegex(ValueError, "아카이브\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 채팅을\\ 확인하세요\\.\\ 이\\ 작업은\\ 반복되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform(self.sid, True, request_id, lambda: native, prepare)
         count = len(calls)
-        with self.assertRaisesRegex(ValueError, "이전\\ 아카이브\\ 작업이\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 해당\\ 기록은\\ 자동으로\\ 삭제되거나\\ 재생되지\\ 않습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform(self.sid, True, str(uuid.uuid4()), lambda: native, prepare)
         self.assertEqual(len(calls), count)
         self.assertEqual(prepare.call_count, 1)
@@ -100,9 +100,9 @@ class DisconnectArchive(unittest.TestCase):
         prepare = Mock(return_value=lambda: native.update(archived=True, _archiveFlags={self.sid: True, 'child': False}))
         read = lambda: dict(native)
         request_id = str(uuid.uuid4())
-        with self.assertRaisesRegex(ValueError, "아카이브\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 채팅을\\ 새로\\ 고칩니다\\.\\ 이\\ 작업은\\ 반복되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform(self.sid, True, request_id, read, prepare)
-        with self.assertRaisesRegex(ValueError, "이전\\ 아카이브\\ 작업이\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 해당\\ 기록은\\ 자동으로\\ 삭제되거나\\ 재생되지\\ 않습니다\\.\\ 원래\\ 클라이언트를\\ 먼저\\ 확인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform(self.sid, True, request_id, read, prepare)
         native['_archiveFlags']['child'] = True
         self.assertEqual(commands.perform(self.sid, True, request_id, read, prepare)['status'], 'confirmed')
@@ -165,13 +165,13 @@ class DisconnectArchive(unittest.TestCase):
         owned.release_for_archive()
         owned, _ = self.owner()
         owned.process.wait.side_effect = lambda timeout: -9
-        with self.assertRaisesRegex(BridgeUnavailable, "원래\\ 세션이\\ 정상적으로\\ 종료되지\\ 않아\\ 연결\\ 해제\\ 결과를\\ 확인해야\\ 합니다\\."):
+        with self.assertRaisesRegex(BridgeUnavailable, '未正常退出'):
             owned.release_for_archive()
 
     def test_owned_cli_exit_timeout_is_not_replaced_by_force_kill(self):
         owned, _ = self.owner()
         owned.process.wait.side_effect = subprocess.TimeoutExpired('fixture', .01)
-        with self.assertRaisesRegex(BridgeUnavailable, "원래\\ 세션\\ 연결이\\ 해제되지\\ 않았습니다\\.\\ 원래\\ 세션을\\ 확인하세요\\."):
+        with self.assertRaisesRegex(BridgeUnavailable, '尚未释放'):
             owned.release_for_archive(timeout=.01)
         owned.process.terminate.assert_not_called()
         owned.process.kill.assert_not_called()

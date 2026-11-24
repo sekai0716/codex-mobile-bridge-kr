@@ -17,14 +17,12 @@ class FastModeControl {
   reset(){this.catalog=null;this.view=null;this.model=null;this.dirty=false;this.busy=false;this.render();}
   open(catalog,view,model){this.catalog=catalog;this.view=view;this.select(model);}
   select(model){this.model=Array.isArray(this.catalog?.models)?this.catalog.models.find(m=>m.id===model):null;this.dirty=false;this.render();}
-  sync(view){this.view=view;if(this.waitingForModel())this.dirty=false;this.render();}
+  sync(view){this.view=view;this.render();}
   setBusy(value){this.busy=value;this.render();}
   available(){return fastModeState(this.catalog,this.view,this.model).available;}
-  waitingForModel(){return ['pending','unknown'].includes(this.view?.creationSettings?.status);}
-  payload(){return !this.waitingForModel()&&this.available()&&this.dirty?{fastMode:this.input.checked}:{};}
+  payload(){return this.view?.connected&&this.available()&&this.dirty?{fastMode:this.input.checked}:{};}
   render(){
-    this.root.hidden=!this.available();this.input.disabled=this.busy||!this.view?.connected||this.waitingForModel();
-    this.root.title=this.waitingForModel()?BridgeI18n.t('모델 설정을 확인한 뒤 빠른 모드를 변경할 수 있습니다.') : '';
+    this.root.hidden=!this.available();this.input.disabled=this.busy||!this.view?.connected;
     if(this.root.hidden)return;
     const {fast,other}=fastModeState(this.catalog,this.view,this.model);
     if(!this.dirty){this.input.checked=fast;this.input.indeterminate=other;}

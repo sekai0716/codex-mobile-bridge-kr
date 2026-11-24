@@ -17,12 +17,12 @@ from .desktop import process_inventory
 BUDGET = 25
 CHILD_TYPES = {'renderer', 'gpu-process', 'utility', 'zygote', 'broker',
                'crashpad-handler', 'ppapi', 'ppapi-broker'}
-UNSUPPORTED = "이 시스템은 Windows 앱 강제 종료를 지원하지 않습니다."
-INVALID = "데스크톱 앱 구성을 사용할 수 없습니다. 다시 스캔하세요."
-CHANGED = "앱 프로세스가 변경되었거나 확인할 수 없어 강제 종료가 중지되었습니다. 다시 시도하기 전에 다시 스캔하세요."
-PROTECTED = "선택한 앱이 게이트웨이 또는 해당 앱을 실행한 프로세스와 겹치므로 강제 종료할 수 없습니다."
-FAILED = "모든 앱 프로세스를 종료할 수 있는 것은 아닙니다. 다시 시도하기 전에 컴퓨터에서 권한을 확인하거나 문제를 해결하세요."
-TIMEOUT = "앱이 강제 종료되기를 기다리는 중 시간이 초과되었습니다. 다시 스캔하고 컴퓨터에서 앱을 확인하세요."
+UNSUPPORTED = '此系统不支持 Windows 客户端强制结束'
+INVALID = '桌面应用配置不可用，请重新扫描'
+CHANGED = '客户端进程已变化或无法核对，已停止强制结束；请重新扫描后重试'
+PROTECTED = '所选应用与网关或其启动进程重叠，不能强制结束'
+FAILED = '未能结束全部客户端进程，请检查权限或在电脑端处理后重试'
+TIMEOUT = '等待客户端强制结束超时，请重新扫描并检查电脑端状态'
 
 
 def _path(value):

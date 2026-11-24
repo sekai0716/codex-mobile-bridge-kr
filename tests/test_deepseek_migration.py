@@ -23,7 +23,7 @@ class DeepSeekInsertionTests(unittest.TestCase):
             ('Application  \\\n    Support', 'Application  Support'),
             (r'Application\nSupport', 'Application\nSupport'),
             ('Application'+'\\'*2+'\n    Support', 'Application\\ Support'),
-            (r'애플리케이션 \"quoted\" \\path'+'\n    Support', '애플리케이션 "quoted" \\path Support'),
+            (r'应用 \"quoted\" \\path'+'\n    Support', '应用 "quoted" \\path Support'),
         ]
         for newline in ('\n', '\r\n'):
             for raw, expected in cases:
@@ -35,7 +35,7 @@ class DeepSeekInsertionTests(unittest.TestCase):
         """Keep path characters and unrelated patch bytes across both line endings."""
         paths = ['/Users/example/Library/Application Support/bridge/connection.json',
                  r'C:\Users\example\Application Support\bridge\connection.json',
-                 '/Users/예/Application Support/따옴표"백슬래시 포함\\/connection.json']
+                 '/Users/示例/Application Support/引号"与反斜线\\/connection.json']
         for newline in ('\n', '\r\n'):
             for path in paths:
                 with self.subTest(newline=newline, path=path):
@@ -302,7 +302,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
                 source.write_bytes(content)
                 before = {path: (path.read_bytes(), path.stat().st_mtime_ns)
                           for path in (*self.old.directory.iterdir(), self.profile)}
-                with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+                with self.assertRaisesRegex(ValueError, '无法验证'):
                     self.new.ensure_installed()
                 self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns)
                                           for path in before})
@@ -310,7 +310,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
 
     def test_restore_saved_directory_is_checked_against_actual_insertion(self):
         self.assertTrue(self.new.use_existing(self.old.directory)['reused'])
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.new.use_existing(self.root/'unrelated')
 
     def test_revision_three_without_quit_is_reused_without_rewriting_live_source(self):
@@ -344,13 +344,13 @@ class DeepSeekMigrationTests(unittest.TestCase):
         source = self.old.directory/'mobile-host.mjs'
         original_source = source.read_bytes()
         source.write_text('// not our recognized adapter')
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.new.ensure_installed()
         source.write_bytes(original_source)
         record = self.old.directory/'installation.json'
         saved = json.loads(record.read_text())
         record.write_text(json.dumps({**saved, 'home': str(self.root/'some-other-dsh')}))
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.new.ensure_installed()
         self.assertEqual(self.profile.read_bytes(), before)
         self.assertFalse(self.new_path.exists())
@@ -401,7 +401,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
             self.assertEqual(detail['messages'][0]['text'], 'old history')
             self.assertFalse(detail['capabilities']['attachments'])
             self.assertFalse(detail['capabilities']['send'])
-            self.assertIn("업데이트", detail['notice'])
+            self.assertIn('更新', detail['notice'])
             responses['status']['bridgeRevision'] = BRIDGE_REVISION
             self.assertFalse(self.new.call('status')['updateRequired'])
 
@@ -435,10 +435,10 @@ class DeepSeekMigrationTests(unittest.TestCase):
             self.assertIsNone(manager.adapters.get('deepseek'))
             manager.config['enabled'] = {'deepseek': True}
             with patch.object(DeepSeek, 'call') as native:
-                with self.assertRaisesRegex(ValueError, "저장된\\ Harness\\ 연결을\\ 확인할\\ 수\\ 없습니다\\.\\ 다시\\ 스캔하세요\\."):
+                with self.assertRaisesRegex(ValueError, '请重新扫描'):
                     manager.call('deepseek', 'list')
                 self.assertEqual(manager.config['setup']['deepseek']['setupStatus'], 'failed')
-                with self.assertRaisesRegex(ValueError, '저장된 Harness 연결을 확인할 수 없습니다.*다시 스캔하세요'):
+                with self.assertRaisesRegex(ValueError, '请重新扫描'):
                     manager.require_enabled('deepseek')
                 row = next(row for row in manager.clients()['clients'] if row['id'] == 'deepseek')
                 self.assertFalse(row['configured'])
@@ -456,7 +456,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
                                 'dataDirectory': str(self.home), 'executable': '/fixture/Harness',
                                 'desktopProfileReady': True} for provider in ('codex', 'claude', 'deepseek')}
         manager.config['setup'] = {'deepseek': {'setupStatus': 'restart-required', 'restartConnected': True}}
-        manager.deepseek_restore_error = "저장된 Harness 연결을 확인할 수 없습니다. 다시 스캔하세요."
+        manager.deepseek_restore_error = '已有 Harness 接入无法验证，请重新扫描'
         try:
             with patch('bridge.clients.discovery.discover_clients', return_value=discovered), \
                     patch('bridge.app.desktop.Desktop.preferences', return_value={}), \
@@ -468,7 +468,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
             self.assertTrue(row['configured'])
             self.assertFalse(row['enabled'])
             self.assertEqual(row['setupStatus'], 'ready')
-            self.assertEqual(row['reason'], "연결 준비됨")
+            self.assertEqual(row['reason'], '接入配置已就绪')
             self.assertIsNone(manager.deepseek_restore_error)
             saved = json.loads(manager.config_path.read_text())
             self.assertEqual(saved['deepseekAdapterDirectory'], str(self.old.directory))
@@ -519,7 +519,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
         target = self.old.directory/'mobile-host.mjs'
         target.write_text('// user replaced source after scan')
         before = target.read_bytes()
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.new.update_existing()
         self.assertEqual(target.read_bytes(), before)
 
@@ -552,7 +552,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
             self.assertEqual(row['setupStatus'], 'restart-required')
             self.assertFalse(row['configured'])
             self.assertFalse(row['enabled'])
-            self.assertIn("업데이트", row['reason'])
+            self.assertIn('更新', row['reason'])
             launch.assert_not_called()
         self.assertEqual((self.old.directory/'mobile-host.mjs').read_bytes(), before)
 
@@ -626,7 +626,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
         for session in [{'status': 'active'}, {'status': 'idle', 'requests': [{'id': 'pending'}]}]:
             with patch.object(self.new, 'call', side_effect=lambda action: {'connected': True, 'bridgeRevision': 3} if action == 'status' else {'complete': True, 'bridgeRevision': 3, 'sessions': [session]}), \
                     patch('bridge.clients.lifecycle.launch_deepseek') as launch:
-                with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
+                with self.assertRaisesRegex(ValueError, '运行或等待确认'):
                     manager.connect_deepseek(restart=True)
                 launch.assert_not_called()
                 self.assertEqual(source.read_bytes(), before)
@@ -675,7 +675,7 @@ class DeepSeekMigrationTests(unittest.TestCase):
     def test_owned_but_replaced_connector_source_is_not_overwritten(self):
         source = self.old.directory/'mobile-host.mjs'
         source.write_text('// user edited connector')
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.old.ensure_installed()
         self.assertEqual(source.read_text(), '// user edited connector')
 

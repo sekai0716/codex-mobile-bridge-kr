@@ -14,7 +14,9 @@ Status: implemented
 
 IPC 연결, 초기화 및 owner 공유 절대값 읽기 deadline。핸드셰이크는 검증 작업자 스레드에도 적용되며 조정 스레드는 동기적으로 중단되지 않습니다. Unix `sendall` 또는 Windows 작성이 보류 중입니다. 기한이 있는 읽기는 전송 시간을 공제하고 일반 요청의 1초 수신 유예를 첨부하지 않습니다. 일반 쓰기 요청은 원래의 대기 및 결과를 알 수 없는 의미를 유지하며 재생되지 않습니다. 시간 초과 또는 조기 실패가 발생하면 이 임시 세션을 닫습니다. follower 그리고 조용한 작업이 하나씩 끝날 때까지 기다리지 않고 웨이터를 깨우십시오.。`close` 지연을 방지하면서 연결 세대의 socket 또는 응답을 초기화하여 연결을 다시 발행하십시오. 원래 제어 연결은 원본과 동일합니다. owner 영향을 받지 않음。
 
-## 대안
+所核对的本机 Desktop 路由对 `client-discovery-request` 固定等待最多 10 秒，之后才返回精确 `no-client-found`。单次 owner 读取上限为 11 秒，并将候选预算的三分之二留给发现、余量留给快照及最终复核；总操作截止仍为原 20 秒。有大量候选时每项仍按有界并行分摊，不承诺全量历史在期限内完成，也不把未收到的负面回复推断为不存在 owner。
+
+## 备选方案
 
 확인만 `gateway.live` 역사적 규모를 우회할 수 있지만 원본만 놓칠 수 있음 App 실행 중인 작업. 현재 Desktop follower 프로토콜이 완전한지 확인되지 않았습니다. loaded-thread 열거형, 첨부된 채팅 없음 fork；기존 App 내부에 `thread/loaded/list` 및 `thread/fork` 외부와 동등하지 않음 follower 인터페이스이므로 초기화가 필요하지 않다고 주장합니다.。
 
@@ -34,4 +36,8 @@ IPC 연결, 초기화 및 owner 공유 절대값 읽기 deadline。핸드셰이�
 
 ## 기록 메모 확인
 
-[공유 런타임 데이터 경계](../architecture/2026-11-08-codex-shared-runtime-data-deletion.md)부분 중복: 투명한 어댑터를 유지하고, 먼저 다시 시작하고, 트랜잭션 및 기본 데이터 승인을 작성하고, 초기화 작업 범위 및 확인 일정만 구체화합니다.。[런타임 제안 공유](../../proposed/architecture/2026-11-08-codex-shared-desktop-runtime.md)태그 동기화 제한 사항은 유지되며 이러한 확인 및 복구는 태그 동기화가 완료된 것으로 간주되지 않습니다.。[CLI 기존 owner](2026-10-14-cli-existing-owner.md)소스가 아닌 실제 속성을 기반으로 라우팅을 계속 요구합니다. 이번에는 연결 규칙이 변경되지 않습니다. 계정 전환은 이번 초기화와 다르며 일반적입니다. CLI 보호 효과는 계속 유지됩니다.。
+[共享运行时数据边界](../architecture/2026-11-08-codex-shared-runtime-data-deletion.md)部分重叠：保留透明适配器、首次重启、写入事务和原生数据验收，只细化初始化任务范围与核验调度。[共享运行时提案](../../proposed/architecture/2026-11-08-codex-shared-desktop-runtime.md)保留其标签同步限制，不将本次核验修复视为已实现标签同步。[CLI 原 owner](2026-10-14-cli-existing-owner.md)继续要求按实际归属而非来源路由；本次不改其接续规则。账号切换与本次初始化不同，通用 CLI 保护继续有效。
+
+## 原生发现时限复验
+
+本机 Codex Desktop 随附 0.169.0-alpha.11.1，安装包路由实现中 discovery 等待 10 秒。纯读取同一历史元数据目标：旧版单次读取上限 6 秒返回读取超时并判 unknown；调整后实际收到原生 `no-client-found`，审计通过。没有读取聊天正文到日志，也没有执行退出、归档或删除。新增匹配原生时限的回归先失败后通过；48 项 Desktop idle/IPC deadline/stream 定向通过，既有 busy、systemError、修订漂移与绝对期限保护均保持。全历史 876 个候选的同机对照仍检出真实 active，并保留大历史/无响应客户端可能不完整的限制。

@@ -28,10 +28,10 @@ class TerminalTests(unittest.TestCase):
         args = [sys.executable, '-u', str(script)]
         return subprocess.list2cmdline(args) if os.name == 'nt' else shlex.join(args)
     def test_output_exit_and_cwd(self):
-        command=self.python_command("import os,sys;sys.stdout.buffer.write((os.getcwd()+'\\n안녕하세요\\n').encode('utf-8'));sys.exit(7)")
+        command=self.python_command("import os,sys;sys.stdout.buffer.write((os.getcwd()+'\\n你好\\n').encode('utf-8'));sys.exit(7)")
         key=self.identifier();self.manager.start('owner','thread',key,self.root,command)
         job=self.manager.get('owner','thread',key);self.assertTrue(job.done.wait(5));result=job.read()
-        self.assertIn(str(self.root),result['output']);self.assertIn('안녕하세요',result['output']);self.assertEqual(result['exitCode'],7)
+        self.assertIn(str(self.root),result['output']);self.assertIn('你好',result['output']);self.assertEqual(result['exitCode'],7)
         self.assertEqual(job.read(result['cursor'])['output'],'')
     def test_start_idempotent_and_scoped(self):
         key=self.identifier();command=self.python_command("with open('runs.txt','ab') as f:f.write(b'run\\n')")
@@ -43,7 +43,7 @@ class TerminalTests(unittest.TestCase):
         for owner,thread in [('other','thread'),('owner','other')]:
             with self.assertRaises(KeyError):self.manager.get(owner,thread,key)
     def test_output_limit_and_incremental_unicode(self):
-        job=CommandJob(self.root,self.python_command("import sys;sys.stdout.buffer.write(('가운데'*300000).encode('utf-8'))"))
+        job=CommandJob(self.root,self.python_command("import sys;sys.stdout.buffer.write(('中'*300000).encode('utf-8'))"))
         self.assertTrue(job.done.wait(8));result=job.read()
         self.assertEqual(len(result['output']),MAX_OUTPUT);self.assertTrue(result['reset']);self.assertTrue(result['truncated']);self.assertNotIn('�',result['output'])
     def test_stop_and_gateway_close(self):
@@ -60,7 +60,7 @@ class TerminalTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.manager.start('owner','thread',self.identifier(),self.root,'echo no')
     def test_timeout(self):
         with patch('bridge.features.terminals.manager.MAX_SECONDS',.05):
-            job=CommandJob(self.root,self.python_command('import time;time.sleep(90)'));self.assertTrue(job.done.wait(4));self.assertIn("명령에 도달했습니다 30 분 실행 제한",job.read()['message'])
+            job=CommandJob(self.root,self.python_command('import time;time.sleep(90)'));self.assertTrue(job.done.wait(4));self.assertIn('上限',job.read()['message'])
     def test_remote_protocol_output_and_stop(self):
         original=subprocess.Popen
         def launch(args,**kwargs):

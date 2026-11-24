@@ -25,12 +25,12 @@ from bridge.features.sessions.display_metadata import confirm_native_title
 
 MODES = {'default', 'acceptEdits', 'plan', 'dontAsk', 'auto', 'bypassPermissions'}
 PERMISSION_OPTIONS = (
-    ('default', '기본 권한', "필요할 때 승인을 요청하세요."),
-    ('acceptEdits', '파일 편집 허용', "파일 편집을 허용합니다. 다른 작업은 권한 규칙을 따릅니다."),
-    ('plan', '계획 모드', "먼저 계획을 세워보세요"),
-    ('dontAsk', '묻지 마세요', "자동으로 승인할 수 없는 작업 거부"),
-    ('auto', '자동 모드', "Claude가 자동으로 실행할 수 있는 작업을 결정하도록 합니다."),
-    ('bypassPermissions', '전체 액세스', "건너뛰기 권한 프롬프트"),
+    ('default', '默认权限', '需要时请求确认'),
+    ('acceptEdits', '允许文件编辑', '文件编辑自动允许，其他操作仍按规则确认'),
+    ('plan', '计划模式', '先制定计划'),
+    ('dontAsk', '不询问', '无法自动允许的操作直接拒绝'),
+    ('auto', '自动模式', '由 Claude 判断可自动执行的操作'),
+    ('bypassPermissions', '完全访问', '跳过权限确认'),
 )
 _MANAGED_API_ROUTING = {
     'CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST',
@@ -44,7 +44,7 @@ _MANAGED_API_ROUTING = {
 
 class ClaudeControlRejected(BridgeUnavailable):
     def __init__(self, reason):
-        super().__init__("Claude Code 작업이 확인되지 않았습니다. 원래 채팅을 확인하세요.")
+        super().__init__('Claude Code 控制请求未确认，请检查原会话')
         self.reason = reason
 
 
@@ -82,9 +82,9 @@ def _compact_cli(owned, request_id):
     # The native slash dispatcher owns compaction; never substitute a model prompt.
     with owned.condition:
         if not _supports_compact(owned.catalog):
-            raise BridgeUnavailable('현재 Claude Code 기본 컨텍스트 압축 명령이 제공되지 않습니다.')
+            raise BridgeUnavailable('当前 Claude Code 未提供原生上下文压缩命令')
         if owned.active or owned.pending or owned.error or owned.finished:
-            raise BridgeUnavailable('현재를 기다려주세요 Claude Code 작업이 완료된 후 컨텍스트를 압축합니다.')
+            raise BridgeUnavailable('请等待当前 Claude Code 任务结束后再压缩上下文')
         owned.active = True
         owned.write({'type': 'user', 'uuid': request_id,
                      'message': {'role': 'user', 'content': '/compact'}})
@@ -98,11 +98,11 @@ def _supports_rename(catalog):
 def _rename_cli(owned, row, title, readback):
     if (not isinstance(title, str) or not 1 <= len(title.strip()) <= 120 or
             re.search(r'[\x00-\x1f\x7f]', title)):
-        raise ResumePreflightBlocked('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.')
+        raise ResumePreflightBlocked('标题为 1–120 字，不能包含控制字符')
     with owned.condition:
         if (not _supports_rename(owned.catalog) or owned.error or owned.finished or
                 owned.native != row['nativeId'] or owned.cwd != row['cwd'] or owned.origin != row['origin']):
-            raise ResumePreflightBlocked('현재 Claude Code 연결이 아직 확인된 기본 이름 변경 기능을 제공하지 않습니다.')
+            raise ResumePreflightBlocked('当前 Claude Code 连接尚未提供已确认的原生改名能力')
     title = title.strip()
     # This is the official non-model control request. Do not send /rename as a
     # user prompt, append JSONL ourselves, or start a second CLI for metadata.
@@ -115,7 +115,7 @@ def _rename_cli(owned, row, title, readback):
     try:
         confirm_native_title(read_title, identity, title)
     except ValueError as error:
-        raise BridgeUnavailable('이름 변경 결과는 확인 대기 중입니다. 원본을 확인하세요. Claude Code 세션; 중복 제출 불가') from error
+        raise BridgeUnavailable('改名结果待核对，请检查原 Claude Code 会话；不会重复提交') from error
     return {'status': 'confirmed', 'scope': 'native', 'result': {'id': row['id'], 'title': title}}
 
 
@@ -163,7 +163,7 @@ def _applied_settings(owned):
     settings = owned.control({'subtype': 'get_settings'})
     applied = settings.get('applied') if isinstance(settings, dict) else None
     if not isinstance(applied, dict) or not isinstance(applied.get('model'), str):
-        raise BridgeUnavailable('Claude Code 현재 모델 설정은 보고되지 않습니다.')
+        raise BridgeUnavailable('Claude Code 未报告当前模型设置')
     return settings
 
 
@@ -181,16 +181,16 @@ def _cli_selection(owned, public):
 def _cli_catalog(owned, public, refresh=False):
     if refresh:
         if getattr(owned, 'model_list_unsupported', False):
-            raise BridgeUnavailable('현재 Claude Code 이 버전은 모델 디렉터리 새로 고침을 지원하지 않습니다.')
+            raise BridgeUnavailable('当前 Claude Code 版本不支持刷新模型目录')
         try:
             models = owned.control({'subtype': 'list_models'}).get('models')
         except ClaudeControlRejected as exc:
             if exc.reason != 'Unsupported control request subtype: list_models':
                 raise
             owned.model_list_unsupported = True
-            raise BridgeUnavailable('현재 Claude Code 이 버전은 모델 디렉터리 새로 고침을 지원하지 않습니다.') from None
+            raise BridgeUnavailable('当前 Claude Code 版本不支持刷新模型目录') from None
         if not isinstance(models, list):
-            raise BridgeUnavailable('Claude Code 반환된 모델 목록이 없습니다.')
+            raise BridgeUnavailable('Claude Code 未返回模型列表')
         owned.catalog['models'] = models
     rows = _model_catalog(owned.catalog)
     try:
@@ -212,13 +212,13 @@ def _set_cli_settings(owned, body):
     if manual_model:
         identifier = body.get('model')
         if not isinstance(identifier, str) or not re.fullmatch(r'[^\s\x00-\x1f\x7f]{1,256}', identifier):
-            raise ValueError('올바른 모델 이름을 입력하세요.')
+            raise ValueError('请输入有效的模型名称')
         selected = {'id': identifier, 'efforts': []}
     effort = body.get('effort')
     if body.get('manualEffort') is True and (not isinstance(effort, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', effort)):
-        raise ValueError('올바른 사고 강도를 입력하세요.')
+        raise ValueError('请输入有效的思考强度')
     if effort is not None and body.get('manualEffort') is not True and effort not in selected['efforts']:
-        raise ValueError("이 모델은 추론 강도를 지원하지 않습니다.")
+        raise ValueError('该模型不支持此思考强度')
     _applied_settings(owned)
     target = next((item for item in owned.catalog.get('models') or []
                    if isinstance(item, dict) and (item.get('value') == 'default' and selected['id'] == 'default'
@@ -232,13 +232,13 @@ def _set_cli_settings(owned, body):
     applied = settings['applied']
     if ((_has_resolved_models(owned.catalog) or manual_model) and applied.get('model') != expected or
             effort not in (None, 'auto') and applied.get('effort') != effort):
-        raise BridgeUnavailable('Claude Code 모델 또는 반사 강도 설정이 확인되지 않았습니다. 새로고침해 주세요.')
+        raise BridgeUnavailable('Claude Code 未确认模型或思考强度设置，请刷新检查')
     sources = settings.get('sources')
     if effort == 'auto' and (not isinstance(sources, list) or
                             any(source.get('source') == 'flagSettings' and
                                 source.get('settings', {}).get('effortLevel') is not None
                                 for source in sources if isinstance(source, dict))):
-        raise BridgeUnavailable('Claude Code 기본 사고 강도가 확인되지 않았습니다. 확인을 새로 고쳐주세요.')
+        raise BridgeUnavailable('Claude Code 未确认默认思考强度，请刷新检查')
     owned.model = applied['model']
 
 
@@ -251,7 +251,7 @@ def _verify_creation_settings(owned, selection):
     if ((expected != 'default' and applied.get('model') != expected) or
             effort not in (None, 'auto') and applied.get('effort') != effort or
             effort == 'auto' and applied.get('effort') not in (None, 'auto')):
-        raise ResumePreflightBlocked('새로운 대화 모델이나 사고 강도가 아직 확인되지 않았으며 첫 번째 메시지가 전송되지 않았습니다.')
+        raise ResumePreflightBlocked('新会话模型或思考强度尚未确认，首条消息未发送')
     owned.model = applied['model']
 
 IMAGE_URL = re.compile(r'data:(image/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/]+={0,2})\Z')
@@ -306,7 +306,7 @@ def _auth_ready(profile):
 
 def _events(path):
     if path.stat().st_size > 20_000_000:
-        raise ValueError("이 Claude 기록 내용이 너무 커서 읽을 수 없습니다.")
+        raise ValueError('Claude 会话记录过大，无法读取')
     result = []
     with path.open(encoding='utf-8', errors='replace') as source:
         for line in source:
@@ -340,9 +340,9 @@ def _message_content(body):
         references = []
         for item in files:
             if not isinstance(item, dict) or not isinstance(item.get('path'), str) or not Path(item['path']).is_absolute() or not isinstance(item.get('name'), str):
-                raise ValueError('파일 첨부 형식이 잘못되었습니다.')
+                raise ValueError('文件附件格式无效')
             references.append({'name': item['name'], 'path': item['path']})
-        text += ('\n\n' if text.strip() else '') + '업로드된 기본 파일을 읽고 참조하세요.：\n' + json.dumps(references, ensure_ascii=False)
+        text += ('\n\n' if text.strip() else '') + '请读取并参考这些已上传的本机文件：\n' + json.dumps(references, ensure_ascii=False)
     # Claude parses slash invocations from a single text block. Keep file
     # references with that text so adding an attachment preserves the Skill.
     text = file_mentions(text, body.get('resolvedReferences', []))
@@ -350,7 +350,7 @@ def _message_content(body):
     for image in images:
         match = IMAGE_URL.fullmatch(image.get('url', '')) if isinstance(image, dict) else None
         if not match:
-            raise ValueError("잘못된 이미지 첨부 형식")
+            raise ValueError('图片附件格式无效')
         blocks.append({'type': 'image', 'source': {'type': 'base64', 'media_type': match[1], 'data': match[2]}})
     return blocks
 
@@ -387,7 +387,7 @@ def _saved(path, origin):
                     if title is None and command is None and not event.get('isMeta') and not event.get('isSynthetic'):
                         message = event.get('message') if isinstance(event.get('message'), dict) else {}
                         lines = _text(message.get('content')).strip().splitlines()
-                        title = lines[0][:120] if lines else "Claude Code 채팅"
+                        title = lines[0][:120] if lines else 'Claude Code 会话'
                     if event.get('permissionMode') in MODES:
                         user_permission = event['permissionMode']
                     if isinstance(event.get('uuid'), str):
@@ -494,9 +494,9 @@ class _Owned:
             start = (claude_process.process_start_filetime(pid) if pid == self.process.pid
                      else claude_process.owned_child_start_filetime(pid, self.process.pid))
         except OSError as exc:
-            raise BridgeUnavailable('확인할 수 없습니다 Claude Code 네이티브 프로세스 ID') from exc
+            raise BridgeUnavailable('无法确认 Claude Code 原生进程身份') from exc
         if start is None:
-            raise BridgeUnavailable('Claude Code 기본 프로세스가 닫혔습니다.')
+            raise BridgeUnavailable('Claude Code 原生进程已关闭')
         self.native_process = (pid, start)
 
     def _read(self):
@@ -517,7 +517,7 @@ class _Owned:
                         if isinstance(event.get('cwd'), str):
                             self.cwd = event['cwd']
                         if event.get('status') == 'blocked':
-                            self.error = event.get('message') or 'Claude Code 원격 복구 전 확인 실패'
+                            self.error = event.get('message') or 'Claude Code 远端恢复前核验失败'
                     elif kind == 'control_response':
                         response = event.get('response') or {}
                         self.responses[response.get('request_id')] = response
@@ -527,7 +527,7 @@ class _Owned:
                         self.pending.pop(event.get('request_id'), None)
                     elif kind == 'system' and event.get('subtype') == 'init':
                         if event.get('session_id') != self.native or event.get('cwd') != self.cwd:
-                            self.error = "Claude 채팅 ID 또는 작업 디렉터리가 일치하지 않습니다."
+                            self.error = 'Claude 会话身份或工作目录不一致'
                             mismatched = True
                         self.model = event.get('model') or self.model
                         self.permission = event.get('permissionMode') or self.permission
@@ -554,12 +554,12 @@ class _Owned:
         with self.condition:
             if (self.process.poll() is not None or self.error or self.eof_sent
                     or self.local_control and self.local_control.intent()):
-                raise BridgeUnavailable(self.error or "Claude Code 채팅이 종료되었습니다. 다시 연결하려면 채팅을 계속하세요.")
+                raise BridgeUnavailable(self.error or 'Claude Code 会话已关闭，请重新继续')
             try:
                 self.process.stdin.write(json.dumps(frame, ensure_ascii=False) + '\n')
                 self.process.stdin.flush()
             except (BrokenPipeError, OSError):
-                raise BridgeUnavailable("Claude Code로의 배송이 확인되지 않았습니다. 계속하기 전에 채팅을 확인하세요.") from None
+                raise BridgeUnavailable('Claude Code 写入结果不明，请检查会话') from None
 
     def control(self, request, timeout=20):
         rid = str(uuid.uuid4())
@@ -572,7 +572,7 @@ class _Owned:
         if response and response.get('subtype') == 'error':
             raise ClaudeControlRejected(response.get('error'))
         if not response or response.get('subtype') != 'success':
-            raise BridgeUnavailable("Claude Code 작업이 확인되지 않았습니다. 원래 채팅을 확인하세요.")
+            raise BridgeUnavailable('Claude Code 控制请求未确认，请检查原会话')
         return response.get('response') or {}
 
     def release_for_archive(self, timeout=20):
@@ -598,7 +598,7 @@ class _Owned:
             while (self.active or self.pending) and not self.finished and time.monotonic() < deadline:
                 self.condition.wait(max(0, deadline-time.monotonic()))
             if self.error or self.active or self.pending:
-                raise BridgeUnavailable('중지 결과가 확인 대기 중이며 연결이 아직 해제되지 않았습니다.')
+                raise BridgeUnavailable('停止结果待核对，连接尚未释放')
         # EOF lets the original executor flush and exit; no terminate/kill fallback.
         self.eof_sent = True
         self.process.stdin.close()
@@ -606,15 +606,15 @@ class _Owned:
             code = self.process.wait(timeout=max(.1, deadline-time.monotonic()))
             # Native print mode exits 1 after an acknowledged user interruption.
             if code != 0 and not (active and code == 1):
-                raise BridgeUnavailable('원래 세션이 정상적으로 종료되지 않아 연결 해제 결과를 확인해야 합니다.')
+                raise BridgeUnavailable('原会话未正常退出，连接释放结果待核对')
         except subprocess.TimeoutExpired:
-            raise BridgeUnavailable('원래 세션 연결이 해제되지 않았습니다. 원래 세션을 확인하세요.') from None
-        return self.check_exit() if getattr(self, 'spawn_profile', None) is not None else {'status': 'released', 'notice': '연결이 해제되었으며 컴퓨터에서 계속할 수 있습니다.'}
+            raise BridgeUnavailable('原会话连接尚未释放，请核对原会话') from None
+        return self.check_exit() if getattr(self, 'spawn_profile', None) is not None else {'status': 'released', 'notice': '连接已释放，可在电脑端继续'}
 
     def check_exit(self):
         if getattr(self, 'local_control', None) is not None:
             return self.local_control.check()
-        return {'status': 'unknown', 'notice': '기존 Claude CLI 기본 종료 ID가 확인되지 않았습니다. 컴퓨터에서 확인하세요.。'}
+        return {'status': 'unknown', 'notice': '原 Claude CLI 的原生退出身份尚未核验，请在电脑端检查。'}
 
     def close(self):
         try:
@@ -771,7 +771,7 @@ class ClaudeCli:
         awaiting = bool(pending)
         value.update(status='active' if active else 'idle', runtimeKnown=True,
                      connectionState='awaiting' if awaiting else 'active' if active else 'ready' if live else 'closed',
-                     requests=[{'id': rid, 'tool': event['request'].get('tool_name', '도구'),
+                     requests=[{'id': rid, 'tool': event['request'].get('tool_name', '工具'),
                                 'input': event['request'].get('input', {}),
                                 'needsInput': event['request'].get('tool_name') == 'AskUserQuestion'}
                                for rid, event in pending.items()])
@@ -799,7 +799,7 @@ class ClaudeCli:
             with self.lock:
                 row = self.index.get(sid)
         if row is None:
-            raise ValueError("Claude Code 채팅을 찾을 수 없거나 원래 계정 구성이 변경되었습니다.")
+            raise ValueError('找不到 Claude Code 会话或原账号配置已切换')
         return row
 
     def _saved_cached(self, path, origin):
@@ -832,16 +832,16 @@ class ClaudeCli:
     def create(self, cwd, origin, message, directory_identity=None, account_identity=None, selection=None):
         profile = self.profile_resolver()
         if not profile or profile['origin'] != origin or not self._ready(profile, fresh=True):
-            raise BridgeUnavailable("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
+            raise BridgeUnavailable('原 Claude Code 账号配置已变化或不可用')
         if account_identity is not None and project_account_identity(profile) != account_identity:
-            raise BridgeUnavailable("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
+            raise BridgeUnavailable('原 Claude Code 账号配置已变化或不可用')
         project = Path(cwd).resolve(strict=True)
         if not project.is_dir():
-            raise ValueError('원래 프로젝트 디렉터리를 사용할 수 없습니다.')
+            raise ValueError('原项目目录不可用')
         if directory_identity is not None:
             stat = project.stat()
             if directory_identity != {'cwd': str(project), 'device': stat.st_dev, 'inode': stat.st_ino}:
-                raise ValueError('프로젝트 디렉터리가 변경되었습니다. 디렉터리를 다시 선택하세요.')
+                raise ValueError('项目目录已变化，请重新选择目录')
         native = str(uuid.uuid4())
         sid = model.gateway_id('cli:' + origin, native)
         env = managed_api_env() if profile.get('managedApi') else os.environ.copy()
@@ -859,13 +859,13 @@ class ClaudeCli:
             upload_dir = self.upload_root/DesktopUploads.scope('claude', sid)
             upload_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             if self.upload_root.is_symlink() or upload_dir.is_symlink():
-                raise ValueError('Claude Code 첨부파일 디렉터리가 잘못되었습니다.')
+                raise ValueError('Claude Code 附件目录无效')
             command.extend(('--add-dir', str(upload_dir.resolve())))
         fresh = self.profile_resolver()
         if not fresh or fresh['origin'] != origin:
-            raise BridgeUnavailable("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
+            raise BridgeUnavailable('原 Claude Code 账号配置已变化或不可用')
         if account_identity is not None and project_account_identity(fresh) != account_identity:
-            raise BridgeUnavailable("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
+            raise BridgeUnavailable('原 Claude Code 账号配置已变化或不可用')
         from bridge.clients.claude.owned_control import spawn_profile
         spawn = spawn_profile(profile)
         process = subprocess.Popen(command, cwd=str(project), env=env, stdin=subprocess.PIPE,
@@ -900,7 +900,7 @@ class ClaudeCli:
                     if owned.error or owned.finished:
                         break
                 time.sleep(.1)
-            raise BridgeUnavailable('Claude Code 새 메시지 생성 결과를 알 수 없습니다. 대화 목록을 확인하세요.')
+            raise BridgeUnavailable('Claude Code 新建消息结果不明，请检查会话列表')
         except Exception:
             if native not in self.owned:
                 owned.close()
@@ -922,7 +922,7 @@ class ClaudeCli:
                 raise (ResumePreflightBlocked if action == 'resume' else BridgeUnavailable)(owned.error)
             if owned and owned.origin != row['origin'] and owned.process.poll() is None:
                 raise (ResumePreflightBlocked if action == 'resume' else BridgeUnavailable)(
-                    "이 채팅은 다른 Claude Code 구성으로 열려 있습니다. 먼저 해당 연결을 닫으십시오.")
+                    '此会话已由另一 Claude Code 配置继续，请先结束该连接')
             if owned and (owned.origin != row['origin'] or owned.process.poll() is not None):
                 owned = None
             public = self._public(row)
@@ -930,7 +930,7 @@ class ClaudeCli:
             if action in ('archive-state', 'archive'):
                 profile = self.profile_resolver()
                 if not profile or profile['origin'] != row['origin']:
-                    raise BridgeUnavailable('기존 Claude Code 구성이 변경되었습니다.')
+                    raise BridgeUnavailable('原 Claude Code 配置已变化')
                 env = managed_api_env() if profile.get('managedApi') else os.environ.copy()
                 env['CLAUDE_CONFIG_DIR'] = str(profile['directory'])
                 enabled = file_archive.supported(profile['binary'], env)
@@ -949,20 +949,20 @@ class ClaudeCli:
                 if action == 'archive-state':
                     return result
                 if not safe:
-                    raise BridgeUnavailable('원본 확인 불가 Claude Code 세션이 중지되었거나 기본 보관 기능이 확인되지 않았습니다.')
+                    raise BridgeUnavailable('无法确认原 Claude Code 会话已停止或原生归档能力未验证')
                 if self.profile_resolver() != profile:
-                    raise BridgeUnavailable('기존 Claude Code 구성이 변경되었습니다.')
+                    raise BridgeUnavailable('原 Claude Code 配置已变化')
                 assert_session_closed(profile['directory'])
                 file_archive.assert_no_cli(profile['binary'])
                 if not file_archive.supported(profile['binary'], env):
-                    raise BridgeUnavailable('Claude 기본 프로그램이 변경되었거나 보관하기 전에 확인할 수 없습니다.')
+                    raise BridgeUnavailable('Claude 原生程序在归档前变化或无法核验')
                 value = file_archive.change(profile['directory'], row['path'], native, body.get('archived'))
                 self.index.pop(sid, None)
                 return value
             if action == 'detail':
                 before = body.get('historyBefore')
                 if before is not None and (not isinstance(before, str) or len(before) > 1024):
-                    raise ValueError('Claude 기록 커서가 잘못되었습니다.')
+                    raise ValueError('Claude 历史游标无效')
                 limit = body.get('historyLimit', 40)
                 history_events, cursor, has_more = history_page(
                     row['path'], row['id'] + ':' + row['origin'], before, limit)
@@ -981,7 +981,7 @@ class ClaudeCli:
                         # Completion UUIDs are notification anchors, not message-window state.
                         'turns': model.turns(history_events + (live_events if before is None else [])),
                         'history': {'before': cursor, 'hasMore': has_more},
-                        'notice': "원래 권한 모드를 알 수 없습니다. 컴퓨터에서 이 채팅을 계속하세요." if not live and not row['permissionKnown'] else '',
+                        'notice': '无法确认原会话权限模式，请在电脑端继续' if not live and not row['permissionKnown'] else '',
                         'capabilities': {
                             'resume': can_resume,
                             'send': live and public['connectionState'] == 'ready',
@@ -991,7 +991,7 @@ class ClaudeCli:
                             **row.get('capabilities', {}), 'rename': public['capabilities']['rename']}}
             if action == 'catalog':
                 if not live:
-                    return {'models': [], 'capabilities': {'models': False}, 'notice': "먼저 이 Claude Code 채팅을 계속하세요."}
+                    return {'models': [], 'capabilities': {'models': False}, 'notice': '请先继续这条 Claude Code 会话'}
                 return _cli_catalog(owned, public, body.get('refresh') is True)
             if action == 'access' and 'mode' not in body:
                 options = [{'value': mode, 'label': label, 'description': description}
@@ -1000,18 +1000,18 @@ class ClaudeCli:
                         'options': options if live else []}
             if action == 'resume':
                 if row['archived']:
-                    raise ResumePreflightBlocked('먼저 이 보관된 게시물을 복원하세요. Claude Code 대화')
+                    raise ResumePreflightBlocked('请先恢复这条已归档的 Claude Code 会话')
                 if live:
                     return {'status': 'ready'}
                 profile = self.profile_resolver()
                 if not profile or profile['origin'] != row['origin'] or not self._ready(profile, fresh=True):
-                    raise ResumePreflightBlocked("원래 Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.")
+                    raise ResumePreflightBlocked('原 Claude Code 账号配置已变化或不可用')
                 if not row['permissionKnown'] or row['permissionMode'] not in MODES:
-                    raise ResumePreflightBlocked("원래 권한 모드를 알 수 없습니다. 컴퓨터에서 이 채팅을 계속하세요.")
+                    raise ResumePreflightBlocked('无法确认原会话权限模式，请在电脑端继续')
                 try:
                     cwd = str(Path(row['cwd']).resolve(strict=True))
                 except OSError as exc:
-                    raise ResumePreflightBlocked("원래 프로젝트 디렉터리를 사용할 수 없습니다. 컴퓨터에서 확인해보세요.") from exc
+                    raise ResumePreflightBlocked('原项目目录不可用，请在电脑端检查') from exc
                 env = managed_api_env() if profile.get('managedApi') else os.environ.copy()
                 env['CLAUDE_CONFIG_DIR'] = str(profile['directory'])
                 command = [profile['binary'], '-p', '--resume', native, '--input-format', 'stream-json',
@@ -1022,7 +1022,7 @@ class ClaudeCli:
                     upload_dir = self.upload_root/DesktopUploads.scope('claude', sid)
                     upload_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
                     if self.upload_root.is_symlink() or upload_dir.is_symlink():
-                        raise ResumePreflightBlocked('Claude Code 첨부파일 디렉터리가 잘못되었습니다.')
+                        raise ResumePreflightBlocked('Claude Code 附件目录无效')
                     command.extend(('--add-dir', str(upload_dir.resolve())))
                 if row['model']:
                     command.extend(('--model', row['model']))
@@ -1043,34 +1043,34 @@ class ClaudeCli:
                         raise BridgeUnavailable(owned.error)
                     owned.permission = owned.catalog.get('current_permission_mode') or row['permissionMode']
                     if owned.permission != row['permissionMode']:
-                        raise BridgeUnavailable("Claude Code는 원래 권한 모드를 유지하지 않았습니다.")
+                        raise BridgeUnavailable('Claude Code 未保留原会话权限模式')
                 except Exception:
                     owned.close()
                     raise
                 self.owned[native] = owned
                 return {'status': 'ready'}
             if not live:
-                raise BridgeUnavailable("먼저 이 Claude Code 채팅을 계속하세요.")
+                raise BridgeUnavailable('请先继续这条 Claude Code 会话')
             if action == 'rename':
                 return _rename_cli(owned, row, body.get('title'), lambda: self._get(sid))
             if action == 'send':
                 if body.get('mode') in ('queue', 'steer'):
-                    raise ValueError("이 전송 옵션은 아직 Claude Code CLI에 대해 지원되지 않습니다.")
+                    raise ValueError('Claude Code CLI 暂不支持此发送选项')
                 selected = body.get('plugins') or []
                 if not isinstance(selected, list) or len(selected) > 1:
-                    raise ValueError('Claude Code CLI 메시지당 한 번만 전화를 걸 수 있습니다. Skill')
+                    raise ValueError('Claude Code CLI 每条消息只能调用一个 Skill')
                 if selected:
                     offered = {skill['id'] for skill in _skill_catalog(owned.catalog)
                                if skill['selectable']}
                     if selected[0] not in offered:
-                        raise ValueError("해당 스킬을 더 이상 사용할 수 없습니다. 새로고침하고 다시 선택하세요.")
+                        raise ValueError('技能已不可用，请刷新后选择')
                     message = '/' + selected[0] + (' ' + body['text'] if body['text'].strip() else '')
                 else:
                     message = body['text']
                 content = _message_content({**body, 'text': message})
                 with owned.condition:
                     if owned.active or owned.pending:
-                        raise BridgeUnavailable("다른 메시지를 보내기 전에 현재 Claude Code 작업이 완료될 때까지 기다리세요.")
+                        raise BridgeUnavailable('请等待当前 Claude Code 任务结束后再发送')
                     owned.active = True
                     owned.write({'type': 'user', 'message': {'role': 'user', 'content': content}})
             elif action == 'compact':
@@ -1082,12 +1082,12 @@ class ClaudeCli:
             elif action == 'access':
                 mode = body.get('mode')
                 if mode not in MODES:
-                    raise ValueError("Claude Code에서 제공하는 권한 모드를 선택하세요.")
+                    raise ValueError('请选择 Claude Code 提供的权限模式')
                 if mode == 'bypassPermissions' and body.get('confirmed') is not True:
-                    raise ValueError('전체 액세스에는 명시적인 확인이 필요합니다.')
+                    raise ValueError('完全访问需要明确确认')
                 result = owned.control({'subtype': 'set_permission_mode', 'mode': mode})
                 if result.get('mode') != mode:
-                    raise BridgeUnavailable("Claude Code가 권한 모드를 확인하지 않았습니다.")
+                    raise BridgeUnavailable('Claude Code 未确认权限模式')
                 with owned.condition:
                     owned.permission = mode
             elif action == 'respond':
@@ -1095,26 +1095,22 @@ class ClaudeCli:
                 with owned.condition:
                     pending = owned.pending.get(rid)
                 if not pending:
-                    raise ValueError("요청이 이미 처리되었거나 만료되었습니다.")
+                    # 在写管道前确认无效请求，避免将未发送请求记为 unknown。
+                    raise ResumePreflightBlocked('请求已处理或过期')
                 decision = {'accept': 'allow', 'decline': 'deny'}.get(body.get('decision'))
                 if not decision:
-                    raise ValueError("한 번 허용 또는 거부를 선택하세요.")
+                    raise ResumePreflightBlocked('请选择本次允许或拒绝')
                 response = {'behavior': decision}
                 if decision == 'allow':
-                    updated = pending['request'].get('input', {})
+                    raw_input = pending['request'].get('input')
                     if pending['request'].get('tool_name') == 'AskUserQuestion':
-                        updated = dict(updated)
-                        answers = {}
-                        for index, question in enumerate(updated.get('questions') or []):
-                            key = str(question.get('id') or question.get('question') or index)
-                            values = ((body.get('answers') or {}).get(key) or {}).get('answers') or []
-                            if not values or not all(isinstance(value, str) for value in values):
-                                raise ValueError("모든 질문에 답변하세요")
-                            answers[question['question']] = ', '.join(values)
-                        updated['answers'] = answers
+                        updated = model.respond_answers(raw_input, body.get('answers'),
+                                                        error_cls=ResumePreflightBlocked)
+                    else:
+                        updated = dict(raw_input) if isinstance(raw_input, dict) else {}
                     response['updatedInput'] = updated
                 else:
-                    response['message'] = '사용자가 이 작업을 거부했습니다.'
+                    response['message'] = '用户拒绝了本次操作'
                 # Claim before a potentially ambiguous pipe write. A new HTTP request ID
                 # must never replay an approval whose result may already be applied.
                 with owned.condition:
@@ -1122,7 +1118,7 @@ class ClaudeCli:
                 owned.write({'type': 'control_response', 'response': {'subtype': 'success',
                              'request_id': rid, 'response': response}})
             else:
-                raise ValueError("이 Claude Code 작업은 지원되지 않습니다.")
+                raise ValueError('不支持的 Claude Code 操作')
             return {'status': 'accepted'}
 
     def close(self):
@@ -1145,14 +1141,14 @@ def owned_connections(client, remote=False):
             def release(stop, owned=owned, sid=sid, native=row['nativeId'], token=token):
                 with client.lock:
                     if client.owned.get(sid if remote else native) is not owned or owned.connection_token != token:
-                        raise BridgeUnavailable('기존 CLI 연결이 변경되었습니다. 새로운 연결이 작동되지 않음')
+                        raise BridgeUnavailable('原 CLI 连接已变化；未操作新的连接')
                     result = owned.release_connection(stop)
                     if result and result['status'] == 'released':
                         client.owned.pop(sid if remote else native, None)
                     return result or {'status': 'released'}
             public = {'key': token, 'provider': 'claude', 'sessionId': sid,
                          'host': row.get('host', 'local'), 'title': row.get('title') or sid,
-                         'location': row.get('hostLabel') or row.get('host', '로컬 머신 CLI'), '_release': release}
+                         'location': row.get('hostLabel') or row.get('host', '本机 CLI'), '_release': release}
             if not remote:
                 public.update(getattr(client, 'cli_force_callbacks', lambda _row: {})(public))
             rows.append(public)

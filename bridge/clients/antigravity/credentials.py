@@ -12,7 +12,7 @@ class NativeCredentials:
         elif sys.platform == 'linux':
             from bridge.platforms.linux import credential_vault
         else:
-            raise ValueError('현재 시스템에서는 아직 지원하지 않습니다. Antigravity 계정 저장')
+            raise ValueError('当前系统暂不支持 Antigravity 账号保存')
         self.vault = credential_vault
 
     def read(self):

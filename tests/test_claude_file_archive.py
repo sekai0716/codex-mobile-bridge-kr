@@ -142,7 +142,7 @@ class FileArchiveTests(unittest.TestCase):
         listing=cli.listing()
         self.assertEqual(len(listing['sessions']),2)
         bad=next(row for row in listing['sessions'] if row.get('archiveIncomplete'))
-        self.assertEqual(bad['title'],'Claude Code 검토를 위해 보관됨')
+        self.assertEqual(bad['title'],'Claude Code 归档待核对')
         self.assertFalse(bad['runtimeKnown']);self.assertFalse(bad['capabilities']['archive'])
         self.assertFalse(listing['complete'])
 
@@ -201,7 +201,7 @@ class FileArchiveTests(unittest.TestCase):
         cli=ClaudeCli(Path(self.temp.name)/'uploads',profile_resolver=lambda:profile)
         sid=cli.listing()['sessions'][0]['id']
         with patch.object(archive,'supported',side_effect=[True,False]),patch.object(archive,'assert_no_cli'),patch('bridge.clients.claude.cli_session.assert_session_closed'):
-            with self.assertRaisesRegex(BridgeUnavailable,"Claude\\ 기본\\ 프로그램이\\ 변경되었거나\\ 보관하기\\ 전에\\ 확인할\\ 수\\ 없습니다\\."):cli.call('archive',sid,{'archived':True})
+            with self.assertRaisesRegex(BridgeUnavailable,'原生程序'):cli.call('archive',sid,{'archived':True})
         self.assertEqual(self.path.read_bytes(),self.raw)
         self.assertFalse(self.stored().exists())
 

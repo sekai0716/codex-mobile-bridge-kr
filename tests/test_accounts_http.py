@@ -45,6 +45,14 @@ class AccountsHttpTests(unittest.TestCase):
         self.assertEqual(self.request('POST','/api/accounts/switch',{**value,'apiKey':'forbidden'},headers)[0],400)
         self.assertEqual(self.request('POST','/api/accounts/switch',value,headers)[0],202)
         manager.switch.assert_called_once_with(value)
+        manager.switch.reset_mock()
+        confirmed = {**value, 'sharedDaemonConfirmed': True}
+        self.assertEqual(self.request('POST','/api/accounts/switch',confirmed,headers)[0],202)
+        manager.switch.assert_called_once_with(confirmed)
+        manager.switch.reset_mock()
+        self.assertEqual(self.request('POST','/api/accounts/switch',
+            {**value, 'sharedDaemonConfirmed': 'true'},headers)[0],400)
+        manager.switch.assert_not_called()
 
     def test_ssh_retry_requires_auth_csrf_and_registered_host(self):
         self.manager()
@@ -97,26 +105,14 @@ class AccountsHttpTests(unittest.TestCase):
         self.assertEqual(self.request('POST', path, value, headers)[0], 403)
         manager.control.assert_not_called()
 
-    def test_deferred_runtime_requires_primary_scope_confirmation_and_auth(self):
+    def test_retired_preparation_actions_are_rejected_without_starting_runtime(self):
         manager = self.manager()
-        manager.control = Mock(return_value={'desktopRuntime': {'deferred': {'state': 'waiting'}}})
-        path = '/api/accounts/desktop-runtime'
-        schedule = {'action': 'deferDesktopRuntime', 'confirmed': True, 'requestId': 'fixture'}
-        cancel = {'action': 'cancelDeferredDesktopRuntime', 'requestId': 'fixture'}
-        self.assertEqual(self.request('POST', path, schedule)[0], 401)
+        manager.control = Mock()
         headers = self.login()
-        for body in (schedule, cancel):
-            self.assertEqual(self.request('POST', path, body, {'Cookie': headers['Cookie']})[0], 403)
-            self.assertEqual(self.request('POST', path, body, headers)[0], 202)
-            manager.control.assert_called_with(body)
-        manager.control.reset_mock()
-        for invalid in ({**schedule, 'confirmed': False}, {**schedule, 'acknowledgeUnavailable': True},
-                        {**cancel, 'confirmed': True}, {k:v for k,v in schedule.items() if k != 'confirmed'}):
-            self.assertEqual(self.request('POST', path, invalid, headers)[0], 400)
-        self.server.bridge.account_target = Mock(return_value=SimpleNamespace(accounts=manager))
-        self.assertEqual(self.request('POST', path + '?entry=codex:fixture', schedule, headers)[0], 400)
-        self.server.auth.config['mode'] = 'none'
-        self.assertEqual(self.request('POST', path, schedule, headers)[0], 403)
+        for action in ('deferDesktopRuntime', 'cancelDeferredDesktopRuntime'):
+            status, _, _ = self.request('POST', '/api/accounts/desktop-runtime', {
+                'action': action, 'confirmed': True, 'requestId': 'fixture'}, headers)
+            self.assertEqual(status, 400)
         manager.control.assert_not_called()
 
     def test_enrollment_and_mutation_routes_do_not_exist_on_web(self):

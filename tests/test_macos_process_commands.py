@@ -22,7 +22,7 @@ class MacOSProcessCommandsTests(unittest.TestCase):
 
     def test_gui_c_locale_does_not_escape_unicode_process_identity(self):
         from bridge.platforms.macos.desktop import processes
-        command = '/Users/test/중국 프로젝트/Gateway serve --data-dir /Users/test/대화'
+        command = '/Users/test/中文项目/Gateway serve --data-dir /Users/test/会话'
         def ps(args, **options):
             self.assertEqual(options['env']['LC_ALL'], 'en_US.UTF-8')
             self.assertEqual(options['encoding'], 'utf-8')

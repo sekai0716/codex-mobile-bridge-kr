@@ -1,5 +1,6 @@
 """Manual discovery adds only the native default ZCode, never a second profile."""
 import json
+import os
 import plistlib
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from pathlib import Path, PureWindowsPath
 from unittest.mock import Mock, patch
 
 from bridge.clients.manager import DesktopSessions
+from bridge.clients.discovery import discover_clients
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -68,16 +70,39 @@ class ZCodeDefaultRegistration(unittest.TestCase):
         finally:
             restored.close()
 
+    @unittest.skipUnless(os.name == 'posix', 'stable application symlink')
+    def test_registered_stable_symlink_follows_update_without_changing_the_configuration_home(self):
+        updated = self.bundle('Updated ZCode.app')
+        selected = self.root/'Stable ZCode.app'; selected.symlink_to(self.app, target_is_directory=True)
+        self.manager._discovery_preferences.side_effect = lambda: {
+            'zcodeApplication': self.manager.config.get('zcodeApplication', '')}
+        self.discovery.side_effect = lambda preferences: discover_clients(
+            preferences, platform='darwin', home=self.home, env={}, applications=[])
+        with patch('bridge.clients.desktop_app.process_inventory', side_effect=lambda paths: {
+                Path(path): {'pids': [], 'commands': {}} for path in paths}), \
+             patch('bridge.clients.zcode.installation.launch', side_effect=AssertionError('launch')):
+            self.manager.register_zcode_application(str(selected))
+            original_home = self.manager.config['discovered']['zcode']['dataDirectory']
+            self.assertEqual(self.manager.config['discovered']['zcode']['application'], str(self.app))
+            selected.unlink(); selected.symlink_to(updated, target_is_directory=True)
+            self.manager.scan(inventory_only=True)
+        row = self.manager.config['discovered']['zcode']
+        self.assertEqual(row['application'], str(updated))
+        self.assertEqual(row['executable'], str(updated/'Contents/MacOS/ZCode'))
+        self.assertEqual(row['dataDirectory'], original_home)
+        self.assertEqual(self.manager.adapters['zcode'].home, Path(original_home))
+        self.assertEqual(json.loads(self.manager.config_path.read_text())['zcodeApplication'], str(selected))
+
     def test_fresh_discovery_prevents_stale_form_from_overwriting_existing_client(self):
         self.discovery.return_value = {'zcode': {'installed': True, 'application': '/existing/ZCode.app'}}
-        with self.assertRaisesRegex(ValueError, "ZCode는\\ 이미\\ 사용\\ 가능합니다\\.\\ 기존\\ 관리\\ 페이지를\\ 사용하세요\\."):
+        with self.assertRaisesRegex(ValueError, '客户端已存在'):
             self.manager.instance_control(self.request)
         self.assertNotIn('zcodeApplication', self.manager.config)
         self.assertNotIn('zcode', self.manager.adapters)
 
     def test_exact_native_identity_is_required_and_no_other_installation_is_substituted(self):
         wrong = self.bundle('Other.app', 'example.other')
-        with self.assertRaisesRegex(ValueError, "선택한\\ 경로는\\ 유효한\\ ZCode\\ 애플리케이션이\\ 아닙니다\\."):
+        with self.assertRaisesRegex(ValueError, '不是可用的 ZCode'):
             self.manager.instance_control({**self.request, 'application': str(wrong)})
         self.discovery.assert_called_once_with({})
         self.assertNotIn('zcodeApplication', self.manager.config)
@@ -90,17 +115,17 @@ class ZCodeDefaultRegistration(unittest.TestCase):
 
     def test_enabled_or_active_connection_cannot_be_replaced(self):
         self.manager.config.setdefault('enabled', {})['zcode'] = True
-        with self.assertRaisesRegex(ValueError, "다른\\ 애플리케이션을\\ 선택하기\\ 전에\\ ZCode\\ 모바일\\ 액세스를\\ 비활성화하세요\\."):
+        with self.assertRaisesRegex(ValueError, '先停用'):
             self.manager.instance_control(self.request)
         self.manager.config['enabled']['zcode'] = False
         pipe = Mock(); pipe.owner.return_value = {'pid': 123}
         self.manager.zcode_pipe = pipe
-        with self.assertRaisesRegex(ValueError, '활성 연결'):
+        with self.assertRaisesRegex(ValueError, '活动连接'):
             self.manager.instance_control(self.request)
         pipe.start.assert_not_called()
         self.manager.zcode_pipe = None
         self.manager._zcode_official_status.return_value = {'connected': True}
-        with self.assertRaisesRegex(ValueError, '활성 연결'):
+        with self.assertRaisesRegex(ValueError, '活动连接'):
             self.manager.instance_control(self.request)
         self.assertNotIn('zcodeApplication', self.manager.config)
 
@@ -142,7 +167,7 @@ class ZCodeDefaultRegistration(unittest.TestCase):
 
     def test_windows_network_path_is_not_a_local_application(self):
         with patch('bridge.clients.manager.sys.platform', 'win32'), patch('bridge.clients.manager.Path', PureWindowsPath):
-            with self.assertRaisesRegex(ValueError, "로컬\\ ZCode\\ 애플리케이션의\\ 전체\\ 경로를\\ 선택하십시오\\."):
+            with self.assertRaisesRegex(ValueError, '本机'):
                 self.manager.instance_control({**self.request, 'application': r'\\server\share\ZCode.exe'})
         self.discovery.assert_not_called()
 
@@ -152,7 +177,7 @@ class ZCodeDefaultRegistration(unittest.TestCase):
         self.manager._changing = Mock(side_effect=lambda *args, **kwargs: nullcontext())
         for state in ({'loginSaved': True, 'restoring': False}, {'restoring': True}, {}):
             self.manager._zcode_official_status.return_value = state
-            with self.assertRaisesRegex(ValueError, "먼저\\ 컴퓨터\\ 게이트웨이를\\ 구성하고\\ 공식\\ 원격\\ 제어에\\ 로그인하십시오\\."):
+            with self.assertRaisesRegex(ValueError, '请先在电脑网关'):
                 self.manager._select_zcode_connection('official-remote')
         self.manager._zcode_official_status.return_value = {'loginSaved': True, 'restoring': True, 'configured': False}
         self.manager._select_zcode_connection('official-remote')

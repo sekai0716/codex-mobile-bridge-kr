@@ -120,7 +120,7 @@ class MobileUpdates:
                       and ('-' in current or not r['prerelease'])]
         selected = max(candidates, key=lambda r: version_key(r['version'])) if candidates else None
         if selected and (selected['size'] <= 0 or selected['sha256'] is None):
-            raise ValueError('출시정보가 변경되었거나 인증정보가 누락되었습니다. 업데이트 내용을 다시 확인해주세요.')
+            raise ValueError('发布信息已变化或缺少校验信息，请重新检查更新')
         return {'supported': True, 'release': selected}
 
     def _cleanup(self):
@@ -146,7 +146,7 @@ class MobileUpdates:
             raise ValueError('잘못된 업데이트 요청')
         release = next((r for r in self.releases() if r['size'] > 0 and r['sha256'] is not None and all(r[k] == value[k] for k in value)), None)
         if release is None:
-            raise ValueError('출시정보가 변경되었거나 인증정보가 누락되었습니다. 업데이트 내용을 다시 확인해주세요.')
+            raise ValueError('发布信息已变化或缺少校验信息，请重新检查更新')
         identifier = hashlib.sha256((release['version'] + ':' + release['sha256']).encode()).hexdigest()
         with self.lock:
             if self.closed.is_set():

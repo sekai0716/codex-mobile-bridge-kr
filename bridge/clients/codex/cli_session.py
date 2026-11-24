@@ -17,7 +17,7 @@ from contextlib import nullcontext
 from bridge.features.sessions.identity import same_cwd
 from bridge.clients.codex.app_server import (
     AppServerError, AppServerUnavailable, AppServerReadTimeout, AppServerUnknownResult, AppServerUnsupported,
-    AppServerMessageTooLarge, CodexAppServer)
+    CodexAppServer)
 from bridge.clients.codex.catalog import Catalog, CatalogError, ModelStore, normalize_native_skills
 from bridge.clients.codex.remote import RemoteStore, RemoteUnavailable, remote_model_catalog, remote_model_identity, ssh_read
 from bridge.clients.codex.linux_control import LinuxCliControl
@@ -29,26 +29,6 @@ from bridge.features.sessions.store import SessionStore, StoreUnavailable
 
 MAX_REASONING_PARTS = 1024
 
-
-class _JsonLines:
-    """The official app-server's stdio transport uses one JSON object per line."""
-    def __init__(self, reader, writer):
-        self.reader, self.writer = reader, writer
-
-    def send(self, message):
-        body = json.dumps(message, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
-        if len(body) > CodexAppServer.MAX_LINE:
-            raise AppServerMessageTooLarge('Codex stdio request is too large')
-        self.writer.write(body)
-        self.writer.flush()
-
-    def receive(self):
-        body = self.reader.readline(CodexAppServer.MAX_LINE + 1)
-        if not body:
-            raise EOFError()
-        if len(body) > CodexAppServer.MAX_LINE or not body.endswith(b'\n'):
-            raise AppServerError('Incomplete or oversized Codex stdio response')
-        return json.loads(body)
 
 
 def _managed_cli(home):
@@ -155,7 +135,6 @@ class CliSessions:
         self.start_lock = threading.Lock()
         self.daemon_start_generation = 0
         self.attach_locks = {}
-        self.created_desktop = False
         self.joined = {}
         self.attaching = set()
         self.metadata = {}
@@ -387,80 +366,6 @@ class CliSessions:
             self.lifecycle.refresh()
         return result
 
-    def created_desktop_runtime(self, on_state=None, on_disconnect=None):
-        """An independent subscription for a locally created desktop chat, opened on explicit handoff only."""
-        if sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home:
-            raise AppServerUnsupported('Created desktop handoff requires the default local Linux runtime')
-        child = CliSessions(self.home, on_state or self.on_state, on_disconnect or self.on_disconnect,
-                            cli=self.configured_cli, allow_installed_runtime=True)
-        child.created_desktop = True
-        if not Path(child.client.socket_path).exists() and _managed_cli(self.home) is None:
-            # Some official desktop packages have an app-server binary but no managed
-            # daemon installation. Share its RPC implementation, never the CLI's client.
-            from bridge.features.sessions.create import runtime_environment
-            def launch(command, **kwargs):
-                env = runtime_environment(self.home)
-                env['PWD'] = '/'
-                return subprocess.Popen(command, cwd='/', env=env, **kwargs)
-            child.client = CodexAppServer(child.client.socket_path, command=[self.configured_cli, 'app-server', '--listen', 'stdio://'],
-                check_socket=False, client_name='codex-mobile-bridge-cli', transport_factory=_JsonLines,
-                process_factory=launch, on_event=child._event, on_server_request=child._server_request,
-                on_disconnect=child._disconnect)
-        return child
-
-    def loaded_desktop_runtime(self, on_state=None, on_disconnect=None):
-        """Connect a separate subscriber to the verified original Linux Desktop."""
-        from bridge.clients.codex.loaded_desktop import LoadedDesktopSessions
-        if sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home:
-            raise AppServerUnsupported('Existing desktop connection requires the default local Linux runtime')
-        return LoadedDesktopSessions(self.home, on_state or self.on_state, on_disconnect or self.on_disconnect,
-                                     cli=self.configured_cli)
-
-    def attach_created_desktop(self, thread_id, *, cwd, provider, model, effort, guard):
-        """Resume the verified, empty desktop creation without opening or sending a turn."""
-        from bridge.features.sessions.create import model_overrides
-        if (not self.created_desktop or sys.platform != 'linux' or self.alias is not None or self.clear_sqlite_home
-                or str(uuid.UUID(thread_id)) != thread_id or not Path(cwd).is_absolute() or provider != 'openai'):
-            raise AppServerUnsupported('Created desktop thread identity is unavailable')
-        overrides = model_overrides(model, effort)
-        with self.lock:
-            attach_lock = self.attach_locks.setdefault(thread_id, threading.Lock())
-        with attach_lock:
-            with self.lock:
-                if thread_id in self.joined:
-                    raise AppServerUnsupported('Created desktop thread already has a subscription')
-            account = guard()
-            self._runtime_home(self._connect_explicit(allow_start=self.client.check_socket))
-            process = self.client.process
-            saved = self.store.get(thread_id)
-            if (saved.get('id') != thread_id or saved.get('origin') != 'desktop' or saved.get('archived') != 0
-                    or saved.get('attached_thread_parent_id') or saved.get('thread_source') == 'subagent'
-                    or saved.get('cwd') != cwd or saved.get('model_provider') != provider or saved.get('has_user_event') != 0
-                    or saved.get('first_user_message')):
-                raise AppServerUnsupported('Created desktop thread no longer matches its saved identity')
-            self._check_desktop_account(saved, process, account)
-            before = self.client.request('thread/read', {'threadId': thread_id, 'includeTurns': True},
-                                         replay_safe=True, expected_process=process)['thread']
-            if (before.get('id') != thread_id or before.get('modelProvider') != provider or before.get('cwd') != cwd
-                    or (before.get('status') or {}).get('type') != 'notLoaded' or before.get('turns') != []
-                    or before.get('ephemeral') is not False or before.get('attachedToThreadId')
-                    or before.get('parentThreadId') or before.get('forkedFromId') or before.get('source') != 'vscode'
-                    or self.client.is_loaded(thread_id) or guard() != account or process is not self.client.process):
-                raise AppServerUnsupported('Created desktop thread is already active, nonempty, or changed')
-            params = {'threadId': thread_id, 'cwd': cwd, 'modelProvider': provider, **overrides}
-            return self._resume_checked(thread_id, before, params, provider, process=process, created=True)
-
-    def _check_desktop_account(self, saved, process, account):
-        from bridge.features.accounts.draft_identity import draft_identity
-        auth = self.client.request('account/read', {'refreshToken': False}, replay_safe=True, expected_process=process)
-        route = auth.get('workspaceRouting') or {}
-        workspace, user = route.get('chatgptAccountId'), auth.get('userId')
-        if (not workspace or not user or (auth.get('account') or {}).get('type') != 'chatgpt'
-                or route.get('backendOrigin') != 'https://chatgpt.com' or auth.get('requiresOpenaiAuth') is not True
-                or saved.get('creator_account_id') != workspace or saved.get('creator_user_id') != user
-                or draft_identity('chatgpt', workspace) != account):
-            raise AppServerUnsupported('Native account differs from the desktop thread owner')
-
     def observe(self, thread_id):
         """Read an already loaded native thread without subscribing or resuming it."""
         if self.alias is None and isinstance(self.client, CodexAppServer):
@@ -574,7 +479,7 @@ class CliSessions:
             if thread_id in self.joined:
                 self._require_joined(thread_id)
                 if target_provider is not None and self.metadata[thread_id]['modelProvider'] != target_provider:
-                    raise AppServerUnsupported('대상 세션이 여전히 기본적으로 로드되어 있습니다. 먼저 명시적으로 확인하세요. CLI 서비스 유지관리 공급자가 마이그레이션되지 않았습니다.。')
+                    raise AppServerUnsupported('目标会话仍被原生加载，请先明确确认 CLI 服务维护；未迁移提供商。')
                 return copy.deepcopy(self.states[thread_id])
         process = self.client.process
         try:
@@ -598,35 +503,25 @@ class CliSessions:
             if (self.alias is not None or not isinstance(expected_identity, dict) or expected_identity.get('id') != thread_id
                     or expected_identity.get('modelProvider') != retained
                     or not same_cwd(expected_identity.get('cwd'), before.get('cwd'), os.name == 'nt')):
-                raise AppServerUnsupported('원래 세션 ID 또는 확인된 대상 액세스가 변경되었습니다. 공급자가 마이그레이션되지 않았습니다.。')
+                raise AppServerUnsupported('原会话身份或已确认的目标接入已变化；未迁移提供商。')
         if target_provider is not None:
             if not isinstance(target_provider, str) or not target_provider:
-                raise AppServerUnsupported('확인된 대상 제공자를 사용할 수 없습니다. 공급자가 마이그레이션되지 않았습니다.。')
+                raise AppServerUnsupported('已确认的目标提供商不可用；未迁移提供商。')
         if target_provider is not None or before_resume is not None:
             if loaded or before.get('status', {}).get('type') != 'notLoaded':
-                raise AppServerUnsupported('대상 세션이 여전히 기본적으로 로드되어 있습니다. 먼저 명시적으로 확인하세요. CLI 서비스 유지관리 공급자가 마이그레이션되지 않았습니다.。')
+                raise AppServerUnsupported('目标会话仍被原生加载，请先明确确认 CLI 服务维护；未迁移提供商。')
         # Ordinary resume retains all native settings. A separately confirmed
         # cold migration changes only the provider, after checking the source.
+        with self.lock:
+            self.attaching.add(thread_id)
         params = {'threadId': thread_id, 'excludeTurns': True}
         if target_provider is not None:
             params['modelProvider'] = target_provider
-        return self._resume_checked(thread_id, before, params, target_provider or retained or before.get('modelProvider'),
-                                    process=self.client.process, before_resume=before_resume)
-
-    def _resume_checked(self, thread_id, before, params, expected_provider, *, process, created=False,
-                        before_resume=None, desktop_lease=None):
-        # Desktop subscriptions must stay on the connection that proved the owner's identity.
-        guard = {'expected_process': process} if created or getattr(self.client, 'pinned_process', None) is process else {}
-        with self.lock:
-            self.attaching.add(thread_id)
+        process = self.client.process
         try:
-            with desktop_lease if desktop_lease is not None else nullcontext():
-                if before_resume:
-                    before_resume()
-                # An undelivered response must not release a live Desktop's retention
-                # lock while a resume is still pending. Disconnect wakes this request.
-                timeout = {'timeout': None} if desktop_lease is not None else {}
-                resumed = self.client.request('thread/resume', params, **guard, **timeout)
+            if before_resume:
+                before_resume()
+            resumed = self.client.request('thread/resume', params)
         except Exception as error:
             with self.lock:
                 self.attaching.discard(thread_id)
@@ -635,27 +530,25 @@ class CliSessions:
                     self.joined[thread_id] = self.client.process
                     self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'cleanupOnly': True,
                                                'cwd': before.get('cwd'),
-                                               'modelProvider': expected_provider}
+                                               'modelProvider': target_provider or before.get('modelProvider')}
             reason = (getattr(error, 'rpc_error', {}).get('data') or {}).get('type')
             if reason in ('modelProviderMismatch', 'modelProviderNotConfigured', 'modelProviderPolicyConflict'):
-                raise AppServerUnsupported('원래 세션 제공자가 현재 사용 가능한 액세스 권한과 일치하지 않거나 정책 제한이 적용됩니다. 원래 공급자 구성을 복원하거나 컴퓨터의 현재 액세스를 사용하여 새 채팅을 만드십시오. 원래 세션이 마이그레이션되지 않았습니다.。') from error
+                raise AppServerUnsupported('原会话的提供商与当前可用接入不一致或受到策略限制；请恢复原提供商配置，或在电脑端使用当前接入新建聊天。未迁移原会话。') from error
             raise
         after = resumed.get('thread') or {}
-        if 'modelProvider' not in params and self.alias is None and resumed.get('modelProvider') != expected_provider:
+        expected_provider = target_provider or retained or before.get('modelProvider')
+        if (target_provider is None and self.alias is None and resumed.get('modelProvider') != expected_provider):
             try:
                 expected_provider = self.persisted_identity(before)['modelProvider']
             except AppServerError:
                 pass
-        if (created and (resumed.get('model') != params['model'] or resumed.get('cwd') != before['cwd']
-                         or ('config' in params and resumed.get('reasoningEffort') != params['config']['model_reasoning_effort'])
-                         or after.get('turns') != [] or after.get('modelProvider') != expected_provider) or
-                after.get('id') != thread_id or not same_cwd(before.get('cwd'), after.get('cwd'), self.alias is None and os.name == 'nt') or
+        if (after.get('id') != thread_id or not same_cwd(before.get('cwd'), after.get('cwd'), self.alias is None and os.name == 'nt') or
                 resumed.get('modelProvider') != expected_provider):
             self._cleanup_failed_join(thread_id, before, process)
             raise AppServerUnsupported('CLI thread identity changed during join')
         try:
             goal = normalize_goal_result(self.client.request(
-                'thread/goal/get', {'threadId': thread_id}, replay_safe=True, **guard))
+                'thread/goal/get', {'threadId': thread_id}, replay_safe=True))
         except AppServerUnsupported:
             goal = None
         except (AppServerUnavailable, AppServerUnknownResult):
@@ -666,10 +559,7 @@ class CliSessions:
             # joining the thread for turns, models and Skills.
             goal = None
         with self.lock:
-            if self.client.process is not process or process is None:
-                self.attaching.discard(thread_id)
-                raise AppServerUnavailable('Codex runtime changed during join')
-            self.joined[thread_id] = process
+            self.joined[thread_id] = self.client.process
             self.attaching.discard(thread_id)
             self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'model': resumed.get('model'),
                                         'modelProvider': resumed.get('modelProvider'),
@@ -684,12 +574,7 @@ class CliSessions:
             if before.get('modelProvider') != resumed.get('modelProvider'):
                 self.metadata[thread_id]['historicalProvider'] = before.get('modelProvider')
         try:
-            state = self.refresh(thread_id)
-            if created and (state['turns'] or state['requests'] or state['threadRuntimeStatus'].get('type') != 'idle'
-                            or state.get('latestModel') != params['model'] or
-                            'config' in params and state.get('latestReasoningEffort') != params['config']['model_reasoning_effort']):
-                raise AppServerUnsupported('Created desktop thread settings changed during join')
-            return state
+            return self.refresh(thread_id)
         except Exception:
             self._cleanup_failed_join(thread_id, before, process)
             raise
@@ -706,8 +591,7 @@ class CliSessions:
             self.metadata[thread_id] = {'connectionToken': str(uuid.uuid4()), 'cleanupOnly': True,
                                        'cwd': before.get('cwd'), 'modelProvider': before.get('modelProvider')}
         try:
-            options = {'expected_process': process} if self.created_desktop else {}
-            result = self.client.request('thread/unsubscribe', {'threadId': thread_id}, **options)
+            result = self.client.request('thread/unsubscribe', {'threadId': thread_id})
             if result.get('status') in ('unsubscribed', 'notSubscribed', 'notLoaded'):
                 self._invalidate(thread_id, process)
         except AppServerError:
@@ -857,8 +741,6 @@ class CliSessions:
             self._queue_refresh(thread_id)
             return {'applied': True}
         if desktop_method == 'thread-follower-steer-turn':
-            if params.get('attachments') or (params.get('restoreMessage') or {}).get('context', {}).get('fileAttachments'):
-                raise AppServerUnsupported('CLI steering with files is unavailable')
             with self.lock:
                 active = next((t for t in reversed(self.states[thread_id]['turns'])
                                if t.get('status') == 'inProgress'), None)
@@ -866,7 +748,7 @@ class CliSessions:
                 raise AppServerUnavailable('No active CLI turn to steer')
             result = self.client.request('turn/steer', {
                 'threadId': thread_id, 'expectedTurnId': active['turnId'],
-                'input': self._inputs(params.get('input', []), {}),
+                'input': self._inputs(params.get('input', []), (params.get('restoreMessage') or {}).get('context') or {}),
                 'clientUserMessageId': params.get('clientUserMessageId')}, timeout=timeout)
             self._queue_refresh(thread_id)
             return result
@@ -922,11 +804,7 @@ class CliSessions:
         raise AppServerUnsupported('CLI operation is not supported by this adapter')
 
     def _check_joined_identity(self, thread_id):
-        process = self._require_joined(thread_id)
-        if self.created_desktop:
-            from bridge.features.accounts.draft_identity import codex_account_identity
-            self._check_desktop_account(self.store.get(thread_id), process,
-                                        codex_account_identity(self.home, 'openai'))
+        self._require_joined(thread_id)
         if not self.client.is_loaded(thread_id):
             self._invalidate(thread_id)
             raise AppServerUnavailable('CLI thread unloaded before the operation')
@@ -1046,7 +924,7 @@ class CliSessions:
             except DaemonEnvironmentUnavailable:
                 return {'kind': 'models', 'models': [], 'modelSource': 'api',
                         'fastMode': {'allowed': False},
-                        'modelError': '현재를 확인할 수 없습니다 CLI 백그라운드 서비스 시작 환경은 재접속 후 모델 목록을 새로고침해주세요.',
+                        'modelError': '无法核验当前 CLI 后台服务的启动环境，请重新连接后刷新模型列表',
                         'currentModel': state.get('latestModel'),
                         'currentEffort': state.get('latestReasoningEffort')}
             catalog = reader.read_models(
@@ -1202,6 +1080,8 @@ class CliSessions:
             row = {'turnId': turn.get('id'), 'status': turn.get('status'),
                           'turnStartedAtMs': (turn.get('startedAt') or 0) * 1000,
                           'items': turn.get('items') or [], 'error': turn.get('error')}
+            if turn.get('completedAt') is not None:
+                row['turnCompletedAtMs'] = turn['completedAt'] * 1000
             if turn.get('model'):
                 row['params'] = {'model': turn['model'], 'effort': turn.get('reasoningEffort')}
             turns.append(row)
@@ -1228,12 +1108,10 @@ class CliSessions:
 
     def _require_joined(self, thread_id):
         with self.lock:
-            process = self.joined.get(thread_id)
-            if process is None or process is not self.client.process:
+            if self.joined.get(thread_id) is not self.client.process or self.client.process is None:
                 raise AppServerUnavailable('CLI thread is not joined on this connection')
             if self.metadata.get(thread_id, {}).get('cleanupOnly'):
-                raise AppServerUnavailable('이전에 CLI 접속 결과를 확인해야 합니다. 먼저 연결을 해제하십시오. 반복적인 복구나 전송 작업이 필요하지 않습니다.')
-            return process
+                raise AppServerUnavailable('此前 CLI 接入结果待核对，请先释放该连接；未重复恢复或发送任务')
 
     def _check_identity(self, thread_id):
         result = self.client.request('thread/read', {'threadId': thread_id,
@@ -1249,7 +1127,26 @@ class CliSessions:
             self._invalidate(thread_id)
             raise AppServerUnavailable('CLI thread identity changed before the operation')
 
-    def _event(self, event):
+    @staticmethod
+    def _merge_streamed_item(previous, incoming):
+        """Keep deltas when a native replacement omits an already streamed field."""
+        if not isinstance(previous, dict) or not isinstance(incoming, dict):
+            return incoming
+        if previous.get('id') != incoming.get('id') or previous.get('type') != incoming.get('type'):
+            return incoming
+        item = dict(incoming)
+        for field in ('text', 'aggregatedOutput'):
+            prior = previous.get(field)
+            if isinstance(prior, str) and prior and not item.get(field):
+                item[field] = prior
+        if incoming.get('type') == 'reasoning' and not item.get('summary') and not item.get('content'):
+            for field in ('summary', 'content'):
+                prior = previous.get(field)
+                if isinstance(prior, list) and not item.get(field):
+                    item[field] = copy.deepcopy(prior)
+        return item
+
+    def _event(self, event, *, publish=True):
         method = event.get('method')
         params = event.get('params') or {}
         thread_id = params.get('threadId')
@@ -1310,6 +1207,7 @@ class CliSessions:
                     row = {'turnId': turn.get('id'), 'items': []}
                     state['turns'].append(row)
                 if method == 'turn/started':
+                    row.pop('turnCompletedAtMs', None)
                     model = turn.get('model') or state.get('latestModel')
                     effort = turn.get('reasoningEffort') or state.get('latestReasoningEffort')
                     if model:
@@ -1319,12 +1217,15 @@ class CliSessions:
                 row.update(status=turn.get('status'), error=turn.get('error'))
                 if turn.get('startedAt') is not None:
                     row['turnStartedAtMs'] = turn['startedAt'] * 1000
+                if turn.get('completedAt') is not None:
+                    row['turnCompletedAtMs'] = turn['completedAt'] * 1000
                 row.pop('willRetry', None)
                 state['threadRuntimeStatus'] = {'type': 'active' if method == 'turn/started' else 'idle'}
                 if turn.get('items'):
-                    items = turn['items']
                     previous_times = {item.get('id'): item['timestamp'] for item in row['items'] if item.get('timestamp') is not None}
-                    items = [{**item, 'timestamp': previous_times[item.get('id')]} if item.get('timestamp') is None and item.get('id') in previous_times else item for item in items]
+                    previous_items = {item.get('id'): item for item in row['items'] if item.get('id') is not None}
+                    items = [{**item, 'timestamp': previous_times[item.get('id')]} if item.get('timestamp') is None and item.get('id') in previous_times else item for item in turn['items']]
+                    items = [self._merge_streamed_item(previous_items.get(item.get('id')), item) for item in items]
                     if method == 'turn/completed':
                         incoming_ids = {item.get('id') for item in items}
                         # Completed event items can omit user messages still present in thread/read.
@@ -1349,15 +1250,7 @@ class CliSessions:
                         if existing.get('id') == item.get('id'):
                             if item.get('timestamp') is None and existing.get('timestamp') is not None:
                                 item = {**item, 'timestamp': existing['timestamp']}
-                            if method == 'item/started' and item.get('type') == existing.get('type') == 'reasoning':
-                                # A late start must not erase deltas already received.
-                                item = {**item, **{field: existing[field] for field in ('summary', 'content')
-                                                  if not item.get(field) and isinstance(existing.get(field), list)}}
-                            if method == 'item/started' and item.get('type') == existing.get('type'):
-                                if existing.get('status') in ('completed', 'failed', 'interrupted', 'declined') or existing.get('completed') is True or existing.get('_bridgePlanComplete'):
-                                    break
-                                if item.get('type') == 'plan' and existing.get('text') and not item.get('text'):
-                                    item = {**item, 'text': existing['text']}
+                            item = self._merge_streamed_item(existing, item)
                             items[index] = item
                             break
                     else:
@@ -1407,10 +1300,12 @@ class CliSessions:
                     parts[slot] = (parts[slot] if isinstance(parts[slot], str) else '') + delta
             else:
                 return
+            if not publish:
+                return
             snapshot = copy.deepcopy(state)
         self.on_state(thread_id, snapshot)
 
-    def _server_request(self, request):
+    def _server_request(self, request, *, publish=True):
         thread_id = (request.get('params') or {}).get('threadId')
         with self.lock:
             if thread_id not in self.joined and thread_id not in self.attaching:
@@ -1423,6 +1318,8 @@ class CliSessions:
             state = self.states.get(thread_id)
             if state is not None:
                 state['requests'] = list(self.requests[thread_id].values())
+                if not publish:
+                    return
                 snapshot = copy.deepcopy(state)
             else:
                 snapshot = None
@@ -1495,7 +1392,7 @@ class CliSessions:
             self.refresh_pending.clear()
         self.on_disconnect()
 
-    def _invalidate(self, thread_id, expected_process=None):
+    def _invalidate(self, thread_id, expected_process=None, *, notify=True):
         with self.lock:
             if expected_process is not None and self.joined.get(thread_id) is not expected_process:
                 return
@@ -1510,7 +1407,8 @@ class CliSessions:
             self.states.pop(thread_id, None)
             self.requests.pop(thread_id, None)
             self.consumed_requests.pop(thread_id, None)
-        self.on_disconnect(thread_id)
+        if notify:
+            self.on_disconnect(thread_id)
 
     def close(self):
         self.client.close()

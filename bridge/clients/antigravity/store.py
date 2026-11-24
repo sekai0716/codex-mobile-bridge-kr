@@ -9,7 +9,7 @@ import sqlite3
 from urllib.parse import unquote, urlsplit
 
 from bridge.features.workspace.uploads import MAX_FILE, image_type
-from .model import SURFACE_LABELS, extract_user_text, gateway_id, normalize_steps
+from .model import SURFACE_LABELS, compute_turn_fork_points, extract_user_text, gateway_id, normalize_steps
 
 SURFACE_DIRS = (
     ('app', '.gemini/antigravity'),
@@ -19,6 +19,65 @@ SURFACE_DIRS = (
 
 _FRACTION_RE = re.compile(r'\.(\d+)')
 _MAX_FULL_FIELD_CHARS = 65536
+_MAX_ANNOTATION_BYTES = 65536
+_PBTXT_ESCAPE_RE = re.compile(r'\\([0-7]{1,3}|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[abfnrtv\\\'"])')
+_PBTXT_SIMPLE_ESCAPES = {
+    'a': b'\a', 'b': b'\b', 'f': b'\f', 'n': b'\n', 'r': b'\r', 't': b'\t', 'v': b'\v',
+    '\\': b'\\', "'": b"'", '"': b'"',
+}
+
+
+def _decode_pbtxt_string(raw):
+    """Decode a protobuf text-format string literal (UTF-8 or octal/hex/C escapes)."""
+    out = bytearray()
+    pos = 0
+    for match in _PBTXT_ESCAPE_RE.finditer(raw):
+        out.extend(raw[pos:match.start()].encode('utf-8'))
+        esc = match.group(1)
+        if esc in _PBTXT_SIMPLE_ESCAPES:
+            out.extend(_PBTXT_SIMPLE_ESCAPES[esc])
+        elif esc.startswith('x'):
+            out.append(int(esc[1:], 16))
+        elif esc.startswith(('u', 'U')):
+            out.extend(chr(int(esc[1:], 16)).encode('utf-8', errors='replace'))
+        else:
+            out.append(int(esc, 8) & 0xFF)
+        pos = match.end()
+    out.extend(raw[pos:].encode('utf-8'))
+    return out.decode('utf-8', errors='replace')
+
+
+def read_annotation_pbtxt(surface_root, conversation_id):
+    """Read top-level title/archived metadata from annotations/<cid>.pbtxt safely."""
+    if not re.fullmatch(r'[0-9a-fA-F-]{36}', str(conversation_id or '')):
+        return {}
+    path = Path(surface_root) / 'annotations' / f'{conversation_id}.pbtxt'
+    try:
+        if path.is_symlink() or not path.is_file():
+            return {}
+        if path.stat().st_size > _MAX_ANNOTATION_BYTES:
+            return {}
+        text = path.read_text(encoding='utf-8', errors='replace')
+    except OSError:
+        return {}
+    result = {}
+    depth = 0
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if depth == 0:
+            title_match = re.match(r'^title\s*:\s*"((?:[^"\\]|\\.)*)"\s*$', line)
+            if title_match:
+                result['title'] = _decode_pbtxt_string(title_match.group(1)).strip()
+            else:
+                arch_match = re.match(r'^archived\s*:\s*(true|false)\b', line, re.IGNORECASE)
+                if arch_match:
+                    result['archived'] = arch_match.group(1).lower() == 'true'
+        # Track nested proto blocks while ignoring braces inside quoted strings.
+        cleaned = re.sub(r'"(?:[^"\\]|\\.)*"', '', line)
+        depth = max(0, depth + cleaned.count('{') - cleaned.count('}'))
+    return result
 
 
 def parse_timestamp(value):
@@ -86,7 +145,7 @@ def _cap_large_fields(step):
     for key in ('content', 'thinking'):
         val = copied.get(key)
         if isinstance(val, str) and len(val) > _MAX_FULL_FIELD_CHARS:
-            copied[key] = val[:_MAX_FULL_FIELD_CHARS] + '\n…（내용이 너무 길어서 휴대폰에서 미리보기가 잘렸습니다.）'
+            copied[key] = val[:_MAX_FULL_FIELD_CHARS] + '\n…（内容过长，已在手机端截断预览）'
     return copied
 
 
@@ -127,11 +186,13 @@ class AntigravityStore:
                 return [dict(row) for row in conn.execute(sql, params).fetchall()]
             finally:
                 conn.close()
-        except sqlite3.OperationalError:
+        except sqlite3.DatabaseError:
             if strict:
                 raise
             # Never combine independently copied main/WAL/SHM files. A missing
             # consistent native snapshot is unavailable, not evidence of idle.
+            # 数据库损坏（DatabaseError，如 file is not a database）在非严格列表读取时同样应降级为空，
+            # 避免列表接口返回 500 或穿透全局通知轮询；strict=True 时仍向上抛出以保持安全拦截。
             return []
 
     @staticmethod
@@ -142,16 +203,40 @@ class AntigravityStore:
             return 'cli'
         return 'app'
 
-    def _row_to_summary(self, dir_key, root, row):
+    def _query_summaries_with_archived(self, db_path, sql):
+        if not db_path.is_file():
+            return [], set()
+        try:
+            conn = sqlite3.connect(db_path.resolve().as_uri() + '?mode=ro', uri=True, timeout=1.5)
+            try:
+                conn.row_factory = sqlite3.Row
+                rows = [dict(row) for row in conn.execute(sql).fetchall()]
+                fts_archived = set()
+                try:
+                    fts_rows = conn.execute(
+                        'SELECT DISTINCT conversation_id FROM conversations_fts WHERE archived = 1'
+                    ).fetchall()
+                    fts_archived = {str(r[0]).strip() for r in fts_rows if r and r[0]}
+                except sqlite3.DatabaseError:
+                    fts_archived = set()
+                return rows, fts_archived
+            finally:
+                conn.close()
+        except sqlite3.DatabaseError:
+            return [], set()
+
+    def _row_to_summary(self, dir_key, root, row, *, fts_archived=()):
         cid = str(row.get('conversation_id') or '').strip()
         if not re.fullmatch(r'[0-9a-fA-F-]{36}', cid):
             return None
         sid = gateway_id(dir_key, cid)
         cwd = parse_workspace_uris(row.get('workspace_uris') or '')
-        title = str(row.get('title') or '').strip()
+        annotation = read_annotation_pbtxt(root, cid)
+        title = str(annotation.get('title') or row.get('title') or '').strip()
         if not title:
             preview = extract_user_text(str(row.get('preview') or '')).splitlines()
-            title = (preview[0][:80] if preview and preview[0].strip() else '') or f'채팅 {cid[:8]}'
+            title = (preview[0][:80] if preview and preview[0].strip() else '') or f'聊天 {cid[:8]}'
+        archived = annotation['archived'] if isinstance(annotation.get('archived'), bool) else (cid in fts_archived)
         updated_at = parse_timestamp(row.get('last_modified_time'))
         active = bool(row.get('not_fully_idle')) or str(row.get('status') or '').endswith('_RUNNING')
         backend = self._backend_for(dir_key, str(row.get('source') or ''))
@@ -169,7 +254,7 @@ class AntigravityStore:
             'projectId': cwd or f'{dir_key}:unassigned',
             'projectName': project_name,
             'updatedAt': updated_at,
-            'archived': False,
+            'archived': archived,
             'status': 'active' if active else 'idle',
             'notFullyIdle': bool(row.get('not_fully_idle')),
             'stepCount': int(row.get('step_count') or 0),
@@ -190,12 +275,13 @@ class AntigravityStore:
         )
         for surface in self.surfaces():
             db_path = surface['root'] / 'conversation_summaries.db'
-            for row in self._query_db(db_path, sql):
+            rows, fts_archived = self._query_summaries_with_archived(db_path, sql)
+            for row in rows:
                 cid = str(row.get('conversation_id') or '').strip()
                 if not cid or (surface['root'], cid) in seen_native:
                     continue
                 seen_native.add((surface['root'], cid))
-                summary = self._row_to_summary(surface['key'], surface['root'], row)
+                summary = self._row_to_summary(surface['key'], surface['root'], row, fts_archived=fts_archived)
                 if summary is not None:
                     sessions.append(summary)
         sessions.sort(key=lambda item: item.get('updatedAt', 0), reverse=True)
@@ -217,6 +303,7 @@ class AntigravityStore:
                 if gateway_id(surface['key'], cid) == sid:
                     transcript = candidate_dir / '.system_generated/logs/transcript.jsonl'
                     mtime = transcript.stat().st_mtime if transcript.is_file() else 0.0
+                    annotation = read_annotation_pbtxt(surface['root'], cid)
                     return {
                         'id': gateway_id(surface['key'], cid),
                         'nativeId': cid,
@@ -225,12 +312,12 @@ class AntigravityStore:
                         'provider': 'antigravity',
                         'host': 'local',
                         'backend': surface['key'],
-                        'title': f'채팅 {cid[:8]}',
+                        'title': str(annotation.get('title') or '').strip() or f'聊天 {cid[:8]}',
                         'cwd': '',
                         'projectId': f'{surface["key"]}:unassigned',
                         'projectName': surface['name'],
                         'updatedAt': mtime,
-                        'archived': False,
+                        'archived': bool(annotation.get('archived')),
                         'status': 'idle',
                         'notFullyIdle': False,
                         'stepCount': 0,
@@ -247,15 +334,15 @@ class AntigravityStore:
             (conversation_id,), strict=True,
         )
         if not rows or rows[0].get('not_fully_idle') is None:
-            raise ValueError('기본 세션이 유휴 상태인지 확인할 수 없습니다. 컴퓨터에서 세션을 확인하십시오.')
+            raise ValueError('无法核验原生会话是否空闲，请在电脑检查会话')
         row = rows[0]
         if row['not_fully_idle'] or str(row.get('status') or '').endswith('_RUNNING'):
             return True
         if str(row.get('status') or '').endswith('_IDLE'):
             return False
-        raise ValueError('기본 세션이 유휴 상태인지 확인할 수 없습니다. 컴퓨터에서 세션을 확인하십시오.')
+        raise ValueError('无法核验原生会话是否空闲，请在电脑检查会话')
 
-    def list_tasks(self, surface_root, conversation_id):
+    def list_tasks(self, surface_root, conversation_id, *, live=False):
         """Return subagent child conversations for AgentsPanel."""
         db_path = Path(surface_root) / 'conversation_summaries.db'
         rows = self._query_db(
@@ -279,37 +366,17 @@ class AntigravityStore:
                 status = 'failed'
             else:
                 status = 'completed'
-            title = str(row.get('title') or row.get('agent_name') or f'하위 에이전트 {cid[:8]}').strip()
+            title = str(row.get('title') or row.get('agent_name') or f'子代理 {cid[:8]}').strip()
             tasks.append({
                 'id': cid,
                 'title': title,
                 'status': status,
-                'cancellable': False,
+                'cancellable': bool(live and status == 'running'),
             })
         return tasks
 
-    def read_transcript_page(self, surface_root, conversation_id, *, limit=40, before=None, session_active=False):
-        """Read a reverse-paginated slice of transcript.jsonl with targeted full-line hydration."""
-        logs_dir = Path(surface_root) / 'brain' / conversation_id / '.system_generated' / 'logs'
-        if not re.fullmatch(r'[0-9a-fA-F-]{36}', conversation_id) or (Path(surface_root)/'brain'/conversation_id).is_symlink():
-            raise ValueError('잘못된 기본 세션 경로')
-        compact_path = logs_dir / 'transcript.jsonl'
-        full_path = logs_dir / 'transcript_full.jsonl'
-        if not compact_path.is_file():
-            return {
-                'messages': [],
-                'turns': [],
-                'history': {'hasMore': False, 'before': None},
-                'contextUsage': None,
-            }
-
-        before_index = None
-        if before is not None and str(before).strip() != '':
-            try:
-                before_index = int(str(before).strip())
-            except ValueError as exc:
-                raise ValueError('기록 커서 형식이 잘못되었습니다.') from exc
-
+    @staticmethod
+    def _load_reconciled_steps(compact_path):
         steps = []
         with compact_path.open('r', encoding='utf-8', errors='replace') as stream:
             for idx, line in enumerate(stream):
@@ -326,15 +393,53 @@ class AntigravityStore:
                 if not isinstance(step_idx, int):
                     step_idx = idx
                     obj['step_index'] = step_idx
-                if before_index is not None and step_idx >= before_index:
-                    continue
-
                 # Branch reconciliation: if new step index is <= last step index,
                 # the transcript rewound or branched. Prune the earlier abandoned steps.
                 while steps and steps[-1].get('step_index', 0) >= step_idx:
                     steps.pop()
-
                 steps.append(obj)
+        return steps
+
+    def valid_fork_steps(self, surface_root, conversation_id):
+        """Return valid native turn-end step indices eligible for ForkConversation."""
+        if not re.fullmatch(r'[0-9a-fA-F-]{36}', str(conversation_id or '')):
+            return set()
+        conv_dir = Path(surface_root) / 'brain' / conversation_id
+        if conv_dir.is_symlink():
+            return set()
+        compact_path = conv_dir / '.system_generated' / 'logs' / 'transcript.jsonl'
+        if not compact_path.is_file():
+            return set()
+        all_steps = self._load_reconciled_steps(compact_path)
+        points = compute_turn_fork_points(all_steps, session_active=False)
+        messages, _, _ = normalize_steps(all_steps, session_active=False, turn_fork_points=points)
+        return {int(msg['forkMessageId']) for msg in messages if isinstance(msg.get('forkMessageId'), str) and msg['forkMessageId'].isdigit()}
+
+    def read_transcript_page(self, surface_root, conversation_id, *, limit=40, before=None, session_active=False):
+        """Read a reverse-paginated slice of transcript.jsonl with targeted full-line hydration."""
+        logs_dir = Path(surface_root) / 'brain' / conversation_id / '.system_generated' / 'logs'
+        if not re.fullmatch(r'[0-9a-fA-F-]{36}', conversation_id) or (Path(surface_root)/'brain'/conversation_id).is_symlink():
+            raise ValueError('原生会话路径无效')
+        compact_path = logs_dir / 'transcript.jsonl'
+        full_path = logs_dir / 'transcript_full.jsonl'
+        if not compact_path.is_file():
+            return {
+                'messages': [],
+                'turns': [],
+                'history': {'hasMore': False, 'before': None},
+                'contextUsage': None,
+            }
+
+        before_index = None
+        if before is not None and str(before).strip() != '':
+            try:
+                before_index = int(str(before).strip())
+            except ValueError as exc:
+                raise ValueError('历史游标格式无效') from exc
+
+        all_steps = self._load_reconciled_steps(compact_path)
+        turn_fork_points = compute_turn_fork_points(all_steps, session_active=session_active)
+        steps = [s for s in all_steps if before_index is None or s['step_index'] < before_index]
 
         # Prefer six complete turns within the page budget. A single long turn
         # must still paginate; its earlier prompt remains available in older pages.
@@ -381,7 +486,11 @@ class AntigravityStore:
             if hydrated:
                 page = [hydrated.get(step['step_index'], step) for step in page]
 
-        messages, turns, usage = normalize_steps(page, session_active=session_active and before_index is None)
+        messages, turns, usage = normalize_steps(
+            page,
+            session_active=session_active and before_index is None,
+            turn_fork_points=turn_fork_points,
+        )
         return {
             'messages': messages,
             'turns': turns,
@@ -420,34 +529,34 @@ class AntigravityStore:
     def read_image(self, surface_root, conversation_id, source):
         """Re-verify image membership in transcript.jsonl and return base64 bytes + MIME."""
         if not isinstance(source, dict):
-            raise ValueError('잘못된 이미지 참조 형식')
+            raise ValueError('图片引用格式无效')
         target_step = source.get('stepIndex')
         target_media = source.get('mediaIndex')
         if type(target_step) is not int or type(target_media) is not int or target_step < 0 or target_media < 0:
-            raise ValueError('잘못된 이미지 인덱스')
+            raise ValueError('图片索引无效')
         if not re.fullmatch(r'[0-9a-fA-F-]{36}', str(conversation_id or '')):
-            raise ValueError('잘못된 기본 세션 경로')
+            raise ValueError('原生会话路径无效')
         raw_session_dir = Path(surface_root) / 'brain' / conversation_id
         if raw_session_dir.is_symlink():
-            raise ValueError('잘못된 기본 세션 경로')
+            raise ValueError('原生会话路径无效')
         logs_dir = raw_session_dir / '.system_generated' / 'logs'
         compact_path = logs_dir / 'transcript.jsonl'
         full_path = logs_dir / 'transcript_full.jsonl'
         if not compact_path.is_file() and not full_path.is_file():
-            raise ValueError('원래 세션 기록을 찾을 수 없습니다.')
+            raise ValueError('找不到原始会话记录')
 
         uri = self._extract_image_uri(compact_path, target_step, target_media) if compact_path.is_file() else None
         if not uri and full_path.is_file():
             uri = self._extract_image_uri(full_path, target_step, target_media)
 
         if not uri:
-            raise ValueError('이미지가 이 세션 기록에 없습니다.')
+            raise ValueError('图片不在该会话历史记录中')
         raw_path = local_file_path(uri) if uri.startswith('file://') else uri
         raw_candidate = Path(raw_path)
         if not raw_candidate.is_absolute() or '..' in raw_candidate.parts:
-            raise ValueError('원본 이미지가 현재 세션이나 프로젝트 디렉터리에 없습니다.')
+            raise ValueError('原始图片不在当前会话或项目目录中')
         if raw_candidate.is_symlink():
-            raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
+            raise ValueError('不允许预览符号链接图片')
         image_path = raw_candidate.resolve()
         session_dir = raw_session_dir.resolve()
         surface_key = next((r['key'] for r in self.surfaces() if r['root'] == Path(surface_root)), 'app')
@@ -459,7 +568,7 @@ class AntigravityStore:
         matched = [(raw_root, resolved_root) for raw_root, resolved_root in allowed_pairs
                    if resolved_root == image_path or resolved_root in image_path.parents]
         if not matched:
-            raise ValueError('원본 이미지가 현재 세션이나 프로젝트 디렉터리에 없습니다.')
+            raise ValueError('原始图片不在当前会话或项目目录中')
         verified_lexical = False
         for raw_root, resolved_root in matched:
             for base in (raw_root, resolved_root):
@@ -471,22 +580,22 @@ class AntigravityStore:
                 for part in rel.parts:
                     cur = cur / part
                     if cur.is_symlink():
-                        raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
+                        raise ValueError('不允许预览符号链接图片')
                 verified_lexical = True
                 break
             if verified_lexical:
                 break
         if not verified_lexical:
-            raise ValueError('심볼릭 링크 이미지 미리보기 허용 안함')
+            raise ValueError('不允许预览符号链接图片')
         if not image_path.is_file():
-            raise ValueError('원본 이미지 파일이 제거되었거나 읽을 수 없습니다.')
+            raise ValueError('原始图片文件已移除或不可读')
         size = image_path.stat().st_size
         if not 0 < size <= MAX_FILE:
-            raise ValueError('이미지 크기가 미리보기 제한을 초과합니다.')
+            raise ValueError('图片大小超出预览限制')
         raw = image_path.read_bytes()
         mime = image_type(raw)
         if not mime:
-            raise ValueError('지원되지 않는 이미지 형식')
+            raise ValueError('不支持的图片格式')
         return {
             'data': base64.b64encode(raw).decode('ascii'),
             'mediaType': mime,

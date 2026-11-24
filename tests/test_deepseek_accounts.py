@@ -6,12 +6,67 @@ import unittest
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from bridge.clients.deepseek.accounts import DeepSeekAccounts, GRANT_KEY, API_REF, ORIGIN, _document, _request, _balance
 
 
 class DeepSeekAccountsTests(unittest.TestCase):
+    def test_native_empty_mapping_sections_remain_read_only_and_have_a_model_identity(self):
+        from bridge.clients.manager import DesktopSessions
+        manager = SimpleNamespace(adapters={'deepseek': SimpleNamespace(home=self.home)}, config={},
+                                  _account_store=lambda provider: self.accounts)
+        for newline in ('\n', '\r\n'):
+            for section in ('{}', '{ }', 'null', '~', ''):
+                with self.subTest(section=section, newline=repr(newline)):
+                    raw = newline.join(['version: 1', 'refs: '+section, 'records: '+section, '']).encode()
+                    self.path.write_bytes(raw)
+                    self.path.chmod(0o600)
+                    self.assertEqual(_document(raw), {'version': 1, 'refs': {}, 'records': {}})
+                    result = self.accounts.public()
+                    self.assertNotIn('error', result.get('current', {}))
+                    self.assertTrue(DesktopSessions._account_model_identity(manager, 'deepseek'))
+                    self.assertEqual(self.path.read_bytes(), raw)
+        self.assertEqual(_document(b'version: 1\n'), {'version': 1})
+
+    def test_restore_into_inline_empty_section_preserves_other_bytes_and_exact_rollback(self):
+        self.write(extra=False)
+        identifiers = {kind: self.identifier(kind, kind) for kind in ('official', 'api')}
+        for newline in ('\n', '\r\n'):
+            for scalar in ('{}', '{ }', 'null', '~'):
+                for kind, section in (('api', 'refs'), ('official', 'records')):
+                    other = 'records' if section == 'refs' else 'refs'
+                    unrelated = ('records:\n  unrelated/default:\n    exact: 1.2300\n'
+                                 if other == 'records' else 'refs:\n  OTHER_API_KEY: "untouched"\n')
+                    raw = ('# native header\nversion: 1\n'+section+': '+scalar+'\n'
+                           '# keep this comment\n'+unrelated).replace('\n', newline).encode()
+                    with self.subTest(kind=kind, scalar=scalar, newline=repr(newline)):
+                        self.path.write_bytes(raw)
+                        self.path.chmod(0o600)
+                        token = self.accounts.restore(identifiers[kind])
+                        after = self.path.read_bytes()
+                        self.assertIn(('# keep this comment\n'+unrelated).replace('\n', newline).encode(), after)
+                        self.assertIn(('# native header\nversion: 1\n'+section+':\n').replace('\n', newline).encode(), after)
+                        parsed = _document(after)
+                        self.assertEqual(parsed['refs'][API_REF] if kind == 'api' else parsed['records'][GRANT_KEY]['payload']['token'],
+                                         'private-api' if kind == 'api' else 'private-one')
+                        self.accounts.rollback(token)
+                        self.assertEqual(self.path.read_bytes(), raw)
+
+    def test_empty_flow_mapping_never_admits_wrong_types_or_nested_block_children(self):
+        invalid = [
+            'refs: []', 'records: []', 'refs: {secret: value}', 'records: &anchor {}',
+            'refs: *alias', 'refs: !!map {}', 'refs: {}\n  X: value',
+            'refs: null\n  X: value', 'records: {}\n  X: value',
+            'refs: {}\nrefs: {}', 'refs:\n  X: first\n  X: second',
+        ]
+        for section in invalid:
+            with self.subTest(section=section):
+                raw = ('version: 1\n'+section+'\n').encode()
+                with self.assertRaisesRegex(ValueError, '格式无法识别'):
+                    _document(raw)
+
     def test_new_api_snapshot_can_be_edited_and_applied_without_secret_response(self):
         self.write()
         before = self.path.read_bytes()
@@ -97,7 +152,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
         self.assertEqual(self.accounts.public()['accounts'], [])
         self.assertFalse(self.directory.exists())
         self.assertFalse(self.path.exists())
-        with self.assertRaisesRegex(ValueError, "현재\\ Harness\\ 연결을\\ 찾을\\ 수\\ 없습니다\\.\\ 먼저\\ 클라이언트에서\\ API에\\ 로그인하거나\\ 구성하세요\\."):
+        with self.assertRaisesRegex(ValueError, '未找到'):
             self.accounts.import_current()
 
     def test_import_deduplicates_private_snapshot_and_never_exposes_secrets(self):
@@ -189,14 +244,14 @@ class DeepSeekAccountsTests(unittest.TestCase):
         before = self.path.read_bytes()
         lock = self.path.with_name('.credentials.yaml.lock')
         lock.write_text('12345\n')
-        with self.assertRaisesRegex(ValueError, "Harness는\\ 계정\\ 데이터를\\ 저장하고\\ 있습니다\\.\\ 잠시\\ 후\\ 다시\\ 시도하세요\\."):
+        with self.assertRaisesRegex(ValueError, '正在写入'):
             self.accounts.restore(identifier)
         self.assertEqual(self.path.read_bytes(), before)
         lock.unlink()
         token = self.accounts.restore(identifier)
         self.write('external')
         external = self.path.read_bytes()
-        with self.assertRaisesRegex(ValueError, "Harness\\ 계정이\\ 외부에서\\ 변경되었습니다\\.\\ 복원하기\\ 전에\\ 컴퓨터에서\\ 확인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '外部修改'):
             self.accounts.rollback(token)
         self.assertEqual(self.path.read_bytes(), external)
 
@@ -206,13 +261,13 @@ class DeepSeekAccountsTests(unittest.TestCase):
         for text in ('version: 1\nrecords: !!js private-secret\n', '{"version":2}',
                      'version: 1\nrefs:\n  X: first\n  X: second\n'):
             self.path.write_text(text)
-            with self.assertRaisesRegex(ValueError, '형식이 인식되지 않습니다.'):
+            with self.assertRaisesRegex(ValueError, '格式无法识别'):
                 self.accounts.restore(identifier)
             self.assertEqual(self.path.read_text(), text)
         if os.name != 'nt':
             self.write()
             self.path.chmod(0o644)
-            with self.assertRaisesRegex(ValueError, '권한'):
+            with self.assertRaisesRegex(ValueError, '权限'):
                 self.accounts.import_current()
 
     def test_symlink_is_rejected(self):
@@ -226,7 +281,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
             if getattr(exc, 'winerror', None) == 1314:
                 self.skipTest('Windows symbolic-link privilege unavailable')
             raise
-        with self.assertRaisesRegex(ValueError, '심볼릭 링크'):
+        with self.assertRaisesRegex(ValueError, '符号链接'):
             self.accounts.restore(identifier)
         self.path.unlink()
         target.rename(self.path)
@@ -235,7 +290,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
         data = self.write()
         data['records'][GRANT_KEY]['payload']['issuer'] = 'https://untrusted.example'
         self.path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(ValueError, "현재\\ Harness\\ 자격\\ 증명이\\ 잘못되었습니다\\.\\ 클라이언트에서\\ 다시\\ 로그인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '凭据无效'):
             self.accounts.import_current()
 
     def test_api_environment_override_is_not_claimed_as_stored_active_account(self):
@@ -243,7 +298,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
         api = self.identifier('API', 'api')
         with patch.dict(os.environ, {API_REF: 'launch-environment'}):
             self.assertNotIn(api, self.accounts.public()['activeIds'])
-            with self.assertRaisesRegex(ValueError, "Harness\\ API는\\ 실행\\ 환경에\\ 의해\\ 설정됩니다\\.\\ 로컬\\ 자격\\ 증명은\\ 전환할\\ 수\\ 없습니다\\."):
+            with self.assertRaisesRegex(ValueError, '启动环境'):
                 self.accounts.restore(api)
 
     def test_quota_uses_precise_currency_amounts_caches_and_manual_refresh_resets_timer(self):
@@ -278,7 +333,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
     def test_quota_failure_is_not_zero_balance_and_api_never_sends_key(self):
         self.write()
         official = self.identifier()
-        with patch('bridge.clients.deepseek.accounts._request', side_effect=ValueError("Harness 잔액을 로드할 수 없습니다. 나중에 다시 시도하세요.")):
+        with patch('bridge.clients.deepseek.accounts._request', side_effect=ValueError('Harness 余额查询失败，请稍后重试')):
             usage = self.accounts.details(official)['accounts'][0]['usage']
             self.assertEqual(usage['status'], 'error')
             self.assertNotIn('balance', usage)
@@ -300,12 +355,12 @@ class DeepSeekAccountsTests(unittest.TestCase):
                 _balance({'normal_wallets': [{'currency': 'CNY', 'balance': bad}], 'bonus_wallets': []})
 
     def test_network_errors_are_sanitized_and_only_fixed_paths_are_allowed(self):
-        with self.assertRaisesRegex(ValueError, "이\\ Harness\\ 계정\\ 쿼리는\\ 지원되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '不受支持'):
             _request('https://untrusted.example', 'private-token')
         error = urllib.error.HTTPError(ORIGIN+'/private-token', 401, 'private-token', {}, None)
         with patch('bridge.clients.deepseek.accounts.urllib.request.build_opener') as opener:
             opener.return_value.open.side_effect = error
-            with self.assertRaisesRegex(ValueError, '로그인이 만료되었습니다') as context:
+            with self.assertRaisesRegex(ValueError, '登录已失效') as context:
                 _request('/api/v0/users/get_user_summary', 'private-token')
             self.assertNotIn('private-token', str(context.exception))
             request = opener.return_value.open.call_args[0][0]
@@ -351,7 +406,7 @@ class DeepSeekAccountsTests(unittest.TestCase):
             self.assertEqual(row['email'], 'current@example.test')
         self.assertEqual(self.path.read_bytes(), before)
         self.assertFalse(self.directory.exists())
-        with self.assertRaisesRegex(ValueError, "현재\\ Harness\\ 연결이\\ 저장되지\\ 않았습니다\\.\\ 먼저\\ 데스크톱\\ 게이트웨이에\\ 계정을\\ 추가하세요\\."):
+        with self.assertRaisesRegex(ValueError, '尚未保存'):
             self.accounts.restore('current-official')
 
     def test_native_account_change_cannot_reuse_old_current_quota_or_identity(self):

@@ -12,7 +12,7 @@ def worker_source():
     for node in reader.body:
         if isinstance(node, ast.ImportFrom) and node.module == 'bridge.features.workspace.workspace':
             if node.level or len(node.names) != 1 or node.names[0].name != 'Workspace':
-                raise ValueError('시각적 원격 읽기 종속성이 잘못되었습니다.')
+                raise ValueError('可视化远端读取依赖无效')
             if node.names[0].asname:
                 body.append(node.names[0].asname + ' = Workspace')
         else:

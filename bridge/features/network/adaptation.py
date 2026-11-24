@@ -10,7 +10,7 @@ def settings(directory, value=None):
     path = Path(directory) / 'network-adaptation.json'
     if value is not None:
         if not isinstance(value, dict) or set(value) != {'enabled'} or type(value['enabled']) is not bool:
-            raise ValueError('네트워크 변경에 대한 자동 복구 스위치가 잘못되었습니다.')
+            raise ValueError('网络变化自动恢复开关无效')
         with session_file_lock(path):
             write_json(path, value)
     saved = read_json(path, {})
@@ -70,12 +70,12 @@ class NetworkAdaptation:
 
     def control(self, value):
         if not isinstance(value, dict):
-            raise ValueError('네트워크 변경 자동 복구 요청이 잘못되었습니다.')
+            raise ValueError('网络变化自动恢复请求无效')
         if value == {'action': 'status'}:
             return self.public()
         if (set(value) != {'action', 'enabled'} or value['action'] != 'set'
                 or type(value['enabled']) is not bool):
-            raise ValueError('네트워크 변경 자동 복구 요청이 잘못되었습니다.')
+            raise ValueError('网络变化自动恢复请求无效')
         with self.lock:
             old = settings(self.directory)
             settings(self.directory, {'enabled': value['enabled']})

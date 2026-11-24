@@ -64,8 +64,10 @@ class DesktopConnectionsPanel {
     }catch(error){if(revision!==this.statusRevision)return;this.statusError=error.message;this.scanMessage=error.message;this.scanError=true;this.renderScan();this.renderDetails();}
   }
   applyClientSnapshot(value){
-    ClientLifecycle.reconcile(this.operationFailures,this.managementClients(value.clients));
-    this.clients=value.clients;this.instanceError=value.instanceError||'';
+    this.clientsPending=value.pending===true;this.clientsError=value.refreshError||'';
+    const clients=(this.clientsPending||this.clientsError)&&!value.clients.length&&this.clients?.length?this.clients:value.clients;
+    if(!this.clientsPending&&!this.clientsError)ClientLifecycle.reconcile(this.operationFailures,this.managementClients(clients));
+    this.clients=clients;this.instanceError=value.instanceError||'';
     this.inventoryAvailable=value.inventoryAvailable??this.inventoryAvailable;
     this.gatewayRunning=value.gatewayRunning??this.gatewayRunning;this.windowsSession=value.windowsSession??this.windowsSession;
   }
@@ -78,8 +80,8 @@ class DesktopConnectionsPanel {
     if(this.clientsLoading){await this.clientsLoading;if(refresh)return this.refreshClients(true);return;}
     const revision=this.clientsRevision;
     const pending=(async()=>{
-      try{const value=await ClientLifecycle.request(()=>this.api.desktopSessions({action:'clients',refresh}),{timeout:this.statusTimeout??10000,uncertain:false,message:'클라이언트 상태를 제때 읽을 수 없습니다. 다시 새로고침해 보세요.'});if(revision!==this.clientsRevision)return;this.applyClientSnapshot(value);this.renderClients();this.renderScan();}
-      catch(error){if(revision!==this.clientsRevision)return;this.scanMessage=error.message;this.scanError=true;this.renderScan();}
+      try{const value=await ClientLifecycle.request(()=>this.api.desktopSessions({action:'clients',refresh}),{timeout:this.statusTimeout??10000,uncertain:false,message:'客户端状态读取超时，请重试。'});if(revision!==this.clientsRevision)return;this.applyClientSnapshot(value);this.renderClients();this.renderScan();}
+      catch(error){if(revision!==this.clientsRevision)return;this.clientsPending=false;this.clientsError=error.message;this.renderScan();}
     })();
     this.clientsLoading=pending;try{await pending;}finally{if(this.clientsLoading===pending)this.clientsLoading=null;this.renderClients();}
   }
@@ -98,17 +100,17 @@ class DesktopConnectionsPanel {
   }
   syncPolling(){
     const visible=!document.hidden&&!document.getElementById('clients-page').hidden;
-    const interval=visible?(this.managementClients().some(client=>this.connection(client).waiting)?2000:15000):0;
+    const interval=visible?(this.clientsPending||this.managementClients().some(client=>this.connection(client).waiting)?2000:15000):0;
     if(interval===(this.pollInterval||0))return;
     clearInterval(this.pollTimer);this.pollInterval=interval;
     if(interval)this.pollTimer=setInterval(()=>this.pollClients(),interval);
   }
   pollClients(fast=false){
-    if(document.hidden||document.getElementById('clients-page').hidden||this.hasUncertain()||(fast&&!this.managementClients().some(client=>this.connection(client).waiting)))return;
+    if(document.hidden||document.getElementById('clients-page').hidden||(this.hasUncertain()&&!this.clientsPending)||(fast&&!this.clientsPending&&!this.managementClients().some(client=>this.connection(client).waiting)))return;
     return this.refreshClients();
   }
   async scan(manual=false){
-    if(this.scanning||this.busy||this.choosingClient)return;this.scanning=true;this.clientsRevision++;this.statusRevision++;this.scanMessage='로컬 클라이언트 검색 중…';this.scanError=false;this.renderScan();
+    if(this.scanning||this.busy||this.choosingClient)return;this.scanning=true;this.clientsRevision++;this.statusRevision++;this.clientsError='';this.scanMessage='正在扫描本机客户端…';this.scanError=false;this.renderScan();
     let gotSnapshot=false;
     try{const value=await this.api.desktopSessions({action:'scan',setup:false,inventoryOnly:!manual});if(value.clients){this.applyClientSnapshot(value);gotSnapshot=true;}this.scanError=!!value.errors?.length;this.scanMessage=this.scanError?value.errors.map(row=>row.distribution+'：'+BridgeI18n.t(row.error)).join('\n'):'스캔이 완료되었습니다. 연결 상태는 아래와 같습니다.';}
     catch(error){this.scanMessage=error.message;this.scanError=true;if(manual)this.feedback(error.message,true);}
@@ -160,8 +162,8 @@ class DesktopConnectionsPanel {
     }catch(error){release();this.feedback(error.message,true);}
   }
   renderScan(){
-    const node=document.getElementById('client-scan-status');if(node){node.textContent=BridgeI18n.t(this.instanceError||this.scanMessage||(this.visibleClients().some(client=>client.id==='claude')?'연결할 앱을 선택하세요. macOS에서 Claude는 백그라운드에서 시작되어 기존 연결을 복원하려고 시도합니다. 초기화 연결은 확인 후에만 포그라운드를 사용합니다. Windows는 먼저 백그라운드 초기화를 시도합니다.':'기존 클라이언트를 선택하거나 클라이언트 추가를 선택하여 새 클라이언트를 구성합니다.'))+' '+BridgeI18n.t(ClientLifecycle.sessionNotice(this.windowsSession));node.classList.toggle('error',!!this.scanError||!!this.instanceError);}
-    const button=document.getElementById('refresh-clients');if(button){button.disabled=!!this.scanning||!!this.busy||!!this.choosingClient;button.dataset.i18n=this.scanning?'스캐닝…':'다시 스캔';button.textContent=BridgeI18n.t(button.dataset.i18n);}
+    const node=document.getElementById('client-scan-status');if(node){node.textContent=BridgeI18n.t(this.instanceError||this.clientsError||this.scanMessage||(this.visibleClients().some(client=>client.id==='claude')?'选择需要接入的应用。macOS Claude 默认后台启动并尝试恢复已有连接；“初始化连接”经确认后使用电脑前台。Windows 优先尝试后台初始化。':'选择已有客户端，或通过“添加客户端”配置新的客户端。'))+' '+BridgeI18n.t(ClientLifecycle.sessionNotice(this.windowsSession));node.classList.toggle('error',!!this.scanError||!!this.instanceError||!!this.clientsError);}
+    const button=document.getElementById('refresh-clients');if(button){button.disabled=!!this.scanning||!!this.busy||!!this.choosingClient;button.dataset.i18n=this.scanning?'正在扫描…':'重新扫描';button.textContent=BridgeI18n.t(button.dataset.i18n);}
     this.root.querySelectorAll('[data-desktop-action]').forEach(button=>button.disabled=!!this.scanning||!!this.busy||!!this.choosingClient||(button.dataset.desktopAction!=='scan'&&this.hasUncertain()));
   }
   async toggleClient(id,enabled,{initializeDesktop=false,connectionMode}={}){
@@ -414,21 +416,28 @@ class DesktopConnectionsPanel {
     const status=node('p'),reason=node('p',undefined,'hint'),saved=node('p',undefined,'hint');status.setAttribute('role','status');reason.setAttribute('role','status');saved.setAttribute('role','status');
     const label=node('label'),link=node('input');link.type='url';link.autocomplete='off';link.spellcheck=false;link.maxLength=4096;link.placeholder=BridgeI18n.t('이 컴퓨터의 웹 원격 제어 링크를 붙여넣으세요.');label.append(node('span','공식 원격 링크'),link);
     const actions=node('div',undefined,'actions'),buttons={};
-    for(const [action,text] of [['save','연결 설정 저장'],['login','공식 계정에 로그인'],['connect','공식 리모콘 연결'],['disconnect','공식 리모컨 연결 끊기'],['forget','저장된 공식 로그인 삭제']]){
+    for(const [action,text] of [['save','保存连接配置'],['login','登录官方账号'],['browser-login','使用系统浏览器登录'],['connect','连接官方远控'],['disconnect','断开官方远控'],['forget','清除官方登录']]){
       const button=node('button',text);button.type='button';button.dataset.officialAction=action;buttons[action]=button;actions.append(button);
     }
-    refresh.type='button';section.append(heading,help,guide,status,reason,label,saved,actions);article.insertBefore(section,before);
+    const receiptRow=node('div'),receiptLabel=node('label'),receipt=node('input'),submitReceipt=node('button','提交授权回执');
+    receipt.type='url';receipt.autocomplete='off';receipt.spellcheck=false;receipt.maxLength=16384;receipt.placeholder=BridgeI18n.t('粘贴浏览器完成授权后的完整回调地址');
+    receiptLabel.append(node('span','授权回执'),receipt);submitReceipt.type='button';submitReceipt.dataset.officialAction='login-receipt';buttons['login-receipt']=submitReceipt;
+    receiptRow.append(node('p','通常会自动完成登录；未返回时，可在这里粘贴完整回调地址。','account-muted'),receiptLabel,submitReceipt);
+    refresh.type='button';section.append(heading,help,guide,status,reason,label,saved,actions,receiptRow);article.insertBefore(section,before);
     let busy=false,pendingAction='',loadedLink='',error='',guidePending=true;
     const panel=this.zcodeOfficial={value:null};
     const render=()=>{
       const value=panel.value,unavailable=!value,edited=link.value.trim()!==loadedLink;
       if(value&&guidePending){guide.open=!value.configured;guidePending=false;}
-      status.textContent=value?[(value.configured?BridgeI18n.t('로그인됨')+(value.accountName?' · '+value.accountName:'')+(value.provider?' · '+value.provider:''):BridgeI18n.t('공식 계정에 로그인하지 않음')),
-        BridgeI18n.t(value.connected?'공식 원격 연결됨':'공식 원격 연결이 끊어졌습니다.')].join('；'):'';
-      reason.textContent=BridgeI18n.t(busy?({state:'상쾌한 상태…',save:'연결 설정 저장 중…',login:'공식 로그인을 여는 중…',connect:'공식 리모컨 연결 중…',disconnect:'공식 리모컨 연결을 끊는 중…',forget:'저장된 공식 로그인 삭제 중…'})[pendingAction]:error||value?.reason||'');reason.className=error?'error':'hint';
-      saved.textContent=BridgeI18n.t(edited?'연결 설정에 저장되지 않은 변경사항이 있습니다.':loadedLink?'연결 설정이 저장되었습니다. 인증이 만료되면 다시 로그인하세요.':'이 컴퓨터의 공식 원격 링크를 저장한 다음 로그인하세요.');label.dataset.dirty=String(edited);
+      status.textContent=value?[(value.configured?BridgeI18n.t('已登录')+(value.accountName?' · '+value.accountName:'')+(value.provider?' · '+value.provider:''):BridgeI18n.t('尚未登录官方账号')),
+        BridgeI18n.t(value.connected?'官方远控已连接':'官方远控未连接')].join('；'):'';
+      reason.textContent=BridgeI18n.t(busy?({state:'正在刷新状态…',save:'正在保存连接配置…',login:'正在打开官方登录…','browser-login':'正在打开官方登录…','login-receipt':'正在提交授权回执…',connect:'正在连接官方远控…',disconnect:'正在断开官方远控…',forget:'正在清除官方登录…'})[pendingAction]:error||value?.reason||'');reason.className=error?'error':'hint';
+      saved.textContent=BridgeI18n.t(edited?'连接配置已修改，尚未保存。':loadedLink?'连接配置已保存。登录失效时需要重新验证。':'请保存此电脑的官方远控链接，再完成官方登录。');label.dataset.dirty=String(edited);
       link.disabled=busy;refresh.disabled=busy;for(const button of Object.values(buttons))button.disabled=busy||unavailable;
       buttons.save.disabled=busy||unavailable||!link.value.trim()||!edited;buttons.login.disabled=busy||unavailable||!loadedLink||edited;buttons.connect.disabled=busy||unavailable||!value?.configured||!loadedLink||edited||value?.connected===true;
+      buttons['browser-login'].disabled=buttons.login.disabled;
+      receiptRow.hidden=!value?.browserLoginPending;if(receiptRow.hidden)receipt.value='';receipt.disabled=busy;
+      submitReceipt.disabled=busy||unavailable||edited||!value?.browserLoginPending||!receipt.value.trim();
       buttons.disconnect.disabled=busy||!value?.connected;buttons.forget.disabled=busy||!value?.configured;
     };
     const perform=async action=>{
@@ -438,14 +447,15 @@ class DesktopConnectionsPanel {
       if(action==='forget'&&!window.confirm(BridgeI18n.t('게이트웨이의 저장된 공식 로그인을 제거하고 공식 원격 연결을 끊으시겠습니까? 저장된 링크, 원래 ZCode 앱의 계정 및 작업은 유지됩니다.')))return;
       const edited=link.value!==loadedLink;busy=true;pendingAction=action;error='';this.busy=true;render();this.renderClients();this.renderScan();
       try{
-        const value=await this.api.desktopSessions({action:'zcode-official-'+action,...(['save','login','connect'].includes(action)?{link:link.value.trim()}:{})});
+        const value=await this.api.desktopSessions({action:'zcode-official-'+action,...(['save','login','browser-login','connect'].includes(action)?{link:link.value.trim()}:{}),...(action==='login-receipt'?{receipt:receipt.value.trim()}:{})});
+        if(action==='login-receipt')receipt.value='';
         panel.value=value;if(!edited||['save','forget'].includes(action))link.value=value.link||'';loadedLink=value.link||'';
       }catch(failure){error=failure.message;this.feedback(error,true);panel.value=null;if(action!=='state')try{panel.value=await this.api.desktopSessions({action:'zcode-official-state'});}catch(_){}}
       finally{busy=false;this.busy=false;render();this.renderClients();this.renderScan();}
-      if(!['state','login'].includes(action))await this.refreshClients(true);
+      if(!['state','login','browser-login','login-receipt'].includes(action))await this.refreshClients(true);
     };
     for(const [action,button] of Object.entries(buttons))button.onclick=()=>perform(action);
-    refresh.onclick=panel.refresh=()=>perform('state');link.oninput=render;render();
+    refresh.onclick=panel.refresh=()=>perform('state');link.oninput=receipt.oninput=render;render();
   }
   resumeAccounts(){
     if(!document.hidden&&!document.getElementById('clients-page').hidden)

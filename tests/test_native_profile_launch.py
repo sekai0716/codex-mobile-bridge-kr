@@ -32,7 +32,7 @@ class WindowsNativeProfileLaunchTests(unittest.TestCase):
     def test_unverified_package_cannot_fall_back_to_explorer_or_default_instance(self):
         with patch('bridge.platforms.windows.discovery_ext.application_execution_alias', return_value=None), \
                 patch('subprocess.Popen') as launch:
-            with self.assertRaisesRegex(ValueError, "선택한\\ 앱의\\ 독립\\ 실행형\\ 실행\\ 별칭을\\ 확인할\\ 수\\ 없습니다\\.\\ 기본\\ 구성이\\ 아직\\ 실행되지\\ 않았습니다\\."):
+            with self.assertRaisesRegex(ValueError, '独立启动别名'):
                 start(Path('/WindowsApps/Claude/app/claude.exe'), Path('/profile'), {}, new_instance=True)
             launch.assert_not_called()
 

@@ -21,24 +21,24 @@ def validate(value, catalog):
         return {}  # Existing callers retain the original client's default.
     identity = (catalog.get('cache') or {}).get('identity')
     if not identity or selection.get('modelCatalogIdentity') != identity:
-        raise ValueError('계정이나 운영 환경이 변경되었습니다. 새 채팅의 모델 목록을 새로고침해주세요.')
+        raise ValueError('账号或运行环境已变化，请刷新新建聊天的模型列表')
     model = selection.get('model')
     if not isinstance(model, str) or not re.fullmatch(r'[^\s\x00-\x1f\x7f]{1,300}', model):
-        raise ValueError('먼저 새 세션의 모델을 선택하세요.')
+        raise ValueError('请先选择新会话的模型')
     capabilities = catalog.get('capabilities') or {}
     rows = catalog.get('models') or []
     selected = next((row for row in rows if row.get('id') == model), None)
     if selected is None and not (selection.get('manualModel') is True and capabilities.get('manualModels') is True):
-        raise ValueError('선택한 모델은 더 이상 사용할 수 없습니다. 모델 목록을 새로 고친 후 다시 선택하세요.')
+        raise ValueError('所选模型已不可用，请刷新模型列表后重新选择')
     effort = selection.get('effort')
     if effort is not None:
         if selected and selected.get('supportsEffort') is False:
-            raise ValueError('선택한 모델은 반사 강도 설정을 제공하지 않습니다.')
+            raise ValueError('所选模型未提供思考强度设置')
         if not isinstance(effort, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', effort):
-            raise ValueError('유효한 사고 강도를 선택하십시오')
+            raise ValueError('请选择有效的思考强度')
         allowed = (selected or {}).get('efforts') or []
         if effort not in allowed and not (selection.get('manualEffort') is True and capabilities.get('manualEffort') is True):
-            raise ValueError('선택한 모델은 이 사고 강도를 지원하지 않습니다. 다시 선택하세요.')
+            raise ValueError('所选模型不支持此思考强度，请重新选择')
     elif selected and selected.get('efforts'):
-        raise ValueError('먼저 새 세션의 사고 강도를 선택하세요.')
+        raise ValueError('请先选择新会话的思考强度')
     return {key: val for key, val in selection.items() if key != 'modelCatalogIdentity'}

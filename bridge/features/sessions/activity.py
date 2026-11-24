@@ -208,7 +208,7 @@ def function_message(item):
     return ''
 
 
-def visible_items(native, turn):
+def visible_items(native):
     items = []
     for item in native:
         kind = item.get('type')
@@ -221,10 +221,6 @@ def visible_items(native, turn):
         if retry_attempt(item) and items and retry_attempt(items[-1]):
             items[-1] = {**item, 'id': items[-1].get('id')}
         else:
-            items.append(item)
-    if turn.get('willRetry') is True and isinstance(turn.get('error'), dict):
-        item = {**turn['error'], 'type': 'error', 'willRetry': True, 'id': 'model-retry-' + str(turn.get('turnId'))}
-        if not items or items[-1].get('type') != 'error' or not items[-1].get('willRetry'):
             items.append(item)
     return items
 

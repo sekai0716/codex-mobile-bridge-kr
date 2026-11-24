@@ -151,11 +151,11 @@ class WslCodexColdRestartTests(unittest.TestCase):
     def test_active_thread_on_later_page_or_unknown_receipt_never_stops_or_writes(self):
         before = self.store.files()
         self.old.second_active = True
-        with self.assertRaisesRegex(ValueError, "이\\ WSL\\ 구성에는\\ 활성\\ 작업\\ 또는\\ 보류\\ 중인\\ 승인이\\ 있습니다\\.\\ 계정이\\ 전환되지\\ 않았습니다\\."):
+        with self.assertRaisesRegex(ValueError, '运行中'):
             self.accounts.change(self.request())
         self.old.second_active = False
         self.entry.receipts['unknown'] = {'result': {'status': 'unknown'}}
-        with self.assertRaisesRegex(ValueError, '대기 중인 작업이나 확인되지 않은 결과'):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             self.accounts.change(self.request())
         self.stop.assert_not_called()
         self.assertEqual(self.store.files(), before)
@@ -207,7 +207,7 @@ class WslCodexColdRestartTests(unittest.TestCase):
         self.stop.side_effect = ValueError('fixture drain timeout')
         with self.assertRaisesRegex(ValueError, 'timeout'):
             self.accounts.change(self.request())
-        with self.assertRaisesRegex(ValueError, "원래\\ 서비스\\ 종료가\\ 확인되지\\ 않았습니다\\.\\ 더\\ 이상\\ 종료\\ 신호가\\ 전송되지\\ 않습니다\\.\\ 서비스를\\ 확인하고\\ 복구하세요\\."):
+        with self.assertRaisesRegex(ValueError, '不会再次'):
             self.accounts.change(self.request())
         self.stop.assert_called_once()
         with self.assertRaisesRegex(ValueError, 'still draining'):

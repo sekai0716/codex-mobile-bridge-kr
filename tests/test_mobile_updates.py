@@ -74,7 +74,7 @@ class MobileUpdateTests(unittest.TestCase):
         missing = row()
         missing['assets'][0]['digest'] = None
         self.service._open = Mock(return_value=Response(json.dumps([missing, row('2.0.1')]).encode()))
-        with self.assertRaisesRegex(ValueError, "출시정보가\\ 변경되었거나\\ 인증정보가\\ 누락되었습니다\\.\\ 업데이트\\ 내용을\\ 다시\\ 확인해주세요\\."): self.service.check('2.0.2')
+        with self.assertRaisesRegex(ValueError, '校验信息'): self.service.check('2.0.2')
         self.assertIsNone(self.service.check('2.0.4')['release'])
 
     def test_cache_range_resume_and_concurrent_reuse(self):

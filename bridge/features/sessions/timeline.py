@@ -18,24 +18,31 @@ def encoded(value):
 
 
 class Timeline:
-    def __init__(self):
+    def __init__(self, image_cache=None):
+        self.image_cache = image_cache
         self.epoch = uuid.uuid4().hex
         self.sequence = -1
         self.rows = []
+        self.image_views = {}
         self.order_origin = 0
         self.details = {}
+        self.detail_sources = {}
         self.file_patches = {}
         self.file_revision = 0
+        self.conversation_rows = []
+        self.conversation_positions = {}
+        self.process_groups = {}
         self.positions = {}
         self.versions = OrderedDict()
         self.meta = {}
         self.limit = None
+        self.conversation = False
         self.window_anchor = None
         self.source_anchor = None
         self.window_more = False
 
-    def update(self, view, limit=None):
-        if self.sequence == view['sequence'] and self.limit == limit:
+    def update(self, view, limit=None, conversation=False):
+        if self.sequence == view['sequence'] and self.limit == limit and self.conversation == conversation:
             return
         activation_ids = set(view.get('goalActivationIds') or ())
         entries = []
@@ -83,7 +90,8 @@ class Timeline:
                 entries.append(((turn['id'], summary['id'], summary['kind'], 0), turn, summary, False))
             if turn.get('error'):
                 entries.append(((turn['id'], 'error'), turn, None, False))
-        start = max(0, len(entries) - limit) if limit is not None else 0
+        visible = [i for i, entry in enumerate(entries) if entry[2] is None or not process_row(entry[2])]
+        start = (visible[-limit] if len(visible) > limit else 0) if conversation and limit else max(0, len(entries) - limit) if limit is not None else 0
         # Keep the loaded prefix while new replies arrive. Expanding history
         # must not hash/copy bodies outside the requested presentation window.
         if self.window_anchor is not None and limit is not None:
@@ -91,13 +99,14 @@ class Timeline:
             if anchor is not None:
                 start = min(start, anchor)
         self.limit = limit
+        self.conversation = conversation
         self.window_more = start > 0 or view.get('historyWindowMore', False)
         self.window_anchor = entries[start][0] if start < len(entries) else None
         # A tool call carried only to interpret a recent result must not expand
         # the next source read to every intervening historical item.
         self.source_anchor = next((entry[2].get('_sourceIdentity', entry[0]) for entry in entries[start:]
                                    if entry[2] is not None and entry[2].get('kind') != 'fileChanges' and not entry[2].get('_historyCarry')), None)
-        rows, details, file_patches = [], {}, {}
+        rows, details, detail_sources, file_patches = [], {}, {}, {}
         for identity, turn, message, first_user in entries[start:]:
             if message is not None:
                 base = hashlib.sha256(encoded(identity[:3])).hexdigest()[:24]
@@ -124,34 +133,39 @@ class Timeline:
                 activity = message['role'] in ('activity', 'fileChanges')
                 attachments = [{k: str(a[k])[:4096 if k == 'path' else 300] for k in ('type', 'name', 'path', 'desktopId') if k in a}
                                for a in (message.get('attachments') or [])[:20]]
-                revision = None
+                patch_revision = None
                 if message.get('fileSummary'):
-                    # 원본 문자열 참조만 보관한다. 같은 줄 수라도 내용이 바뀌면 이전 diff 페이지를 무효화한다.
                     patches = tuple(c.get('diff') or '' for c in turn['fileChanges'])
                     previous = self.file_patches.get(key)
                     if previous and patches == previous[1]:
-                        revision = previous[0]
+                        patch_revision = previous[0]
                     else:
                         self.file_revision += 1
-                        revision = self.file_revision
-                    file_patches[key] = (revision, patches)
-                version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
-                                                 revision, message.get('title'), message.get('activityCard'), message.get('appView'), message.get('agent'), message.get('collab'), message.get('computerUse'),
-                                                 message.get('approvalReview'), message.get('reviewLinked'), message.get('commandActions'),
-                                                 message.get('status'), message.get('exitCode'), message.get('success'),
-                                                 message.get('source'), message.get('completed')])).hexdigest()[:24]
-                row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
-                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'collab', 'computerUse', 'activityCard', 'appView',
-                                             'commandActions') if k in message}
+                        patch_revision = self.file_revision
+                    file_patches[key] = (patch_revision, patches)
+                fields = ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'interaction', 'toolName',
+                          'activityFiles', 'forkMessageId', 'editMessageId', 'exitCode', 'success', 'approvalReview',
+                          'reviewLinked', 'source', 'completed', 'agent', 'collab', 'computerUse', 'activityCard',
+                          'appView', 'commandActions')
+                row = {k: message[k] for k in fields if k in message}
                 if label_lines:
                     row['commandLabelLines'] = label_lines
                 if isinstance(message.get('reviewActionLabel'), str):
                     row['reviewActionLabel'] = message['reviewActionLabel'][:180].split('\n', 1)[0]
-                row.update(key=key, turnId=turn['id'], itemId=message.get('id'), order=len(rows), version=version,
+                version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, row,
+                                                 message.get('fileSummary'), patch_revision,
+                                                 view['sequence'] if message.get('_detailSource') else None])).hexdigest()[:24]
+                row.update(key=key, turnId=turn['id'], order=len(rows), version=version,
                            text=preview[:180 if activity else TEXT_PREVIEW],
                            truncated=(activity and bool(text)) or len(text) > TEXT_PREVIEW, turnStatus=turn.get('status'),
                            editable=turn.get('actionable', True) and first_user and message.get('kind') == 'userMessage',
                            forkable=turn.get('actionable', True) and message['role'] == 'assistant' and message.get('phase') != 'commentary' and turn.get('status') == 'completed')
+                if turn.get('startedAt') is not None:
+                    row['turnStartedAt'] = turn['startedAt']
+                if turn.get('completedAt') is not None:
+                    row['turnCompletedAt'] = turn['completedAt']
+                if turn.get('completionKnown') is False:
+                    row['turnCompletionKnown'] = False
                 timestamp = message.get('timestamp')
                 if timestamp is None and first_user:
                     timestamp = turn.get('startedAt')
@@ -167,6 +181,9 @@ class Timeline:
                     row['attachments'] = attachments
                 rows.append(row)
                 details[key] = text
+                if message.get('_detailSource'):
+                    detail_sources[key] = message['_detailSource']
+                    row['truncated'] = True
             else:
                 key = hashlib.sha256(encoded([turn['id'], 'error'])).hexdigest()[:24] + '-error'
                 text = turn['error'] if isinstance(turn['error'], str) else json.dumps(turn['error'], ensure_ascii=False)
@@ -178,9 +195,22 @@ class Timeline:
                 details[key] = text
         old_keys = [row['key'] for row in self.rows]
         new_keys = [row['key'] for row in rows]
+        conversation_keys, seen_process, boundary = [], set(), 'start'
+        for row in rows:
+            if process_row(row):
+                key = process_key(row, boundary)
+                if key in seen_process:
+                    continue
+                seen_process.add(key)
+            else:
+                key = row['key']
+                boundary = key
+            conversation_keys.append(key)
+        old_conversation = [row['key'] for row in self.conversation_rows]
+        retained = [key for key in conversation_keys if key in set(old_conversation)]
         # Prepending saved turns preserves existing row keys and cursors.
         first = new_keys.index(old_keys[0]) if old_keys and old_keys[0] in new_keys else 0
-        if old_keys != new_keys[first:first + len(old_keys)]:
+        if old_keys != new_keys[first:first + len(old_keys)] and not (conversation and old_conversation and retained == old_conversation):
             self.epoch = uuid.uuid4().hex
             self.versions.clear()
             self.order_origin = 0
@@ -189,14 +219,45 @@ class Timeline:
         for index, row in enumerate(rows):
             row['order'] = self.order_origin + index
         self.sequence = view['sequence']
-        self.rows, self.details, self.file_patches = rows, details, file_patches
+        # Keep native image evidence separate from response attachments, whose
+        # private paths are removed by the authenticated presentation layer.
+        self.image_views = {row['key']: [a['path'] for a in row.get('attachments', [])
+                                       if a.get('type') == 'localImage' and a.get('path')]
+                            for row in rows if row.get('kind') in ('ImageView', 'imageView')}
+        for key, sources in detail_sources.items():
+            paths = [item['path'] for item in sources
+                     if item.get('type') in ('ImageView', 'imageView') and item.get('path')]
+            if paths:
+                self.image_views[key] = paths
+        self.rows, self.details = rows, details
+        self.detail_sources = detail_sources
+        self.file_patches = file_patches
         self.positions = {row['key']: i for i, row in enumerate(rows)}
+        self.conversation_rows, self.process_groups, boundary = [], {}, 'start'
+        for row in rows:
+            if not process_row(row):
+                self.conversation_rows.append(row)
+                boundary = row['key']
+                continue
+            key = process_key(row, boundary)
+            if key not in self.process_groups:
+                summary = {k: row[k] for k in ('turnId', 'turnStatus', 'turnStartedAt', 'turnCompletedAt', 'order') if k in row}
+                summary.update(key=key, role='activity', kind='processPage', text='', title='执行过程', processCursor=self.cursor(key))
+                self.conversation_rows.append(summary)
+                self.process_groups[key] = []
+            self.process_groups[key].append(row)
+        for row in self.conversation_rows:
+            if row.get('processCursor'):
+                entries = [(r['key'], r['version'], r.get('status'), r.get('title'), r.get('toolName'))
+                           for r in self.process_groups[row['key']]]
+                row['version'] = hashlib.sha256(encoded(entries)).hexdigest()[:24]
+        self.conversation_positions = {row['key']: i for i, row in enumerate(self.conversation_rows)}
         self.meta = {k: v for k, v in view.items() if k != 'turns'}
         self.meta['latestUserTurnId'] = next((t['id'] for t in reversed(view['turns'])
                                               if any(m['role'] == 'user'
                                                      and (not m.get('requestId') or m['requestId'] not in activation_ids)
                                                      for m in t['messages'])), None)
-        self.versions[self.sequence] = {row['key']: hashlib.sha256(encoded(row)).digest() for row in rows}
+        self.versions[self.sequence] = {row['key']: hashlib.sha256(encoded(row)).digest() for row in rows + self.conversation_rows}
         while len(self.versions) > 16:
             self.versions.popitem(last=False)
 
@@ -209,13 +270,15 @@ class Timeline:
             return None
         return self.positions[key]
 
-    def page(self, limit=20, before=None):
-        end = self.position(before) if before else len(self.rows)
+    def page(self, limit=20, before=None, projection=None):
+        rows = self.conversation_rows if projection == 'conversation' else self.rows
+        positions = self.conversation_positions if projection == 'conversation' else self.positions
+        end = positions.get(before.partition('.')[2]) if before and before.partition('.')[0] == self.epoch else None if before else len(rows)
         if end is None:
-            return {**self.page(), 'reset': True}
+            return {**self.page(projection=projection), 'reset': True}
         limit = max(1, min(100, limit))
         selected, size = [], 0
-        for row in reversed(self.rows[max(0, end - limit):end]):
+        for row in reversed(rows[max(0, end - limit):end]):
             cost = len(encoded(row))
             if selected and size + cost > PAGE_BYTES:
                 break
@@ -227,15 +290,36 @@ class Timeline:
                 'before': self.cursor(selected[0]['key']) if selected else None,
                 'hasMore': start > 0 or self.window_more or self.meta.get('savedHistoryMore', False), 'meta': self.meta}
 
-    def changes(self, after, epoch, start):
-        first = self.position(start) if start else None
-        if epoch != self.epoch or after not in self.versions or (start and first is None):
-            return {**self.page(), 'reset': True}
-        previous, current = self.versions[after], self.versions[self.sequence]
-        rows = [row for row in self.rows[first or 0:]
+    def changes(self, after, epoch, start, paged=False, through=None, projection=None):
+        source = self.conversation_rows if projection == 'conversation' else self.rows
+        positions = self.conversation_positions if projection == 'conversation' else self.positions
+        position_of = lambda cursor: positions.get(cursor.partition('.')[2]) if cursor and cursor.partition('.')[0] == self.epoch else None
+        first = position_of(start) if start else None
+        if epoch != self.epoch or (not paged and after not in self.versions) or (start and first is None):
+            return {**self.page(projection=projection), 'reset': True}
+        previous, current = self.versions.get(after, {}), self.versions[self.sequence]
+        rows = [row for row in source[first or 0:]
                 if previous.get(row['key']) != current[row['key']]]
+        if paged:
+            # Revision expiry requires a bounded resync, not replacement of the
+            # reader's loaded history. A true source replacement changes epoch.
+            position = position_of(through) if through else None
+            if through and position is None:
+                return {**self.page(projection=projection), 'reset': True}
+            if position is not None:
+                rows = [row for row in rows if positions[row['key']] > position]
+            selected, size = [], 0
+            for row in rows:
+                cost = len(encoded(row))
+                if selected and (len(selected) >= 100 or size + cost > PAGE_BYTES):
+                    break
+                selected.append(row)
+                size += cost
+            return {'epoch': self.epoch, 'sequence': self.sequence, 'rows': selected,
+                    'next': self.cursor(selected[-1]['key']) if len(selected) < len(rows) else None,
+                    'meta': self.meta}
         if len(rows) > 100 or sum(len(encoded(row)) for row in rows) > PAGE_BYTES:
-            return {**self.page(), 'reset': True}
+            return {**self.page(projection=projection), 'reset': True}
         return {'epoch': self.epoch, 'sequence': self.sequence, 'rows': rows, 'meta': self.meta}
 
     def detail(self, cursor, offset=0, version=None, file_index=None):
@@ -243,10 +327,16 @@ class Timeline:
         if position is None:
             raise ValueError('내용이 업데이트되었습니다. 채팅을 다시 열어주세요.')
         row = self.rows[position]
+        if row['key'] in self.detail_sources:
+            from .model import normalize_state
+            value = normalize_state({'turns': [{'items': self.detail_sources[row['key']]}]}, image_cache=self.image_cache)['turns'][0]['messages'][0]
+            self.details[row['key']] = value.get('text', '') + ('\n\n' + value['output'] if value.get('output') else '')
+            self.detail_sources.pop(row['key'])
+            if value.get('attachments'):
+                row['attachments'] = value['attachments']
         if file_index is None:
             text = self.details[row['key']]
         else:
-            # 경로를 입력받아 파일을 여는 대신 표시된 턴·버전 안의 파일 번호로만 조회한다.
             patches = self.file_patches.get(row['key'])
             if not patches or type(file_index) is not int or not 0 <= file_index < len(patches[1]) or version != row['version']:
                 raise ValueError('메시지가 변경되었습니다. 다시 열어보세요.')
@@ -258,5 +348,53 @@ class Timeline:
             if newline >= offset:
                 end = newline + 1
         return {'key': row['key'], 'version': row['version'], 'text': text[offset:end],
+                **({'attachments': row['attachments']} if row.get('attachments') else {}),
                 **({'fileIndex': file_index} if file_index is not None else {}),
                 'offset': offset, 'next': end if end < len(text) else None}
+
+    def process(self, cursor, after=None, limit=20):
+        epoch, _, key = cursor.partition('.')
+        if epoch != self.epoch or key not in self.process_groups:
+            raise ValueError('过程记录已变化，请重新展开')
+        rows = self.process_groups[key]
+        # The live preview needs the recent end, including under the byte cap.
+        # Historical reads keep their ordinary forward cursors.
+        latest = after == 'latest'
+        start = 0
+        if after and not latest:
+            keys = [row['key'] for row in rows]
+            if after not in keys:
+                raise ValueError('过程记录已变化，请重新展开')
+            start = keys.index(after) + 1
+        limit = max(1, min(100, limit))
+        candidates = reversed(rows[-limit:]) if latest else rows[start:start + limit]
+        selected, size = [], 0
+        for row in candidates:
+            entry = {field: row[field] for field in ('key', 'version', 'role', 'kind', 'title', 'toolName', 'status',
+                     'turnId', 'turnStatus', 'timestamp', 'interaction', 'commandActions', 'exitCode', 'success',
+                     'approvalReview', 'reviewLinked', 'reviewActionLabel', 'computerUse', 'source', 'completed',
+                     'agent', 'collab') if field in row}
+            entry.update(text=row.get('text', '')[:TEXT_PREVIEW] if row['role'] == 'assistant' else '', detailCursor=self.cursor(row['key']))
+            entry['hasDetail'] = bool(self.details.get(row['key']) or row['key'] in self.detail_sources or row.get('attachments'))
+            cost = len(encoded(entry))
+            if selected and size + cost > PAGE_BYTES:
+                break
+            selected.append(entry)
+            size += cost
+        if latest:
+            return {'epoch': self.epoch, 'sequence': self.sequence, 'rows': selected[::-1],
+                    'next': None, 'hasEarlier': len(selected) < len(rows)}
+        return {'epoch': self.epoch, 'sequence': self.sequence, 'rows': selected,
+                'next': selected[-1]['key'] if selected and start + len(selected) < len(rows) else None}
+
+
+def process_row(row):
+    if row.get('fileSummary') or row.get('role') in ('fileChanges', 'error'):
+        return False
+    return (row.get('role') in ('activity', 'reasoning') or row.get('kind') == 'reasoning'
+            or row.get('role') == 'user' and row.get('interaction') == 'response'
+            or row.get('role') == 'assistant' and row.get('phase') == 'commentary')
+
+
+def process_key(row, boundary):
+    return 'process-' + hashlib.sha256(encoded([row.get('turnId'), boundary])).hexdigest()[:24]

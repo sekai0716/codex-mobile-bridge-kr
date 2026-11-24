@@ -56,7 +56,7 @@ class CommandJob:
             self.process.stdout.close(); self.done.set()
 
     def _timeout(self):
-        if not self.done.wait(MAX_SECONDS): self.stop('명령에 도달했습니다 30 분 실행 제한')
+        if not self.done.wait(MAX_SECONDS): self.stop('命令已达到 30 分钟运行上限')
 
     def _signal(self, force=False):
         try:
@@ -69,7 +69,7 @@ class CommandJob:
         except (ProcessLookupError, OSError, subprocess.TimeoutExpired):
             if self.process.poll() is None: self.process.kill()
 
-    def stop(self, reason='중지됨'):
+    def stop(self, reason='已停止'):
         if self.done.is_set(): return
         self.reason = reason; self._signal()
         def finish():
@@ -116,7 +116,7 @@ def serve_remote(root, command):
 class RemoteCommandJob(CommandJob):
     def __init__(self, alias, root, command):
         if not alias or alias.startswith('-') or any(c.isspace() for c in alias):
-            raise ValueError('SSH 잘못된 별칭')
+            raise ValueError('SSH 别名无效')
         self.lock = threading.RLock(); self.text = ''; self.end = 0; self.code = None; self.reason = ''
         self.done = threading.Event(); self.created = time.monotonic(); self.command = command; self.root = str(root)
         source = Path(__file__).read_text(encoding='utf-8')
@@ -145,15 +145,15 @@ class RemoteCommandJob(CommandJob):
                 else: self.append(event['output'])
                 if not event['running']:
                     self.code = event['exitCode']; self.reason = event['message']; finished = True
-            if not finished: self.reason = 'SSH 연결이 끊어졌습니다. 서버에서 실행 결과를 확인하시기 바랍니다. 실행을 직접 반복하지 마십시오.。'
+            if not finished: self.reason = 'SSH 连接已断开，请检查服务器上的执行结果；不要直接重复执行。'
         except (ValueError, KeyError):
-            self.reason = 'SSH 출력이 비정상적입니다. 서버에서 실행 결과를 확인하시기 바랍니다.。'
+            self.reason = 'SSH 输出异常，请检查服务器上的执行结果。'
         finally:
             self.process.stdout.close()
             if not finished: self.process.kill()
             self.process.wait(); self.process.stdin.close(); self.done.set()
 
-    def stop(self, reason='중지됨'):
+    def stop(self, reason='已停止'):
         if self.done.is_set(): return
         self.reason = reason
         try:
@@ -172,17 +172,17 @@ class TerminalManager:
     def start(self, owner, thread, identifier, root, command, alias=None):
         uuid.UUID(identifier)
         if not isinstance(command, str) or not command.strip() or len(command) > 16000 or '\x00' in command:
-            raise ValueError('유효한 명령을 입력하십시오（최대 16,000 성격）')
-        if not root or (not alias and not Path(root).is_dir()): raise ValueError('채팅 프로젝트 디렉터리를 사용할 수 없습니다.')
+            raise ValueError('请输入有效命令（最多 16,000 字符）')
+        if not root or (not alias and not Path(root).is_dir()): raise ValueError('聊天项目目录不可用')
         key = (owner, thread, identifier); fingerprint = hashlib.sha256((str(root)+'\0'+command).encode()).hexdigest()
         with self.lock:
             if key in self.seen:
-                if self.seen[key] != fingerprint: raise ValueError('실행 번호가 이미 다른 명령에 사용되었습니다.')
-                if key not in self.jobs: raise ValueError('이 명령 레코드는 만료되어 다시 실행되지 않습니다.')
+                if self.seen[key] != fingerprint: raise ValueError('执行编号已用于另一条命令')
+                if key not in self.jobs: raise ValueError('此命令记录已过期，不会重复执行')
                 return self.jobs[key].read()
-            if len(self.seen) >= 4096: raise ValueError('이 게이트웨이의 명령 기록이 꽉 찼습니다. 계속하려면 게이트웨이를 다시 시작하세요.')
+            if len(self.seen) >= 4096: raise ValueError('本次网关的命令记录已满，请重启网关后继续')
             active = [k for k,j in self.jobs.items() if not j.done.is_set()]
-            if len(active) >= 16 or sum(k[0] == owner for k in active) >= 4: raise ValueError('먼저 실행 중인 명령을 중지하거나 기다려 주세요.')
+            if len(active) >= 16 or sum(k[0] == owner for k in active) >= 4: raise ValueError('请先停止或等待正在运行的命令')
             job = RemoteCommandJob(alias, root, command) if alias else CommandJob(root, command)
             self.jobs[key] = job; self.seen[key] = fingerprint
             for old in list(self.jobs):
@@ -193,7 +193,7 @@ class TerminalManager:
     def get(self, owner, thread, identifier):
         with self.lock:
             job = self.jobs.get((owner, thread, identifier))
-            if job is None: raise KeyError('명령이 존재하지 않거나 현재 로그인에 속하지 않습니다. 게이트웨이가 다시 시작되면 기록이 지워집니다.')
+            if job is None: raise KeyError('命令不存在或不属于当前登录；网关重启后记录会清除')
             return job
 
     def open_session(self, owner, thread, identifier, root, cols, rows, alias=None, *, session_factory=None):
@@ -204,12 +204,12 @@ class TerminalManager:
         uuid.UUID(identifier); dimensions(cols, rows)
         key = (owner, thread, identifier)
         with self.lock:
-            if key in self.closed: raise ValueError('이 터미널은 폐쇄되었습니다. 새 터미널을 열어주세요')
+            if key in self.closed: raise ValueError('此终端已关闭，请打开新终端')
             if key in self.sessions: return self.sessions[key].read()
-            if not root or (not alias and session_factory is None and not Path(root).is_dir()): raise ValueError('채팅 프로젝트 디렉터리를 사용할 수 없습니다.')
+            if not root or (not alias and session_factory is None and not Path(root).is_dir()): raise ValueError('聊天项目目录不可用')
             active = [k for k, job in self.sessions.items() if not job.done.is_set()]
-            if len(active) >= 16 or sum(k[0] == owner for k in active) >= 4: raise ValueError('먼저 다른 터미널을 닫아주세요')
-            if len(self.closed) >= 4096: raise ValueError('터미널 기록이 꽉 찼습니다. 게이트웨이를 다시 시작하세요')
+            if len(active) >= 16 or sum(k[0] == owner for k in active) >= 4: raise ValueError('请先关闭其他终端')
+            if len(self.closed) >= 4096: raise ValueError('终端记录已满，请重启网关')
             for old in list(self.sessions):
                 if self.sessions[old].done.is_set(): self.closed.add(old); del self.sessions[old]
             self.sessions[key] = (session_factory(root, cols, rows) if session_factory else
@@ -219,11 +219,11 @@ class TerminalManager:
     def session(self, owner, thread, identifier):
         with self.lock:
             session = self.sessions.get((owner, thread, identifier))
-            if session is None: raise TerminalSessionMissing('터미널이 닫혀 있거나 현재 로그인에 속하지 않습니다. 다시 열어주세요.')
+            if session is None: raise TerminalSessionMissing('终端已关闭或不属于当前登录，请重新打开')
             return session
 
     def close(self):
         with self.lock: jobs = list(self.jobs.values()) + list(self.sessions.values())
-        for job in jobs: job.stop('게이트웨이가 중지되었습니다.')
+        for job in jobs: job.stop('网关已停止')
         deadline = time.monotonic() + 5
         for job in jobs: job.done.wait(max(0, deadline-time.monotonic()))

@@ -28,13 +28,13 @@ def default_shell():
         shell = ''
     shell = shell or os.environ.get('SHELL') or '/bin/sh'
     if not os.path.isabs(shell) or not os.access(shell, os.X_OK):
-        raise ValueError('시스템 기본값 shell 실행할 수 없습니다. 컴퓨터에서 로그인을 확인하세요. shell 설정')
+        raise ValueError('系统默认 shell 不可执行，请在电脑上检查登录 shell 设置')
     return shell
 
 
 def dimensions(cols, rows):
     if type(cols) is not int or type(rows) is not int or not 2 <= cols <= 500 or not 2 <= rows <= 300:
-        raise ValueError('잘못된 터미널 크기')
+        raise ValueError('无效终端尺寸')
     return cols, rows
 
 
@@ -47,7 +47,7 @@ def utf8_terminal_environment(env):
     selected = (locales.get('C.UTF8') or locales.get('ENUS.UTF8') or
                 next((name for key, name in locales.items() if key.endswith('.UTF8')), None))
     if not selected:
-        raise ValueError('시스템에 사용 가능한 항목이 없습니다. UTF-8 locale，터미널을 시작할 수 없습니다')
+        raise ValueError('系统没有可用的 UTF-8 locale，无法启动终端')
     env.pop('LC_ALL', None)
     env['LC_CTYPE'] = selected
     return env
@@ -65,7 +65,7 @@ def child_main(shell):
 class TerminalSession:
     def __init__(self, root, cols=80, rows=24):
         if os.name == 'nt':
-            raise ValueError('이 플랫폼은 현재 연속 터미널을 지원하지 않습니다.')
+            raise ValueError('此平台暂不支持连续终端')
         import pty
         self.lock = threading.RLock(); self.changed = threading.Event(); self.input_lock = threading.Lock()
         self.text = ''; self.end = 0; self.reason = ''; self.code = None
@@ -131,10 +131,10 @@ class TerminalSession:
                     'exitCode': self.code, 'message': self.reason, 'shell': self.shell, 'cwd': self.root}
 
     def current_cwd(self):
-        if self.done.is_set(): raise ValueError('터미널이 닫혔습니다. 다시 열어주세요.')
+        if self.done.is_set(): raise ValueError('终端已关闭，请重新打开')
         try:
             if os.tcgetpgrp(self.master) != self.process.pid:
-                raise ValueError("포그라운드 프로그램이 실행되는 동안 쉘 디렉토리를 확인할 수 없습니다")
+                raise ValueError('前台程序运行时无法确认 shell 当前目录')
             if sys.platform == 'linux':
                 cwd = os.readlink('/proc/' + str(self.process.pid) + '/cwd')
             elif sys.platform == 'darwin':
@@ -144,28 +144,28 @@ class TerminalSession:
                 rows = result.stdout.decode('utf-8', 'strict').splitlines()
                 cwd = next((row[1:] for row in rows if row.startswith('n/')), '')
             else:
-                raise ValueError("이 시스템은 터미널 디렉토리를 변경하지 않고는 터미널 디렉토리를 결정할 수 없습니다")
+                raise ValueError('此系统无法只读确认终端当前目录')
             if not cwd or os.tcgetpgrp(self.master) != self.process.pid:
-                raise ValueError("터미널 디렉터리를 확인할 수 없습니다")
+                raise ValueError('无法确认终端当前目录')
             return cwd
         except (OSError, subprocess.SubprocessError, UnicodeError):
-            raise ValueError("터미널 디렉토리를 변경하지 않고는 터미널 디렉토리를 결정할 수 없습니다") from None
+            raise ValueError('无法只读确认终端当前目录') from None
 
     def write(self, identifier, data):
-        if not isinstance(identifier, str): raise ValueError('잘못된 입력 번호')
+        if not isinstance(identifier, str): raise ValueError('无效输入编号')
         uuid.UUID(identifier)
         if not isinstance(data, str) or not data or len(data.encode('utf-8')) > 16384:
-            raise ValueError('잘못된 터미널 입력')
+            raise ValueError('无效终端输入')
         raw = data.encode('utf-8'); digest = hashlib.sha256(raw).digest()
         with self.input_lock:
-            if self.done.is_set(): raise ValueError('터미널이 닫혔습니다. 다시 열어주세요.')
+            if self.done.is_set(): raise ValueError('终端已关闭，请重新打开')
             entry = self.inputs.setdefault(identifier, [digest, 0])
-            if entry[0] != digest: raise ValueError('입력 번호가 이미 다른 용도로 사용되었습니다.')
+            if entry[0] != digest: raise ValueError('输入编号已用于其他内容')
             self.touched = time.monotonic(); deadline = self.touched + 3
             while entry[1] < len(raw):
                 try: entry[1] += os.write(self.master, raw[entry[1]:])
                 except BlockingIOError:
-                    if time.monotonic() > deadline: raise TimeoutError('터미널 입력이 혼잡합니다. 다시 시도해 주세요.')
+                    if time.monotonic() > deadline: raise TimeoutError('终端输入拥堵，请重试')
                     select.select([], [self.master], [], .1)
             while len(self.inputs) > 256: self.inputs.popitem(last=False)
         return {'accepted': True}
@@ -180,7 +180,7 @@ class TerminalSession:
             fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
         return {'resized': True}
 
-    def stop(self, reason='터미널이 폐쇄되었습니다'):
+    def stop(self, reason='终端已关闭'):
         if self.done.is_set(): return
         self.reason = reason
         with self.input_lock:
@@ -200,7 +200,7 @@ class TerminalSession:
     def _idle(self):
         while not self.done.wait(30):
             if time.monotonic() - self.touched >= IDLE_SECONDS:
-                self.stop('터미널 유휴 60 분, 닫힘'); return
+                self.stop('终端闲置 60 分钟，已关闭'); return
 
 
 def remote_main(root, cols, rows):
@@ -217,10 +217,10 @@ def remote_main(root, cols, rows):
                     elif request['action'] == 'resize': result = session.resize(request['cols'], request['rows'])
                     elif request['action'] == 'complete': result = complete_path(session, request['text'], request['selectionStart'])
                     elif request['action'] == 'stop': session.stop(); result = {'closed': True}
-                    else: raise ValueError('잘못된 터미널 작동')
+                    else: raise ValueError('无效终端操作')
                     emit({'ack': request['request'], 'result': result})
                 except Exception as exc: emit({'ack': request['request'], 'error': str(exc)})
-        finally: session.stop('SSH 연결이 끊어졌습니다')
+        finally: session.stop('SSH 连接已断开')
     threading.Thread(target=control, daemon=True).start()
     cursor = 0
     try:
@@ -233,7 +233,7 @@ def remote_main(root, cols, rows):
 
 class RemoteTerminalSession:
     def __init__(self, alias, root, cols=80, rows=24, *, transport=None, transport_name="SSH"):
-        if transport is None and (not alias or alias.startswith('-') or any(c.isspace() for c in alias)): raise ValueError('SSH 잘못된 별칭')
+        if transport is None and (not alias or alias.startswith('-') or any(c.isspace() for c in alias)): raise ValueError('SSH 别名无效')
         dimensions(cols, rows)
         self.transport_name = transport_name
         self.lock = threading.RLock(); self.changed = threading.Event(); self.write_lock = threading.Lock(); self.pending = {}
@@ -248,7 +248,7 @@ class RemoteTerminalSession:
         self.process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         threading.Thread(target=self._read, daemon=True).start()
         if not self.ready.wait(12) or self.done.is_set():
-            self.process.kill(); raise ValueError(self.transport_name + ' 터미널을 시작하지 못했습니다. 연결 및 원격을 확인하세요. Python')
+            self.process.kill(); raise ValueError(self.transport_name + ' 终端未能启动，请检查连接和远程 Python')
 
     read = TerminalSession.read
     append = TerminalSession.append
@@ -270,7 +270,7 @@ class RemoteTerminalSession:
                 if not event['running']: break
         except (OSError, ValueError, KeyError): pass
         finally:
-            self.reason = self.reason or self.transport_name + ' 터미널 연결이 끊어졌습니다'
+            self.reason = self.reason or self.transport_name + ' 终端已断开'
             self.process.stdout.close()
             if self.process.poll() is None: self.process.terminate()
             self.process.wait(); self.done.set(); self.changed.set(); self.ready.set()
@@ -283,9 +283,9 @@ class RemoteTerminalSession:
         with self.lock: self.pending[identifier] = (finished, value)
         try:
             with self.write_lock:
-                if self.done.is_set(): raise ValueError(self.transport_name + ' 터미널이 폐쇄되었습니다')
+                if self.done.is_set(): raise ValueError(self.transport_name + ' 终端已关闭')
                 self.process.stdin.write((json.dumps({'request':identifier,'action':action,**params})+'\n').encode()); self.process.stdin.flush()
-            if not finished.wait(6): raise TimeoutError(self.transport_name + ' 터미널 응답 시간 초과')
+            if not finished.wait(6): raise TimeoutError(self.transport_name + ' 终端响应超时')
             if 'error' in value: raise ValueError(value['error'])
             return value['result']
         finally:
@@ -294,7 +294,7 @@ class RemoteTerminalSession:
     def write(self, identifier, data): return self.request('input', inputId=identifier, data=data)
     def complete(self, text, selection_start): return self.request('complete', text=text, selectionStart=selection_start)
     def resize(self, cols, rows): dimensions(cols, rows); return self.request('resize', cols=cols, rows=rows)
-    def stop(self, reason='터미널이 폐쇄되었습니다'):
+    def stop(self, reason='终端已关闭'):
         if self.done.is_set(): return
         try: self.request('stop')
         except (OSError, ValueError, TimeoutError): pass

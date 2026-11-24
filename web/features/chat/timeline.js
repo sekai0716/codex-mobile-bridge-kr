@@ -55,7 +55,7 @@ function timelineFilePath(path,cwd){
 
 // History and live changes share stable keys, but never share a request queue.
 class ChatTimeline {
-  static clearCache(key){if(key)recentTimelinePages.delete(key);else recentTimelinePages.clear();}
+  static clearCache(key){if(key)recentTimelinePages.delete(key);else recentTimelinePages.clear();window.BridgeChatHistoryCache?.forget(key);}
   constructor({url, request, renderMeta, renderText, status, onAction, onFile, onReady, canEdit = () => true, elements = {}, active = () => true, cacheKey = ''}) {
     Object.assign(this,{url,request,renderMeta,renderText,status,onAction,onFile,onReady,active,cacheKey});
     this.canEdit=()=>!this.cached&&canEdit();
@@ -72,19 +72,30 @@ class ChatTimeline {
     this.showReasoning=document.documentElement.dataset.showReasoning!=='false';
     this.showProcess=document.documentElement.dataset.showProcess!=='false';
     this.showToolImages=document.documentElement.dataset.showToolImages!=='false';
+    this.lastViewportHeight=this.viewport.clientHeight;
     this.onScroll=()=>{
       if(this.suppress||!this.viewport.clientHeight)return;
       const upward=this.viewport.scrollTop<this.lastTop;
-      this.lastTop=this.viewport.scrollTop;this.following=this.atBottom();this.anchor=this.capture();
+      // A viewport resize can clamp scrollTop upward while it remains at bottom.
+      const resized=this.viewport.clientHeight!==this.lastViewportHeight;this.lastViewportHeight=this.viewport.clientHeight;
+      this.lastTop=this.viewport.scrollTop;this.following=resized&&this.following&&this.atBottom()||!upward&&this.atBottom();this.anchor=this.capture();
       if(this.following)this.newer.hidden=true;
       if(upward&&this.nearTop()&&!this.retryCount)this.loadOlder(100);
     };
     this.viewport.addEventListener('scroll',this.onScroll,{passive:true});
+    this.onActivityClick=event=>{
+      const activity=event.target?.closest?.('summary')?.closest?.('.activity');
+      const row=activity?.closest?.('[data-key]');
+      if(!row||this.nodes.get(row.dataset.key)?.node!==row)return;
+      this.following=false;
+      this.anchor={key:row.dataset.key,offset:row.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
+    };
+    this.viewport.addEventListener('click',this.onActivityClick,true);
     // At the scroll boundary wheel/touch intent produces no scroll event.
     this.atHistoryEdge=()=>!this.suppress&&this.viewport.clientHeight&&this.viewport.scrollTop<=1&&!this.retryCount;
-    this.onWheel=event=>{if(event.deltaY<0&&this.atHistoryEdge())this.loadOlder(100);};
-    this.onTouchStart=event=>{this.touchY=event.touches.length===1?event.touches[0].clientY:null;};
-    this.onTouchMove=event=>{if(this.touchY===null||event.touches.length!==1)return;const y=event.touches[0].clientY;if(y-this.touchY>12&&this.atHistoryEdge()){this.touchY=y;this.loadOlder(100);}};
+    this.onWheel=event=>{if(event.deltaY<0&&!event.target?.closest?.('.activity-body')&&this.atHistoryEdge())this.loadOlder(100);};
+    this.onTouchStart=event=>{this.touchY=event.touches.length===1&&!event.target?.closest?.('.activity-body')?event.touches[0].clientY:null;};
+    this.onTouchMove=event=>{if(this.touchY===null||event.touches.length!==1||event.target?.closest?.('.activity-body'))return;const y=event.touches[0].clientY;if(y-this.touchY>12&&this.atHistoryEdge()){this.touchY=y;this.loadOlder(100);}};
     this.viewport.addEventListener('wheel',this.onWheel,{passive:true});
     this.viewport.addEventListener('touchstart',this.onTouchStart,{passive:true});
     this.viewport.addEventListener('touchmove',this.onTouchMove,{passive:true});
@@ -92,14 +103,12 @@ class ChatTimeline {
     this.newer.onclick=()=>{this.jumpBottom();this.anchor=this.capture();};
     this.resize=new ResizeObserver(()=>this.restore(this.anchor,this.following));
     this.resize.observe(this.container);
+    // The keyboard and composer can resize the viewport without changing message content.
+    this.resize.observe(this.viewport);
   }
-  dispose(){this.abort.abort();this.strictReviewNotice?.remove();this.activityGroups.clear();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
+  dispose(){this.abort.abort();window.BridgeMermaidCards?.clearScope(this.mermaidScope);clearTimeout(this.startRetry);clearTimeout(this.agentTimer);this.resize.disconnect();this.viewport.removeEventListener('scroll',this.onScroll);this.viewport.removeEventListener('click',this.onActivityClick,true);this.viewport.removeEventListener('wheel',this.onWheel);this.viewport.removeEventListener('touchstart',this.onTouchStart);this.viewport.removeEventListener('touchmove',this.onTouchMove);this.newer.hidden=true;}
   atBottom(){return chatFollowsLatest(this.viewport);}
-  holdDisclosure(summary){
-    this.following=false;
-    this.anchor={key:summary.parentElement.dataset.key,offset:summary.getBoundingClientRect().top-this.viewport.getBoundingClientRect().top};
-  }
-  nearTop(){const nodes=[...this.container.children].filter(n=>!n.hidden);return nodes.length>0&&nodes.slice(0,11).some(n=>n.getBoundingClientRect().bottom>=this.viewport.getBoundingClientRect().top);}
+  nearTop(){return this.viewport.scrollTop<=160;}
   capture(accept){return this.viewport.clientHeight?captureChatScrollAnchor(this.viewport,this.container,accept):this.anchor;}
   rowVisible(row){
     if(row.role==='user'||row.role==='error')return true;
@@ -125,8 +134,11 @@ class ChatTimeline {
         entry.node.replaceWith(node);entry.node=node;restoreChatActivityState(node,reading);
       }
       entry.node.hidden=!this.rowVisible(row);
+      if(entry.node.hidden)entry.node.__cancelProcessReads?.();
     }
-    this.syncRows();this.refreshActions();
+    const ordered=[...this.rows.values()].map(value=>value.row).sort((a,b)=>a.order-b.order);
+    this.syncRows(ordered);
+    this.refreshActions();
     this.restore(anchor,bottom);
   }
   jumpBottom(){this.viewport.scrollTop=this.viewport.scrollHeight;this.following=true;this.newer.hidden=true;}
@@ -138,7 +150,7 @@ class ChatTimeline {
     const node=anchor&&(this.nodes.get(anchor.key)?.node||this.activityGroups?.anchorNode(anchor.key));
     if(bottom)this.jumpBottom();
     else restoreChatScrollAnchor(this.viewport,node,anchor);
-    this.lastTop=this.viewport.scrollTop;
+    this.lastTop=this.viewport.scrollTop;this.lastViewportHeight=this.viewport.clientHeight;
     this.anchor=this.capture();
     requestAnimationFrame(()=>this.suppress=false);
   }
@@ -149,12 +161,16 @@ class ChatTimeline {
     if(this.sequence<0&&this.cacheKey&&recentTimelinePages.has(this.cacheKey)){
       this.apply(recentTimelinePages.get(this.cacheKey),true,false,true);
     }
-    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText('최근 콘텐츠 로드 중…');
+    if(this.sequence<0&&this.cacheKey)window.BridgeChatHistoryCache?.read(this.cacheKey,'timeline-recent-v1').then(page=>{
+      if(page&&!this.receivedFreshPage&&this.sequence<0&&!this.abort.signal.aborted)this.apply(page,true,false,true);
+    });
+    this.older.hidden=false;this.older.disabled=true;this.older.textContent=timelineText('正在读取最近内容…');
     try{
       const page=await this.read('timeline',{limit:20});
       if(this.abort.signal.aborted)return;
       this.apply(page,true);this.updates();
-    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText('로드할 수 없습니다. 다시 시도하려면 클릭하세요.');this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
+      if(this.hasMore&&page.rows.length&&page.rows.every(row=>chatActivityKind(row)))this.loadOlder(100);
+    }catch(e){if(this.abort.signal.aborted)return;this.older.disabled=false;this.older.textContent=timelineText('读取失败，点击重试');this.status(e.message);this.startRetry=setTimeout(()=>this.start(),3000);}
     finally{this.starting=false;}
   }
   historyStatus(){this.older.hidden=!this.hasMore;this.older.disabled=this.busy;this.older.textContent=this.busy?timelineText('이전 콘텐츠 로드 중…'):this.retryCount?timelineText('기록을 로드할 수 없습니다. 다시 시도하려면 클릭하세요.'):timelineText('오래된 콘텐츠 로드');}
@@ -166,19 +182,30 @@ class ChatTimeline {
       // of hidden tool activity may otherwise leave scrollTop stuck at zero.
       for(let attempt=0;attempt<3;attempt++){
         const generation=this.generation,before=this.before;
-        const page=await this.read('timeline',{before,limit:count});
+        const result=await readChatHistoryBatch(cursor=>this.read('timeline',{before:cursor,limit:count}),before,{
+          known:new Set(this.rows.keys()),current:()=>!this.abort.signal.aborted&&generation===this.generation});
         if(this.abort.signal.aborted)return;
-        if(generation!==this.generation)continue;
-        if(page.reset||page.epoch!==this.epoch){this.apply(page,true);if(!this.hasMore)return;continue;}
-        if(page.hasMore&&(!page.rows.length||page.before===before)){this.retryCount=count;return;}
-        const visible=page.rows.some(row=>!this.rows.has(row.key)&&this.rowVisible(row));
-        this.apply(page,false,true);
-        if(visible||!this.hasMore||!this.active()||!this.nearTop())return;
+        if(result.cancelled)continue;
+        const reset=result.reset||result.pages.find(page=>page.epoch!==this.epoch);
+        if(reset){this.apply(reset,true);if(!this.hasMore)return;continue;}
+        if(result.pages.length){
+          const pages=result.pages,last=pages.at(-1),rows=new Map(),files=new Map();
+          for(const page of [...pages].reverse()){
+            for(const row of page.rows)rows.set(row.key,row);
+            for(const file of page.files||[])files.set(file.id,file);
+          }
+          // Commit one visual change for one history intent, even when several
+          // native pages contained only intermediate activity records.
+          this.apply({...last,sequence:Math.min(...pages.map(page=>page.sequence)),rows:[...rows.values()],files:[...files.values()]},false,true);
+        }
+        if(result.error||result.stalled)this.retryCount=count;
+        return;
       }
     }catch(e){if(this.abort.signal.aborted)return;this.retryCount=count;}
     finally{this.busy=false;if(!this.abort.signal.aborted)this.historyStatus();}
   }
   apply(page,reset=false,history=false,cached=false){
+    if(!cached&&!history&&!page.meta.loadingHistory)this.receivedFreshPage=true;
     if(this.cached&&!cached){
       // An empty owner-discovery response is not an empty conversation.
       if(!page.rows.length&&page.meta.loadingHistory){
@@ -210,32 +237,33 @@ class ChatTimeline {
         if(actions&&JSON.stringify(before)===JSON.stringify(after)){
           // Late native clocks must not replace text selection or a player.
           actions.querySelector('.message-time')?.remove();renderChatMessageTime(actions,timestamp);
-          old.stamp=stamp;continue;
+          old.node.__chatMessage=row;old.stamp=stamp;continue;
         }
       }
       const node=this.renderRow(row);node.dataset.key=row.key;
       node.hidden=!this.rowVisible(row);changed=changed||!node.hidden;
       this.nodes.set(row.key,{node,stamp});
     }
-    const ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
-    this.syncRows(ordered);
-    if(!cached){
-      if(!history&&!this.meta?.temporary&&this.onAgentTabs){
-        const created=page.rows.filter(row=>row.kind==='subAgentCreated'&&row.agent&&(!reset||row.turnStatus==='inProgress'));
-        if(created.length)this.onAgentTabs(created.map(({agent})=>({...agent,nickname:this.agentName(agent)})));
-      }
-      this.resolveAgentNames(ordered);
+    let ordered=[...this.rows.values()].map(x=>x.row).sort((a,b)=>a.order-b.order);
+    if(!reset&&!history&&!this.busy&&chatShouldSlideHistory(ordered.length,bottom)){
+      // The original epoch/cursor can still fetch omitted rows on demand.
+      // Do not move a reader's history window or an in-flight backfill.
+      for(const row of ordered.slice(0,-160)){this.rows.delete(row.key);this.nodes.delete(row.key);this.details.delete(row.key);}
+      ordered=ordered.slice(-160);this.before=this.epoch+'.'+ordered[0].key;this.hasMore=true;this.windowRevision++;
     }
+    this.syncRows(ordered);
+    if(!cached)this.resolveAgentNames(page.rows);
     if(reset||history){this.before=page.before;this.hasMore=page.hasMore;this.windowRevision++;}
     this.refreshActions();this.historyStatus();this.restore(anchor,bottom);
     if(!history&&!bottom&&(changed||page.meta.requests?.length)){this.newer.textContent=page.meta.requests?.length?timelineText('확인 필요 ↓'):timelineText('새로운 콘텐츠 ↓');this.newer.hidden=false;}
     if(!cached&&!history&&this.cacheKey){
       const rows=ordered.slice(-20);
-      // Memory-only, bounded and gateway/auth/host/thread scoped by the caller.
+      // Bounded and gateway/auth/host/thread scoped by the caller.
       // Cached approvals and access permissions never become actionable state.
       recentTimelinePages.delete(this.cacheKey);
       if(rows.length)recentTimelinePages.set(this.cacheKey,JSON.parse(JSON.stringify({rows,sequence:this.sequence,epoch:this.epoch,
         before:this.epoch+'.'+rows[0].key,hasMore:this.hasMore||ordered.length>20,meta:{requests:[]},files:page.files||[]})));
+      if(!page.meta.temporary&&!page.meta.loadingHistory)window.BridgeChatHistoryCache?.write(this.cacheKey,'timeline-recent-v1',recentTimelinePages.get(this.cacheKey)||{rows:[],sequence:this.sequence,epoch:this.epoch,before:null,hasMore:false,meta:{requests:[]},files:[]});
       while(recentTimelinePages.size>8)recentTimelinePages.delete(recentTimelinePages.keys().next().value);
     }
     if(!cached&&!history&&!this.abort.signal.aborted&&!page.meta.loadingHistory)this.onReady?.();
@@ -257,8 +285,15 @@ class ChatTimeline {
     if(this.strictReviewNotice.textContent!==text)this.strictReviewNotice.textContent=text;
   }
   syncRows(ordered=[...this.rows.values()].map(entry=>entry.row).sort((a,b)=>a.order-b.order)){
-    this.activityGroups??=new ChatActivityGroups();
-    this.activityGroups.sync(this.container,ordered.filter(row=>row.kind!=='reasoning'&&!(row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved'))).map(row=>({row,node:this.nodes.get(row.key).node})));
+    const rows=ordered.filter(row=>row.kind!=='reasoning'&&!(row.kind==='automaticApprovalReview'&&(row.reviewLinked||row.approvalReview?.status==='approved')));
+    const entries=rows.map(row=>({row,node:this.nodes.get(row.key).node}));
+    if(rows.some(row=>row.turnId&&row.turnId!=='history'&&row.turnStatus&&row.turnCompletionKnown!==false)){
+      this.activityGroups.clear();
+      syncChatMessageNodes(this.container,chatNodesWithTurnCompletions(this.container,entries.map(entry=>entry.node),rows));
+    }else{
+      for(const {node} of entries)node.classList.remove('chat-process-collapsed');
+      this.activityGroups.sync(this.container,entries);
+    }
   }
   agentName(agent){return agent.nickname||this.agentNames.get(agent.id)||agent.taskName||'';}
   agentLabel(agent){
@@ -315,6 +350,7 @@ class ChatTimeline {
     // 이미지가 있는 호출은 실행 기록과 미리보기를 담을 바깥 제목을 둔다.
     const computerUse=toolImages&&row.computerUse;
     const node=document.createElement(activity&&(!toolImages||computerUse)?'details':'div');
+    node.__chatMessage=row;
     node.className=toolImages?'tool-images timeline-row':activity?'activity timeline-row':'message timeline-row '+row.role;
     if(computerUse){
       node.classList.add('activity','computer-use');
@@ -414,7 +450,7 @@ class ChatTimeline {
     };
     if(row.commandLabelLines)body.relabelCommand=paint;
     more.onclick=load;content.append(body,more);paint();
-    if(row.role==='user'||row.role==='assistant'){
+    if(!activity&&(row.role==='user'||row.role==='assistant')){
       const actions=document.createElement('div');actions.className='message-actions';
       const copy=document.createElement('button');copy.type='button';copy.className='plain message-copy';copy.textContent=timelineText('복사');copy.onclick=()=>window.BridgeClipboard?.copy(()=>this.fullText(row),copy);actions.append(copy);node.append(actions);
       const quote=document.createElement('button');quote.type='button';quote.className='plain message-quote';quote.textContent=timelineText('인용');quote.onclick=()=>node.dispatchEvent(new CustomEvent('bridge-compose-quote',{bubbles:true,detail:{getText:()=>this.fullText(row),source:row.key}}));actions.append(quote);
@@ -518,22 +554,30 @@ class ChatTimeline {
       const attachment=node.querySelector('.timeline-attachments small.muted');
       if(attachment)attachment.textContent=timelineText('부착:')+row.attachments.map(a=>a.name||a.type).join('、');
     }
-    this.newer.textContent=timelineText(this.pendingRequests?'확인 필요 ↓':'새로운 콘텐츠 ↓');
+    this.newer.textContent=timelineText(this.pendingRequests?'有待确认请求 ↓':'有新内容 ↓');
     this.syncRows();
   }
   async updates(){
+    let after=this.sequence,through='',snapshot=null;
     while(!this.abort.signal.aborted){
       if(!this.active()){await this.pause(1000);continue;}
       try{
         const generation=this.generation,windowRevision=this.windowRevision;
-        const page=await this.read('changes',{after:this.sequence,epoch:this.epoch,start:this.before||''});
+        const page=await this.read('changes',{after,epoch:this.epoch,start:this.before||'',paged:1,through});
         if(this.abort.signal.aborted)return;
-        if(generation!==this.generation||windowRevision!==this.windowRevision)continue;
+        if(generation!==this.generation||windowRevision!==this.windowRevision){after=-1;through='';snapshot=null;continue;}
         // History may have expanded the window while this poll was in flight.
         // Polls never replace the oldest loaded cursor.
         this.apply(page,!!page.reset);
-        await this.pause(200);
-      }catch(e){if(this.abort.signal.aborted)return;this.syncStrictReviewNotice(false);this.status(timelineText('다시 연결하는 중'));await this.pause(3000);}
+        if(page.reset){after=this.sequence;through='';snapshot=null;}
+        else{
+          snapshot=snapshot===null?page.sequence:Math.min(snapshot,page.sequence);
+          through=page.next||'';
+          // Revisit edits made during a multi-page resync on the next poll.
+          if(!through){after=snapshot;snapshot=null;}
+        }
+        await this.pause(through?0:200);
+      }catch(e){if(this.abort.signal.aborted)return;this.status(timelineText('重新连接中'));await this.pause(3000);}
     }
   }
   pause(ms){return new Promise(resolve=>{const done=()=>{clearTimeout(timer);this.abort.signal.removeEventListener('abort',done);resolve();};const timer=setTimeout(done,ms);this.abort.signal.addEventListener('abort',done,{once:true});});}

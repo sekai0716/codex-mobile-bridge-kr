@@ -75,7 +75,7 @@ class SystemErrorTests(unittest.TestCase):
         self.client.connect.return_value['userAgent'] = 'codex-mobile-bridge-cli/0.163.0 (fixture)'
         with self.assertRaises(ValueError):
             self.check_idle()
-        with self.assertRaisesRegex(ValueError, '버전'):
+        with self.assertRaisesRegex(ValueError, '版本'):
             release_thread(self.client.request, 'failed-a')
         self.assert_no_write()
 

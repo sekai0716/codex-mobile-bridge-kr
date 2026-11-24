@@ -90,7 +90,7 @@ def main(connections=None, connection_secrets=None):
         parser.error("auth.mode는 password 또는 none이어야 합니다.")
     if args.no_auth:
         config["auth"]["mode"] = "none"
-    from bridge.features.network.access import validate_connections, public_urls, public_url
+    from bridge.features.network.access import origin as normalize_origin, validate_connections, public_urls, public_url
     legacy_addresses = config.get('lanAddresses')
     raw_interfaces = config.get('lanInterfaces',
                                 interfaces.migrate_addresses_to_interfaces(rows, legacy_addresses))
@@ -106,10 +106,14 @@ def main(connections=None, connection_secrets=None):
     if entries:
         config['publicUrl'] = public_url(preferences)
     origins = config.get("origins", []) + args.origin + public_urls(preferences)
-    for origin in origins:
-        parsed = urlsplit(origin)
+    for index, value in enumerate(origins):
+        parsed = urlsplit(value)
         if parsed.scheme != "https" or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
-            parser.error("추가 origin은 경로가 없는 완전한 HTTPS 주소여야 합니다.")
+            parser.error("额外 origin 必须是完整 HTTPS 源且不能有路径")
+        try:
+            origins[index] = normalize_origin(value)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.lan:
         hosts = ['127.0.0.1', 'localhost'] + network.bindings(preferences, rows)[1:]
     else:

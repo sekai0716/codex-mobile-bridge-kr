@@ -149,7 +149,7 @@ class OwnedControl:
             return {}
         return {'configurationKey': _digest(['claude', 'local', profile['uid'], profile['directory'],
                                              profile['device'], profile['inode']]),
-                'configurationLabel': '로컬 머신 Claude CLI · ' + profile['directory']}
+                'configurationLabel': '本机 Claude CLI · ' + profile['directory']}
 
     def matches(self):
         expected = self.binding['process']
@@ -188,11 +188,11 @@ class OwnedControl:
         except (OSError, ValueError, KeyError, TypeError):
             available = False
         return {'canForce': bool(available), 'generation': self.generation,
-                'scopeLabel': '로컬 머신 Claude CLI · ' + self.binding['profile']['directory'],
+                'scopeLabel': '本机 Claude CLI · ' + self.binding['profile']['directory'],
                 'impact': [{'sessionId': self.binding['sessionId'], 'connectionKey': self.binding['key']}],
                 'taskState': 'unknown',
-                'message': '이거 강제종료 Claude CLI，완료되지 않은 작업이 중단될 수 있습니다.。' if available
-                           else '기존 CLI 퇴사했거나 신원 및 퇴사 영수증이 아직 확인되지 않았습니다. 반복되는 강제 종료가 없습니다.。'}
+                'message': '强制结束这一个 Claude CLI，未完成任务可能中断。' if available
+                           else '原 CLI 已退出或身份、退出回执尚待核对；未重复强制退出。'}
 
     def check(self, timeout=0):
         deadline = time.monotonic() + timeout
@@ -203,13 +203,13 @@ class OwnedControl:
                 gone = False
             if gone or time.monotonic() >= deadline:
                 return {'status': 'released' if gone else 'unknown',
-                        'notice': '기존 Claude CLI 종료됨, 연결이 해제됨。' if gone else '기존 Claude CLI 종료 결과를 확인해야 하며 자동으로 종료가 재발행되지 않습니다.。'}
+                        'notice': '原 Claude CLI 已退出，连接已释放。' if gone else '原 Claude CLI 退出结果待核对，不会自动重发退出。'}
             time.sleep(.05)
 
     def force(self, operation_id, generation):
         uuid.UUID(operation_id)
         if generation != self.generation or not self.durable:
-            raise _not_sent('기존 Claude CLI 연결 또는 종료 확인이 변경되었습니다. 강제 종료 없음')
+            raise _not_sent('原 Claude CLI 连接或退出回执已变化；未强制退出')
         intent = self.intent()
         if intent:
             return {**self.check(), 'canonicalOperationId': intent['operationId']}
@@ -219,7 +219,7 @@ class OwnedControl:
             handle = self.native.open(self.binding['process'])
             try:
                 if not self.matches():
-                    raise _not_sent('기존 Claude CLI 프로세스가 변경되었습니다. 새로운 프로세스가 실행되지 않았습니다.')
+                    raise _not_sent('原 Claude CLI 进程已变化；未操作新的进程')
                 try:
                     _write_once(self.directory, self.binding['key'] + '.force.json',
                                 {'operationId': operation_id, 'generation': generation})
@@ -229,7 +229,7 @@ class OwnedControl:
                     self.native.terminate(handle)
                 except OSError:
                     return {'status': 'unknown', 'forceDispatched': True,
-                            'notice': '기존 Claude CLI 강제 종료 결과는 확인 대기 중입니다. 반복적으로 전송되지 않습니다.。'}
+                            'notice': '原 Claude CLI 强制退出结果待核对；不会重复发送。'}
                 return {**self.check(timeout=3), 'forceDispatched': True}
             finally:
                 self.native.close(handle)

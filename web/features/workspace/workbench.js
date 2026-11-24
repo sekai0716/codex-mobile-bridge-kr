@@ -51,7 +51,7 @@ class Workbench {
     this.dropZone = this.node('div','wb-split-drop','여기로 내려오면 오른쪽에 열립니다.');
     this.layout.append(this.mainPane,this.divider,this.panel,this.dropZone);
     chat.querySelector('.chat-head').after(this.strip,this.layout);
-    this.splitButton=this.button('',()=>this.splitMode?this.unsplit():this.split(this.current?.active),'분할 보기로 열기');
+    this.splitButton=this.button('',()=>this.toggleSplit(),'在右侧分屏');
     this.splitButton.className='wb-split-button';this.toolStrip.append(this.splitButton);
     const splitIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');splitIcon.setAttribute('viewBox','0 0 24 24');splitIcon.setAttribute('aria-hidden','true');splitIcon.innerHTML='<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>';this.splitButton.append(splitIcon);
     this.divider.onpointerdown=event=>{
@@ -83,7 +83,22 @@ class Workbench {
     this.chat.style.setProperty('--wb-left',`calc(${ratio*100}% - var(--wb-divider-width, 8px) / 2)`);
     this.divider.setAttribute('aria-valuemin',String(Math.round(minimum*100)));this.divider.setAttribute('aria-valuemax',String(Math.round((1-minimum)*100)));this.divider.setAttribute('aria-valuenow',String(Math.round(ratio*100)));
   }
-  split(id){if(!this.canSplit()||!this.current?.files.some(t=>t.id===id&&id!==this.primaryChatTab(this.current)))return;if(id!=='files')this.cancelLocate();this.rememberScroll();this.current.splitTab=id;this.current.active=id;this.paint();}
+  splitTarget(session=this.current){
+    if(!session)return null;
+    const eligible=tab=>tab&&!tab.chatId;
+    if(eligible(session.files.find(t=>t.id===session.active)))return session.active;
+    if(session.lastToolTab&&eligible(session.files.find(t=>t.id===session.lastToolTab)))return session.lastToolTab;
+    return session.files.find(t=>t.id==='files')?.id||session.files.find(eligible)?.id||null;
+  }
+  toggleSplit(){
+    if(!this.current)return;
+    if(this.splitMode)return this.unsplit();
+    if(!this.canSplit())return;
+    const target=this.splitTarget();
+    if(target)return this.split(target);
+    this.files(true);
+  }
+  split(id){if(!this.canSplit()||!this.current?.files.some(t=>t.id===id&&!t.chatId))return;if(id!=='files')this.cancelLocate();this.rememberScroll();this.current.lastToolTab=id;this.current.splitTab=id;this.current.active=id;this.paint();}
   unsplit(){if(!this.current)return;this.current.active=this.current.splitTab||this.current.active;this.current.splitTab=null;this.paint();}
   endDrag(){this.dragTab=null;this.layout.classList.remove('wb-dragging');}
   node(tag, cls = '', text) { const n = document.createElement(tag); n.className = cls; if (text !== undefined) { n._rawText=text;n.textContent = ['pre','code'].includes(tag)?text:BridgeI18n.t(text); const source=BridgeI18n.source(text); if(source&&!['pre','code'].includes(tag))n.dataset.i18n=source; } return n; }
@@ -134,7 +149,7 @@ class Workbench {
   refreshThumbnails() {
     this.stopThumbnails();
     const session = this.current;
-    if (!this.showThumbnails || session?.active !== 'files') return;
+    if (!this.showThumbnails || !session || !this.isVisible(session, {id: 'files'})) return;
     const controller = this.thumbnailController = new AbortController(), queue = [];
     let running = 0;
     const pump = () => {
@@ -229,7 +244,7 @@ class Workbench {
     if(id!=='terminal')this.current.files.find(tab=>tab.id==='terminal')?.terminal?.clearCompletion?.();
     if (id !== 'files') this.cancelLocate();
     if (this.previewFullscreen && this.previewFullscreen.tab.id !== id) this.closePreviewFullscreen();
-    this.rememberScroll(); this.current.active = id; if(this.current.splitTab&&id!==this.primaryChatTab(this.current))this.current.splitTab=id; this.paint();
+    this.rememberScroll(); this.current.active = id; const selectedTab=this.current.files.find(tab=>tab.id===id); if(selectedTab&&!selectedTab.chatId){this.current.lastToolTab=id;if(this.current.splitTab)this.current.splitTab=id;} this.paint();
     if(id==='terminal')this.current.files.find(tab=>tab.id==='terminal')?.terminal?.focusOnSelect?.();
     if(id==='sidechat')this.current.files.find(tab=>tab.id==='sidechat')?.sideChat?.load();
     if (id === 'chat') { const session = this.current; requestAnimationFrame(() => { if (session === this.current && session.active === 'chat') this.chat.querySelector('.timeline').scrollTop = session.scroll; }); }
@@ -259,9 +274,9 @@ class Workbench {
     this.splitEligible=this.canSplit();
     this.paintTabs(session);
     this.chat.classList.toggle('workbench-active', this.isFileVisible); this.panel.hidden = !this.isFileVisible&&!this.splitMode;
-    this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitMode&&session.active===this.primaryChatTab(session);
-    const splitLabel=this.splitMode?'분할 보기 종료':'분할 보기로 열기';this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
-    const active = session.files.find(t => t.id!==this.primaryChatTab(session) && t.id === (this.splitMode?session.splitTab:session.active));
+    this.chat.classList.toggle('wb-split',this.splitMode);this.splitButton.hidden=!this.splitEligible;this.splitButton.disabled=!this.splitEligible;
+    const splitLabel=this.splitMode?'退出分屏':'在右侧分屏';this.splitButton.dataset.i18nTitle=splitLabel;this.splitButton.dataset.i18nAriaLabel=splitLabel;this.splitButton.title=BridgeI18n.t(splitLabel);this.splitButton.setAttribute('aria-label',BridgeI18n.t(splitLabel));this.splitButton.setAttribute('aria-pressed',String(this.splitMode));if(this.splitMode)this.setRatio(session.splitRatio??.5,false);
+    const active = session.files.find(t => t.id !== this.primaryChatTab(session) && t.id === (this.splitMode?session.splitTab:session.active));
     if (this.activeBrowser !== active?.browser) {
       this.activeBrowser?.setVisible(false);
       this.activeBrowser = active?.browser;
@@ -317,9 +332,10 @@ class Workbench {
     session.files[index].controller?.abort(); session.files[index].pdf?.dispose(); session.files[index].html?.dispose(); session.files[index].markdown?.dispose(); session.files[index].fileFont?.dispose(); session.files[index].git?.dispose(); session.files[index].terminal?.dispose(); session.files[index].agents?.dispose(); session.files[index].sideChat?.dispose(); session.files.splice(index, 1);
     if(session.splitTab===id){
       const primary=this.primaryChatTab(session);
-      const adjacent=[...session.files.slice(index),...session.files.slice(0,index).reverse()].find(t=>t.id!==primary);
+      const adjacent=[...session.files.slice(index),...session.files.slice(0,index).reverse()].find(tab=>tab.id!==primary);
       session.splitTab=!this.canSplit()&&id.startsWith('child:')?null:adjacent?.id||null;
     }
+    if(session.lastToolTab===id)session.lastToolTab=session.splitTab||session.files.find(t=>!t.chatId)?.id||null;
     const wasActive=session.active===id;
     if(wasActive){
       const chatTab=session.chatId&&session.chatId!==session.id?'child:'+session.chatId:'chat';
@@ -328,13 +344,14 @@ class Workbench {
     if (this.current !== session) return;
     if (wasActive) this.select(session.active); else this.paint();
   }
-  files() {
+  files(split = false) {
     const session = this.current; if (!session) return;
     if (!session.files.some(t => t.id === 'files')) {
       const tab = {id: 'files', name: BridgeI18n.t('파일'), body: this.node('div', 'wb-browser')}; session.files.unshift(tab);
       this.directory(session, tab, session.directory);
     }
-    this.select('files');
+    if (split && this.canSplit()) this.split('files');
+    else this.select('files');
   }
   referenceFile(session, info) {
     const input=this.composer;

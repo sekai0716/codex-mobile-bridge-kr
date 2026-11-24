@@ -62,10 +62,10 @@ class ConPtyBundleTests(unittest.TestCase):
 class TerminalStartupTests(unittest.TestCase):
     def test_cmd_cwd_only_shortens_equivalent_extended_local_drive_paths(self):
         from bridge.platforms.windows import terminal
-        local = '\\\\?\\C:\\project 중국어 space'
+        local = '\\\\?\\C:\\project 中文 space'
         with patch.object(terminal.os.path, 'samefile', return_value=True) as same:
-            self.assertEqual(terminal.cmd_working_directory(local), 'C:\\project 중국어 space')
-            same.assert_called_once_with(local, 'C:\\project 중국어 space')
+            self.assertEqual(terminal.cmd_working_directory(local), 'C:\\project 中文 space')
+            same.assert_called_once_with(local, 'C:\\project 中文 space')
         with patch.object(terminal.os.path, 'samefile', return_value=False):
             self.assertEqual(terminal.cmd_working_directory('\\\\?\\C:\\trailing. '), '\\\\?\\C:\\trailing. ')
         with patch.object(terminal.os.path, 'samefile', side_effect=OSError):
@@ -233,15 +233,15 @@ class ConPtyTests(unittest.TestCase):
                     self.assertIn('\x1b[?1000h', output)
                     self.assertIn('\x1b[?1006h', output)
                     click = '\x1b[<0;12;8M\x1b[<0;12;8m'
-                    session.write(str(uuid.uuid4()), click + '가운데q')
+                    session.write(str(uuid.uuid4()), click + '中q')
                     self.wait_for_output(session, lambda output: 'MOUSE_DONE' in output, cursor)
                     self.assertTrue(result.exists(), repr(session.read(cursor)))
                     data = json.loads(result.read_text(encoding='utf-8'))
                     if mode == 'native':
                         self.assertEqual(data['mouse'], [[11, 7, 1, 0], [11, 7, 0, 0]])
-                        self.assertEqual(data['text'], '가운데q')
+                        self.assertEqual(data['text'], '中q')
                     else:
-                        self.assertEqual(data['text'], click + '가운데q')
+                        self.assertEqual(data['text'], click + '中q')
             finally:
                 session.stop(); self.assertTrue(session.done.wait(10))
 
@@ -319,7 +319,7 @@ class ConPtyTests(unittest.TestCase):
     def test_extended_local_drive_start_cwd_and_cd_state(self):
         from bridge.platforms.windows.terminal import WindowsTerminalSession
         parent = Path(__file__).resolve().parents[1] / '.tmp'; parent.mkdir(exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix='cmb cwd 중국어 space ', dir=parent) as folder:
+        with tempfile.TemporaryDirectory(prefix='cmb cwd 中文 space ', dir=parent) as folder:
             root = Path(folder); (root / 'nested').mkdir()
             with terminal_runtime():
                 session = WindowsTerminalSession('\\\\?\\' + str(root), 80, 24)

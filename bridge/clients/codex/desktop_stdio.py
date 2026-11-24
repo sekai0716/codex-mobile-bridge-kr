@@ -1,9 +1,10 @@
-"""One native Desktop stdio connection, with bounded metadata calls from Bridge.
+"""One native Desktop stdio connection, with explicitly enabled Bridge calls.
 
-The App remains the sole initializer and recipient of notifications/approvals.
+The App remains the sole initializer; native notifications/approvals reach it.
 Only request IDs are translated; no execution settings or responses are replayed.
 """
 import json
+import logging
 import secrets
 import threading
 from concurrent.futures import Future, TimeoutError
@@ -18,18 +19,21 @@ METADATA_METHODS = frozenset(('thread/fork', 'thread/list', 'thread/inject_items
 
 
 class DesktopStdio:
-    def __init__(self, write, emit, initialized):
+    def __init__(self, write, emit, initialized, *, control_methods=()):
         self.write, self.emit, self.initialized = write, emit, initialized
         self.lock = threading.RLock()
         self.pending = {}
         self.prefix, self.sequence = secrets.token_hex(16) + ':', 0
         self.closed = False
         self.ready = False
+        self.control_methods = frozenset(control_methods)
+        self.server_requests = {}
+        self.observer = None
 
     def _send(self, value):
         data = json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
         if len(data) > MAX_LINE + 1:
-            raise AppServerMessageTooLarge('기본 요청이 메시지 크기 제한을 초과했습니다.')
+            raise AppServerMessageTooLarge('原生请求超过消息大小限制')
         self.write(data)
 
     def _identifier(self):
@@ -39,11 +43,16 @@ class DesktopStdio:
     def from_app(self, message):
         with self.lock:
             if self.closed:
-                raise AppServerUnavailable('기본 데스크톱 연결이 닫혔습니다.')
+                raise AppServerUnavailable('原生桌面连接已关闭')
+            if self.control_methods and 'method' not in message and 'id' in message:
+                identifier = message['id']
+                if identifier not in self.server_requests:
+                    return
+                self.server_requests.pop(identifier, None)
             value = message
             if 'method' in message and 'id' in message:
                 identifier = self._identifier()
-                self.pending[identifier] = ('app', message['id'], message.get('method'))
+                self.pending[identifier] = ('app', message['id'], message.get('method'), message)
                 value = {**message, 'id': identifier}
             try:
                 self._send(value)
@@ -56,6 +65,17 @@ class DesktopStdio:
         # Native requests use their own ID namespace. App approval responses go
         # back unchanged and never collide with a translated outbound request.
         if 'method' in message or 'id' not in message:
+            with self.lock:
+                if 'method' in message and 'id' in message:
+                    self.server_requests[message['id']] = message
+                if message.get('method') == 'serverRequest/resolved':
+                    self.server_requests.pop((message.get('params') or {}).get('requestId'), None)
+                if self.observer is not None:
+                    try:
+                        self.observer.native_event(message)
+                    except Exception:
+                        # Secondary normalization cannot interrupt the App's IO.
+                        logging.getLogger(__name__).warning('Desktop control observer rejected a native event')
             self.emit(message)
             return
         with self.lock:
@@ -65,21 +85,26 @@ class DesktopStdio:
             if pending[0] == 'bridge':
                 pending[1].set_result(message)
                 return
-            _, identifier, method = pending
+            _, identifier, method, request = pending
             if method == 'initialize' and 'result' in message:
                 # Desktop completes its handshake on this response; current
                 # versions do not send a separate "initialized" notification.
                 self.initialized(message['result'])
                 self.ready = True
+            if self.observer is not None:
+                try:
+                    self.observer.app_response(request, message)
+                except Exception:
+                    logging.getLogger(__name__).warning('Desktop control observer rejected a native response')
         self.emit({**message, 'id': identifier})
 
     def request_packet(self, method, params, timeout=90):
-        if method not in METADATA_METHODS or not isinstance(params, dict):
-            raise AppServerRequestNotSent('이 연결은 기본 채팅 메타데이터 작업만 지원합니다.')
+        if method not in METADATA_METHODS | self.control_methods or not isinstance(params, dict):
+            raise AppServerRequestNotSent('此连接仅支持原生聊天元数据操作')
         future = Future()
         with self.lock:
             if self.closed or not self.ready:
-                raise AppServerRequestNotSent('기본 데스크톱 연결이 아직 준비되지 않았습니다.')
+                raise AppServerRequestNotSent('原生桌面连接尚未就绪')
             identifier = self._identifier()
             self.pending[identifier] = ('bridge', future)
             try:
@@ -93,13 +118,22 @@ class DesktopStdio:
         try:
             response = future.result(timeout=timeout)
         except TimeoutError as exc:
-            raise AppServerUnknownResult('네이티브 작업 결과는 아직 확인되지 않았으며 반복적으로 제출되지 않습니다.') from exc
+            raise AppServerUnknownResult('原生操作结果尚未确认，不会重复提交') from exc
         finally:
             with self.lock:
                 self.pending.pop(identifier, None)
         if 'result' not in response and 'error' not in response:
-            raise AppServerUnknownResult('기본 작업 영수증이 잘못되어 반복적으로 제출되지 않습니다.')
+            raise AppServerUnknownResult('原生操作回执无效，不会重复提交')
         return response
+
+    def respond(self, request_id, result, *, thread_id):
+        with self.lock:
+            pending = self.server_requests.get(request_id)
+            if (not self.ready or self.closed or pending is None or
+                    pending.get('params', {}).get('threadId') != thread_id):
+                raise AppServerRequestNotSent('原生审批已处理或不属于当前聊天')
+            self.server_requests.pop(request_id)
+            self._send({'id': request_id, 'result': result})
 
     def close(self):
         with self.lock:
@@ -107,5 +141,6 @@ class DesktopStdio:
             self.ready = False
             for pending in self.pending.values():
                 if pending[0] == 'bridge':
-                    pending[1].set_exception(AppServerUnknownResult('기본 연결이 종료되었으며 작업 결과가 아직 확인되지 않았습니다.'))
+                    pending[1].set_exception(AppServerUnknownResult('原生连接已关闭，操作结果尚未确认'))
             self.pending.clear()
+            self.server_requests.clear()

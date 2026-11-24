@@ -8,10 +8,14 @@ import tempfile
 import threading
 import unittest
 import zipfile
+from email.message import Message
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
+from urllib.parse import urlsplit
 
 import bridge.features.network.access as access
+from bridge.api.httpd import Handler
 from bridge.app.desktop import Desktop
 from bridge.features.notifications.channels import Notifications, write_json
 from bridge.features.network.ssh_tunnel import SSHTunnel, command
@@ -39,6 +43,22 @@ class AccessTests(unittest.TestCase):
         self.desktop.status = lambda: {'running': False, 'pid': None}
         self.value = self.desktop.snapshot()
         self.value['preferences'].update(codexHome=str(self.directory))
+
+    def test_snapshot_survives_zero_filled_rebuildable_state_files(self):
+        # Power loss leaves size-correct but zero-filled JSON.
+        entries = self.desktop.preferences()['connections']
+        names = ['address-notifications.json', 'security-notifications.json',
+                 'cloudflare-status.json', 'network-status.json',
+                 'notification-status.json']
+        names += ['ssh-status-' + entry['id'] + '.json' for entry in entries]
+        for name in names:
+            (self.directory/name).write_bytes(b'\0' * 327)
+        value = self.desktop.snapshot()
+        self.assertEqual(value['addressNotificationStatus'], {})
+        self.assertEqual(value['securityNotificationStatus'], {})
+        self.assertEqual(value['externalStatus'], {})
+        self.assertIn('runtime', value)
+        self.assertTrue(value['urls'])
 
     def tearDown(self):
         self.temp.cleanup()
@@ -69,9 +89,9 @@ class AccessTests(unittest.TestCase):
         self.assertNotIn('--tunnel', self.desktop.argv())
         path = self.desktop.export_deployment({'id':'server'})['path']
         with zipfile.ZipFile(path) as archive:
-            self.assertEqual(set(archive.namelist()), {'compose.yaml', 'Caddyfile', '배포 지침.md', 'DEPLOYMENT_EN.md'})
+            self.assertEqual(set(archive.namelist()), {'compose.yaml', 'Caddyfile', '部署说明.md', 'DEPLOYMENT_EN.md'})
             self.assertIn('127.0.0.1:18787', archive.read('Caddyfile').decode())
-            self.assertNotIn('첫 로그인.txt', archive.namelist())
+            self.assertNotIn('首次登录.txt', archive.namelist())
         state['preferences']['connections'] = []
         self.desktop.save(state)
         self.assertEqual(self.desktop.config()['origins'], ['https://another.example.com'])
@@ -102,7 +122,7 @@ class AccessTests(unittest.TestCase):
                 self.assertEqual(self.desktop.config()['origins'], [url])
                 files = self.desktop.deployment({'id': 'server'})['files']
                 self.assertIn(url + ' {', files['Caddyfile'])
-                for name in ('배포 지침.md', 'DEPLOYMENT_EN.md'):
+                for name in ('部署说明.md', 'DEPLOYMENT_EN.md'):
                     self.assertIn('TCP 8443', files[name])
 
     def test_default_https_port_matches_browser_origin_serialization(self):
@@ -143,7 +163,7 @@ class AccessTests(unittest.TestCase):
                 patch('bridge.app.desktop.socket.socket'), patch('bridge.app.desktop.subprocess.Popen') as spawn:
             self.assertTrue(self.desktop.start()['started'])
         self.assertEqual(spawn.return_value.stdin.write.call_args.args[0], b'{}')
-        with self.assertRaisesRegex(ValueError, '자체 서버 또는 NAS'):
+        with self.assertRaisesRegex(ValueError, '自有服务器或 NAS'):
             self.desktop.deployment({'id': 'external'})
         self.assertEqual(access.public_urls(self.desktop.preferences()), ['https://phone.example.com:8443'])
         from bridge.features.notifications.addresses import entry_urls
@@ -162,20 +182,96 @@ class AccessTests(unittest.TestCase):
                 self.desktop.save(value)
             self.assertEqual(self.desktop.config(), before)
 
+    def test_public_ipv6_literal_uses_the_browser_authority_in_the_saved_allowlist(self):
+        value = copy.deepcopy(self.value)
+        value['preferences'].update(lan=False, localAccess=False, connections=[{
+            'id': 'external', 'enabled': True, 'accessMode': 'external',
+            'publicUrl': 'https://[2001:0DB8:0000:0000:0000:0000:0000:0042]:8443/',
+        }])
+        state = self.desktop.save(value)
+        expected = 'https://[2001:db8::42]:8443'
+        self.assertEqual(state['urls'], [expected+'/'])
+        self.assertEqual(self.desktop.config()['origins'], [expected])
+        self.assertEqual(state['preferences']['connections'][0]['publicUrl'], expected)
+
+        # The configured URL authority, HTTP Host and browser Origin use the same
+        # canonical compressed literal; the existing exact allowlist remains intact.
+        host = urlsplit(expected).netloc
+        self.assertEqual(self.desktop.config()['origins'], ['https://'+host])
+        request = Handler.__new__(Handler)
+        request.server = SimpleNamespace(hosts={host}, secure_hosts={host}, local_access=False)
+        request.headers = Message()
+        request.headers['Host'] = host
+        request.headers['Origin'] = 'https://'+host
+        request.connection = SimpleNamespace(getsockname=lambda: ('2001:db8::10', 8787))
+        request.command, request.path = 'POST', '/api/test'
+        request.check_request(write=True)
+        request.headers.replace_header('Origin', 'https://[2001:0db8:0:0:0:0:0:42]:8443')
+        with self.assertRaisesRegex(PermissionError, '교차 사이트'):
+            request.check_request(write=True)
+
+        # IPv4 literals use the same existing HTTPS-origin canonicalization.
+        self.assertEqual(access.origin('https://192.0.2.42:443'), 'https://192.0.2.42')
+        self.assertEqual(access.origin('https://192.0.2.42:8443'), 'https://192.0.2.42:8443')
+        self.assertEqual(access.origin('https://[2001:db8::42]:443'), 'https://[2001:db8::42]')
+        with self.assertRaises(ValueError):
+            access.origin('https://2001:db8::42')
+        with self.assertRaises(ValueError):
+            access.origin('https://[fe80::42%25eth0]')
+
+        # An older saved origin using a non-canonical spelling is replaced on
+        # save, rather than retained beside the normalized public URL.
+        config = self.desktop.config()
+        config['origins'] = ['https://[2001:0db8:0:0:0:0:0:42]:8443']
+        write_json(self.desktop.config_path, config)
+        legacy_preferences = json.loads((self.directory/'desktop.json').read_text())
+        legacy_preferences['connections'][0]['publicUrl'] = 'https://[2001:0db8:0:0:0:0:0:42]:8443/'
+        write_json(self.directory/'desktop.json', legacy_preferences)
+        value = self.desktop.snapshot()
+        self.desktop.save(value)
+        self.assertEqual(self.desktop.config()['origins'], [expected])
+
+        value['preferences']['connections'][0]['publicUrl'] = 'http://[2001:db8::42]:8443'
+        with self.assertRaises(ValueError):
+            self.desktop.save(value)
+        self.assertEqual(self.desktop.config()['origins'], [expected])
+
+    def test_startup_normalizes_legacy_ip_literal_origins_before_allowlisting(self):
+        config_path = self.directory/'config.json'
+        expanded = 'https://[2001:0DB8:0000:0000:0000:0000:0000:0042]'
+        config_path.write_text(json.dumps({'auth': {'mode': 'password'}, 'origins': [expanded]}))
+        listener, monitor = MagicMock(), MagicMock()
+        monitor.scan.side_effect = RuntimeError('stop after listener configuration')
+        argv = ['run.py', '--config', str(config_path), '--origin', expanded,
+                '--origin', 'https://192.0.2.42:443']
+        with patch.object(run.sys, 'argv', argv), patch.object(run.sys, 'stdout', MagicMock()), \
+                patch.object(run.sys, 'stderr', MagicMock()), patch.object(run, 'Bridge'), \
+                patch.object(run, 'GatewayServer', return_value=listener) as server_factory, \
+                patch.object(run, 'DynamicListenerManager'), patch.object(run, 'RuntimeNetworkMonitor', return_value=monitor), \
+                patch.object(run, 'NetworkAdaptation'), patch.object(run, 'adaptation_settings', return_value={'enabled': False}), \
+                patch.object(run, 'GatewayControl'), patch.object(run.signal, 'signal'), \
+                self.assertRaisesRegex(RuntimeError, 'stop after listener'):
+            run.main(connections=[])
+        listener_config = server_factory.call_args.kwargs.get('config') or server_factory.call_args.args[2]
+        self.assertCountEqual(listener_config['origins'], [
+            'https://[2001:db8::42]', 'https://192.0.2.42',
+            'http://127.0.0.1:8787', 'http://localhost:8787',
+        ])
+
     def test_external_probe_classifies_tls_network_redirect_and_wrong_target(self):
         preferences = {'port': 8787, 'connections': [{
             'id': 'external', 'enabled': True, 'accessMode': 'external',
             'publicUrl': 'https://phone.example.com:8443'}]}
         selected = access.select_connection({**preferences, 'lan': False}, {'id': 'external'})
         cases = [(ssl.SSLError('certificate failed'), 'TLS'),
-                 (socket.gaierror('DNS failed'), '연결할 수 없습니다'),
-                 (ValueError('입장 반환 HTTP 302 리디렉션'), '리디렉션')]
+                 (socket.gaierror('DNS failed'), '无法连接'),
+                 (ValueError('入口返回 HTTP 302 重定向'), '重定向')]
         for error, message in cases:
             with self.subTest(error=error), patch.object(access, 'read_auth', side_effect=error):
                 with self.assertRaisesRegex(ValueError, message):
                     access.check_entry(selected, instance_id='current')
         with patch.object(access, 'read_auth', return_value={'instanceId': 'other'}) as probe:
-            with self.assertRaisesRegex(ValueError, '현재 게이트웨이'):
+            with self.assertRaisesRegex(ValueError, '当前网关'):
                 access.check_entry(selected, instance_id='current')
             probe.assert_called_once_with('https://phone.example.com:8443')
 
@@ -184,7 +280,7 @@ class AccessTests(unittest.TestCase):
         connection = MagicMock()
         connection.getresponse.return_value = response
         with patch.object(access.http.client, 'HTTPSConnection', return_value=connection) as create:
-            with self.assertRaisesRegex(ValueError, '리디렉션'):
+            with self.assertRaisesRegex(ValueError, '重定向'):
                 access.read_auth('https://phone.example.com:8443')
         self.assertEqual(create.call_args.args, ('phone.example.com', 8443))
         connection.request.assert_called_once_with('GET', '/api/auth', headers={'Cache-Control': 'no-cache'})
@@ -193,11 +289,11 @@ class AccessTests(unittest.TestCase):
     def test_running_configuration_cannot_change_external_access(self):
         self.desktop.save(self.value)
         self.desktop.status = lambda: {'running': True, 'pid': os.getpid()}
-        with self.assertRaisesRegex(ValueError, "현재\\ 연결이\\ 끊어지지\\ 않도록\\ 네트워크\\ 설정이나\\ 런타임\\ 경로를\\ 변경하기\\ 전에\\ 게이트웨이를\\ 중지하세요\\."):
+        with self.assertRaisesRegex(ValueError, '先停止'):
             self.desktop.save(self.server())
         invalid = copy.deepcopy(self.value)
         invalid['origins'] = ['https://new.example.com']
-        with self.assertRaisesRegex(ValueError, "HTTPS\\ 주소를\\ 변경하기\\ 전에\\ 게이트웨이를\\ 중지한\\ 다음\\ 저장하고\\ 다시\\ 시작하세요\\."):
+        with self.assertRaisesRegex(ValueError, '先停止'):
             self.desktop.save(invalid)
 
     def test_probe_checks_current_instance_and_does_not_send_credentials(self):
@@ -205,13 +301,13 @@ class AccessTests(unittest.TestCase):
         for remote, success in [({'instanceId': 'same'}, True), ({'instanceId': 'another'}, False), ({}, False)]:
             with patch('bridge.features.network.access.read_auth', side_effect=[{'instanceId': 'same'}, remote]) as read:
                 if success:
-                    self.assertIn("고정된 HTTPS 항목은 현재 게이트웨이에 도달합니다. 모바일 데이터를 사용하여 휴대폰에서 로그인 및 채팅을 확인하세요.", access.check_entry(preferences)['message'])
+                    self.assertIn('已连到当前网关', access.check_entry(preferences)['message'])
                 else:
-                    with self.assertRaisesRegex(ValueError, '현재 게이트웨이'):
+                    with self.assertRaisesRegex(ValueError, '当前网关'):
                         access.check_entry(preferences)
                 self.assertEqual(read.call_args_list[0].args, ('http://127.0.0.1:8787',))
         self.desktop.save(self.server())
-        with self.assertRaisesRegex(ValueError, "고정된\\ 항목을\\ 확인하기\\ 전에\\ 게이트웨이를\\ 시작하십시오\\."):
+        with self.assertRaisesRegex(ValueError, '先启动'):
             self.desktop.check_entry({'id':'server'})
 
     def test_fixed_notification_url_precedence_keeps_explicit_override(self):
@@ -221,7 +317,7 @@ class AccessTests(unittest.TestCase):
 
     def test_old_tunnel_url_and_stale_ssh_status_are_not_shown(self):
         self.desktop.save(self.server())
-        (self.directory/'외부 접속 주소.txt').write_text('https://stale.trycloudflare.com')
+        (self.directory/'外网地址.txt').write_text('https://stale.trycloudflare.com')
         write_json(self.directory/'ssh-status.json', {'pid': 101, 'message': 'old connection'})
         self.desktop.status = lambda: {'running': True, 'pid': 102}
         state = self.desktop.snapshot()
@@ -374,7 +470,7 @@ class ConcurrentRuntimeTests(unittest.TestCase):
                 starter.join(3); closer.join(3)
                 self.assertFalse(starter.is_alive() or closer.is_alive())
                 process.terminate.assert_called()
-                with self.assertRaisesRegex(RuntimeError, '터널이 멈췄다'): tunnel.start()
+                with self.assertRaisesRegex(RuntimeError, '隧道已停止'): tunnel.start()
             self.assertTrue(errors)
             tunnel.on_origin.assert_not_called()
 

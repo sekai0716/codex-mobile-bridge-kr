@@ -80,10 +80,10 @@ class ZCodeLinuxTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True), \
                 patch.dict(sys.modules, {'fcntl': fcntl}):
             app = package(Path(directory))
-            with self.assertRaisesRegex(ValueError, '그래픽 세션'):
+            with self.assertRaisesRegex(ValueError, '图形会话'):
                 zcode_pipe.launch(app)
             with patch.dict(os.environ, {'WAYLAND_DISPLAY': 'wayland-0'}), patch.object(zcode_pipe.desktop, 'processes', return_value=[1234]):
-                with self.assertRaisesRegex(ValueError, '이미 실행 중'):
+                with self.assertRaisesRegex(ValueError, '已在运行'):
                     zcode_pipe.launch(app)
         self.assertEqual(fcntl.mock_calls, [])
 

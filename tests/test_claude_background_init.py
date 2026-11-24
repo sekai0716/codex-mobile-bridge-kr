@@ -323,7 +323,7 @@ class BackgroundInitializationWorker(unittest.TestCase):
                 else:
                     self.assertTrue(self.adapter.status()['connected'])
                     self.assertTrue(self.adapter.discovery['consoleCleanupPending'])
-                    self.assertIn("Claude가 연결되었습니다. 개발자 도구 창을 수동으로 닫아주세요.", self.adapter.discovery['reason'])
+                    self.assertIn('开发者工具未自动关闭', self.adapter.discovery['reason'])
         self.foreground.assert_not_called()
 
     def test_none_falls_back_only_for_explicit_interactive_attempt(self):

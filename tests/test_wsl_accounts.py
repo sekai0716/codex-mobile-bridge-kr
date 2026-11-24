@@ -147,7 +147,7 @@ class WslAccountWorkerTests(unittest.TestCase):
         with patch.object(worker, '_write', side_effect=fail_with_external_change), self.assertRaises(worker.AccountError):
             self.switch(identifier)
         restored = worker.AccountStore('claude', str(self.home), guard=lambda *_: [])
-        with self.assertRaisesRegex(worker.AccountError, "네이티브\\ 구성이\\ 외부적으로\\ 수정되었습니다\\.\\ 원래\\ 도구에서\\ 해결하세요\\."):
+        with self.assertRaisesRegex(worker.AccountError, '外部修改'):
             restored.change({'action': 'switch', 'id': identifier,
                              'expectedIdentity': restored.public()['identity']})
         self.assertEqual((self.home/'settings.json').read_text(), '{"external":"retained"}')
@@ -168,7 +168,7 @@ class WslAccountWorkerTests(unittest.TestCase):
         saved = self.store.path.read_bytes()
         for changes in ({'apiKey': 'new-key'}, {'baseUrl': 'https://other.invalid'}, {'model': 'other-model'}):
             with self.subTest(changes=changes):
-                with self.assertRaisesRegex(worker.AccountError, "활성\\ 프로필을\\ 편집하기\\ 전에\\ 다른\\ 프로필로\\ 전환하십시오\\.\\ 이름을\\ 직접\\ 바꿀\\ 수\\ 있습니다\\."):
+                with self.assertRaisesRegex(worker.AccountError, '先切换到其他接入'):
                     self.save(id=identifier, **changes)
                 self.assertEqual(self.store.files(), files)
                 self.assertEqual(self.store.path.read_bytes(), saved)
@@ -387,7 +387,7 @@ class WslAccountModelCacheTests(unittest.TestCase):
             return record
         with patch.object(self.accounts.models_store, 'read', side_effect=closing_read), \
                 patch('bridge.features.accounts.wsl_account_models.threading.Timer') as timer:
-            with self.assertRaisesRegex(ValueError, "중지"):
+            with self.assertRaisesRegex(ValueError, '停止'):
                 self.accounts.change(self.request)
             timer.assert_not_called()
 

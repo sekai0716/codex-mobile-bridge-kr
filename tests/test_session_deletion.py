@@ -77,7 +77,7 @@ class DeletionTests(unittest.TestCase):
         prepare = Mock(return_value=fail)
         args = (self.root, request_id, snapshot['scope'], lambda: snapshot, self.store.existing_ids, prepare)
         with self.assertRaises(CreationError): commands.perform(*args)
-        with self.assertRaisesRegex(ValueError, "이전\\ 삭제\\ 내용은\\ 확인되지\\ 않으며\\ 다시\\ 제출되지\\ 않습니다\\.\\ 삭제\\ 메뉴를\\ 다시\\ 열어\\ 확인하세요\\."): commands.perform(*args)
+        with self.assertRaisesRegex(ValueError, '不会重复'): commands.perform(*args)
         self.assertEqual(prepare.call_count, 1)
 
     def test_partial_delete_cannot_confirm_or_replay(self):

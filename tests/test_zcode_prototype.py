@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from bridge.clients.errors import BridgeUnavailable
 from bridge.clients.manager import DesktopSessions
 from bridge.clients.zcode.adapter import ZCodePrototype, project_files, project_snapshot
 from bridge.platforms.macos.loopback import listener_identity
@@ -14,6 +15,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ZCodePrototypeTests(unittest.TestCase):
+    def test_native_product_turn_clocks_survive_projection_without_guessing_from_messages(self):
+        start = 1700000000000
+        snapshot = {'sessionId': 'sess_test', 'revision': 1, 'seq': 1, 'logEpoch': 'epoch',
+                    'control': {'activeWorks': []}, 'pendingInteractions': [], 'queue': {'items': []},
+                    'rows': {'totalCount': 3, 'window': [
+                        {'rowId': 1, 'kind': 'turnHeader', 'turnId': 'legacy', 'productTurnId': 'product',
+                         'state': 'completedSuccess', 'startedAt': start, 'endedAt': start + 125000, 'activeMs': 60000},
+                        {'rowId': 2, 'kind': 'assistantText', 'turnId': 'legacy-followup', 'productTurnId': 'product',
+                         'visibility': 'visible', 'text': 'answer', 'createdAt': start + 1000},
+                        {'rowId': 3, 'kind': 'assistantText', 'turnId': 'partial',
+                         'visibility': 'visible', 'text': 'partial history', 'createdAt': start + 200000},
+                    ]}}
+        rows = project_snapshot(snapshot, str(self.project))['messages']
+        self.assertEqual(rows[0]['turnId'], 'product')
+        self.assertEqual(rows[0]['turnStatus'], 'completed')
+        self.assertEqual(rows[0]['turnStartedAt'], start)
+        self.assertEqual(rows[0]['turnCompletedAt'], start + 125000)
+        self.assertEqual(rows[1]['turnId'], 'partial')
+        self.assertNotIn('turnStartedAt', rows[1])
+        self.assertNotIn('turnCompletedAt', rows[1])
+        self.assertNotIn('turnStatus', rows[1])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=ROOT / '.tmp')
         self.addCleanup(self.temp.cleanup)
@@ -51,7 +74,7 @@ class ZCodePrototypeTests(unittest.TestCase):
         self.assertEqual(recovered.call('zcode', 'send', 'sess_test', body), result)
         recovered_transport.assert_not_called()
         self.assertEqual(transport.call_count, 1)
-        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
+        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
             recovered.call('zcode', 'send', 'sess_test', {**body, 'text': 'different'})
 
     def test_project_reference_revalidates_shared_boundary(self):
@@ -65,12 +88,60 @@ class ZCodePrototypeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             project_files(self.project, ['file.md', 'file.md'])
 
+    def test_removed_project_does_not_block_plain_text_or_advertise_project_references(self):
+        transport = Mock(return_value={'status': 'accepted', 'result': {'delivery': 'startNow'}})
+        manager = self.manager(transport)
+        self.project.rmdir()
+        body = {'id': str(uuid.uuid4()), 'text': 'continue without local project files'}
+        result = manager.call('zcode', 'send', 'sess_test', body)
+        self.assertEqual(result['status'], 'accepted')
+        transport.assert_called_once()
+        self.assertEqual(transport.call_args.args[0]['body']['files'], [])
+
+        snapshot = {'sessionId': 'sess_test', 'revision': 1, 'seq': 1, 'logEpoch': 'epoch',
+                    'control': {'canStop': False, 'activeWorks': []}, 'rows': {'totalCount': 0, 'window': []},
+                    'pendingInteractions': [], 'queue': {'items': []}, 'inputRouting': {'mode': 'startNow'}}
+        capabilities = project_snapshot(snapshot, str(self.project))['capabilities']
+        self.assertTrue(capabilities['send'])
+        self.assertFalse(capabilities['projectReferences'])
+        self.assertTrue(capabilities['attachments'])
+        detail = project_snapshot(snapshot, str(self.project))
+        self.assertIn('原项目目录已不可用', detail['notice'])
+        with self.assertRaisesRegex(ValueError, '原项目目录不可用'):
+            project_files(self.project, ['missing.md'])
+
+        upload = self.root/'upload.bin'; upload.write_bytes(b'uploaded outside the old project')
+        uploaded = manager.call('zcode', 'send', 'sess_test', {
+            'id': str(uuid.uuid4()), 'text': 'include upload',
+            'resolvedFiles': [{'id': 'fixture-upload', 'path': str(upload), 'name': upload.name}]})
+        self.assertEqual(uploaded['status'], 'accepted')
+        self.assertEqual(transport.call_count, 2)
+        self.assertEqual(transport.call_args.args[0]['body']['files'][0]['name'], upload.name)
+
+    def test_removed_zcode_project_has_explicit_workspace_unavailable_state(self):
+        manager = self.manager(Mock())
+        adapter = Mock()
+        manager.adapters['zcode'] = adapter
+        adapter.call.return_value = {'sessions': [{'id': 'sess_test', 'cwd': str(self.project)}]}
+        self.project.rmdir()
+        from bridge.clients.errors import BridgeUnavailable
+        with self.assertRaisesRegex(BridgeUnavailable, '项目目录'):
+            manager.workspace_bridge('zcode', 'sess_test')
+
+        history = self.root/'native-history'; history.mkdir()
+        (history/'tasks-index.sqlite').touch()
+        adapter.record_path.return_value = str(history/'tasks-index.sqlite')
+        bridge = manager.workspace_bridge('zcode', 'sess_test', host_files=True)
+        self.assertIsNone(bridge.root)
+        self.assertEqual(bridge.history_path, str(history/'tasks-index.sqlite'))
+        self.assertEqual(bridge.workspace('sess_test', 'list', {'scope': 'host'})['path'], history.as_posix())
+
     def test_wrong_session_and_unbound_write_are_not_dispatched(self):
         transport = Mock()
         adapter = ZCodePrototype(self.root, self.config, transport)
         with self.assertRaises(ValueError): adapter.call('stop', 'another-session', {'id': str(uuid.uuid4())})
         adapter.bindings.clear()
-        with self.assertRaisesRegex(Exception, "먼저\\ 기본\\ 테스트\\ 세션에\\ 명시적으로\\ 연결해야\\ 합니다\\."): adapter.call('send', 'sess_test', {'id': str(uuid.uuid4()), 'text': 'hi'})
+        with self.assertRaisesRegex(Exception, '显式接入'): adapter.call('send', 'sess_test', {'id': str(uuid.uuid4()), 'text': 'hi'})
         transport.assert_not_called()
 
     def test_explicit_attach_does_not_require_the_stale_binding(self):
@@ -89,23 +160,23 @@ class ZCodePrototypeTests(unittest.TestCase):
                 return {'workspace': str(self.project)}
             if req['action'] == 'attach':
                 return {'binding': binding, 'subscriptionId': 'lease'}
-            raise BridgeUnavailable('알 수 없는 영수증')
+            raise BridgeUnavailable('回执未知')
         transport = Mock(side_effect=native)
         adapter = ZCodePrototype(self.root, {**self.config, 'dataDirectory': self.root/'v2'}, transport)
         rid = str(uuid.uuid4())
         with patch.object(adapter, '_window_app', return_value='original'), \
                 patch.object(adapter, '_live_process', return_value={'pid': 70}), \
                 patch.object(adapter, '_resume_window', return_value={'id': rid, 'status': 'ready'}) as window, \
-                patch.object(adapter, '_send_window', side_effect=BridgeUnavailable('알 수 없는 영수증')) as send:
+                patch.object(adapter, '_send_window', side_effect=BridgeUnavailable('回执未知')) as send:
             adapter.call('resume', 'sess_test', {'id': rid})
-            with self.assertRaisesRegex(BridgeUnavailable, '알 수 없는 영수증'):
+            with self.assertRaisesRegex(BridgeUnavailable, '回执未知'):
                 adapter.call('send', 'sess_test', {'id': rid, 'text': 'only once'})
             transport.assert_not_called()
             # Lock only prevents the GUI's explicit resume. An authorized debugger
             # reconnects the same session without unlocking or retrying that input.
-            window.side_effect = ResumePreflightBlocked('화면이 잠겨 있습니다.')
+            window.side_effect = ResumePreflightBlocked('屏幕已锁定')
             self.assertEqual(adapter.call('resume', 'sess_test', {'id': rid})['status'], 'ready')
-            with self.assertRaisesRegex(BridgeUnavailable, '알 수 없는 영수증'):
+            with self.assertRaisesRegex(BridgeUnavailable, '回执未知'):
                 adapter.call('send', 'sess_test', {'id': rid, 'text': 'new input'})
             self.assertEqual([c.args[0]['action'] for c in transport.call_args_list], ['target','attach','send'])
             send.assert_called_once()
@@ -141,14 +212,14 @@ class ZCodePrototypeTests(unittest.TestCase):
         outside = self.root / 'replacement'; outside.mkdir()
         (outside / 'file.md').write_text('different project')
         self.project.symlink_to(outside, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 다시\\ 로그인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '项目目录已变化'):
             project_files(str(self.project), ['file.md'])
 
     @patch('bridge.clients.zcode.adapter.Workspace')
     def test_attachment_total_is_bounded_before_native_transfer(self, workspace):
         workspace.return_value.root = self.project
         workspace.return_value.read.return_value = {'name': 'file', 'size': 12 * 1024 * 1024, 'data': ''}
-        with self.assertRaisesRegex(ValueError, "프로토타입의\\ 총\\ 첨부\\ 파일\\ 수는\\ 다음을\\ 초과할\\ 수\\ 없습니다\\.\\ 20\\ MB"):
+        with self.assertRaisesRegex(ValueError, '总量'):
             project_files(self.project, ['one', 'two'])
 
     def test_projection_keeps_stable_ids_native_attachments_and_partial_history(self):
@@ -198,13 +269,90 @@ class ZCodePrototypeTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(request['body']['files'][0]['data']), b'new project')
         self.assertEqual(adapter.config['binding'], {'owner': 'one'})
 
+    def test_created_sessions_keep_their_verified_scope_beside_an_existing_anchor(self):
+        owner = {'pid': 7, 'birth': 'one'}
+        (self.root/'tasks-index.sqlite').touch()
+        for same_project in (True, False):
+            with self.subTest(same_project=same_project):
+                project = self.project if same_project else self.root
+                binding = {'clientId': 'native', 'connectionId': 'connection',
+                           'runtime': {'identity': 'runtime', 'workspaceKey': str(project)}}
+                snapshot = {'sessionId': 'sess_new', 'revision': 1, 'seq': 2, 'logEpoch': 'epoch',
+                            'control': {'canStop': False, 'activeWorks': []},
+                            'rows': {'totalCount': 0, 'window': []}, 'pendingInteractions': [],
+                            'queue': {'items': []}, 'inputRouting': {'mode': 'startNow'}}
+                transport = Mock(side_effect=lambda request: {
+                    'status': 'accepted', 'result': {'id': 'sess_new'},
+                    'workspace': str(project), 'binding': binding} if request['action'] == 'create'
+                    else {'snapshot': snapshot})
+                adapter = ZCodePrototype(self.root, {**self.config, 'dataDirectory': str(self.root)},
+                                         transport, pipe=Mock())
+                adapter.application_create = True
+                adapter.process = adapter.application_owner = owner
+                adapter.debug_sessions.add('sess_test')
+                result = adapter.call('create', body={'id': str(uuid.uuid4()),
+                    'projectKey': str(project), 'firstMessage': 'new chat'})
+                self.assertEqual(result['status'], 'accepted')
+                self.assertEqual(adapter.sid, 'sess_test')
+                self.assertEqual(adapter.workspace, str(self.project))
+                self.assertEqual(adapter.application_owner, owner)
+                with patch.object(adapter, '_live_process', return_value=owner), \
+                        patch('bridge.clients.zcode.reply_metadata.native_reply_models', return_value={}):
+                    self.assertFalse(adapter.inventory_status()['connected'])
+                    detail = adapter.call('detail', 'sess_new')
+                    self.assertTrue(detail['session']['runtimeKnown'])
+                    self.assertTrue(detail['capabilities']['send'])
+                    self.assertEqual(detail['session'].get('controlScope'), 'session')
+                    self.assertEqual(detail['session']['connectionState'], 'ready')
+                    self.assertEqual(transport.call_args.args[0]['binding'], binding)
+
+                    snapshot['queue'] = None
+                    unknown = adapter.call('detail', 'sess_new')
+                    self.assertFalse(unknown['session']['runtimeKnown'])
+                    self.assertFalse(unknown['capabilities']['send'])
+                    self.assertFalse(any(unknown['capabilities']['sendModes'].values()))
+
+    def test_created_session_without_binding_does_not_claim_a_live_session(self):
+        transport = Mock(return_value={'status': 'accepted', 'result': {'id': 'sess_new'},
+                                      'workspace': str(self.root)})
+        adapter = ZCodePrototype(self.root, self.config, transport, pipe=Mock())
+        adapter.application_create = True
+        adapter.call('create', body={'id': str(uuid.uuid4()), 'projectKey': str(self.root),
+                                     'firstMessage': 'new chat'})
+        self.assertNotIn('sess_new', adapter.debug_sessions)
+        transport.reset_mock()
+        with self.assertRaisesRegex(BridgeUnavailable, '显式接入'):
+            adapter.call('send', 'sess_new', {'id': str(uuid.uuid4()), 'text': 'do not dispatch'})
+        transport.assert_not_called()
+
+    def test_created_session_registration_is_retired_with_its_original_process(self):
+        owner = {'pid': 7, 'birth': 'one'}
+        transport = Mock(return_value={'status': 'accepted', 'result': {'id': 'sess_new'},
+                                      'workspace': str(self.root), 'binding': {'owner': 'one'}})
+        adapter = ZCodePrototype(self.root, self.config, transport, pipe=Mock())
+        adapter.application_create = True
+        adapter.process = adapter.application_owner = owner
+        adapter.call('create', body={'id': str(uuid.uuid4()), 'projectKey': str(self.root),
+                                     'firstMessage': 'new chat'})
+        self.assertIn('sess_new', adapter.debug_sessions)
+        replacement = {'pid': 7, 'birth': 'other'}
+        adapter._adopt_process(replacement)
+        self.assertFalse(adapter.debug_sessions)
+        self.assertFalse(adapter.bindings)
+        self.assertFalse(adapter.application_create)
+        transport.reset_mock()
+        with patch.object(adapter, '_live_process', return_value=replacement), \
+                self.assertRaisesRegex(BridgeUnavailable, '连接原会话'):
+            adapter.call('send', 'sess_new', {'id': str(uuid.uuid4()), 'text': 'do not dispatch'})
+        transport.assert_not_called()
+
     def test_new_project_requires_explicit_binding_after_adapter_restart(self):
         new = str(self.root / 'new-project')
         transport = Mock(return_value={'sessions': [{'id': 'sess_new', 'cwd': new}]})
         adapter = ZCodePrototype(self.root, self.config, transport)
         adapter.call('list')
         transport.reset_mock()
-        with self.assertRaisesRegex(Exception, "먼저\\ 기본\\ 테스트\\ 세션에\\ 명시적으로\\ 연결해야\\ 합니다\\."):
+        with self.assertRaisesRegex(Exception, '显式接入'):
             adapter.call('send', 'sess_new', {'id': str(uuid.uuid4()), 'text': 'test'})
         transport.assert_not_called()
 

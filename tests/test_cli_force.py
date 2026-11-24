@@ -108,11 +108,11 @@ class CliForceTests(CliForceFixture):
     def test_force_requires_fresh_process_and_config_binding(self):
         body = self.confirmation(self.preview())
         self.generation = (43323, 'changed')
-        with self.assertRaisesRegex(ValueError, "CLI\\ 구성,\\ 프로세스\\ 또는\\ 영향\\ 범위가\\ 변경되었습니다\\.\\ 다시\\ 미리\\ 보십시오\\."):
+        with self.assertRaisesRegex(ValueError, '重新预览'):
             self.bridge.cli_network(self.thread_id, body)
         body = self.confirmation(self.preview())
         (self.home/'config.toml').write_text('model = "new"\n')
-        with self.assertRaisesRegex(ValueError, "CLI\\ 구성,\\ 프로세스\\ 또는\\ 영향\\ 범위가\\ 변경되었습니다\\.\\ 다시\\ 미리\\ 보십시오\\."):
+        with self.assertRaisesRegex(ValueError, '重新预览'):
             self.bridge.cli_network(self.thread_id, body)
         self.force.assert_not_called()
         self.assertFalse(self.bridge.cli_force.path.exists())
@@ -165,7 +165,7 @@ class CliForceTests(CliForceFixture):
         body = self.confirmation(self.preview())
         self.assertEqual(self.bridge.cli_network(self.thread_id, body)['status'], 'stopped')
         self.assertEqual(self.bridge._cli_recovery_record()['unresolvedResume'], original)
-        with self.assertRaisesRegex(IPCError, "이전의\\ CLI\\ 연결\\ 결과는\\ 아직\\ 알려지지\\ 않았습니다\\.\\ 저장된\\ 상태에서\\ 다시\\ 연결되는지\\ 확인하고\\ 명확하게\\ 확인하세요\\.\\ 작업이\\ 전송되지\\ 않았습니다\\.。"):
+        with self.assertRaisesRegex(IPCError, '明确确认'):
             self.bridge._recover_cli_environment(self.thread_id)
         self.bridge.activate.assert_not_called()
         self.cli._start_daemon.assert_not_called()
@@ -202,7 +202,7 @@ class CliForceTests(CliForceFixture):
         result = self.bridge._force_cli_connection(self.thread_id, key, str(uuid.uuid4()), preview['generation'])
         self.assertEqual(result['status'], 'released')
         self.assertEqual(self.bridge._cli_recovery_record()['unresolvedResume'], original)
-        with self.assertRaisesRegex(IPCError, "이전의\\ CLI\\ 연결\\ 결과는\\ 아직\\ 알려지지\\ 않았습니다\\.\\ 저장된\\ 상태에서\\ 다시\\ 연결되는지\\ 확인하고\\ 명확하게\\ 확인하세요\\.\\ 작업이\\ 전송되지\\ 않았습니다\\.。"):
+        with self.assertRaisesRegex(IPCError, '明确确认'):
             self.bridge._recover_cli_environment(self.thread_id)
         self.cli._start_daemon.assert_not_called()
 

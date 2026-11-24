@@ -36,7 +36,7 @@ class CreationChoices(unittest.TestCase):
             root = Path(folder)
             reader = Catalog(root, 'fixture', allow_background_refresh=False)
             reader._fetch = Mock(return_value={'models': [], 'modelSource': 'api',
-                '_defaultProvider': 'custom', 'modelError': '모델 디렉터리를 일시적으로 사용할 수 없습니다.'})
+                '_defaultProvider': 'custom', 'modelError': '模型目录暂不可用'})
             bridge = object.__new__(Bridge)
             bridge.host = 'local'
             bridge.projects = lambda host=None: [{'key': 'local|p', 'host': 'local', 'cwd': folder, 'type': 'desktop'}]
@@ -53,7 +53,7 @@ class CreationChoices(unittest.TestCase):
             self.assertEqual(validate(choice, value)['model'], 'manual-model')
             (root/'auth.json').write_text('{"account":"changed"}')
             changed = bridge.creation_models('local|p')
-            with self.assertRaisesRegex(ValueError, "계정이나\\ 운영\\ 환경이\\ 변경되었습니다\\.\\ 새\\ 채팅의\\ 모델\\ 목록을\\ 새로고침해주세요\\."):
+            with self.assertRaisesRegex(ValueError, '账号或运行环境已变化'):
                 validate(choice, changed)
 
     def test_independent_codex_entry_never_routes_empty_project_to_default_account(self):
@@ -122,7 +122,7 @@ class CreationChoices(unittest.TestCase):
         self.assertEqual(calls[0], ('thread/start', {'cwd':'.','ephemeral':False,'model':'fixture-model','config':{'model_reasoning_effort':'low'}}))
         self.assertNotIn('turn/start', [method for method,_ in calls])
         with patch('bridge.features.sessions.create._runtime_operation', side_effect=lambda a,b,c,run:run(rpc)):
-            with self.assertRaisesRegex(CreationError, "채팅이\\ 생성되었으나\\ 모델이나\\ 사고\\ 강도가\\ 확인되지\\ 않았습니다\\.\\ 원본\\ 대화를\\ 확인하세요\\.\\ 다시\\ 생성되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(CreationError, '尚未确认'):
                 create_empty('fixture', Path('.'), '.', 'Name', model='different-model', effort='low')
 
 

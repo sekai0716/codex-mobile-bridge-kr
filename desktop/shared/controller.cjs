@@ -2,8 +2,8 @@
 const {spawn}=require('node:child_process');
 const path=require('node:path');
 function runWorker({executable,prefix=[],dataDir},action,payload){
-  const allowed=new Set(['tailscale-setup','read-credentials','server-setup','connection-credentials','snapshot','save','start','stop','logs','test-notification','webhook-endpoint','network-adaptation','deployment','export-deployment','check-entry','devices','pairing','account', 'accounts', 'cli-access', 'harness', 'desktop-sessions','notification-watches','transfer-settings','update-preflight','update-prepare']);
-  if(!allowed.has(action))return Promise.reject(Error('알 수 없는 작업입니다.'));
+  const allowed=new Set(['tailscale-setup','read-credentials','server-setup','connection-credentials','snapshot','save','start','stop','logs','test-notification','webhook-endpoint','network-adaptation','deployment','export-deployment','check-entry','devices','pairing','account', 'accounts', 'cli-access', 'harness', 'desktop-sessions','notification-watches','transfer-settings','update-preflight','update-prepare','update-backup']);
+  if(!allowed.has(action))return Promise.reject(Error('未知操作'));
   return new Promise((resolve,reject)=>{
     const child=spawn(executable,[...prefix,action,'--data-dir',dataDir],{stdio:['pipe','pipe','pipe'],windowsHide:true});
     let output='',error='';

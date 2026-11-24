@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from bridge.clients.codex.ipc import DesktopIPC, IPCError
 from bridge.app.service import LiveSession
@@ -23,43 +23,6 @@ class RecoveryTests(unittest.TestCase):
         with self.bridge.lock:
             self.bridge.live[sibling.id] = sibling
         return sibling
-
-    def test_target_failure_preserves_working_follower_and_has_no_host_restart_advice(self):
-        target = self.bridge.session(THREAD)
-        sibling = self.sibling()
-        sibling.connected, sibling.owner = True, 'other-owner'
-        sibling.retry_at, sibling.last_activation = 55, 14
-        target.connected = False
-        with patch.object(self.bridge, '_refresh_async'), patch.object(self.bridge, 'activate', side_effect=IPCError('no-client-found')), \
-             patch.object(self.bridge.ipc, 'reconnect') as replace:
-            with self.assertRaises(IPCError):
-                self.bridge.rebuild_connection(target.id)
-        replace.assert_not_called()
-        self.assertEqual((True, 'other-owner', 55, 14, None), (sibling.connected, sibling.owner, sibling.retry_at,
-                                                            sibling.last_activation, sibling.error))
-        self.assertTrue(target.rebuild_recommended)
-        self.assertFalse(target.desktop_restart_recommended)
-        self.assertFalse(self.bridge.desktop_restart_recommended())
-
-    def test_rebuild_preserves_another_inflight_follow(self):
-        target = self.bridge.session(THREAD)
-        sibling = self.sibling()
-        sibling.connecting = sibling.owner_probe_inflight = sibling.discovering = True
-        target.connected = False
-        with patch.object(self.bridge, '_refresh_async'), patch.object(self.bridge, 'activate', return_value=target), \
-             patch.object(self.bridge.ipc, 'reconnect') as replace:
-            self.bridge.rebuild_connection(target.id)
-        replace.assert_not_called()
-
-    def test_transport_loss_does_not_reset_an_unfollowed_chat(self):
-        target = self.bridge.session(THREAD)
-        sibling = self.sibling()
-        sibling.last_activation, sibling.retry_at, sibling.error = 12, 98, 'saved history only'
-        self.bridge._disconnected()
-        self.assertFalse(target.connected)
-        self.assertTrue(target.rebuild_recommended)
-        self.assertEqual((12, 98, 'saved history only', 0, False), (sibling.last_activation, sibling.retry_at,
-                         sibling.error, sibling.sequence, sibling.rebuild_recommended))
 
     def test_late_write_failure_does_not_invalidate_recovered_session_or_repeat_write(self):
         target = self.bridge.session(THREAD)
@@ -78,45 +41,6 @@ class RecoveryTests(unittest.TestCase):
         self.assertTrue(target.connected)
         self.assertIsNone(target.error)
 
-    def test_owner_disconnect_requires_an_identified_client_on_this_host(self):
-        target = self.bridge.session(THREAD)
-        sibling = self.sibling()
-        for params in (None, {'status': 'disconnected'}, {'status': 'disconnected', 'clientId': target.owner, 'hostId': 'other-host'}):
-            self.bridge._event({'method': 'client-status-changed', 'params': params})
-        self.assertTrue(target.connected)
-        self.assertEqual(sibling.sequence, 0)
-        self.bridge._event({'method': 'client-status-changed', 'params': {
-            'status': 'disconnected', 'clientId': target.owner, 'hostId': self.bridge.native_host}})
-        self.assertFalse(target.connected)
-        self.assertEqual(sibling.sequence, 0)
-
-    def test_recovered_host_retires_only_existing_restart_warnings(self):
-        target = self.bridge.session(THREAD)
-        target.connected = False
-        sibling = self.sibling()
-        sibling.desktop_restart_recommended = sibling.rebuild_recommended = True
-        sibling.error = 'earlier host outage'
-        self.fixture.snapshot()
-        with sibling.condition:
-            self.assertTrue(sibling.condition.wait_for(lambda: not sibling.desktop_restart_recommended, timeout=2))
-        self.assertTrue(target.connected)
-        self.assertTrue(sibling.rebuild_recommended)
-        self.assertIn('this chat', sibling.error)
-        self.assertFalse(self.bridge.desktop_restart_recommended())
-
-    def test_follow_failure_after_matching_snapshot_keeps_connection(self):
-        target = self.bridge.session(THREAD)
-        target.connected = False
-        def snapshot_then_fail(*args, **kwargs):
-            self.fixture.snapshot()
-            with target.condition:
-                self.assertTrue(target.condition.wait_for(lambda: target.connected, timeout=2))
-            raise IPCError('server-closed')
-        with patch.object(self.bridge.ipc, 'follow', side_effect=snapshot_then_fail):
-            self.bridge._attach(target)
-        self.assertTrue(target.connected)
-        self.assertIsNone(target.error)
-
     def test_changed_router_revalidates_target_even_with_a_working_sibling(self):
         target = self.bridge.session(THREAD)
         sibling = self.sibling()
@@ -127,19 +51,6 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(target.state['title'], 'Fresh owner snapshot')
         self.assertTrue(sibling.connected)
         replace.assert_not_called()
-
-    def test_recovering_one_chat_preserves_connected_sibling(self):
-        session = self.bridge.session(THREAD)
-        sibling = self.sibling()
-        sibling.connected = True
-        with session.condition:
-            session.connected = False
-            session.rebuild_recommended = True
-        with patch.object(self.bridge.ipc, 'endpoint_changed', return_value=True), patch.object(
-                self.bridge.ipc, 'reconnect') as replace:
-            self.assertTrue(self.bridge.rebuild_connection(THREAD).connected)
-        replace.assert_not_called()
-        self.assertTrue(sibling.connected)
 
     def test_observed_socket_disconnect_recovers_before_old_success_cooldown(self):
         if os.name == 'nt':
@@ -355,9 +266,9 @@ class RecoveryTests(unittest.TestCase):
         started, replaced = threading.Event(), threading.Event()
         original_socket = self.bridge.ipc.socket
         rebuild = self.bridge._rebuild_desktop_transport
-        def replace(thread_id):
+        def replace():
             replaced.set()
-            return rebuild(thread_id)
+            return rebuild()
         def reconnect():
             started.set()
             return self.bridge.reconnect_session(THREAD)
@@ -475,6 +386,34 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(session.view()['rebuildRecommended'])
         self.assertFalse(self.bridge.desktop_restart_recommended())
 
+    def _hosted_cold_recovery_keeps_shared_transport(self, *, rebuild):
+        from bridge.app.service import LiveSession
+        session = self.bridge.session(THREAD)
+        self.bridge.ipc.hosted = True
+        self.fixture.loaded = False
+        session.connected = False
+        session.rebuild_recommended = True
+        session.last_activation = time.monotonic() if rebuild else None
+        other = LiveSession('other-chat')
+        other.runtime = other.origin = 'desktop'
+        other.connected = True
+        other.owner = 'original-owner'
+        self.bridge.live[other.id] = other
+        original_socket = self.bridge.ipc.socket
+        with patch.object(self.bridge.ipc, 'endpoint_changed', return_value=False), patch(
+                'bridge.app.service.open_in_desktop', side_effect=lambda *_: setattr(self.fixture, 'loaded', True)) as navigate:
+            result = self.bridge.reconnect_session(THREAD, rebuild=rebuild)
+        self.assertTrue(result.connected)
+        self.assertIs(self.bridge.ipc.socket, original_socket)
+        self.assertTrue(other.connected, 'One cold chat must not disconnect another chat')
+        navigate.assert_called_once()
+
+    def test_hosted_cold_activation_keeps_other_chats_connected(self):
+        self._hosted_cold_recovery_keeps_shared_transport(rebuild=False)
+
+    def test_hosted_explicit_rebuild_keeps_other_chats_connected(self):
+        self._hosted_cold_recovery_keeps_shared_transport(rebuild=True)
+
     def test_reconnect_clears_old_transport_synchronously(self):
         ipc = self.bridge.ipc
         ipc.connect()
@@ -486,11 +425,29 @@ class RecoveryTests(unittest.TestCase):
         ipc._disconnect(old)  # A delayed old reader must not invalidate the replacement.
         self.assertEqual(ipc.client_id, client_id)
 
+    def test_rebuild_checks_new_connection_after_an_old_probe_finishes(self):
+        session = self.bridge.session(THREAD)
+        self.bridge._disconnected()
+        session.owner_probe_inflight = True
+        original_wait = session.condition.wait_for
+
+        def wait_for(predicate, timeout=None):
+            if session.owner_probe_inflight:
+                session.owner_probe_inflight = False
+                return True
+            return original_wait(predicate, timeout)
+
+        with patch.object(self.bridge, '_refresh_async'), patch.object(session.condition, 'wait_for', side_effect=wait_for), \
+             patch('bridge.app.service.open_in_desktop') as navigate:
+            result = self.bridge.reconnect_session(THREAD, rebuild=True)
+        self.assertTrue(result.connected)
+        navigate.assert_not_called()
+
     def test_unreachable_owner_finishes_with_remote_rebuild_available(self):
         session = self.bridge.session(THREAD)
         self.bridge._disconnected()
         with patch.object(self.bridge, '_attach'), patch('bridge.app.service.open_in_desktop', side_effect=OSError('unavailable')):
-            with self.assertRaisesRegex(IPCError, "게이트웨이\\ 연결이\\ 다시\\ 설정되었지만\\ 원래\\ 데스크톱\\ 세션은\\ 복원되지\\ 않았습니다\\.\\ 애플리케이션\\ 관리에서\\ 작업을\\ 확인한\\ 후\\ 다시\\ 시작할\\ 수\\ 있습니다\\.\\ Codex；작업이\\ 전송되지\\ 않았습니다\\.。"):
+            with self.assertRaisesRegex(IPCError, '应用管理'):
                 self.bridge.rebuild_connection(THREAD)
         self.assertTrue(session.view()['desktopRestartRecommended'])
         self.assertTrue(self.bridge.desktop_restart_recommended())
@@ -504,7 +461,7 @@ class RecoveryTests(unittest.TestCase):
         session.rebuild_recommended = False
         with patch.object(self.bridge, '_refresh_async'), patch.object(
                 self.bridge.ipc, 'reconnect', side_effect=IPCError('interrupted')):
-            with self.assertRaisesRegex(IPCError, "원래\\ 데스크톱\\ 세션의\\ 연결이\\ 여전히\\ 끊어졌습니다\\.\\ 다시\\ 재구축해\\ 보세요\\.\\ 실패하면\\ Codex를\\ 다시\\ 시작하기\\ 전에\\ 앱\\ 관리에서\\ 작업을\\ 검토하세요\\."):
+            with self.assertRaisesRegex(IPCError, '再次重建'):
                 self.bridge.rebuild_connection(THREAD)
         self.assertTrue(session.view()['desktopRestartRecommended'])
         self.assertTrue(session.view()['rebuildRecommended'])
@@ -523,6 +480,58 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(request.call_count, 1)
         self.assertFalse(session.connected)
         self.assertTrue(session.view()['rebuildRecommended'])
+
+
+
+class MaintenanceMetadataTests(unittest.TestCase):
+    def test_transient_metadata_failure_does_not_kill_passive_recovery(self):
+        from bridge.app.service import Bridge, LiveSession
+        from bridge.clients.codex.remote import RemoteUnavailable
+        bridge = Bridge.__new__(Bridge)
+        bridge.host = 'local'
+        bridge.accounts = None
+        bridge.closed = Mock()
+        bridge.closed.is_set.return_value = False
+        bridge.lock = threading.RLock()
+        bridge.submit_lock = threading.RLock()
+        bridge.submissions = {}
+        bridge.ipc = Mock(client_id='fixture-router')
+        bridge.released_cli = Mock()
+        bridge.released_cli.contains.return_value = False
+        bridge._access = Mock(return_value={})
+        first, sibling = LiveSession('first'), LiveSession('sibling')
+        for session in (first, sibling):
+            session.watched = True
+            session.activity_only = True
+        bridge.live = {'first': first, 'sibling': sibling}
+        bridge.store = Mock()
+        bridge.store.attached_parent.return_value = None
+        calls = []
+        def metadata(identifier):
+            calls.append(identifier)
+            if calls == ['first']:
+                raise RemoteUnavailable('SSH temporarily unavailable')
+            return {'origin': 'cli', 'cwd': '/original', 'model_provider': 'original-provider'}
+        bridge.store.get.side_effect = metadata
+        rounds = []
+        def wait(delay):
+            rounds.append(delay)
+            if len(rounds) == 2:
+                self.assertEqual(first.error, 'SSH temporarily unavailable')
+                self.assertFalse(first.origin_verified)
+                for session in (first, sibling):
+                    session.retry_at = 0
+            return len(rounds) == 3
+        bridge.closed.wait.side_effect = wait
+        # Exercise the real maintenance loop and origin read, including the
+        # second pass after a transport failure; never activate a native CLI.
+        bridge._maintain()
+        self.assertEqual(calls, ['first', 'sibling', 'first'])
+        self.assertTrue(first.origin_verified)
+        self.assertEqual(first.saved_provider, 'original-provider')
+        self.assertEqual(first.saved_cwd, '/original')
+        bridge.ipc.request.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

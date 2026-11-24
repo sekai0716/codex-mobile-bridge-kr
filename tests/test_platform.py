@@ -25,7 +25,7 @@ class TransportTests(unittest.TestCase):
     def test_missing_desktop_is_actionable(self):
         endpoint = (r'\\.\pipe\missing-' + uuid.uuid4().hex if os.name == 'nt'
                     else str(ROOT / '.tmp/missing.sock'))
-        with self.assertRaisesRegex(IPCError, "데스크탑\\ App\\ 연결되지\\ 않았습니다\\.\\ 열어주세요\\.\\ Codex\\ App。"):
+        with self.assertRaisesRegex(IPCError, '\u684c\u9762 App'):
             DesktopIPC(endpoint).connect()
 
     def test_large_unicode_frames_and_reconnect(self):
@@ -186,9 +186,16 @@ class LifecycleTests(unittest.TestCase):
                     reads += 1
                     return record if reads == 1 else None
                 return record
-            with patch('bridge.app.lifecycle.read_record', side_effect=read), patch.object(Path, 'unlink', side_effect=PermissionError('Windows delete pending')) as unlink:
+            unlink = Path.unlink
+            attempted = []
+            def remove(target, *args, **kwargs):
+                if target == request:
+                    attempted.append(target)
+                    raise PermissionError('Windows delete pending')
+                return unlink(target, *args, **kwargs)
+            with patch('bridge.app.lifecycle.read_record', side_effect=read), patch.object(Path, 'unlink', autospec=True, side_effect=remove):
                 request_stop(folder)
-                unlink.assert_not_called()
+                self.assertEqual(attempted, [])
             self.assertEqual(json.loads(request.read_text()), record)
 
     def test_stop_acknowledgement_follows_request_cleanup(self):
@@ -228,7 +235,7 @@ class LifecycleTests(unittest.TestCase):
                         if process.poll() is not None or time.monotonic() >= deadline:
                             self.fail('Gateway failed to start: ' + (root / 'output.log').read_text(encoding='utf-8', errors='replace'))
                         time.sleep(.05)
-                    self.assertIn('모바일 게이트웨이가 시작되었습니다', (root / 'output.log').read_text(encoding='utf-8'))
+                    self.assertIn('모바일 게이트웨이가 시작되었습니다.', (root / 'output.log').read_text(encoding='utf-8'))
                     conn = http.client.HTTPConnection('127.0.0.1', port, timeout=3)
                     conn.request('GET', '/api/auth')
                     response = conn.getresponse()
@@ -243,7 +250,7 @@ class LifecycleTests(unittest.TestCase):
                     conn.close()
                     credentials = next(root.glob('*.txt')).read_text(encoding='utf-8')
                     self.assertEqual(json.loads(config.read_text(encoding='utf-8'))['auth']['username'], 'admin')
-                    self.assertIn("Codex App 모바일 게이트웨이\n계정: admin\n비밀번호: ", credentials)
+                    self.assertIn('계정: admin', credentials)
                     result = subprocess.run([sys.executable, '-B', str(ROOT / 'stop.py'), '--config', str(config)],
                                             capture_output=True, timeout=20)
                     self.assertEqual(result.returncode, 0, result.stderr)

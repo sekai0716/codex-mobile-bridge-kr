@@ -55,7 +55,7 @@ class ApiModelAuthTests(unittest.TestCase):
         self.assertEqual(self.calls, ['config/read'])
 
     def test_unicode_provider_model_ids_are_valid_but_whitespace_and_controls_stay_rejected(self):
-        model = 'xmy:\u65e5\u5361/deepseek-v4.1-flash'
+        model = 'xmy:日卡/deepseek-v4.1-flash'
         self.assertTrue(valid_model_id(model))
         self.assertTrue(valid_model_id('ccs-openai/gpt-6-astra'))
         for invalid in ('', ' route/model', 'route/model ', 'route/\tmodel', 'route/\nmodel', 'route/\x00model',
@@ -81,7 +81,7 @@ class ApiModelAuthTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             result, opened = self.read({'data': [{'id': 'api-model'}]})
         opened.assert_not_called()
-        self.assertIn('인증 요청 헤더', result['modelError'])
+        self.assertIn('认证请求头', result['modelError'])
 
     def test_gateway_environment_cannot_supply_desktop_header_or_key(self):
         self.definition.pop('experimental_bearer_token')
@@ -118,7 +118,7 @@ class ApiModelAuthTests(unittest.TestCase):
         self.definition['auth'] = {'command': 'do-not-execute'}
         result, opened = self.read({'data': [{'id': 'model'}]})
         opened.assert_not_called()
-        self.assertIn("이 API 연결은 추가 인증 설정을 사용합니다. 모델 ID를 수동으로 입력합니다.", result['modelError'])
+        self.assertIn('额外认证', result['modelError'])
 
     def test_upstream_id_only_response_does_not_invent_reasoning_capabilities(self):
         result, _ = self.read({'data': [{'id': 'plain-model'}]})
@@ -170,5 +170,5 @@ class ApiModelAuthTests(unittest.TestCase):
         self.definition['http_headers'] = {'X-key': 'private\nfixture'}
         result, opened = self.read({'data': [{'id': 'plain'}]})
         opened.assert_not_called()
-        self.assertIn('요청 헤더 형식이 잘못되었습니다.', result['modelError'])
+        self.assertIn('请求头格式无效', result['modelError'])
         self.assertNotIn('private', json.dumps(result))

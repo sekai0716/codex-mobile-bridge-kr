@@ -53,13 +53,13 @@ def location(value, port):
     parsed = urlsplit(value)
     if parsed.scheme or parsed.netloc:
         if parsed.scheme != 'http' or parsed.netloc != f'127.0.0.1:{port}':
-            raise ValueError('Harness 지원되지 않는 리디렉션이 반환되었습니다.')
+            raise ValueError('Harness 返回了不支持的重定向')
         value = parsed.path + ('?' + parsed.query if parsed.query else '') + ('#' + parsed.fragment if parsed.fragment else '')
     if value.startswith('/'):
         value = PREFIX.rstrip('/') + value
     # Relative redirects must stay within the mount.
     if any(part == '..' for part in unquote(urlsplit(value).path).split('/')) or '\\' in value:
-        raise ValueError('Harness 잘못된 리디렉션 경로')
+        raise ValueError('Harness 重定向路径无效')
     return value
 
 
@@ -73,30 +73,30 @@ def proxy(handler):
     # The upstream UI cannot add Bridge's CSRF header. Require exact same-origin
     # for every mutation and WS instead, not merely another configured origin.
     if (write or upgrade or handler.headers.get('Origin')) and handler.headers.get_all('Origin', []) != [expected]:
-        raise PermissionError('교차 사이트 요청은 허용되지 않습니다.')
+        raise PermissionError('不允许跨站请求')
     if not handler.server.auth.permitted(handler.client()['ip']):
-        raise PermissionError("이 IP는 액세스 규칙에 의해 차단되었습니다.")
+        raise PermissionError('此 IP 已被访问规则禁止')
     if not handler.login_session():
         handler.close_connection = True
         if handler.command == 'GET' and not upgrade and path.path in ('/harness', PREFIX):
             return redirect(handler, '/?open=harness')
-        return handler.output(401, {'error': '로그인해주세요', 'code': 'unauthenticated'})
+        return handler.output(401, {'error': '请登录', 'code': 'unauthenticated'})
     if path.path == '/harness':
         return redirect(handler, PREFIX)
     if handler.server.harness is None:
-        return handler.output(503, {'error': "데스크톱 앱에서 DeepSeek Harness를 시작하세요."})
+        return handler.output(503, {'error': '请在电脑 App 中启动 DeepSeek Harness'})
     try:
         port, cookie, process = handler.server.harness.endpoint()
     except ValueError:
-        return handler.output(503, {'error': "데스크톱 앱에서 DeepSeek Harness를 시작하세요."})
+        return handler.output(503, {'error': '请在电脑 App 中启动 DeepSeek Harness'})
     target = handler.path[len(PREFIX) - 1:]
     decoded = unquote(path.path[len(PREFIX) - 1:])
     if (not target.startswith('/') or target.startswith('//') or '\\' in decoded
             or any(ord(c) < 32 for c in decoded) or any(p in ('.', '..') for p in decoded.split('/'))):
-        raise ValueError('Harness 잘못된 요청 경로')
+        raise ValueError('Harness 请求路径无效')
     if upgrade:
         if handler.command != 'GET' or path.path != PREFIX + 'api/remote.mux':
-            raise ValueError('지원되지 않음 Harness WebSocket 길')
+            raise ValueError('不支持的 Harness WebSocket 路径')
         return websocket(handler, target, port, cookie, process)
     return http_proxy(handler, target, port, cookie, process)
 
@@ -106,7 +106,7 @@ def http_proxy(handler, target, port, cookie, process):
     encodings = handler.headers.get_all('Transfer-Encoding', [])
     if encodings or len(sizes) > 1 or (sizes and (not sizes[0].isdigit() or int(sizes[0]) > MAX_UPLOAD)):
         # Browser File/FormData requests carry a length; reject ambiguous framing.
-        raise ValueError('Harness 요청 길이가 잘못되었거나 초과되었습니다. 300 MiB')
+        raise ValueError('Harness 请求长度无效或超过 300 MiB')
     remaining = int(sizes[0]) if sizes else 0
     index = urlsplit(target).path in ('/', '/index.html')
     connection = http.client.HTTPConnection('127.0.0.1', port, timeout=20)
@@ -125,10 +125,10 @@ def http_proxy(handler, target, port, cookie, process):
         connection.endheaders()
         while remaining:
             if not active(handler, process):
-                raise PermissionError('로그인이 만료되었습니다')
+                raise PermissionError('登录已失效')
             chunk = handler.rfile.read(min(65536, remaining))
             if not chunk:
-                raise ValueError('Harness 업로드가 중단되었습니다.')
+                raise ValueError('Harness 上传中断')
             connection.send(chunk)
             remaining -= len(chunk)
         response = connection.getresponse()
@@ -178,7 +178,7 @@ def http_proxy(handler, target, port, cookie, process):
             handler.wfile.flush()
     except (OSError, http.client.HTTPException, ValueError, PermissionError):
         if not sent:
-            handler.output(502, {'error': 'Harness 연결이 중단되었습니다. 컴퓨터를 다시 시작하세요. App 운행상태를 확인하세요'})
+            handler.output(502, {'error': 'Harness 连接中断，请在电脑 App 中检查运行状态'})
     finally:
         connection.close()
 
@@ -190,9 +190,9 @@ def websocket(handler, target, port, cookie, process):
     except ValueError:
         valid = False
     if not valid or handler.headers.get('Sec-WebSocket-Version') != '13':
-        raise ValueError('유효하지 않은 WebSocket 악수')
+        raise ValueError('无效的 WebSocket 握手')
     if handler.headers.get('Transfer-Encoding') or handler.headers.get('Content-Length', '0') != '0':
-        raise ValueError('WebSocket 핸드셰이크에는 요청 본문이 포함될 수 없습니다.')
+        raise ValueError('WebSocket 握手不能包含请求体')
     upstream = socket.create_connection(('127.0.0.1', port), timeout=10)
     handler.close_connection = True
     sent = False
@@ -216,7 +216,7 @@ def websocket(handler, target, port, cookie, process):
         expected = base64.b64encode(hashlib.sha1((key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()).decode()
         if (not rows[0].startswith('HTTP/1.1 101 ') or values.get('sec-websocket-accept') != expected
                 or values.get('upgrade', '').lower() != 'websocket'):
-            raise ValueError('Harness WebSocket 핸드셰이크 실패')
+            raise ValueError('Harness WebSocket 握手失败')
         handler.send_response(101)
         handler.send_header('Upgrade', 'websocket')
         handler.send_header('Connection', 'Upgrade')
@@ -260,6 +260,6 @@ def websocket(handler, target, port, cookie, process):
                 buffers[peers[sock]].extend(chunk)
     except (OSError, ValueError):
         if not sent:
-            handler.output(502, {'error': 'Harness 라이브 연결 실패'})
+            handler.output(502, {'error': 'Harness 实时连接失败'})
     finally:
         upstream.close()

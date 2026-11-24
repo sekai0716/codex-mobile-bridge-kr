@@ -139,7 +139,7 @@ def force_daemon_exit(home, executable, expected, checkpoint, timeout=10):
         from bridge.platforms.windows.codex_daemon_env import force_daemon_exit_windows
         return force_daemon_exit_windows(home, executable, expected, checkpoint, timeout)
     return _exit_posix_daemon(home, executable, expected, signal.SIGKILL, timeout,
-                              'CLI 기본 프로세스의 종료 결과를 확인해야 합니다. 반복되는 강제 종료는 없습니다.', checkpoint)
+                              'CLI 原生进程退出结果待核对；不会重复强制退出', checkpoint)
 
 
 def _exit_posix_daemon(home, executable, expected, requested_signal, timeout, timeout_error, checkpoint=None):

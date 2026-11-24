@@ -4,6 +4,7 @@ from bridge.features.notifications.providers import PROVIDERS, desktop_provider,
 import hashlib
 import base64
 import hmac
+import os
 from bridge.api.validation import FieldError, at_field
 import json
 import logging
@@ -179,8 +180,27 @@ def read_json(path, default):
         return default
 
 
+def read_status_json(path, default=None):
+    """读取非关键状态 JSON；文件损坏或非字典时记录告警并回退默认值，防止状态上报链路二次崩溃。"""
+    # 严格配置与密钥仍复用 read_json()，仅对可重建的状态快照做损坏容错。
+    fallback = {} if default is None else default
+    try:
+        value = read_json(path, fallback)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        logging.warning('忽略损坏的状态文件 %s：%s', path, exc)
+        return dict(fallback) if isinstance(fallback, dict) else fallback
+    if isinstance(fallback, dict) and not isinstance(value, dict):
+        logging.warning('忽略非字典格式的状态文件 %s', path)
+        return dict(fallback)
+    return value
+
+
 def write_json(path, value):
     path = Path(path)
+    if os.name == 'nt':
+        from bridge.platforms.windows.local_service import write_private
+        write_private(path, (json.dumps(value, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+        return
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_name(path.name + '.' + uuid.uuid4().hex + '.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -796,7 +816,7 @@ class Notifications:
             rows = self.watches()
             prior = next((r for r in rows if r['id'] == thread_id and r['host'] == host), None)
             if existing_only and prior is None:
-                raise ValueError("이 채팅은 더 이상 시청되지 않습니다. 목록을 새로 고칩니다.")
+                raise ValueError('该会话的通知监控已移除，请刷新列表')
             selected = prior is not None if enabled is None else enabled
             completion = bool(prior and prior.get('notifyOnCompletion')) if notify_on_completion is None else notify_on_completion
             if enabled is False:
@@ -1304,11 +1324,20 @@ class Notifications:
         with self.lock:
             self._write_status(channel, **values)
 
+    def _report_worker_error(self, channel=None, *, error):
+        # 后台守护线程的兜底分支自身绝不能再抛异常导致线程永久退出。
+        try:
+            self._status(channel, error=error)
+        except Exception:
+            logging.exception('记录通知线程状态失败')
+
     def _write_status(self, channel=None, **values):
         path = self.data_dir/'notification-status.json'
-        prior = read_json(path, {})
+        prior = read_status_json(path, {})
         if channel:
-            record = prior.get(channel, {})
+            record = prior.get(channel)
+            if not isinstance(record, dict):
+                record = {}
             if 'target' in values and record.get('target') != values['target']:
                 record = {}
             current = {**prior, channel: {**record, **values}}
@@ -1322,7 +1351,7 @@ class Notifications:
             try:
                 self.scan(deliver=False)
             except Exception:
-                self._status(error='알림 구성을 읽지 못했습니다. 컴퓨터 실행 프로그램에서 구성을 다시 저장하세요.。')
+                self._report_worker_error(error='通知配置读取失败，请在电脑启动器重新保存配置。')
             self.wakeup.wait(3)
             self.wakeup.clear()
             # Coalesce a burst of stream patches rather than scan per token.
@@ -1336,7 +1365,7 @@ class Notifications:
                 if not self.closed.is_set():
                     self.security.scan()
             except Exception:
-                self._status(error='알림 구성을 읽지 못했습니다. 컴퓨터 실행 프로그램에서 구성을 다시 저장하세요.。')
+                self._report_worker_error(error='通知配置读取失败，请在电脑启动器重新保存配置。')
             self.delivery_wakeup.wait(3)
 
     def _push_allowed(self, event):
@@ -1353,5 +1382,5 @@ class Notifications:
             try:
                 self.mobile_push.drain(settings(self.data_dir).get('mobileEnabled', False), self._push_allowed)
             except Exception:
-                self._status('nativePush', error='시스템 푸시를 일시적으로 사용할 수 없습니다. 플랫폼 구성을 확인하세요.')
+                self._report_worker_error('nativePush', error='系统推送暂不可用，请检查平台配置')
             self.closed.wait(3)

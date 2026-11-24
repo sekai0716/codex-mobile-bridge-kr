@@ -13,6 +13,7 @@ from pathlib import Path
 # 기존 이미지 미리보기의 메모리 예산이며, 첨부 업로드 크기를 제한하지 않는다.
 MAX_FILE = 20 * 1024 * 1024
 MAX_FILES = 10
+MAX_TOTAL = 100 * 1024 * 1024  # Budget for inline images decoded in memory.
 UPLOAD_CHUNK = 1024 * 1024
 
 

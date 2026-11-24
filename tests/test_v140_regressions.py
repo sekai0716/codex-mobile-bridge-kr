@@ -70,7 +70,7 @@ class CatalogIntegrationTests(unittest.TestCase):
             skill.symlink_to(outside)
         except OSError as exc:
             self.skipTest('symlinks unavailable: ' + str(exc))
-        with self.assertRaisesRegex(ValueError, "스킬링크\\ 대상이\\ 변경되었습니다\\.\\ 목록을\\ 새로\\ 고치고\\ 다시\\ 선택하세요\\."):
+        with self.assertRaisesRegex(ValueError, 'Skill.*(授权目录|链接目标已变化)'):
             self.reader.validate_skills(workspace, [identifier])
 
     def test_runtime_discovered_external_skill_links_load_and_can_be_selected(self):

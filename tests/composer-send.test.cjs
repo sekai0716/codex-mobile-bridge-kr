@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {ComposerDrafts}=require('../web/features/chat/composer-drafts.js');
-const {resolveComposerSendMode}=require('../web/features/chat/modes.js');
+const {deriveComposerAction}=require('../web/features/chat/composer-state.js');
 
 function storage(){const values=new Map();return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};}
 // Model the serialization seam here; the browser fixture exercises real IDB.
@@ -13,20 +13,22 @@ function fixture({durable=true,request,local=storage(),temporary=storage(),coord
   const scope={gateway:'gateway',provider:'codex',account:'account',host:'local',session:'fixture'};
   const nodes={composer:{},message:{value:'same text'},'send-mode':{value:'send'},send:{},'send-error':{}};
   const calls=[];let sequence=0;const tab=++tabSequence;
-  const context={$:id=>nodes[id],t:value=>value,BridgeI18n:{locale:()=> 'ko-KR'},
+  const context={composerToolbar:{actionMode:()=>nodes['send-mode'].value==='auto'
+      ?deriveComposerAction({running:context.state.status==='active'}).mode:nodes['send-mode'].value},
+    $:id=>nodes[id],t:value=>value,BridgeI18n:{locale:()=> 'ko-KR'},
     codexQuotes:null,sending:false,currentId:'fixture',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
     attachments:{ready:()=>true,ids:()=>['attachment'],references:()=>[],rows:[{id:'attachment'}],setLocked(){},clear(){}},
-    workModes:{value:()=> 'default',render(){},submitted(){}},invalidSkills:new Set(),selectedSkills:new Set(['skill']),
-    sendModes:{value:view=>resolveComposerSendMode(nodes['send-mode'].value,view),render(){}},
+    renderCodexWorkModes(){},workModes:{value:()=> 'default',render(){},submitted(){}},invalidSkills:new Set(),selectedSkills:new Set(['skill']),
     codexProvisionalDrafts:new Map(),composerDrafts:drafts,codexDraftScope:durable?scope:null,messageManagement:null,renderQueue(){},
     sessionStorage:temporary,draftGateway:'gateway',chatKey:()=> 'local|fixture',uuid:()=> 'submission-'+tab+'-'+(++sequence),
-    saveDraft:()=>drafts.save(scope,{text:nodes.message.value,sendMode:nodes['send-mode'].value,skills:['skill'],quotes:context.codexQuotes?.quotes||[]}),
+    saveDraft:()=>drafts.save(scope,{text:nodes.message.value,skills:['skill'],quotes:context.codexQuotes?.quotes||[]}),
     bumpRecency(){},renderSkillPills(){},restoringComposer:false,window:{BridgePresentation:{showError(){}}},sessionUrl:()=> '/synthetic/send',toast(){},
     api:async(url,body)=>{calls.push(body);return request?request(body):{status:'unknown'};}};
   const source=fs.readFileSync(path.join(__dirname,'../web/shell/app.js'),'utf8');
   const start=source.indexOf("$('composer').onsubmit=async event=>{"),end=source.indexOf("$('message').onkeydown",start);
   assert.ok(start>=0&&end>start,'Exercise the real composer submit handler');
-  const controls=source.slice(source.indexOf('function connectOnFirstSend('),source.indexOf('function renderModelSummary('));
+  const controlStart=source.indexOf('function composerCanSend(');
+  const controls=source.slice(controlStart,source.indexOf('function uuid(',controlStart));
   vm.runInNewContext(controls+source.slice(start,end),context);
   return {nodes,calls,drafts,scope,context,temporary,
     submit:()=>nodes.composer.onsubmit({preventDefault(){}}),

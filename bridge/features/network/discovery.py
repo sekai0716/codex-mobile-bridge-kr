@@ -76,7 +76,7 @@ class ConnectionDiscovery:
             claims = body.get('bindings')
             if (not descriptor or not isinstance(token, RouteToken) or body.get('deviceId') != self.gateway_id
                     or not isinstance(claims, dict) or not 1 <= len(claims) <= 32):
-                raise PermissionError('잘못된 채널 바인딩')
+                raise PermissionError('无效的信道绑定')
             allowed = set(descriptor['endpoints'])
             anchor = body.get('anchor')
             current = session.get('routeBindings', {})
@@ -86,17 +86,17 @@ class ConnectionDiscovery:
             if not verifier and isinstance(anchor, str) and current.get(anchor) != auth.key(str(token)):
                 verifier = current.get(anchor)
             if not verifier or not claims.keys() <= allowed:
-                raise PermissionError('원래 게이트웨이 바인딩을 다시 확인하세요.')
+                raise PermissionError('请重新验证原网关绑定')
             proposed = {url: value for url, value in current.items() if url in allowed}
             for url, claim in claims.items():
                 if not isinstance(claim, dict) or not re.fullmatch('[0-9a-f]{64}', str(claim.get('digest', ''))):
-                    raise ValueError('잘못된 채널 자격 증명 형식')
+                    raise ValueError('信道凭据格式无效')
                 digest = claim['digest']
                 if url in proposed and not hmac.compare_digest(proposed[url], digest):
-                    raise PermissionError('채널 바인딩 ID가 변경되었습니다.')
+                    raise PermissionError('信道绑定身份已变化')
                 message = '\n'.join(('route-grant-v1', self.gateway_id, url, digest))
                 if not hmac.compare_digest(mac(verifier, message), str(claim.get('proof', ''))):
-                    raise PermissionError('채널 바인딩 확인에 실패했습니다.')
+                    raise PermissionError('信道绑定验证失败')
                 proposed[url] = digest
             if proposed != current:
                 if not session.get('routeRenewal'):

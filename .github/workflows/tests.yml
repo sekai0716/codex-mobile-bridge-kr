@@ -73,13 +73,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        # 보안 패치된 선택적 relay 전송(aiohttp 3.14)은 Python 3.10 이상이 필요하다.
-        python: ['3.10', '3.13']
+        os: [windows-latest, ubuntu-24.04]
+        python: ['3.9', '3.13']
         include:
           - os: macos-latest
             python: '3.13'
-    runs-on: ${{ needs.change-scope.outputs.backend == 'true' && matrix.os || 'ubuntu-latest' }}
+    runs-on: ${{ needs.change-scope.outputs.backend == 'true' && matrix.os || 'ubuntu-24.04' }}
     steps:
       - name: Validate selection and report unaffected backend
         env:

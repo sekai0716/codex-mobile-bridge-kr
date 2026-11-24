@@ -34,7 +34,7 @@ class WindowsSessionTests(unittest.TestCase):
     def test_secure_desktop_or_access_denial_does_not_claim_locked(self):
         value, _ = self.snapshot(1, desktop=False)
         self.assertEqual(value['state'], 'unlocked'); self.assertFalse(value['interactive'])
-        self.assertNotIn('잠긴', value['reason'])
+        self.assertNotIn('已锁定', value['reason'])
 
     def test_query_failure_or_unknown_flags_stay_unknown(self):
         for error in (OSError('denied'), ValueError('bad buffer')):

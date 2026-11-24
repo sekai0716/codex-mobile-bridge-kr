@@ -118,10 +118,10 @@ class AppImageTests(unittest.TestCase):
 
     def test_owned_parser_is_size_and_time_bounded(self):
         parser=self.root/'parser';parser.write_text('#!'+sys.executable+'\nimport sys\nsys.stdout.buffer.write(b"x"*70000)\n');parser.chmod(0o700)
-        with self.assertRaisesRegex(ValueError,"AppImage\\ 메타데이터가\\ 너무\\ 큼"):appimage._read_desktop(str(parser),self.app,128,'zcode.desktop')
+        with self.assertRaisesRegex(ValueError,'过大'):appimage._read_desktop(str(parser),self.app,128,'zcode.desktop')
         parser.write_text('#!'+sys.executable+'\nimport time\ntime.sleep(10)\n')
-        with self.assertRaisesRegex(ValueError,"AppImage\\ 메타데이터\\ 읽기\\ 시간\\ 초과"):appimage._read_desktop(str(parser),self.app,128,'zcode.desktop',timeout=.1)
-        with self.assertRaisesRegex(ValueError,'AppImage 잘못된 메타데이터 경로'):appimage._read_desktop(str(parser),self.app,128,'../private')
+        with self.assertRaisesRegex(ValueError,'超时'):appimage._read_desktop(str(parser),self.app,128,'zcode.desktop',timeout=.1)
+        with self.assertRaisesRegex(ValueError,'路径无效'):appimage._read_desktop(str(parser),self.app,128,'../private')
 
     def test_ordinary_launch_uses_durable_image_and_never_imports_desktop_flags(self):
         exe=self.root/'mount/zcode'
@@ -145,7 +145,7 @@ class AppImageTests(unittest.TestCase):
             self.assertEqual(zcode_pipe.runtime_owner(self.app,11),live)
         with patch.object(zcode_pipe,'identity',side_effect=[first,{**live,'birth':'200'}]), \
                 patch.object(zcode_pipe,'installation',return_value=None),patch.object(zcode_pipe.time,'sleep'):
-            with self.assertRaisesRegex(ValueError,"기존\\ ZCode\\ 프로세스\\ ID가\\ 변경되었습니다\\."):zcode_pipe.runtime_owner(self.app,11)
+            with self.assertRaisesRegex(ValueError,'身份已变化'):zcode_pipe.runtime_owner(self.app,11)
 
     def test_initialization_keeps_unverified_cold_app_running_and_accepts_new_mount_after_quit(self):
         from bridge.clients.manager import DesktopSessions
@@ -157,7 +157,7 @@ class AppImageTests(unittest.TestCase):
               'packageType':'appimage','installationIdentity':[1,2,3], 'coldStartVerified':False}
         running={'running':True,'mainPids':[11],'unknown':False}
         with patch('bridge.clients.lifecycle.inspect_client',return_value=running):
-            with self.assertRaisesRegex(ValueError,"이\\ AppImage\\ 콜드\\ 스타트는\\ 아직\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 실행을\\ 사용하십시오\\.\\ App\\ 공식\\ 원격\\ 제어\\ 연결。"):
+            with self.assertRaisesRegex(ValueError,'冷启动尚未核验'):
                 manager._start_zcode_connection(base,initialize=True,acknowledge_unavailable=False)
         manager._stop_client.assert_not_called();manager.zcode_pipe.start.assert_not_called()
         base['coldStartVerified']=True;cold={**base,'executable':str(self.app)};new={**base,'executable':'/new/mount/zcode'}

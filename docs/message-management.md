@@ -10,7 +10,9 @@
 
 Codex Desktop、로컬 머신 CLI、SSH CLI 및 WSL 게이트웨이 대기열 지원 관리。Claude / DSH 네이티브 클라이언트로 전달된 대기열은 여전히 ​​네이티브 클라이언트에서 관리됩니다. 페이지에서는 제한 사항을 설명하고 잘못된 정렬을 제공하지 않습니다. 현재 기기에 저장된 미확인 기록은 별도로 처리 가능。
 
-이전 버전 Android App 원래 컴퓨터 연결에서 선택하세요.“더 → 페이지 새로 고침”，세션을 다시 엽니다. 단지 포그라운드로 다시 전환하는 것만으로도 여전히 이전 페이지를 사용할 수 있습니다. 컴퓨터, 계정, 접속, 세션 기록만 확인합니다. 다른 초안은 삭제되거나 자동으로 전송되지 않습니다.。
+在本机 Codex App 选择“完成后发送”的消息会单独显示在“Codex 中待发送”。打开消息管理时会自动刷新，它们继续由 Codex 发送，编辑、排序和撤回请在电脑端操作。
+
+旧版 Android App 请在原电脑连接中选择“更多 → 刷新页面”，再打开会话；只切回前台可能仍在使用旧页面。它只核对该电脑、账号、接入及会话的记录，不会清空其他草稿，也不会自动发送。
 
 ## English
 
@@ -23,5 +25,7 @@ Open **More → Message management** in a chat. A shortcut also appears above th
 - Ambiguous operations are not retried automatically. Conflicts between pages require refreshing or reopening the manager.
 
 Gateway-owned Codex Desktop, local CLI, SSH CLI and WSL queues are supported. Claude / DSH native queues remain managed by their native clients; unsupported actions are not offered. Device-local unconfirmed records can still be managed.
+
+Messages queued in the local Codex App appear under **Queued in Codex** and refresh while Message management is open. Codex remains responsible for sending them. Use the desktop app to edit, reorder, or withdraw them.
 
 In older Android apps, choose **More → Refresh page** in the existing computer connection, then reopen the chat. Returning to the foreground alone may keep the old page running. No app reinstall or automatic resend is required.

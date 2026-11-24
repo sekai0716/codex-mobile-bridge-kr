@@ -102,9 +102,9 @@ class OfficialZCodeTests(unittest.TestCase):
         self.assertTrue(self.adapter.call('list')['sessions'][0]['capabilities']['rename'])
         self.client.call.reset_mock()
         rid = str(uuid.uuid4())
-        result = self.adapter.call('rename', 'sess_test', {'id': rid, 'title': ' 네이티브 타이틀 '})
+        result = self.adapter.call('rename', 'sess_test', {'id': rid, 'title': ' 原生标题 '})
         self.assertEqual(result['status'], 'confirmed')
-        self.assertEqual(result['result'], {'id': 'sess_test', 'title': '네이티브 타이틀'})
+        self.assertEqual(result['result'], {'id': 'sess_test', 'title': '原生标题'})
         self.assertEqual([call.args[0]['action'] for call in self.client.call.call_args_list], ['target', 'rename'])
         request = self.client.call.call_args.args[0]
         self.assertEqual(request['expectedProcess'], self.owner)
@@ -183,6 +183,10 @@ class OfficialManagerTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(dir=ROOT/'.tmp')
         self.addCleanup(temp.cleanup)
         self.manager = DesktopSessions(Path(temp.name))
+        # This protocol fixture supplies its own installation and process observations.
+        inventory = patch.object(self.manager, '_refresh_installation_inventory', return_value=False)
+        inventory.start()
+        self.addCleanup(inventory.stop)
         self.addCleanup(self.manager.close)
         self.manager.adapters['zcode'] = Mock()
         self.manager.locks['zcode'] = threading.RLock()
@@ -213,7 +217,7 @@ class OfficialManagerTests(unittest.TestCase):
         m = self.manager
         previous = m.adapters['zcode']
         with patch.object(m, '_zcode_official_status', return_value={'configured': False}):
-            with self.assertRaisesRegex(ValueError, "먼저\\ 컴퓨터\\ 게이트웨이를\\ 구성하고\\ 공식\\ 원격\\ 제어에\\ 로그인하십시오\\."):
+            with self.assertRaisesRegex(ValueError, '配置并登录'):
                 m.toggle_client({'provider': 'zcode', 'enabled': True, 'connectionMode': 'official-remote'})
         self.assertIs(m.adapters['zcode'], previous)
         previous.disconnect.assert_not_called()

@@ -96,6 +96,15 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
             with self.subTest(sid=sid), self.assertRaises(ValueError):
                 ZCodeDesktop.record_path(adapter, sid)
 
+    def test_saved_messages_preserve_native_turn_identity(self):
+        with closing(sqlite3.connect(self.transcript)) as db:
+            db.execute("UPDATE message SET data=json_set(data,'$.anchor.turnId','turn-shared') WHERE id IN ('0','2')")
+            db.commit()
+        rows = saved_detail(self.home, 'sess_ok')['messages']
+        for row in rows:
+            if row['id'] in ('0', '2'):
+                self.assertEqual(row.get('turnId'), 'turn-shared')
+
     def test_historical_reply_uses_its_own_completed_model_call(self):
         from bridge.clients.zcode.reply_metadata import native_reply_models
         with closing(sqlite3.connect(self.transcript)) as db:
@@ -161,8 +170,8 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
                 return {'binding': binding, 'subscriptionId': 'lease'}
             if request['action'] == 'detail':
                 return {'snapshot': {'sessionId': 'sess_ok', 'revision': 1, 'seq': 0, 'logEpoch': 'a',
-                                     'rows': {'window': [], 'totalCount': 0}, 'control': {},
-                                     'inputRouting': {'mode': 'startNow'}, 'pendingInteractions': []}}
+                                     'rows': {'window': [], 'totalCount': 0}, 'control': {'activeWorks': []},
+                                     'queue': {'items': []}, 'inputRouting': {'mode': 'startNow'}, 'pendingInteractions': []}}
             raise AssertionError(request['action'])
         with patch.object(adapter, '_window_app', return_value=None), patch.object(adapter, '_live_process', return_value=process), \
                 patch('bridge.clients.zcode.transport.request_native', side_effect=native):
@@ -183,7 +192,7 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
             # Both target lookup and attach must verify the newly observed, exact PID.
             replacement = {**process, 'birth': [2, 0]}
             with patch.object(adapter, '_live_process', side_effect=[replacement, replacement, process]):
-                with self.assertRaisesRegex(BridgeUnavailable, '프로세스가 변경되었습니다.'):
+                with self.assertRaisesRegex(BridgeUnavailable, '进程已变化'):
                     adapter.call('resume', 'sess_ok', {'id': str(uuid.uuid4())})
             self.assertEqual(calls, ['target', 'attach', 'detail', 'target'])
 
@@ -192,9 +201,9 @@ class ZCodeSavedHistoryTests(unittest.TestCase):
         adapter = ZCodePrototype(self.home.parent, {'dataDirectory': self.home, 'debugFallbackPort': 17742})
         with patch.object(adapter, '_live_process', return_value={'pid': 29}), \
                 patch.object(adapter, 'transport', return_value={'workspace': str(self.home.parent / 'unrelated')}) as native:
-            with self.assertRaisesRegex(BridgeUnavailable, '프로젝트가 변경되었습니다'):
+            with self.assertRaisesRegex(BridgeUnavailable, '项目已变化'):
                 adapter.call('resume', 'sess_ok', {'id': str(uuid.uuid4())})
-            with self.assertRaisesRegex(BridgeUnavailable, "계속해서\\ 보관할\\ 수\\ 없습니다\\.\\ ZCode\\ 대화"):
+            with self.assertRaisesRegex(BridgeUnavailable, '归档'):
                 adapter.call('resume', 'sess_archived', {'id': str(uuid.uuid4())})
             self.assertEqual([call.args[0]['action'] for call in native.call_args_list], ['target'])
             self.assertFalse(adapter.sid)

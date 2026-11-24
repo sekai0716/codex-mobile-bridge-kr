@@ -77,7 +77,7 @@ class OrganizationTests(unittest.TestCase):
 
     def test_changed_cwd_is_rejected_before_listing_or_writing(self):
         self.thread['cwd'] = '/different'
-        with self.assertRaisesRegex(ValueError, "원래\\ 채팅\\ 디렉터리가\\ 변경되었습니다\\.\\ 새로고침하고\\ 다시\\ 시도하세요\\."):
+        with self.assertRaisesRegex(ValueError, '工作目录'):
             self.move()
         self.assertEqual(len(self.calls), 1)
 
@@ -88,7 +88,7 @@ class OrganizationTests(unittest.TestCase):
                 self.thread['cwd'] = native
                 self.assertEqual(organization(self.request, self.identifier, expected_cwd=stored)['id'], self.identifier)
         self.thread['cwd'] = '/work/project'
-        with self.assertRaisesRegex(ValueError, "원래\\ 채팅\\ 디렉터리가\\ 변경되었습니다\\.\\ 새로고침하고\\ 다시\\ 시도하세요\\."):
+        with self.assertRaisesRegex(ValueError, '工作目录'):
             organization(self.request, self.identifier, expected_cwd='/work/Project')
 
     def test_empty_body_is_invalid(self):
@@ -115,11 +115,11 @@ class OrganizationTests(unittest.TestCase):
             def dispatch(_change):
                 sent.append(_change)
                 raise TimeoutError('sent, reply lost; read replica still old')
-            with self.assertRaisesRegex(ValueError, "네이티브\\ 조직\\ 결과를\\ 확인해야\\ 합니다\\.\\ 원래\\ 클라이언트를\\ 확인하십시오\\.\\ 이\\ 작업은\\ 다시\\ 제출되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(ValueError, '不会重复提交'):
                 commands.perform(self.identifier, change, read, dispatch)
             for request_id in [change['id'], str(uuid.uuid4())]:
                 commands = OrganizationCommands(directory, private_json)
-                with self.assertRaisesRegex(ValueError, "이전\\ 조직\\ 운영에는\\ 아직\\ 확인이\\ 필요합니다\\.\\ 원래\\ 클라이언트를\\ 확인하십시오\\.\\ 다시\\ 제출되지\\ 않습니다\\."):
+                with self.assertRaisesRegex(ValueError, '不会重复提交'):
                     commands.perform(self.identifier, {**change, 'id': request_id}, read, dispatch)
             self.assertEqual(len(sent), 1)
             self.assertEqual(commands.native_memberships(), set())
@@ -138,19 +138,19 @@ class OrganizationTests(unittest.TestCase):
             change = {'id': str(uuid.uuid4()), 'kind': 'project', 'targetId': 'gone', 'expectedId': 'p1'}
             read = lambda: organization(self.request, self.identifier)
             dispatch = lambda body: organization(self.request, self.identifier, body)
-            with self.assertRaisesRegex(ValueError, "목적지가\\ 삭제되었습니다\\.\\ 새로고침하고\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(ValueError, '移除'):
                 commands.perform(self.identifier, change, read, dispatch)
             self.assertFalse(commands.path.exists())
             change['targetId'] = 'p2'
             commands.perform(self.identifier, change, read, dispatch)
-            with self.assertRaisesRegex(ValueError, '다른 작업'):
+            with self.assertRaisesRegex(ValueError, '不同操作'):
                 commands.perform(self.identifier, {**change, 'targetId': None}, read, dispatch)
             self.assertEqual(len(self.writes()), 1)
 
     def test_unconfirmed_result_is_rejected(self):
         def request(method, params):
             return {} if method == 'thread/metadata/update' else self.request(method, params)
-        with self.assertRaisesRegex(ValueError, "네이티브\\ 조직\\ 결과를\\ 확인해야\\ 합니다\\.\\ 채팅\\ 목록을\\ 새로\\ 고칩니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             organization(request, self.identifier, {'kind': 'project', 'targetId': 'p2', 'expectedId': 'p1'})
 
     def test_pagination_is_bounded_and_repeated_cursor_is_rejected(self):
@@ -167,7 +167,7 @@ class OrganizationTests(unittest.TestCase):
             if method == 'threadSection/list':
                 self.thread['projectId'] = 'external'
             return value
-        with self.assertRaisesRegex(ValueError, '다른 클라이언트'):
+        with self.assertRaisesRegex(ValueError, '其他客户端'):
             organization(request, self.identifier, {'kind': 'project', 'targetId': 'p2', 'expectedId': 'p1'})
         self.assertFalse(self.writes())
 

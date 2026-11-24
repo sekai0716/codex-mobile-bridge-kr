@@ -20,7 +20,7 @@ def _checked_db(path):
             continue
         if (not stat.S_ISREG(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400
                 or member.resolve() != member):
-            raise BridgeUnavailable('ZCode 로컬 히스토리 데이터베이스 경로가 변경되었습니다.')
+            raise BridgeUnavailable('ZCode 本机历史数据库路径已变化')
     return path.is_file()
 
 
@@ -50,11 +50,11 @@ def _history(home):
             if not isinstance(error, sqlite3.OperationalError) and str(error).casefold() != (
                     'malformed database schema (dwf_event_artifact_idx) - unsafe use of json_extract()'):
                 raise
-            raise _TranscriptUnavailable('지금은 읽을 수 없습니다. ZCode 로컬 채팅 기록') from error
+            raise _TranscriptUnavailable('暂时无法读取 ZCode 本机聊天记录') from error
         db.execute('BEGIN')
         yield db
     except sqlite3.Error as exc:
-        raise BridgeUnavailable('지금은 읽을 수 없습니다. ZCode 지역 역사') from exc
+        raise BridgeUnavailable('暂时无法读取 ZCode 本机历史') from exc
     finally:
         if db is not None:
             db.close()
@@ -89,7 +89,7 @@ def _target(db, sid, *, allow_index_only=False):
     found = db.execute(_TASKS + ' AND t.task_id = ?', (sid,)).fetchone() if db is not None else None
     row = _session(found, allow_index_only=allow_index_only)
     if row is None:
-        raise ValueError('이 기계를 찾을 수 없습니다 ZCode 채팅')
+        raise ValueError('找不到此本机 ZCode 聊天')
     if found['transcript_id'] is None:
         row['indexOnly'] = True
     return row
@@ -117,12 +117,12 @@ def resume_workspace(home, sid):
                 "SELECT workspace_path, archived FROM tasks WHERE task_id=? AND deleted=0 "
                 "AND host_id='local' AND provider='glm' AND workspace_identity IS NULL", (sid,)).fetchall()
         if len(rows) != 1:
-            raise ValueError('이 기계를 찾을 수 없습니다 ZCode 채팅')
+            raise ValueError('找不到此本机 ZCode 聊天')
         row = {'cwd': rows[0][0], 'archived': rows[0][1]}
     if row['archived']:
-        raise ValueError('계속해서 보관할 수 없습니다. ZCode 대화')
+        raise ValueError('无法继续已归档的 ZCode 会话')
     if not isinstance(row['cwd'], str) or not Path(row['cwd']).is_absolute():
-        raise ValueError('ZCode 원래 프로젝트 디렉터리가 잘못되었습니다.')
+        raise ValueError('ZCode 原项目目录无效')
     return row['cwd']
 
 
@@ -130,7 +130,7 @@ def send_boundary(home, sid):
     with _history(home) as db:
         row = _target(db, sid)
         if row['archived'] or not row['title']:
-            raise ValueError("먼저 보관되지 않은 ZCode 채팅을 엽니다.")
+            raise ValueError('请先在 ZCode 打开未归档的聊天')
         seq = db.execute('SELECT max(sequence) FROM cli.message WHERE session_id = ?', (sid,)).fetchone()[0]
         return row['title'], seq if seq is not None else -1
 
@@ -164,18 +164,19 @@ def saved_detail(home, sid, body=None):
         if session.get('indexOnly'):
             return {'session': session, 'readOnly': True, 'messages': [], 'requests': [],
                     'capabilities': session['capabilities'], 'history': {'hasMore': False, 'before': None},
-                    'notice': "이 채팅에는 아직 저장된 메시지가 없습니다."}
+                    'notice': '此聊天尚无已保存的消息。'}
         page = ''
         args = [sid]
         if before:
             pos = db.execute('SELECT sequence, time_created, id FROM cli.message WHERE session_id = ? AND id = ?',
                              (sid, before)).fetchone()
             if pos is None:
-                raise ValueError('ZCode 기록이 변경되었습니다. 채팅을 다시 열어주세요.')
+                raise ValueError('ZCode 历史已变化，请重新打开聊天')
             page = ' AND (m.sequence, m.time_created, m.id) < (?, ?, ?)'
             args.extend(pos)
         rows = db.execute("""
             SELECT m.id, m.time_created, json_extract(m.data, '$.role') AS role,
+                   json_extract(m.data, '$.anchor.turnId') AS turn_id,
                    CASE WHEN json_type(m.data, '$.metadata.conversationInputIntent.attachments')='array'
                         THEN json_extract(m.data, '$.metadata.conversationInputIntent.attachments')
                         WHEN json_type(m.data, '$.metadata.inputIntent.attachmentRefs')='array'
@@ -194,6 +195,8 @@ def saved_detail(home, sid, body=None):
         messages = []
         for row in reversed(rows[:limit]):
             message = {'id': row['id'], 'role': row['role'], 'text': '', 'timestamp': row['time_created']}
+            if isinstance(row['turn_id'], str) and row['turn_id']:
+                message['turnId'] = row['turn_id']
             if row['role'] == 'user' and row['files']:
                 message['attachments'] = attachments(sid, json.loads(row['files']), row['command'])
             messages.append(message)
@@ -216,7 +219,7 @@ def saved_detail(home, sid, body=None):
     return {'session': session, 'readOnly': True, 'messages': messages, 'requests': [],
             'capabilities': session['capabilities'],
             'history': {'hasMore': len(rows) > limit, 'before': messages[0]['id'] if len(rows) > limit else None},
-            'notice': '현재 이 기기에 저장된 채팅 텍스트는 보기 전용입니다.。'}
+            'notice': '当前为本机保存的聊天文字，仅供查看。'}
 
 
 def new_user_message(home, sid, after, started, text):

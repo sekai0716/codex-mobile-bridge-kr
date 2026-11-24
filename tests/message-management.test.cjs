@@ -4,7 +4,7 @@ const {MessageManagement}=require('../web/features/chat/message-management.js');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(){
  const m=Object.create(MessageManagement.prototype),saved=[],sent=[];
- Object.assign(m,{target:{id:'chat',host:'ssh'},t:x=>x,uuid:()=> 'fresh-id',busy:false,drag:null,generation:1,dialog:{open:true},content:{inert:false},status:{textContent:''},closeButton:{},refreshButton:{},data:{version:'v1',draftAccountIdentity:'account',queue:[{id:'a'},{id:'b'},{id:'c'}]},queue:[{id:'a'},{id:'b'},{id:'c'}],render(){this.renders=(this.renders||0)+1;},refresh:async()=>{m.refreshes=(m.refreshes||0)+1;},onChanged(){},saveEditor:async(scope,editor)=>saved.push({scope,editor}),edit:async(scope,body)=>{sent.push({scope,body});return {queue:[{id:body.id,editId:body.editId,text:body.text}]};}});
+ Object.assign(m,{target:{id:'chat',host:'ssh'},t:x=>x,uuid:()=> 'fresh-id',busy:false,drag:null,generation:1,dialog:{open:true},content:{inert:false,replaceChildren(){}},status:{textContent:''},closeButton:{},refreshButton:{},data:{version:'v1',draftAccountIdentity:'account',queue:[{id:'a'},{id:'b'},{id:'c'}]},queue:[{id:'a'},{id:'b'},{id:'c'}],render(){this.renders=(this.renders||0)+1;},refresh:async()=>{m.refreshes=(m.refreshes||0)+1;},onChanged(){},saveEditor:async(scope,editor)=>saved.push({scope,editor}),edit:async(scope,body)=>{sent.push({scope,body});return {queue:[{id:body.id,editId:body.editId,text:body.text}]};}});
  return {m,saved,sent};
 }
 test('up/down order is persisted with exact version and all queue IDs',async()=>{
@@ -100,29 +100,17 @@ test('reopening after a failed editor save reloads current storage instead of re
  m.editorSave=Promise.reject(Error('previous save conflict'));m.scope=()=>m.target;m.doc={activeElement:null};m.beforeOpen=()=>{};m.loadEditor=async()=>structuredClone(stored);m.dialog.showModal=()=>shown++;
  await m.open();assert.equal(shown,1);assert.deepEqual(m.editor,stored);assert.deepEqual(m.persistedEditor,stored);assert.equal(m.refreshes,1);
 });
-
-function shortcutFixture(stored=null){
- const result=fixture(),m=result.m;
- m.scope=()=>m.target;m.doc={activeElement:null};m.beforeOpen=()=>{};m.loadEditor=async()=>structuredClone(stored);
- m.dialog.showModal=()=>{m.dialog.open=true;};m.editInput={focus(){m.focused=true;}};
- m.refresh=async()=>true;
- return result;
-}
-test('queue card shortcut edits the latest row in place without withdrawing or sending',async()=>{
- const {m,saved,sent}=shortcutFixture();m.data.queue=[{id:'queued',text:'latest server text',attachments:['original-file']}];
- await m.open('queued');assert.equal(m.editor.sourceId,'queued');assert.equal(m.editor.body.text,'latest server text');
- assert.deepEqual(m.editor.body.attachments,['original-file']);assert.equal(saved.length,1);assert.equal(sent.length,0);assert.equal(m.focused,true);
-});
-test('queue shortcut preserves an existing editor for another message',async()=>{
- const stored={id:'other',sourceId:'other',status:'editing',body:{text:'unsaved edit'}};
- const {m,saved}=shortcutFixture(stored);await m.open('queued');assert.deepEqual(m.editor,stored);assert.equal(saved.length,0);assert.match(m.status.textContent,/현재 편집/);
-});
-test('queue shortcut never edits a stale row, failed read or unsupported queue',async()=>{
- for(const kind of ['missing','failed','unsupported']){
-  const {m,saved}=shortcutFixture();m.data.queue=[{id:'queued',text:'latest'}];
-  if(kind==='missing')m.data.queue=[];
-  if(kind==='failed')m.refresh=async()=>false;
-  if(kind==='unsupported')m.data.capabilities={edit:false};
-  await m.open('queued');assert.equal(m.editor,null);assert.equal(saved.length,0);
+test('open, persistEditor and editRow work without structuredClone',async()=>{
+ const originalClone=globalThis.structuredClone;
+ globalThis.structuredClone=undefined;
+ try{
+  const {m,saved}=fixture();let shown=0;
+  m.scope=()=>({id:'chat',host:'local'});m.doc={activeElement:null};m.beforeOpen=()=>{};m.loadEditor=async()=>undefined;m.dialog.showModal=()=>shown++;
+  await m.open();assert.equal(shown,1);assert.deepEqual(m.target,{id:'chat',host:'local'});assert.equal(m.persistedEditor,undefined);
+  m.data={version:'v1',draftAccountIdentity:'account',queue:[{id:'queued',text:'old'}]};
+  await m.editRow({id:'queued',text:'hello'});assert.equal(m.editor.body.text,'hello');
+  m.editor.body.text='mutated-after';await settle();assert.equal(saved[0].editor.body.text,'hello');
+ }finally{
+  globalThis.structuredClone=originalClone;
  }
 });

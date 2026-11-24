@@ -264,11 +264,12 @@
             .map(key=>[key,source.usage[key]])):null;
         return {type:row.type||source.role,uuid:row.uuid,isSynthetic:row.isSynthetic === true,isMeta:row.isMeta === true,
           isSidechain:row.isSidechain === true,
-          ...Object.fromEntries(['entrypoint','promptId','parentUuid','sessionId']
+          ...Object.fromEntries(['entrypoint','promptId','parentUuid','sessionId','sourceToolAssistantUUID']
             .filter(key=>typeof row[key]==='string').map(key=>[key,row[key]])),
           ...(typeof row.timestamp==='string'||typeof row.timestamp==='number'?{timestamp:row.timestamp}:{}),
           ...(typeof row.parent_tool_use_id==='string'?{parent_tool_use_id:row.parent_tool_use_id}:{}),
           message:{id:source.id,role:source.role || row.type,content,
+            ...(['tool_use','end_turn'].includes(source.stop_reason)?{stop_reason:source.stop_reason}:{}),
             ...(typeof source.model==='string'?{model:source.model}:{}),
             ...(usage&&Object.keys(usage).length?{usage}:{}),
             ...(typeof source.effort==='string'?{effort:source.effort}:{})}};
@@ -451,7 +452,7 @@
   if (!sessionId) {
     const trust = await api.LocalSessions.checkTrust?.(config.cwd);
     if (trust?.trusted !== true)
-      throw new Error('Claude 아직 신뢰할 수 없는 디렉터리：' + config.cwd + '。제발 Claude Code 페이지에서 이 디렉터리를 선택하고 신뢰를 확인한 다음 연결을 초기화합니다.。');
+      throw new Error('Claude 尚未信任目录：' + config.cwd + '。请在 Claude Code 页面选择此目录并确认信任，再初始化连接。');
     if (typeof api.FileSystem?.savePastedFile !== 'function')
       throw new Error('현재 Claude Desktop 메시지 없는 초기화는 지원되지 않습니다. 업데이트하세요. Claude Desktop 나중에 다시 시도해 보세요');
     const digest = prefix => crypto.subtle.digest('SHA-256',encoder.encode(prefix + config.token));

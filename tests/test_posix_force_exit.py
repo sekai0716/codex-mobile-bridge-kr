@@ -2,9 +2,12 @@
 import copy
 import os
 from pathlib import Path
+import posixpath
+import sys
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, Mock, patch
 
 from bridge.platforms.posix.force_exit import force_stop
 
@@ -51,14 +54,14 @@ class PosixForceExitTests(unittest.TestCase):
         for field, value in [('uid', os.getuid()+1), ('image', '/fixture/another-app')]:
             before = self.live[702][field]
             self.live[702][field] = value
-            with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+            with self.assertRaisesRegex(ValueError, '进程已变化'):
                 force_stop(self.executable, self.commands)
             self.native.terminate.assert_not_called()
             self.live[702][field] = before
 
     def test_a_new_process_is_not_added_to_confirmed_target_set(self):
         self.live[703] = {**self.live[702], 'pid': 703}
-        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+        with self.assertRaisesRegex(ValueError, '进程已变化'):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
 
@@ -69,14 +72,14 @@ class PosixForceExitTests(unittest.TestCase):
                 self.live[701]['birth'] = (900, 1)
             return handle
         self.native.open.side_effect = bind
-        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+        with self.assertRaisesRegex(ValueError, '进程已变化'):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
         self.assertEqual(self.native.close.call_count, 2)
 
     def test_inventory_omission_cannot_hide_a_still_live_bound_process(self):
         self.desktop.processes.side_effect = [list(self.live), []]
-        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+        with self.assertRaisesRegex(ValueError, '进程已变化'):
             force_stop(self.executable, self.commands)
         self.assertEqual(self.native.terminate.call_count, 1)
         self.assertIn(702, self.live)
@@ -84,7 +87,7 @@ class PosixForceExitTests(unittest.TestCase):
     def test_first_inventory_omission_cannot_skip_a_known_live_target(self):
         self.desktop.processes.return_value = []
         self.desktop.processes.side_effect = None
-        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+        with self.assertRaisesRegex(ValueError, '进程已变化'):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
         self.assertEqual(set(self.live), set(self.commands))
@@ -97,7 +100,7 @@ class PosixForceExitTests(unittest.TestCase):
             return handle
         self.native.open.side_effect = bind
         self.desktop.processes.side_effect = lambda predicate: [702]
-        with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+        with self.assertRaisesRegex(ValueError, '进程已变化'):
             force_stop(self.executable, self.commands)
         self.native.terminate.assert_not_called()
 
@@ -119,7 +122,7 @@ class PosixForceExitTests(unittest.TestCase):
         self.native.terminate.assert_not_called()
 
     def test_gateway_and_ancestor_images_are_protected(self):
-        with self.assertRaisesRegex(ValueError, '게이트웨이'):
+        with self.assertRaisesRegex(ValueError, '网关'):
             force_stop('/fixture/gateway', {})
         self.native.terminate.assert_not_called()
 
@@ -142,7 +145,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                 force.assert_called_once_with(executable.resolve(), commands)
                 for dangerous in (' --eval dangerous', ' --user-data-dir=/other/profile'):
                     force.reset_mock(); commands[701] += dangerous
-                    with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+                    with self.assertRaisesRegex(ValueError, '进程已变化'):
                         force_stop_client(descriptor, state=state)
                     force.assert_not_called()
 
@@ -159,7 +162,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                     patch('bridge.clients.lifecycle.inspect_client', return_value=state), \
                     patch('bridge.clients.lifecycle._commands', return_value={701: command}), \
                     patch('bridge.platforms.posix.force_exit.force_stop') as force:
-                with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+                with self.assertRaisesRegex(ValueError, '进程已变化'):
                     force_stop_client(descriptor, state=state)
                 force.assert_not_called()
 
@@ -175,7 +178,7 @@ class ForceLifecycleBoundaryTests(unittest.TestCase):
                     patch('bridge.clients.lifecycle.inspect_client', return_value=empty), \
                     patch('bridge.clients.lifecycle._commands', return_value={}), \
                     patch('bridge.platforms.posix.force_exit.force_stop') as force:
-                with self.assertRaisesRegex(ValueError, "앱\\ 프로세스가\\ 변경되었거나\\ 확인할\\ 수\\ 없어\\ 강제\\ 종료가\\ 중지되었습니다\\.\\ 다시\\ 시도하기\\ 전에\\ 다시\\ 스캔하세요\\."):
+                with self.assertRaisesRegex(ValueError, '进程已变化'):
                     force_stop_client(descriptor, state=state)
                 force.assert_not_called()
 
@@ -192,6 +195,42 @@ class LinuxIdentityTests(unittest.TestCase):
             root.exists.return_value = True
             with self.assertRaises(FileNotFoundError):
                 Native.__new__(Native).identity(701)
+
+    def test_deleted_executable_identity_requires_explicit_opt_in(self):
+        from bridge.platforms.linux.force_exit import Native
+        fields = ['S', '12', *(['0']*17), '99']
+        stat = Mock()
+        stat.read_text.return_value = '701 (language_server) '+' '.join(fields)
+        exe = Mock()
+        exe.resolve.side_effect = FileNotFoundError()
+        root = MagicMock()
+        root.stat.return_value = SimpleNamespace(st_uid=1000)
+        root.__truediv__.side_effect = lambda name: stat if name == 'stat' else exe
+        readlink = Mock(return_value='/tmp/extracted/language_server (deleted)')
+        with patch('bridge.platforms.linux.force_exit.Path') as path, \
+             patch('bridge.platforms.linux.force_exit.os', SimpleNamespace(path=posixpath, readlink=readlink)):
+            path.return_value.__truediv__.return_value = root
+            native = Native.__new__(Native)
+            with self.assertRaises(FileNotFoundError):
+                native.identity(701)
+            identity = native.identity(701, allow_deleted=True)
+            for image in ('tmp/extracted/language_server (deleted)', '/tmp/extracted/language_server'):
+                readlink.return_value = image
+                with self.assertRaises(FileNotFoundError):
+                    native.identity(701, allow_deleted=True)
+        self.assertEqual(identity['pid'], 701)
+        self.assertEqual(identity['image'], '/tmp/extracted/language_server (deleted)')
+
+    def test_open_propagates_deleted_identity_opt_in_only_when_requested(self):
+        from bridge.platforms.linux.force_exit import Native
+        native = Native.__new__(Native)
+        identity = {'pid': 701, 'image': '/tmp/extracted/language_server (deleted)'}
+        with patch('bridge.platforms.linux.force_exit.os.pidfd_open', return_value=23, create=True), \
+             patch('bridge.platforms.linux.force_exit.os.close') as close, \
+             patch.object(native, 'identity', return_value=identity) as check:
+            self.assertEqual(native.open(identity, allow_deleted=True), 23)
+        check.assert_called_once_with(701, allow_deleted=True)
+        close.assert_not_called()
 
 
 class LinuxAncestorTests(unittest.TestCase):
@@ -214,6 +253,19 @@ class LinuxAncestorTests(unittest.TestCase):
             with self.assertRaises(ProcessLookupError):
                 native.ancestor(701)
 
+    def test_deleted_ancestor_image_keeps_the_existing_fail_closed_contract(self):
+        from bridge.platforms.linux.force_exit import Native
+        fields = ['S', '12', *(['0']*17), '99']
+        stat, image = Mock(), Mock()
+        stat.read_text.return_value = '701 (appimage) '+' '.join(fields)
+        image.resolve.side_effect = FileNotFoundError()
+        root = MagicMock()
+        root.__truediv__.side_effect = lambda name: stat if name == 'stat' else image
+        with patch('bridge.platforms.linux.force_exit.Path') as path:
+            path.return_value.__truediv__.return_value = root
+            with self.assertRaises(FileNotFoundError):
+                Native.__new__(Native).ancestor(701)
+
     def test_linux_protection_walk_does_not_use_partial_ancestor_data_for_targets(self):
         from bridge.platforms.posix.force_exit import force_stop
         native = Mock()
@@ -221,9 +273,33 @@ class LinuxAncestorTests(unittest.TestCase):
         native.identity.side_effect = PermissionError(13, 'Target image unavailable')
         with patch('bridge.platforms.posix.force_exit.sys.platform', 'linux'), \
                 patch('bridge.platforms.linux.force_exit.Native', return_value=native):
-            with self.assertRaisesRegex(ValueError, '권한'):
+            with self.assertRaisesRegex(ValueError, '权限'):
                 force_stop('/fixture/client', {701: '/fixture/client'})
         native.ancestor.assert_called_once_with(os.getpid())
         native.identity.assert_called_once_with(701)
         native.open.assert_not_called()
         native.terminate.assert_not_called()
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux /proc deleted symlink fixture')
+    def test_deleted_appimage_exe_symlink_is_opt_in_and_missing_non_deleted_fails(self):
+        from bridge.platforms.linux.force_exit import Native
+        with tempfile.TemporaryDirectory() as folder:
+            proc = Path(folder)/'proc'
+            deleted_root = proc/'701'
+            deleted_root.mkdir(parents=True)
+            (deleted_root/'stat').write_text('701 (language_server) S 700 ' + ' '.join(['0'] * 17) + ' 99 0')
+            (deleted_root/'exe').symlink_to('/tmp/appimage_extracted_abc/resources/bin/language_server (deleted)')
+
+            missing_root = proc/'702'
+            missing_root.mkdir(parents=True)
+            (missing_root/'stat').write_text('702 (broken) S 1 ' + ' '.join(['0'] * 17) + ' 99 0')
+            (missing_root/'exe').symlink_to('/tmp/missing/binary')
+
+            native = Native.__new__(Native)
+            with patch('bridge.platforms.linux.force_exit.Path', side_effect=lambda value: proc if value == '/proc' else Path(value)):
+                with self.assertRaises(FileNotFoundError):
+                    native.identity(701)
+                row = native.identity(701, allow_deleted=True)
+                self.assertEqual(row['image'], '/tmp/appimage_extracted_abc/resources/bin/language_server (deleted)')
+                with self.assertRaises(FileNotFoundError):
+                    native.identity(702)

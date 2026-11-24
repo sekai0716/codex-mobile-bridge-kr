@@ -22,22 +22,22 @@ class DisplayMetadataTests(unittest.TestCase):
         self.store = DisplayMetadata(self.temp.name, private_json)
 
     def test_persistent_project_section_and_alias_do_not_change_native_identity(self):
-        project = self.store.change('one', 'chat', change('create-project', title='프로젝트'))
-        section = self.store.change('one', 'chat', change('create-section', title='할 일'))
-        self.store.change('one', 'chat', change('rename', title='표시 이름'))
+        project = self.store.change('one', 'chat', change('create-project', title='工程'))
+        section = self.store.change('one', 'chat', change('create-section', title='待办'))
+        self.store.change('one', 'chat', change('rename', title='显示名称'))
         original = {'id': 'chat', 'title': 'Native', 'cwd': '/original', 'owner': 'owner', 'provider': 'upstream'}
         row = DisplayMetadata(self.temp.name, private_json).decorate('one', original)
-        self.assertEqual(row['title'], '표시 이름')
+        self.assertEqual(row['title'], '显示名称')
         self.assertEqual(row['projectId'], project['projectId'])
         self.assertEqual(row['sectionId'], section['sectionId'])
-        self.assertEqual(row['projectName'], '프로젝트')
+        self.assertEqual(row['projectName'], '工程')
         for field in ('cwd', 'owner', 'provider'):
             self.assertEqual(row[field], original[field])
         self.assertEqual(self.store.decorate('two', original), original)
         self.assertEqual(original['title'], 'Native')
 
     def test_idempotent_create_conflict_and_stale_assignment(self):
-        body = change('create-project', title='프로젝트')
+        body = change('create-project', title='项目')
         first = self.store.change('one', 'chat', body)
         self.assertEqual(self.store.change('one', 'chat', body), first)
         self.assertEqual(len(self.store.snapshot('one', 'chat')['projects']), 1)
@@ -49,20 +49,20 @@ class DisplayMetadataTests(unittest.TestCase):
         self.assertIsNone(self.store.snapshot('one', 'chat')['projectId'])
 
     def test_verified_native_title_is_not_masked_but_old_alias_is_retained(self):
-        self.store.change('one', 'chat', change('rename', title='이전 별칭'))
-        row = self.store.decorate('one', {'id': 'chat', 'title': '네이티브 타이틀', 'capabilities': {'rename': True}})
-        self.assertEqual(row['title'], '네이티브 타이틀')
+        self.store.change('one', 'chat', change('rename', title='旧别名'))
+        row = self.store.decorate('one', {'id': 'chat', 'title': '原生标题', 'capabilities': {'rename': True}})
+        self.assertEqual(row['title'], '原生标题')
         self.assertNotIn('renameScope', row)
-        self.assertEqual(self.store._read()['one']['sessions']['chat']['title'], '이전 별칭')
+        self.assertEqual(self.store._read()['one']['sessions']['chat']['title'], '旧别名')
 
     def test_native_rename_unknown_blocks_new_request_after_restart(self):
         commands = RenameCommands(self.temp.name, private_json)
         read = Mock(return_value={'identity': {'id': 'chat', 'cwd': '/project'}, 'title': 'old'})
         dispatch = Mock(side_effect=TimeoutError)
         body = {'id': str(uuid.uuid4()), 'title': 'new'}
-        with self.assertRaisesRegex(ValueError, "이름\\ 바꾸기에는\\ 확인이\\ 필요합니다\\.\\ 원래\\ 클라이언트를\\ 확인하십시오\\.\\ 다시\\ 제출되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform('chat', body, read, dispatch)
-        with self.assertRaisesRegex(ValueError, "이전\\ 이름\\ ​​변경\\ 결과를\\ 확인해야\\ 합니다\\.\\ 다시\\ 제출되지\\ 않으므로\\ 원본\\ 클라이언트에서\\ 먼저\\ 확인하시기\\ 바랍니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             RenameCommands(self.temp.name, private_json).perform('chat', {**body, 'id': str(uuid.uuid4())}, read, dispatch)
         dispatch.assert_called_once()
         read.return_value['title'] = 'new'
@@ -94,7 +94,7 @@ class DisplayMetadataTests(unittest.TestCase):
     def test_native_readback_identity_change_is_not_retried(self):
         read = Mock(side_effect=[{'identity': {'id': 'chat'}, 'title': 'old'},
                                  {'identity': {'id': 'another'}, 'title': 'new'}])
-        with patch('bridge.features.sessions.display_metadata.time.sleep') as sleep, self.assertRaisesRegex(ValueError, "이름\\ 바꾸기에는\\ 확인이\\ 필요합니다\\.\\ 원래\\ 클라이언트를\\ 확인하십시오\\.\\ 다시\\ 제출되지\\ 않습니다\\."):
+        with patch('bridge.features.sessions.display_metadata.time.sleep') as sleep, self.assertRaisesRegex(ValueError, '待核对'):
             RenameCommands(self.temp.name, private_json).perform('chat', {'id': str(uuid.uuid4()), 'title': 'new'}, read, Mock())
         sleep.assert_not_called()
 
@@ -129,7 +129,7 @@ class ManagerMetadataTests(unittest.TestCase):
 
     def test_unavailable_native_rename_is_explicit_and_never_creates_an_alias(self):
         for provider in ('claude', 'deepseek'):
-            with self.assertRaisesRegex(OrganizationNotSent, "현재\\ 세션은\\ 기본적으로\\ 이름을\\ 바꿀\\ 수\\ 없습니다\\.\\ 먼저\\ 원래\\ 세션에\\ 연결하십시오\\.\\ 여전히\\ 사용할\\ 수\\ 없다면\\ 원래\\ 클라이언트에서\\ 수정하세요\\."):
+            with self.assertRaisesRegex(OrganizationNotSent, '原生改名'):
                 self.manager.call(provider, 'rename', 'chat', {'id': str(uuid.uuid4()), 'title': 'Alias'})
         self.manager.call('claude', 'organization', 'chat', change('create-project', title='Project'))
         rows = self.manager.call('claude', 'list')['sessions']
@@ -178,7 +178,7 @@ class ManagerMetadataTests(unittest.TestCase):
             return value
         body = {'id': str(uuid.uuid4()), 'title': 'Native'}
         self.manager._adapter_call = lost
-        with self.assertRaisesRegex(ValueError, "이름\\ 바꾸기에는\\ 확인이\\ 필요합니다\\.\\ 원래\\ 클라이언트를\\ 확인하십시오\\.\\ 다시\\ 제출되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             self.manager.call('deepseek', 'rename', 'chat', body)
         self.row['capabilities'] = {'rename': False}
         retry = {**body, 'id': str(uuid.uuid4())}
@@ -204,7 +204,7 @@ class MetadataHttpTests(unittest.TestCase):
             headers = self.login()
             self.assertEqual(self.request('GET', route + '?sessionId=code%2Fnative', headers=headers)[0], 200)
             manager.call.assert_called_with(provider, 'organization', 'code/native', {})
-            for action, values in (('rename', {'title': '새 이름'}), ('organization', {'kind': 'create-section', 'title': '할 일'})):
+            for action, values in (('rename', {'title': '新名称'}), ('organization', {'kind': 'create-section', 'title': '待办'})):
                 body = {'sessionId': 'code/native', 'id': str(uuid.uuid4()), **values}
                 target = '/api/desktop-sessions/' + provider + '/' + action
                 self.assertEqual(self.request('POST', target, body, {'Cookie': headers['Cookie']})[0], 403)

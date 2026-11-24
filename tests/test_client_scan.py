@@ -1,6 +1,6 @@
 """Exercise discovery/setup orchestration without touching native app profiles."""
 import json
-from contextlib import nullcontext
+from threading import RLock
 import plistlib
 import tempfile
 import unittest
@@ -90,8 +90,8 @@ class ClientScanTests(unittest.TestCase):
             for key in ('codex', 'claude', 'deepseek')}
         self.deepseek = FakeDeepSeek(self.root/'desktop-sessions/deepseek', self.root/'deepseek-home')
         self.claude = Mock()
-        self.claude.configure.return_value = {'setupState': 'ready-to-connect', 'reason': '연결 가능 Claude'}
-        self.claude.connect.return_value = {'setupState': 'needs-permission', 'reason': '연결하려면 접근성 기능을 승인하세요. Claude'}
+        self.claude.configure.return_value = {'setupState': 'ready-to-connect', 'reason': '可以连接 Claude'}
+        self.claude.connect.return_value = {'setupState': 'needs-permission', 'reason': '请授权辅助功能以连接 Claude'}
         self.claude.status.return_value = {'connected': False}
         self.running = False
         self.connect_on_launch = False
@@ -125,8 +125,8 @@ class ClientScanTests(unittest.TestCase):
         self.discovered['codex'].update(installed=False, executable='')
         self.accounts.index = {}
         self.accounts.assert_editable = Mock()
-        self.accounts.gate = nullcontext()
-        self.accounts.lock = nullcontext()
+        self.accounts.gate = RLock()
+        self.accounts.lock = RLock()
         self.bridge.cli_sessions = SimpleNamespace(available=Mock(return_value=True))
         self.manager.gateway_running = True
         self.manager.config['enabled'] = {'codex': False}

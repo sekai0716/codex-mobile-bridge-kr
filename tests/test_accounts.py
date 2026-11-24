@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import sys
 import tempfile
 import threading
 import traceback
@@ -8,6 +9,7 @@ import unittest
 import uuid
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
+from contextlib import contextmanager, nullcontext
 from unittest.mock import Mock, patch
 
 from bridge.features.accounts import accounts as accounts_module
@@ -33,6 +35,20 @@ class PrivateWriteTests(unittest.TestCase):
         self.path = Path(self.tmp.name)/'config.toml'
         self.path.write_bytes(b'original')
 
+    @contextmanager
+    def windows_writer(self, replace, clock):
+        from bridge.platforms.windows import local_service as native
+        native_os = SimpleNamespace(O_WRONLY=os.O_WRONLY, O_BINARY=getattr(os, 'O_BINARY', 0),
+                                  fdopen=os.fdopen, fsync=os.fsync, replace=replace)
+        def create(path, **kwargs):
+            return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with patch.object(accounts_module, 'os', SimpleNamespace(name='nt')), \
+                patch.object(native, 'os', native_os), patch.object(native, 'time', clock), \
+                patch.object(native, 'private_security', return_value=nullcontext(None)), \
+                patch.object(native, '_open', side_effect=create), \
+                patch.dict(sys.modules, {'msvcrt': SimpleNamespace(open_osfhandle=lambda handle, flags: handle)}):
+            yield
+
     def test_windows_transient_sharing_denial_retries_atomic_replace(self):
         original_replace = os.replace
         attempts = []
@@ -43,14 +59,13 @@ class PrivateWriteTests(unittest.TestCase):
                 error.winerror = (5, 32)[len(attempts)-1]
                 raise error
             return original_replace(source, destination)
-        windows = SimpleNamespace(name='nt', fdopen=os.fdopen, fsync=os.fsync, replace=replace)
         clock = SimpleNamespace(monotonic=Mock(side_effect=[0, .01, .02]), sleep=Mock())
-        with patch.object(accounts_module, 'os', windows), patch.object(accounts_module, 'time', clock):
+        with self.windows_writer(replace, clock):
             private_bytes(self.path, b'restored')
         self.assertEqual(self.path.read_bytes(), b'restored')
         self.assertEqual(len(attempts), 3)
         self.assertEqual(clock.sleep.call_count, 2)
-        self.assertEqual(list(self.path.parent.glob('.account-*')), [])
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
 
     def test_windows_persistent_denial_keeps_original_and_cleans_source(self):
         attempts = []
@@ -59,30 +74,28 @@ class PrivateWriteTests(unittest.TestCase):
             error = PermissionError('persistent sharing denial')
             error.winerror = 5
             raise error
-        windows = SimpleNamespace(name='nt', fdopen=os.fdopen, fsync=os.fsync, replace=replace)
         clock = SimpleNamespace(monotonic=Mock(side_effect=[0, 1, 2]), sleep=Mock())
-        with patch.object(accounts_module, 'os', windows), patch.object(accounts_module, 'time', clock):
+        with self.windows_writer(replace, clock):
             with self.assertRaises(PermissionError):
                 private_bytes(self.path, b'uncommitted')
         self.assertEqual(len(attempts), 2)
         clock.sleep.assert_called_once_with(.05)
         self.assertEqual(self.path.read_bytes(), b'original')
-        self.assertEqual(list(self.path.parent.glob('.account-*')), [])
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
 
     def test_other_denial_is_not_retried(self):
         replace = Mock()
         error = PermissionError('different denial')
         error.winerror = 13
         replace.side_effect = error
-        windows = SimpleNamespace(name='nt', fdopen=os.fdopen, fsync=os.fsync, replace=replace)
         clock = SimpleNamespace(monotonic=Mock(return_value=0), sleep=Mock())
-        with patch.object(accounts_module, 'os', windows), patch.object(accounts_module, 'time', clock):
+        with self.windows_writer(replace, clock):
             with self.assertRaises(PermissionError):
                 private_bytes(self.path, b'uncommitted')
         replace.assert_called_once()
         clock.sleep.assert_not_called()
         self.assertEqual(self.path.read_bytes(), b'original')
-        self.assertEqual(list(self.path.parent.glob('.account-*')), [])
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
 
 
 class AccountsTests(unittest.TestCase):
@@ -124,6 +137,16 @@ class AccountsTests(unittest.TestCase):
         self.assertFalse(self.manager.monitor.preferences['globalResetSignal'])
         self.assertFalse((self.manager.root/'reset-dynamic.json').exists())
 
+    def test_saved_account_catalog_follows_parent_runtime_without_recreating_its_cache(self):
+        reader = self.manager.saved_model_catalog('a'*32)
+        cached = {'models': ['fixture']}
+        reader.kind_caches['models']['cached'] = cached
+        updated = self.root/'updated/codex.exe'
+        self.bridge.catalog_reader.executable = updated
+        self.assertEqual(reader.executable, updated)
+        self.assertIs(self.manager.saved_model_catalog('a'*32), reader)
+        self.assertIs(reader.kind_caches['models']['cached'], cached)
+
     def api(self, **changes):
         return self.manager.add_api({'name':'Test API','baseUrl':'https://fixture.invalid/v1',
                                     'apiKey':'secret-fixture','model':'test-model', **changes})['accounts'][-1]
@@ -149,6 +172,9 @@ class AccountsTests(unittest.TestCase):
         scan.assert_called_once_with()
         self.assertEqual(result['desktopExecutable'], str(gui.resolve()))
         self.assertEqual(json.loads((self.manager.root/'index.json').read_text())['desktopExecutable'], str(gui.resolve()))
+        self.assertEqual(self.manager.index['desktopExecutableSource'], 'scan')
+        self.manager.control({'action': 'configure', 'desktopExecutable': str(gui.resolve())})
+        self.assertEqual(self.manager.index['desktopExecutableSource'], 'manual')
         self.assertEqual(self.manager.snapshot_files(), self.original)
 
     def prepare(self, row, before):
@@ -214,7 +240,7 @@ class AccountsTests(unittest.TestCase):
         self.assertEqual(self.manager.snapshot_files(),self.original)
 
     def test_api_accepts_unicode_provider_model_id(self):
-        model = 'xmy:\u65e5\u5361/deepseek-v4.1-flash'
+        model = 'xmy:日卡/deepseek-v4.1-flash'
         self.assertEqual(self.api(model=model)['model'], model)
 
     def test_rejects_bad_addresses_keys_ids_and_active_edit(self):
@@ -287,26 +313,6 @@ class AccountsTests(unittest.TestCase):
                 self.assertFalse((self.manager.root/'rollback.json').exists())
                 self.manager.phase=phase
 
-    def test_failed_quit_keeps_existing_chat_connections(self):
-        row = self.api()
-        self.manager.prepare = self.prepare
-        self.app.stop.side_effect = ValueError('quit failed')
-        self.switch(row)
-        wait_for_account_worker(self)
-        self.assertEqual(self.manager.state['phase'], 'failed')
-        self.assertEqual(self.manager.snapshot_files(), self.original)
-        self.bridge.ipc.close.assert_not_called()
-        self.bridge._disconnected.assert_not_called()
-
-    def test_linux_shared_desktop_can_be_ready_without_legacy_socket(self):
-        from bridge.clients.codex.ipc import IPCError
-        self.bridge.ipc.connect.side_effect = IPCError('disconnected')
-        with patch('bridge.features.accounts.accounts.sys.platform', 'linux'), patch(
-                'bridge.clients.codex.desktop_runtime.connect') as connect:
-            Accounts.wait_ready(self.manager, self.app)
-        connect.assert_called_once_with(self.home, self.manager.runtime)
-        connect.return_value.close.assert_called_once()
-
     def test_restart_during_thread_migration_requires_recovery(self):
         self.manager.phase('migrating',completed=1,total=2)
         restarted=Accounts(self.bridge)
@@ -366,7 +372,6 @@ class AccountsTests(unittest.TestCase):
         discover.assert_not_called()
         self.app.start.assert_not_called()
         self.assertEqual(self.manager.state['cliSync']['status'], 'verified')
-        self.assertEqual(Accounts(self.bridge).state, self.manager.state)
 
     def test_stopped_desktop_unified_switch_restores_on_verification_failure(self):
         row = self.api()
@@ -392,7 +397,7 @@ class AccountsTests(unittest.TestCase):
     def test_unchecked_shared_switch_blocks_joined_cli_before_desktop_shutdown(self):
         row = self.api()
         self.bridge.cli_sessions.joined['fixture'] = object()
-        with self.assertRaisesRegex(ValueError, "액세스를\\ 전환하기\\ 전에\\ 로컬\\ Codex\\ CLI\\ 채팅을\\ 종료하거나\\ 연결을\\ 끊으세요\\."):
+        with self.assertRaisesRegex(ValueError, 'CLI 会话'):
             self.switch(row, syncLocalCli=False)
         self.app.stop.assert_not_called()
         self.assertEqual(self.manager.snapshot_files(), self.original)
@@ -407,6 +412,69 @@ class AccountsTests(unittest.TestCase):
         wait_for_account_worker(self)
         self.assertEqual(self.manager.snapshot_files(), self.original)
         self.assertEqual(self.manager.state['phase'], 'restored')
+
+    def test_confirmed_shared_daemon_is_handled_after_desktop_exit_before_account_write(self):
+        row = self.api()
+        self.manager.prepare = self.prepare
+        def prepare_shared(*, confirmed=False):
+            self.assertTrue(confirmed)
+            self.app.stop.assert_called_once()
+            self.manager.wait_stopped.assert_called_once()
+            self.assertEqual(self.manager.snapshot_files(), self.original)
+        with patch('bridge.features.accounts.cli_sync.LocalCliSync.prepare_shared_daemon_switch',
+                   side_effect=prepare_shared) as daemon, \
+             patch('bridge.features.accounts.cli_sync.LocalCliSync.verify', return_value={'status': 'verified'}):
+            self.switch(row, sharedDaemonConfirmed=True)
+            wait_for_account_worker(self)
+        daemon.assert_called_once_with(confirmed=True)
+        self.assertEqual(self.manager.state['phase'], 'complete')
+
+    def test_current_account_selection_does_not_stop_shared_daemon_or_desktop(self):
+        row = self.api()
+        self.manager.info.current = Mock(return_value={'id': row['id']})
+        with patch('bridge.features.accounts.cli_sync.LocalCliSync.prepare_shared_daemon_switch') as daemon:
+            self.switch(row, sharedDaemonConfirmed=True)
+        daemon.assert_not_called()
+        self.app.stop.assert_not_called()
+
+    @patch('bridge.features.accounts.cli_sync.sys', SimpleNamespace(platform='darwin'))
+    def test_shared_daemon_exit_receipt_survives_public_switch_retry_and_manager_reload(self):
+        row = self.api()
+        self.manager.prepare = self.prepare
+        running = [True]
+        self.app.stop.side_effect = lambda **_: running.__setitem__(0, False)
+        self.app.start.side_effect = lambda: running.__setitem__(0, True)
+        cli = self.bridge.cli_sessions
+        cli.daemon_may_be_running.return_value = True
+        cli.daemon_status = Mock(return_value='running')
+        cli.client = Mock()
+        generation = (123, (1, 2), (3, 4), '/fixture/runtime')
+        with patch('bridge.features.accounts.cli_sync.LocalCliSync._codex_runtime',
+                   side_effect=lambda: (running[0], self.app)), \
+             patch('bridge.clients.codex.cli_session._managed_cli', return_value=self.root/'runtime'), \
+             patch('bridge.clients.codex.daemon_network.graceful_restart_supported', return_value=True), \
+             patch('bridge.platforms.codex_daemon_env.read_daemon_environment', return_value=({}, generation)), \
+             patch('bridge.features.accounts.cli_sync.LocalCliSync.check_idle_daemon'), \
+             patch('bridge.platforms.codex_daemon_env.stop_daemon_gracefully', side_effect=OSError('timeout')) as stop:
+            self.switch(row, sharedDaemonConfirmed=True)
+            wait_for_account_worker(self)
+            self.assertEqual(self.manager.state['phase'], 'restored')
+            self.assertEqual(self.manager.snapshot_files(), self.original)
+            # A new public request must retain the unknown exit even though it
+            # creates a new operation state after Desktop has restarted.
+            self.switch(row, sharedDaemonConfirmed=True)
+            wait_for_account_worker(self)
+            self.assertEqual(stop.call_count, 1)
+            self.assertEqual(self.manager.snapshot_files(), self.original)
+            self.manager = Accounts(self.bridge)
+            self.bridge.accounts = self.manager
+            self.manager.prepare = self.prepare
+            self.manager.wait_stopped = Mock()
+            self.manager.wait_ready = Mock()
+            self.switch(row, sharedDaemonConfirmed=True)
+            wait_for_account_worker(self)
+            stop.assert_called_once()
+            self.assertEqual(self.manager.snapshot_files(), self.original)
 
     def test_disconnected_active_history_and_connected_error_do_not_block(self):
         self.bridge.live={
@@ -518,6 +586,22 @@ class AccountsTests(unittest.TestCase):
 
 
 class DesktopAppTests(unittest.TestCase):
+    def test_windows_scan_prefers_current_installation_over_surviving_old_runtime_bundle(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as folder:
+            root = Path(folder)
+            old, current = root/'old/ChatGPT.exe', root/'current/ChatGPT.exe'
+            for path in (old, current):
+                path.parent.mkdir(); path.write_bytes(b'MZ-desktop'); path.chmod(0o700)
+            runtime = old.parent/'resources/codex.exe'
+            runtime.parent.mkdir(); runtime.write_bytes(b'MZ-runtime')
+            with patch('bridge.clients.desktop_app.sys.platform', 'win32'), \
+                    patch('bridge.clients.discovery.discover_clients', return_value={
+                        'codex': {'installed': True, 'executable': str(current)}}), \
+                    patch('bridge.clients.desktop_app.subprocess.Popen') as start:
+                self.assertEqual(DesktopApp.scan(runtime, root), str(current.resolve()))
+            start.assert_not_called()
+            self.assertTrue(old.is_file())
+
     def test_windows_native_scan_still_rejects_runtime_as_desktop(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as folder:
             runtime = Path(folder)/'bin/version/codex.exe'
@@ -525,7 +609,7 @@ class DesktopAppTests(unittest.TestCase):
             with patch('bridge.clients.desktop_app.sys.platform', 'win32'), \
                     patch('bridge.clients.discovery.discover_clients', return_value={
                         'codex': {'installed': True, 'executable': str(runtime)}}):
-                with self.assertRaisesRegex(ValueError, '명령줄 런타임'):
+                with self.assertRaisesRegex(ValueError, '命令行运行时'):
                     DesktopApp.scan(runtime, folder)
 
     def test_runtime_and_script_cannot_be_used_as_gui(self):

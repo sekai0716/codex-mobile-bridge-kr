@@ -23,7 +23,7 @@ class ZCodeOfficial(ZCodePrototype):
         owner = self.client.owner()
         if not isinstance(owner, dict) or any(not isinstance(owner.get(key), str) or not owner[key]
                                               for key in ('epoch', 'device')):
-            raise _NoLocalTransport('ZCode 공식리모컨은 아직 연결되지 않았습니다. 애플리케이션 관리에서 다시 연결해주세요.。')
+            raise _NoLocalTransport('ZCode 官方远控尚未连接，请在应用管理中重新连接。')
         return {'epoch': owner['epoch'], 'device': owner['device']}
 
     def connection_owner(self, executable=None):
@@ -33,15 +33,15 @@ class ZCodeOfficial(ZCodePrototype):
             return None
 
     def compatibility_owner(self, executable):
-        raise BridgeUnavailable('공식 리모컨은 기본 호환 포트를 사용하지 않습니다.。')
+        raise BridgeUnavailable('官方远控不使用本机兼容端口。')
 
     def start_private_application(self, owner):
-        raise BridgeUnavailable('공식리모콘으로 접속해주세요 ZCode。')
+        raise BridgeUnavailable('请通过官方远控连接 ZCode。')
 
     def _native(self, request):
         owner = self._live_process()
         if owner != request.get('expectedProcess', self.process):
-            raise BridgeUnavailable('ZCode 공식 연결이나 기기가 변경되었습니다. 다시 확인하고 명시적으로 연결하세요.。')
+            raise BridgeUnavailable('ZCode 官方连接或设备已变化，请重新核验并显式接入。')
         timeout = 120 if request['action'] == 'application' else operation_timeout(request['action'])
         args = {**request, 'expectedProcess': owner,
                 'expiresAt': min(int((time.time() + timeout) * 1000), request.get('expiresAt', float('inf')))}
@@ -60,7 +60,7 @@ class ZCodeOfficial(ZCodePrototype):
         if deadline is not None:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise BridgeUnavailable('ZCode 아직 공식적인 연결이 준비되지 않았습니다. 다시 시도해 주세요.。')
+                raise BridgeUnavailable('ZCode 官方连接尚未就绪，请重试。')
             request['expiresAt'] = int((time.time() + remaining) * 1000)
         self._confirm_application(owner, self.transport(request))
 
@@ -95,8 +95,8 @@ class ZCodeOfficial(ZCodePrototype):
         return {'connected': ready, 'historyAvailable': (self.home/'tasks-index.sqlite').is_file(),
                 'sessionAccess': ready, 'canCreate': ready and self.application_create,
                 'retryable': state.get('configured') is True and not ready,
-                'reason': '공식 리모콘에 연결됨' if ready else
-                          state.get('reason') or 'ZCode 공식리모컨은 아직 연결되지 않았습니다. 애플리케이션 관리에서 다시 연결해주세요.。'}
+                'reason': '已连接官方远控' if ready else
+                          state.get('reason') or 'ZCode 官方远控尚未连接，请在应用管理中重新连接。'}
 
     def status(self):
         base = self._application_status()

@@ -87,16 +87,16 @@ class NativeModelCacheTests(unittest.TestCase):
             self.bridge._native_model_identity.return_value = 'identity-b'
             return {'models': [{'id': 'old-account'}]}
         self.bridge.cli_sessions.get_kind.side_effect = changed
-        with self.assertRaisesRegex(CatalogIdentityChanged, '계정 ID가 변경되었습니다.'):
+        with self.assertRaisesRegex(CatalogIdentityChanged, '账号身份已变化'):
             self.bridge._native_models('thread', self.temp.name, 'openai')
         self.assertIsNone(self.bridge.native_model_store.read('identity-a'))
 
     def test_api_catalog_failure_does_not_stamp_empty_models_as_fresh(self):
         self.bridge.cli_sessions.get_kind.return_value = {
-            'models': [], 'modelSource': 'api', 'modelError': '확인할 수 없습니다 API 신임장'}
+            'models': [], 'modelSource': 'api', 'modelError': '无法核验 API 凭据'}
         failed = self.bridge._native_models('thread', self.temp.name, 'custom')
         self.assertEqual(failed['models'], [])
-        self.assertEqual(failed['modelError'], '확인할 수 없습니다 API 신임장')
+        self.assertEqual(failed['modelError'], '无法核验 API 凭据')
         self.assertEqual(failed['cache'], {'state': 'unavailable', 'identity': 'identity-a'})
         self.assertIsNone(self.bridge.native_model_store.read('identity-a'))
 
@@ -129,7 +129,7 @@ class NativeModelCacheTests(unittest.TestCase):
         bridge.cli_sessions.model_environment_identity = Mock(side_effect=DaemonEnvironmentUnavailable('not verified'))
         bridge.cli_sessions.model_catalog = Mock(return_value={
             'models': [], 'modelSource': 'api', 'modelError': 'Unknown runtime environment'})
-        with self.assertRaisesRegex(AppServerUnavailable, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(AppServerUnavailable, '无法核验'):
             bridge._native_models(None, self.temp.name, 'custom')
         bridge.cli_sessions.model_catalog.assert_not_called()
 

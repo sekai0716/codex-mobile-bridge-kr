@@ -3,6 +3,7 @@ from contextlib import ExitStack, closing, nullcontext
 import hashlib
 import json
 import os
+from pathlib import Path
 import sqlite3
 import sys
 import threading
@@ -130,7 +131,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         before = (self.home/'config.toml').read_bytes()
         with self.automatic_proxy_fixture():
             expected = {name: value for name, value in self.daemon_environment.items() if name.lower() != 'https_proxy'}
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.send(self.thread_id, 'keep this draft', draft)
             pending = self.bridge._cli_recovery_record()
             self.assertTrue(pending['followProxy'])
@@ -152,7 +153,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_changed_proxy_while_waiting_invalidates_the_old_recovery(self):
         self.busy = True
         with self.automatic_proxy_fixture():
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             pending = self.bridge._cli_recovery_record()
             self.system_proxy = 'http://127.0.0.1:15323'
@@ -162,7 +163,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.assertEqual(result['state'], 'failed')
             self.stop.assert_not_called()
             self.cli._start_daemon.assert_not_called()
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             self.bridge.cli_maintenance.worker.join(2)
         self.assertNotEqual(self.bridge._cli_recovery_record()['operationId'], pending['operationId'])
@@ -172,7 +173,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_proxy_changes_after_graceful_exit_use_the_newest_verified_route(self):
         with self.automatic_proxy_fixture():
             self.stop.side_effect = lambda *_args, **_kwargs: setattr(self, 'system_proxy', 'http://127.0.0.1:15323')
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             self.bridge.cli_maintenance.worker.join(2)
         self.stop.assert_called_once()
@@ -188,13 +189,13 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             if len(calls) == 2:
                 self.proxy_reachable.side_effect = lambda _endpoint: True
         with self.automatic_proxy_fixture(), patch.object(LocalCliSync, 'check_idle_daemon', side_effect=check):
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             pending = self.bridge._cli_recovery_record()
             self.bridge.cli_maintenance.worker.join(2)
             result = self.bridge.cli_network(self.thread_id, {'action': 'status', 'operationId': pending['operationId']})
             self.assertEqual(result['state'], 'failed')
-            self.assertIn("현재 시스템 프록시가 변경되었습니다. 세션을 다시 계속하세요. 서비스가 종료되지 않았습니다.", result['message'])
+            self.assertIn('未退出服务', result['message'])
         self.assertEqual(len(calls), 2)
         self.stop.assert_not_called()
         self.cli._start_daemon.assert_not_called()
@@ -210,7 +211,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 start(updates, preserved)
                 self.auth_cache = 'fixture-new'
             self.cli._start_daemon.side_effect = restart
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             pending = self.bridge._cli_recovery_record()
             self.assertTrue(pending['followProxy'])
@@ -230,14 +231,14 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 start({'HTTPS_PROXY': 'http://127.0.0.1:15329'}, preserved)
                 self.cli.daemon_status.return_value = 'running'
             self.cli._start_daemon.side_effect = restart
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             pending = self.bridge._cli_recovery_record()
             self.bridge.cli_maintenance.worker.join(2)
             self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'starting')
             result = self.bridge.cli_network(self.thread_id, {'action': 'status', 'operationId': pending['operationId']})
             self.assertEqual(result['state'], 'unknown')
-            self.assertIn("현재 CLI 에이전트 환경이 검증된 복구 목표를 충족하지 않습니다. 서비스가 다시 종료되지 않습니다.", result['message'])
+            self.assertIn('代理环境', result['message'])
             with self.assertRaises(IPCError):
                 self.bridge.activate(self.thread_id)
         self.stop.assert_called_once()
@@ -283,7 +284,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         draft_id = str(uuid.uuid4())
         with patch('bridge.features.sessions.cli_maintenance.WAIT_INTERVAL', .01), \
                 patch('bridge.clients.codex.daemon_network.inspect_proxy', side_effect=AssertionError('account follow does not inspect proxy')):
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.send(self.thread_id, 'draft fixture', draft_id)
             record = self.bridge._cli_recovery_record()
             self.assertEqual(record['phase'], 'waiting')
@@ -311,7 +312,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.auth_cache = 'fixture-C'
         self.cli._start_daemon.side_effect = restart
         with patch('bridge.features.sessions.cli_maintenance.WAIT_INTERVAL', .01):
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             first = self.bridge._cli_recovery_record()['operationId']
             auth.write_text('{"auth_mode":"apikey","OPENAI_API_KEY":"fixture-C"}')
@@ -319,7 +320,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.assertEqual(self.bridge.cli_network(self.thread_id,
                 {'action': 'status', 'operationId': first})['state'], 'failed')
             self.stop.assert_not_called()
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.activate(self.thread_id)
             second = self.bridge._cli_recovery_record()['operationId']
             self.assertNotEqual(first, second)
@@ -333,7 +334,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_v167_provider_id_mismatch_is_read_only_before_rebuild(self):
         self.probe.connect = lambda: {'codexHome': str(self.home), 'userAgent': 'codex_cli_rs/0.167.0'}
         self.current_config.update(model_provider='new-provider', model_providers={'new-provider': {'requires_openai_auth': False}})
-        with self.assertRaisesRegex(IPCError, "원래\\ 세션\\ 및\\ 현재\\ CLI\\ 구성된\\ 공급자가\\ 다릅니다\\.\\ 계속하기\\ 전에\\ 원래\\ 클라이언트에서\\ 원래\\ 공급자를\\ 선택하십시오\\.\\ 기록과\\ 초안은\\ 유지됩니다\\.。"):
+        with self.assertRaisesRegex(IPCError, '提供商不同'):
             self.bridge.activate(self.thread_id)
         view = self.bridge.live[self.thread_id].view()
         self.assertEqual(view['cliRecovery'], {'reason': 'modelProviderMismatch', 'modelProvider': 'openai', 'currentModelProvider': 'new-provider'})
@@ -351,7 +352,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             'modelProvider': 'openai', 'currentModelProvider': 'custom-provider'}}
         self.cli.attach.side_effect = error
         with patch('bridge.clients.codex.cli_session._managed_cli', return_value=None):
-            with self.assertRaisesRegex(IPCError, "원래\\ 세션\\ 및\\ 현재\\ CLI\\ 구성된\\ 공급자가\\ 다릅니다\\.\\ 계속하기\\ 전에\\ 원래\\ 클라이언트에서\\ 원래\\ 공급자를\\ 선택하십시오\\.\\ 기록과\\ 초안은\\ 유지됩니다\\.。"):
+            with self.assertRaisesRegex(IPCError, '提供商不同'):
                 self.bridge.activate(self.thread_id)
         self.assertEqual(self.bridge.live[self.thread_id].view()['cliRecovery'], {
             'reason': 'modelProviderMismatch', 'modelProvider': 'openai', 'currentModelProvider': 'custom-provider'})
@@ -366,7 +367,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 raise AppServerError('synthetic-secret-in-native-error')
             return original(method, params, **kwargs)
         with patch.object(self.probe, 'request', side_effect=request):
-            with self.assertRaisesRegex(IPCError, '이 구성에 대한 기본 인증 캐시를 확인할 수 없습니다.') as caught:
+            with self.assertRaisesRegex(IPCError, '无法核验此配置的原生认证缓存') as caught:
                 self.bridge.activate(self.thread_id)
         self.assertNotIn('synthetic-secret-in-native-error', str(caught.exception))
         self.assertNotIn('synthetic-secret-in-native-error', str(self.bridge.live[self.thread_id].view()))
@@ -385,7 +386,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         with patch.object(self.probe, 'request', side_effect=request), \
                 patch('bridge.platforms.codex_daemon_env.configuration_after_start',
                       side_effect=lambda _home, _generation, *, files=('config.toml', 'auth.json'): 'auth.json' in files):
-            with self.assertRaisesRegex(IPCError, '이 구성에 대한 기본 인증 캐시를 확인할 수 없습니다.') as caught:
+            with self.assertRaisesRegex(IPCError, '无法核验此配置的原生认证缓存') as caught:
                 self.bridge.activate(self.thread_id)
         self.assertNotIn('fixture-sensitive-native-detail', str(caught.exception))
         self.assertNotIn('fixture-sensitive-native-detail', str(self.bridge.live[self.thread_id].view()))
@@ -406,7 +407,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             with self.subTest(mode=mode):
                 identifier = str(uuid.uuid4())
                 try:
-                    with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+                    with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                         self.bridge.send(self.thread_id, 'fixture draft', identifier, mode=mode)
                     self.assertNotIn(self.thread_id + ':' + identifier, self.bridge.submissions)
                     self.cli.call.assert_not_called()
@@ -436,7 +437,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.assertEqual(self.cli.call.call_args.args[1], 'thread-follower-steer-turn')
             self.assertIsNone(self.bridge.cli_maintenance.worker)
             new_id = str(uuid.uuid4())
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 self.bridge.send(self.thread_id, 'new fixture draft', new_id, mode='steer')
             self.cli.call.assert_called_once()
             self.assertNotIn(self.thread_id + ':' + new_id, self.bridge.submissions)
@@ -461,7 +462,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         identifier = str(uuid.uuid4())
         try:
             with patch.object(self.bridge, '_resolve_skills', side_effect=settled):
-                with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+                with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                     self.bridge.send(self.thread_id, 'new fixture draft', identifier, mode='queue')
             self.assertNotIn(self.thread_id + ':' + identifier, self.bridge.submissions)
         finally:
@@ -480,7 +481,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.native_state['modelProvider'] = 'new-provider'
             return attach(identifier, **options)
         self.cli.attach.side_effect = verify_override
-        with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+        with self.assertRaisesRegex(IPCError, '本次操作未发送'):
             self.bridge.activate(self.thread_id)
         record = self.bridge._cli_recovery_record()
         self.bridge.cli_maintenance.worker.join(2)
@@ -502,7 +503,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.stop.assert_not_called()
             with patch('bridge.platforms.codex_daemon_env.read_daemon_environment',
                        side_effect=lambda *_: ({'NATIVE_FIXTURE_KEY': 'verified-native-key'}, self.generation)):
-                with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+                with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                     self.bridge.activate(self.thread_id)
                 record = self.bridge._cli_recovery_record()
                 self.bridge.cli_maintenance.worker.join(2)
@@ -534,7 +535,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.assertIsNone(entry.cli_maintenance.worker)
             auth.write_text('{"auth_mode":"apikey","OPENAI_API_KEY":"fixture-entry-new"}')
             self.cli._start_daemon.side_effect = lambda *_: setattr(self, 'auth_cache', 'fixture-entry-new')
-            with self.assertRaisesRegex(IPCError, '이 작업은 전송되지 않았습니다.'):
+            with self.assertRaisesRegex(IPCError, '本次操作未发送'):
                 entry.activate(self.thread_id)
             record = entry._cli_recovery_record()
             entry.cli_maintenance.worker.join(2)
@@ -643,6 +644,92 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         self.cli.attach.assert_not_called()
         self.assertEqual(self.bridge.submissions['unrelated:submission']['status'], 'unknown')
 
+    def test_cancel_waits_for_an_open_recovery_reader_before_replacing_its_record(self):
+        self.bridge.submissions['unrelated:submission'] = {'status': 'unknown'}
+        preview = self.bridge.cli_network(self.thread_id)
+        pending = self.bridge.cli_network(self.thread_id, {'confirmed': True, 'generation': preview['generation']})
+        self.bridge.cli_maintenance.cancel()
+        self.bridge.cli_maintenance.worker.join(2)
+        self.assertFalse(self.bridge.cli_maintenance.worker.is_alive())
+        path = self.bridge.data_dir/'cli-daemon-recovery.json'
+        opened, release, cancelling, other_locks_held, release_other_locks = (threading.Event() for _ in range(5))
+        original_read, original_replace, original_path_replace = Path.read_text, os.replace, Path.replace
+        outcomes, sequence, replacements = {}, [], set()
+        lock = self.bridge.cli_maintenance.lock
+        class ReadLock:
+            def __enter__(self):
+                if threading.current_thread().name == 'cancel-recovery':
+                    cancelling.set()
+                return lock.__enter__()
+            def __exit__(self, *args):
+                return lock.__exit__(*args)
+        def read(record, *args, **kwargs):
+            if record == path and threading.current_thread().name == 'recovery-reader':
+                with record.open('r', encoding='utf-8') as stream:
+                    sequence.append('reader-open')
+                    opened.set()
+                    if not release.wait(3):
+                        raise AssertionError('record reader was not released')
+                    value = stream.read()
+                sequence.append('reader-closed')
+                return value
+            return original_read(record, *args, **kwargs)
+        def replace(temporary, target, writer=original_replace):
+            if Path(target) == path:
+                if 'reader-closed' not in sequence:
+                    error = PermissionError('Windows does not permit replacement while this reader is open')
+                    error.winerror = 5
+                    raise error
+                key = (str(temporary), str(target))
+                if key not in replacements:
+                    sequence.append('replaced')
+                    replacements.add(key)
+            return writer(temporary, target)
+        def path_replace(temporary, target):
+            # 3.9 caches os.replace in Path's accessor; newer Python delegates live.
+            return replace(temporary, target, original_path_replace)
+        def reader():
+            outcomes['record'] = self.bridge._cli_recovery_record()
+        def cancel():
+            try:
+                outcomes['cancel'] = self.bridge.cli_network(self.thread_id, {'action': 'cancel', 'operationId': pending['operationId']})
+            except BaseException as error:
+                outcomes['error'] = error
+        def hold_other_locks():
+            with self.bridge.accounts.gate, self.cli.start_lock:
+                other_locks_held.set()
+                release_other_locks.wait(10)
+        reader_thread = threading.Thread(target=reader, name='recovery-reader')
+        cancel_thread = threading.Thread(target=cancel, name='cancel-recovery')
+        holder_thread = threading.Thread(target=hold_other_locks)
+        with patch.object(self.bridge.cli_maintenance, 'lock', ReadLock()), \
+                patch.object(Path, 'read_text', read), patch.object(Path, 'replace', path_replace), \
+                patch.object(os, 'replace', replace):
+            try:
+                reader_thread.start()
+                self.assertTrue(opened.wait(3))
+                reader_holds_lock = not lock.acquire(blocking=False)
+                if not reader_holds_lock:
+                    lock.release()
+                holder_thread.start()
+                self.assertTrue(other_locks_held.wait(3))
+                cancel_thread.start()
+                self.assertTrue(cancelling.wait(3))
+            finally:
+                release.set()
+                reader_thread.join(3); cancel_thread.join(3)
+                release_other_locks.set();holder_thread.join(3)
+        self.assertFalse(reader_thread.is_alive()); self.assertFalse(cancel_thread.is_alive())
+        self.assertTrue(reader_holds_lock, 'recovery reader must protect its open file from cancellation replacement')
+        if 'error' in outcomes:
+            raise outcomes['error']
+        self.assertEqual(outcomes['cancel']['state'], 'cancelled')
+        self.assertEqual(outcomes['record']['phase'], 'waiting')
+        self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'cancelled')
+        self.assertEqual(sequence, ['reader-open', 'reader-closed', 'replaced'])
+        self.assertEqual(self.bridge.submissions['unrelated:submission']['status'], 'unknown')
+        self.stop.assert_not_called(); self.cli._start_daemon.assert_not_called(); self.cli.attach.assert_not_called()
+
     def test_waiting_recovery_aborts_if_process_generation_changes(self):
         self.busy = True
         with patch('bridge.features.sessions.cli_maintenance.WAIT_INTERVAL', .01):
@@ -652,7 +739,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.bridge.cli_maintenance.worker.join(2)
         result = self.bridge.cli_network(self.thread_id, {'action': 'status', 'operationId': pending['operationId']})
         self.assertEqual(result['state'], 'failed')
-        self.assertIn("대기 기간 동안 기본 서비스 또는 구성이 변경되었으며 서비스가 종료되지 않았습니다.", result['message'])
+        self.assertIn('服务或配置已变化', result['message'])
         self.stop.assert_not_called()
         self.cli._start_daemon.assert_not_called()
         self.cli.attach.assert_not_called()
@@ -681,7 +768,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 result = self.bridge.cli_network(self.thread_id,
                     {'action': 'status', 'operationId': pending['operationId']})
                 self.assertEqual(result['state'], 'failed')
-                self.assertIn("복구 대상의 세션 ID가 변경되어 서비스가 복원되지 않았습니다.", result['message'])
+                self.assertIn('恢复目标', result['message'])
                 self.stop.assert_not_called()
                 self.cli._start_daemon.assert_not_called()
                 self.cli.attach.assert_not_called()
@@ -705,7 +792,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             self.bridge.cli_maintenance.worker.join(2)
         result = self.bridge.cli_network(self.thread_id, {'action': 'status', 'operationId': pending['operationId']})
         self.assertEqual(result['state'], 'failed')
-        self.assertIn("복구 대상의 세션 ID가 변경되었으며 유지 관리 작업이 디스패치되지 않았습니다.", result['message'])
+        self.assertIn('恢复目标的会话身份已变化', result['message'])
         self.stop.assert_not_called()
         self.cli._start_daemon.assert_not_called()
         self.cli.attach.assert_not_called()
@@ -831,7 +918,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         from bridge.clients.codex.desktop_runtime import exclusive_lock
         preview = self.bridge.cli_network(self.thread_id)
         with exclusive_lock(self.home, 'cli-maintenance'):
-            with self.assertRaisesRegex(ValueError, "공유\\ 액세스가\\ 아직\\ 사용\\ 중이거나\\ 종료되었습니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\."):
+            with self.assertRaisesRegex(ValueError, '仍在使用或退出中'):
                 self.bridge.cli_network(self.thread_id, {'confirmed': True, 'generation': preview['generation']})
         self.assertEqual(self.bridge._cli_recovery_record(), {})
         self.stop.assert_not_called()
@@ -840,7 +927,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_process_generation_change_aborts_before_stop(self):
         preview = self.bridge.cli_network(self.thread_id)
         with patch('bridge.platforms.codex_daemon_env.read_daemon_environment', return_value=({}, ('replacement',))):
-            with self.assertRaisesRegex(ValueError, '서비스가 변경되었습니다'):
+            with self.assertRaisesRegex(ValueError, '服务已变化'):
                 self.bridge.cli_network(self.thread_id, {'confirmed': True, 'generation': preview['generation']})
         self.stop.assert_not_called()
 
@@ -855,7 +942,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_timed_out_drain_never_signals_twice_and_resumes_only_after_confirmation(self):
         self.cli.daemon_status.return_value = 'running'
         self.stop.side_effect = OSError('still draining')
-        with patch('sys.platform', 'darwin'), self.assertRaisesRegex(ValueError, "설정을\\ 따르는\\ 시스템\\ 프록시가\\ 저장되었습니다\\.，CLI\\ 서비스가\\ 복원되지\\ 않았습니다："): self.confirm()
+        with patch('sys.platform', 'darwin'), self.assertRaisesRegex(ValueError, '设置已保存，CLI 服务尚未恢复'): self.confirm()
         record = self.bridge._cli_recovery_record()
         self.assertEqual(record['phase'], 'draining')
         self.bridge.cli_network(self.thread_id, automatic=True)
@@ -870,8 +957,8 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         with patch('sys.platform', 'darwin'):
             preview = self.bridge.cli_network(self.thread_id)
             self.assertIn('CODEX_HOME', preview['message'])
-            self.assertIn('다른 클라이언트', preview['message'])
-            self.assertIn("복원할 때 여기에 있을 것입니다. CODEX_HOME 의 CLI 사용자 구성에 저장 features.respect_system_proxy=true，이 구성을 사용하여 향후 로드되는 다른 클라이언트 세션도 시스템 프록시를 따르도록 합니다. 시스템 프록시를 수정하지 마십시오。", preview['message'])
+            self.assertIn('其他客户端', preview['message'])
+            self.assertIn('不修改系统代理', preview['message'])
             self.assertFalse(any(method == 'config/value/write' for method, _ in self.native_calls))
             self.bridge.cli_network(self.thread_id, {'confirmed': True, 'generation': preview['generation']})
         writes = [params for method, params in self.native_calls if method == 'config/value/write']
@@ -894,7 +981,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         error.system_proxy_unknown = True
         with patch('sys.platform', 'darwin'), \
                 patch('bridge.clients.codex.daemon_network.enable_system_proxy_following', side_effect=error):
-            with self.assertRaisesRegex(ValueError, "설정에\\ 따른\\ 시스템\\ 에이전트의\\ 쓰기\\ 결과를\\ 확인해야\\ 합니다\\.\\ 서비스\\ 종료\\ 요청이\\ 없으며\\ 설정이\\ 자동으로\\ 재생되지\\ 않습니다\\.。"):
+            with self.assertRaisesRegex(ValueError, '写入结果待核对'):
                 self.confirm()
         self.stop.assert_not_called()
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'configuringUnknown')
@@ -907,7 +994,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'configuringUnknown')
         self.system_proxy_enabled = True
         checked = self.bridge.cli_network(self.thread_id)
-        self.assertIn("시스템 프록시 다음 설정이 확인되고 저장되었습니다.，CLI 서비스가 복원되지 않았습니다. 네트워크를 다시 확인하고 복원을 확인해 주세요.。", checked['message'])
+        self.assertIn('已确认保存', checked['message'])
         self.assertFalse(checked['canRecover'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'complete')
         self.assertFalse(any(method == 'config/value/write' for method, _ in self.native_calls))
@@ -935,7 +1022,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_saved_setting_followed_by_failed_native_verification_never_restarts_again(self):
         self.cli._start_daemon.side_effect = lambda *_: setattr(self, 'system_proxy_enabled', False)
         with patch('sys.platform', 'darwin'):
-            with self.assertRaisesRegex(ValueError, "설정을\\ 따르는\\ 시스템\\ 프록시가\\ 저장되었습니다\\.，CLI\\ 서비스가\\ 복원되지\\ 않았습니다："):
+            with self.assertRaisesRegex(ValueError, '设置已保存，CLI 服务尚未恢复'):
                 self.confirm()
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'starting')
         with self.assertRaises(IPCError):
@@ -946,7 +1033,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_start_verification_can_be_completed_by_read_only_check(self):
         self.cli._start_daemon.side_effect = lambda *_: setattr(self, 'system_proxy_enabled', False)
         with patch('sys.platform', 'darwin'):
-            with self.assertRaisesRegex(ValueError, '서비스가 복원되지 않았습니다'):
+            with self.assertRaisesRegex(ValueError, '服务尚未恢复'):
                 self.confirm()
         self.system_proxy_enabled = True
         self.cli.daemon_status.return_value = 'running'
@@ -976,8 +1063,8 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_external_provider_recovery_uses_only_current_target_sources(self):
         with self.new_native_target():
             preview = self.bridge.cli_network(self.thread_id)
-            self.assertIn('현재 기본 구성', preview['message'])
-            self.assertIn('수정하지 마세요', preview['message'])
+            self.assertIn('当前原生配置', preview['message'])
+            self.assertIn('不修改', preview['message'])
             self.assertIn('target-provider', preview['message'])
             self.assertTrue(self.bridge.cli_network(self.thread_id,
                 {'confirmed': True, 'generation': preview['generation']})['connected'])
@@ -1014,7 +1101,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 self.confirm()
             self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'resuming')
             checked = self.bridge.cli_network(self.thread_id)
-        self.assertIn("현재 스레드 상태와 대상 구성이 확인되었으며 원본 resume 아직 영수증을 알 수 없습니다. 재생되지 않습니다. 연결 구독을 확인해야 하는 경우 먼저 다음으로 이동하세요. CLI 패널 검증 또는 출시。", checked['message'])
+        self.assertIn('回执仍未知', checked['message'])
         self.assertEqual(self.bridge._cli_recovery_record()['providerPhase'], 'checkedUnknown')
         self.cli.attach.assert_called_once()
         self.stop.assert_called_once()
@@ -1040,7 +1127,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         import json
         (self.home / 'auth.json').write_text(json.dumps({'auth_mode': 'apikey', 'OPENAI_API_KEY': 'new-key'}))
         with patch.object(self.bridge, 'activate', return_value=SimpleNamespace(connected=True, runtime='cli')):
-            with self.assertRaisesRegex(IPCError, "확인된\\ 기본\\ 연결이\\ 아직\\ 실행되지\\ 않았습니다\\.\\ 연결을\\ 다시\\ 확인하세요\\.\\ 대상\\ 액세스가\\ 적용되는지\\ 확인되지\\ 않았습니다\\.。"):
+            with self.assertRaisesRegex(IPCError, '尚未执行'):
                 self.confirm()
         self.assertEqual(self.bridge._cli_recovery_record()['providerPhase'], 'authorized')
         self.cli.attach.assert_not_called()
@@ -1056,7 +1143,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         with self.new_native_target():
             with self.assertRaises(IPCError): self.confirm()
             result = self.bridge.cli_network(self.thread_id)
-        self.assertIn("현재 스레드 상태와 대상 구성이 확인되었으며 원본 resume 아직 영수증을 알 수 없습니다. 재생되지 않습니다. 연결 구독을 확인해야 하는 경우 먼저 다음으로 이동하세요. CLI 패널 검증 또는 출시。", result['message'])
+        self.assertIn('回执仍未知', result['message'])
         self.assertEqual(self.bridge._cli_recovery_record()['providerPhase'], 'checkedUnknown')
         self.cli.attach.assert_called_once()
         self.assertFalse(self.cli.metadata.get(self.thread_id, {}).get('fileAuthGeneration'))
@@ -1079,7 +1166,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         import json
         (self.home / 'auth.json').write_text(json.dumps({'auth_mode': 'apikey', 'OPENAI_API_KEY': 'new-key'}))
         self.current_config['cli_auth_credentials_store'] = 'auto'
-        with self.assertRaisesRegex(ValueError, "현재\\ 기본\\ 인증\\ 저장소가\\ 확인되지\\ 않았습니다\\.\\ file\\ 소스,\\ 새\\ 계정을\\ 확인할\\ 수\\ 없습니다\\.\\ 원본\\ 도구에서\\ 인증\\ 소스를\\ 확인하세요\\.。"):
+        with self.assertRaisesRegex(ValueError, '不是已核验的 file 来源'):
             self.bridge.cli_network(self.thread_id)
         self.stop.assert_not_called()
         self.cli._start_daemon.assert_not_called()
@@ -1102,7 +1189,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                          'turns': [{'turnId': 'original-turn', 'status': 'inProgress', 'items': []}]}
         self.cli.call = Mock(return_value={'interrupted': True})
         self.assertTrue(self.bridge.interrupt(self.thread_id)['interrupted'])
-        with self.assertRaisesRegex(IPCError, '여전히 오래된 캐시 API'):
+        with self.assertRaisesRegex(IPCError, '仍缓存旧 API'):
             self.bridge.send(self.thread_id, 'new message', '8d7fa750-7ff4-4c4b-9c98-62e2ebbb5bfa', mode='steer')
         self.cli.call.assert_called_once()
         self.assertEqual(self.cli.call.call_args.args[1], 'thread-follower-interrupt-turn')
@@ -1137,7 +1224,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         self.stop.assert_called_once()
         self.cli._start_daemon.assert_not_called()
 
-    def released_fixture(self, *, legacy=False, notice='이 구성에 대한 공유가 정상적으로 종료되었습니다. CLI 서비스, ​​네이티브 직업이 출시되었습니다'):
+    def released_fixture(self, *, legacy=False, notice='已正常退出此配置的共享 CLI 服务，原生占用已释放'):
         from bridge.app.lifecycle import private_json
         self.proxy_updates = {}
         identity = {key: self.native_state[key] for key in ('id', 'cwd', 'modelProvider')}
@@ -1249,7 +1336,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             ('result', {'status': 'unknown'}), ('result', {'status': 'failed'}),
             ('result', {'status': 'detached'}), ('result', {'host': 'codex:other-home'}),
             ('result', {'provider': 'claude'}), ('result', {'key': 'different-generation-token'}),
-            ('result', {'notice': '기본 세션이 제거되었으며 컴퓨터에서 계속할 수 있습니다.'}),
+            ('result', {'notice': '原生会话已卸载，可在电脑端继续'}),
             ('operation', {'mode': 'wait'}), ('operation', {'connections': ['different-generation-token']}),
         )
         for scope, change in mutations:
@@ -1290,7 +1377,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             record['generation'] = hashlib.sha256(json.dumps(self.generation).encode()).hexdigest()
             private_json(self.bridge.data_dir/'cli-daemon-recovery.json', record)
             self.cli.daemon_status.return_value = 'running'
-            with self.assertRaisesRegex(IPCError, "기존\\ CLI\\ 작업이\\ 아직\\ 소모\\ 중입니다\\.\\ 완료될\\ 때까지\\ 기다려\\ 주세요\\.\\ 종료\\ 신호는\\ 반복적으로\\ 전송되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(IPCError, '仍在排空'):
                 self.bridge._recover_cli_environment(other)
         self.cli._start_daemon.assert_not_called()
         self.cli.attach.assert_not_called()
@@ -1303,7 +1390,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
                 patch('bridge.features.accounts.cli_sync.LocalCliSync.recovery_target', return_value=None):
             self.cli.recovery_environment = {'generation': 'different-generation', 'updates': {},
                                              'preserved': {'OLD_ROUTE_KEY': 'fixture-only'}}
-            with self.assertRaisesRegex(IPCError, "이전에\\ CLI\\ 프로세스\\ 환경을\\ 확인할\\ 수\\ 없습니다\\.\\ 원래\\ 클라이언트에서\\ 액세스를\\ 확인하고\\ 정상적으로\\ 시작하십시오\\.\\ 게이트웨이\\ 환경은\\ 빌려주지\\ 않습니다\\."):
+            with self.assertRaisesRegex(IPCError, '环境已不可核验'):
                 self.bridge._recover_cli_environment(other)
         self.cli._start_daemon.assert_not_called()
         self.cli.attach.assert_not_called()
@@ -1314,7 +1401,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         self.cli.store = self.bridge.store
         with self.released_fixture(legacy=True):
             (self.home/'config.toml').write_text('model_provider="changed-provider"\n')
-            with self.assertRaisesRegex(IPCError, "현재\\ 기본\\ 구성은\\ 대상\\ 공급자를\\ 정의하지\\ 않으며\\ 서비스가\\ 복원되지\\ 않았습니다\\.。"):
+            with self.assertRaisesRegex(IPCError, '配置未定义目标提供商'):
                 self.bridge._recover_cli_environment(other)
         self.cli._start_daemon.assert_not_called()
         self.cli.attach.assert_not_called()
@@ -1401,8 +1488,8 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         self._assert_completed_path_release(legacy=False)
 
     def test_legacy_natural_unload_receipt_does_not_unlock_unfinished_recovery(self):
-        with self.released_fixture(legacy=True, notice='기본 세션이 제거되었으며 컴퓨터에서 계속할 수 있습니다.'):
-            with self.assertRaisesRegex(IPCError, "이전에\\ CLI\\ 서비스가\\ 드레이닝\\ 중이거나\\ 연결\\ 대기\\ 중입니다\\.\\ 확인해주세요\\.\\ CLI\\ 회로망;\\ 반복적으로\\ 종료를\\ 요청하지\\ 않습니다\\."):
+        with self.released_fixture(legacy=True, notice='原生会话已卸载，可在电脑端继续'):
+            with self.assertRaisesRegex(IPCError, '排空|接续'):
                 self.bridge.activate(self.thread_id)
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'stopped')
         self.cli._start_daemon.assert_not_called()
@@ -1411,7 +1498,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_released_config_change_or_lost_injection_source_never_starts(self):
         with self.released_fixture():
             (self.home/'auth.json').write_text('{"OPENAI_API_KEY":"changed"}')
-            with self.assertRaisesRegex(IPCError, '설정|인증'):
+            with self.assertRaisesRegex(IPCError, '配置|认证'):
                 self.bridge.activate(self.thread_id)
         self.cli._start_daemon.assert_not_called()
         self.stop.assert_not_called()
@@ -1471,7 +1558,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
     def test_released_unknown_daemon_status_does_not_start_or_repeat_exit(self):
         with self.released_fixture():
             self.cli.daemon_status.return_value = 'unknown'
-            with self.assertRaisesRegex(IPCError, "CLI\\ 서비스\\ 시작\\ 및\\ 중지\\ 결과를\\ 확인해야\\ 합니다\\.\\ 컴퓨터에서\\ 확인하세요\\.\\ 작업이\\ 재생되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(IPCError, '待核对'):
                 self.bridge.activate(self.thread_id)
         self.cli._start_daemon.assert_not_called()
         self.stop.assert_not_called()
@@ -1622,7 +1709,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
             with self.assertRaisesRegex(OSError, 'not confirmed'):
                 self.bridge._drain_cli_daemon(self.cli, self.home / 'codex', self.generation,
                                               configuration_stamp(self.home), {}, {})
-            with self.assertRaisesRegex(ValueError, "기존\\ CLI\\ 비어\\ 있음\\ 또는\\ 종료\\ 결과가\\ 보류\\ 중이며\\ 종료\\ 신호가\\ 반복적으로\\ 전송되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(ValueError, '不会重复发送'):
                 self.bridge._drain_cli_daemon(self.cli, self.home / 'codex', self.generation,
                                               configuration_stamp(self.home), {}, {})
         request.assert_not_called()
@@ -1638,7 +1725,7 @@ class CliNetworkRecoveryTests(CliBridgeFixture):
         with patch('sys.platform', 'win32'), \
                 patch('bridge.platforms.windows.codex_daemon_env.windows_daemon_drain', return_value=nullcontext(drain)), \
                 patch('bridge.clients.codex.daemon_lifecycle.request_windows_shutdown') as request:
-            with self.assertRaisesRegex(ValueError, "기존\\ CLI\\ 종료가\\ 아직\\ 보류\\ 중이므로\\ 종료\\ 신호가\\ 반복적으로\\ 전송되지\\ 않습니다\\."):
+            with self.assertRaisesRegex(ValueError, '退出仍待核对'):
                 self.bridge._drain_cli_daemon(self.cli, self.home / 'codex', self.generation,
                                               configuration_stamp(self.home), {}, {})
         drain.wait.assert_called_once_with(10)

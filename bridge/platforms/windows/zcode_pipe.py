@@ -36,7 +36,7 @@ def _identity(pid, *, parent=False):
         if not native.alive(process):
             raise ProcessLookupError(pid)
         if not native.session or row['session'] != native.session or not _same_user(native, process, own):
-            raise PermissionError('ZCode 연결 및 전류 Windows 사용자 또는 데스크톱 세션 불일치')
+            raise PermissionError('ZCode 连接与当前 Windows 用户或桌面会话不匹配')
         if parent:
             # PROCESS_BASIC_INFORMATION, last field InheritedFromUniqueProcessId.
             query = ctypes.WinDLL('ntdll').NtQueryInformationProcess
@@ -44,7 +44,7 @@ def _identity(pid, *, parent=False):
             query.restype = wintypes.LONG
             fields = (ctypes.c_size_t * 6)()
             if query(process, 0, fields, ctypes.sizeof(fields), None) != 0:
-                raise PermissionError('확인할 수 없습니다 ZCode 자식 프로세스의 기본 소유자')
+                raise PermissionError('无法核验 ZCode 子进程的原生所有者')
             row['parent'] = fields[5]
         return row
 
@@ -81,11 +81,11 @@ def main_processes(executable, candidates, commands):
         seen = {roots[0]: root}
         def member(pid):
             if pid not in commands:
-                raise ValueError('작업공간 런타임 상위 프로세스를 확인할 수 없습니다.')
+                raise ValueError('无法核对工作区运行时父进程')
             if pid not in seen:
                 row = _identity(pid, parent=True)
                 if row['image'] != root['image'] or row['session'] != root['session']:
-                    raise ValueError('작업공간 런타임이 원래 프로세스와 일치하지 않습니다.')
+                    raise ValueError('工作区运行时与原进程不匹配')
                 seen[pid] = row
             return seen[pid]
         for pid, role in workers.items():
@@ -121,15 +121,15 @@ def process_args(pid):
         size = wintypes.ULONG()
         query(handle, 60, None, 0, ctypes.byref(size))  # ProcessCommandLineInformation
         if not ctypes.sizeof(UnicodeString) <= size.value <= 128 * 1024:
-            raise PermissionError('기본 프로세스 시작 매개변수를 확인할 수 없습니다.')
+            raise PermissionError('无法核验本机进程启动参数')
         buf = ctypes.create_string_buffer(size.value)
         if query(handle, 60, buf, len(buf), ctypes.byref(size)) != 0:
-            raise PermissionError('기본 프로세스 시작 매개변수가 변경되었습니다.')
+            raise PermissionError('本机进程启动参数已变化')
         value = UnicodeString.from_buffer(buf)
         start = ctypes.addressof(buf)
         if (not value.data or value.length % 2 or not value.length or
                 not start <= value.data <= start + len(buf) - value.length):
-            raise ValueError('Windows 잘못된 프로세스 시작 매개변수')
+            raise ValueError('Windows 进程启动参数无效')
         return list(_windows_argv(ctypes.wstring_at(value.data, value.length // 2)))
     finally:
         native.close(handle)
@@ -157,7 +157,7 @@ if ($s.Status -ne 'Valid' -or
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
     if result.returncode:
-        raise PermissionError('선택 항목을 확인할 수 없습니다. ZCode 공식 출판사 서명 설치됨')
+        raise PermissionError('无法核验所选 ZCode 安装的官方发行者签名')
 
 
 class _AppStream:
@@ -184,10 +184,10 @@ def launch(application):
 
     application = Path(application).resolve(strict=True)
     if not is_supported(application):
-        raise ValueError('선택한 항목을 찾을 수 없습니다. ZCode 데스크탑 설치')
+        raise ValueError('未找到所选 ZCode 桌面安装')
     _verify_publisher(application)
     if not _native().session or process_inventory([application])[application]['pids']:
-        raise ValueError('현재 상태를 유지하세요. Windows 사용자 데스크탑은 일반적으로 실행 중을 종료합니다. ZCode，연결을 다시 초기화하세요.')
+        raise ValueError('请在当前 Windows 用户桌面正常退出已运行的 ZCode，再初始化连接')
     with contextlib.ExitStack() as child, contextlib.ExitStack() as host:
         app_read, host_write = pipe(overlapped=(False, True))
         child.callback(_winapi.CloseHandle, app_read)
@@ -215,13 +215,13 @@ def peer_pid(connection, *, server):
     fn.restype = wintypes.BOOL
     pid = wintypes.ULONG()
     if not fn(connection.fileno(), ctypes.byref(pid)) or not pid.value:
-        raise PermissionError('확인할 수 없습니다 Windows Private Pipe의 피어 프로세스')
+        raise PermissionError('无法核验 Windows 私有管道的对端进程')
     return pid.value
 
 
 def _local_path(address):
     if not isinstance(address, str) or not address.casefold().startswith('\\\\.\\pipe\\') or '\\' in address[9:] or not address[9:]:
-        raise ValueError('ZCode 로컬 파이프 주소만 허용')
+        raise ValueError('ZCode 只接受本机管道地址')
     return address
 
 
@@ -266,7 +266,7 @@ def local_connect(address, timeout=2):
                 _winapi.WaitNamedPipe(address, max(1, int((deadline - time.monotonic()) * 1000)))
             except OSError as waiting:
                 if waiting.winerror == _winapi.ERROR_SEM_TIMEOUT:
-                    raise TimeoutError('ZCode 사용 중인 전용 파이프') from waiting
+                    raise TimeoutError('ZCode 私有管道正在使用') from waiting
                 raise
     try:
         _winapi.SetNamedPipeHandleState(handle, _winapi.PIPE_READMODE_MESSAGE, None, None)

@@ -134,7 +134,7 @@ class WslProfileIdentity(unittest.TestCase):
                 patch.object(remote_worker.shutil, 'which', return_value='/fixture/claude'), \
                 patch.object(remote_worker, 'native_wsl_binary', return_value=True), \
                 patch.object(remote_worker, 'auth_status', return_value={}) as status:
-            with self.assertRaisesRegex(ValueError, "WSL\\ Claude\\ Code\\ 지금은\\ 로그인\\ 상태를\\ 확인할\\ 수\\ 없습니다\\.\\ 나중에\\ 다시\\ 시도해\\ 주세요\\."):
+            with self.assertRaisesRegex(ValueError, '暂无法核验'):
                 remote_worker.profile()
         self.assertEqual(status.call_count, 2)
 

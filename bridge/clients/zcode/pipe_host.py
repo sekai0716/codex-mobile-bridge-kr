@@ -147,7 +147,7 @@ class Holder:
 
     def ensure_live(self):
         if not self.owner or owner(self.identity, self.pid) != self.owner:
-            raise ValueError("ZCode 프로세스가 변경되었습니다.")
+            raise ValueError("ZCode 进程已变化")
 
     def handle(self, request):
         if not isinstance(request, dict):
@@ -174,11 +174,11 @@ class Holder:
                         or current["image"] != str(starter / "Contents/MacOS/CMBZCodePipeStarter")
                         or time.monotonic() >= deadline
                     ):
-                        raise PermissionError("ZCode 기존 App 아직 신원이 확인되지 않았습니다.")
+                        raise PermissionError("ZCode 原 App 身份尚未核实")
                     time.sleep(0.04)
             self.ensure_live()
             if not self.transport:
-                raise ValueError("ZCode 초기화가 아직 완료되지 않았습니다.")
+                raise ValueError("ZCode 初始化尚未完成")
             return self.owner
         if command == "status" and set(request) == {"command"}:
             if self.fds is None:
@@ -186,10 +186,10 @@ class Holder:
             self.ensure_live()
             return {"running": True, "owner": self.owner, "transportReady": self.transport is not None}
         if command != "operation" or set(request) != {"command", "owner", "native"}:
-            raise ValueError("알려지지 않은 ZCode 기본 요청")
+            raise ValueError("未知的 ZCode 本机请求")
         self.ensure_live()
         if request["owner"] != self.owner or not self.transport:
-            raise ValueError("ZCode 원래 세션 연결이 변경되었습니다.")
+            raise ValueError("ZCode 原会话连接已变化")
         value = request["native"]
         if (
             not isinstance(value, dict)
@@ -197,7 +197,7 @@ class Holder:
             or value["action"] not in ACTIONS
             or set(value) - KEYS
         ):
-            raise ValueError("알려지지 않은 ZCode 기본 작동")
+            raise ValueError("未知的 ZCode 原生操作")
         return self.transport.call(value)
 
 
@@ -359,7 +359,7 @@ class PipeHostClient:
 
     def _request(self, request, timeout=15):
         if not self.supported():
-            raise ValueError("ZCode 비공개 세션 구성요소를 사용할 수 없습니다.")
+            raise ValueError("ZCode 私有会话组件不可用")
         record = read_json(self.profile / "zcode-pipe-host.json")
         if record.get("application") != str(self.application) or record["profile"] != profile_id(
             self.profile
@@ -414,13 +414,13 @@ class PipeHostClient:
                 except ProcessLookupError:
                     live = None
                 if live == expected:
-                    raise ValueError("기존 ZCode 실행 중이지만 비공개 연결을 일시적으로 사용할 수 없습니다.")
+                    raise ValueError("原 ZCode 正在运行，但其私有连接暂不可用")
             return None
         return result.get("owner") if result.get("running") else None
 
     def start(self):
         if not self.supported():
-            raise ValueError("ZCode 비공개 세션 구성요소를 사용할 수 없습니다.")
+            raise ValueError("ZCode 私有会话组件不可用")
         self._start_service()
         expected = self._request({"command": "initialize"}, timeout=25)
         deadline = time.monotonic() + 10
@@ -428,7 +428,7 @@ class PipeHostClient:
             try:
                 ready = self.call({"expectedProcess": expected, "action": "application"})
                 if not isinstance(ready, dict) or ready.get("ready") is not True:
-                    raise ValueError("ZCode 원래 세션 서비스가 아직 준비되지 않았습니다.")
+                    raise ValueError("ZCode 原会话服务尚未就绪")
                 return expected
             except ValueError:
                 if time.monotonic() >= deadline:
@@ -439,14 +439,14 @@ class PipeHostClient:
         request = dict(request)
         expected = request.pop("expectedProcess", None)
         if not isinstance(expected, dict) or set(expected) != set(OWNER_KEYS):
-            raise ValueError("ZCode 원본 프로세스의 신원은 확인되지 않았습니다.")
+            raise ValueError("ZCode 原进程身份未核验")
         if "application" in request and str(Path(request.pop("application")).resolve()) != str(
             self.application
         ):
-            raise ValueError("ZCode 설치 불일치")
+            raise ValueError("ZCode 安装不匹配")
         request.pop("port", None)
         if set(request) - KEYS:
-            raise ValueError("알려지지 않은 ZCode 네이티브 필드")
+            raise ValueError("未知的 ZCode 原生字段")
         return self._request({"command": "operation", "owner": expected, "native": request},
                              timeout=operation_timeout(request.get("action")) + 3)
 
@@ -482,4 +482,4 @@ class PipeHostClient:
                 if proc.poll() is not None:
                     break
                 time.sleep(0.1)
-        raise OSError("ZCode 아직 비공개 서비스가 준비되지 않았습니다.")
+        raise OSError("ZCode 私有服务尚未就绪")

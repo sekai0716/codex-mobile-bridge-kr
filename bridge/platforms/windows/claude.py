@@ -72,11 +72,11 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
     def quit_interrupted(reason, dispatched):
         if dispatched:
             return {'quitState': 'submitted', 'pid': pid,
-                    'reason': 'Claude 종료 명령 수신이 중단되었습니다. 저장 및 종료가 완료되기를 기다리는 중입니다.'}
+                    'reason': 'Claude 退出命令回执中断，正在等待保存和退出完成'}
         return quit_failed(reason)
     if cancelled and cancelled.is_set():
         if action == 'quit':
-            return quit_failed("Claude 종료 요청이 취소되었습니다.")
+            return quit_failed('已取消 Claude 退出')
         if background:
             return connection_result("Claude 연결이 취소되었습니다.", state='cancelled')
         return {'setupState': 'cancelled', 'reason': "Claude 연결이 취소되었습니다."}
@@ -142,7 +142,7 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
                         dispatched = dispatched or connect_dispatched(expired.output)
                     process.kill(); stdout, _ = process.communicate()
                 if action == 'quit':
-                    return quit_interrupted("Claude 종료 요청이 취소되었습니다." if cancelled and cancelled.is_set()
+                    return quit_interrupted('已取消 Claude 退出' if cancelled and cancelled.is_set()
                                             else "Claude 네이티브 종료 요청 시간이 초과되었습니다. 컴퓨터에서 종료 상태를 확인하세요.",
                                             dispatched or quit_dispatched(stdout))
                 if background:
@@ -198,10 +198,10 @@ def native_action(action, *, helper, pid=None, executable=None, script=None, can
     if action == 'inspect-error':
         owner_issue = stdout.strip().splitlines()[-1] if stdout.strip() else ''
         owner_reasons = {
-            'OWNER_BUSY': 'Claude 아직 브릿지 요청이 진행 중입니다. 나중에 다시 연결해 보세요.',
-            'OWNER_UNCONFIRMED': '이전 게이트웨이에는 아직 확인되지 않은 요청이나 완료되지 않은 인계가 있습니다. 이전 게이트웨이에서 결과를 확인하신 후 다시 시도해주세요.',
-            'OWNER_LEGACY': '이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）',
-            'OWNER_CONFLICT': '이전 버전 Claude 브리지는 전송 중인 요청을 확인할 수 없습니다. 현재 작업이 완료되었는지 확인한 다음 다시 로드하거나 종료하고 다시 시작하세요. Claude Desktop，새 게이트웨이를 다시 초기화합니다（한 번만 마이그레이션하면 됩니다）.）',
+            'OWNER_BUSY': 'Claude 桥接仍有请求进行中，请稍后重试连接',
+            'OWNER_UNCONFIRMED': '旧网关仍有未确认请求或未完成接替，请在旧网关检查结果后重试',
+            'OWNER_LEGACY': '旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）',
+            'OWNER_CONFLICT': '旧版 Claude 桥接无法核验在途请求；请确认当前任务结束后重新加载或退出重开 Claude Desktop，再初始化新网关（只需迁移一次）',
         }
         if owner_issue in owner_reasons:
             return {'setupState': 'owner-conflict', 'reason': owner_reasons[owner_issue]}

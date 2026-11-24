@@ -5,6 +5,7 @@ import sys
 import time
 from pathlib import Path
 
+from bridge.clients.codex.desktop_runtime import SUPPORTED_PLATFORMS
 from bridge.platforms import desktop as native_desktop, discovery as native_discovery
 
 
@@ -54,11 +55,14 @@ class DesktopApp:
 
     @staticmethod
     def scan(runtime, home):
-        candidate = DesktopApp.discover(runtime)
-        if not candidate and sys.platform == 'win32':
+        # An explicit scan resolves the current installation before consulting
+        # an older bundled runtime which may survive an application update.
+        candidate = ''
+        if sys.platform == 'win32':
             from bridge.clients.discovery import discover_clients
             desktop = discover_clients({'codexHome': str(home)})['codex']
             candidate = desktop.get('executable', '') if desktop.get('installed') else ''
+        candidate = candidate or DesktopApp.discover(runtime)
         if candidate:
             app = DesktopApp(candidate, home)
             app.validate(runtime)
@@ -75,7 +79,7 @@ class DesktopApp:
             raise ValueError('설치된 것을 선택해주세요 Codex / ChatGPT 데스크탑 프로그램')
         if runtime and (str(self.executable).casefold() == str(Path(runtime).resolve()).casefold()
                         if sys.platform == 'win32' else self.executable == Path(runtime).resolve()):
-            raise ValueError('데스크탑 프로그램은 내장을 선택할 수 없습니다 Codex 명령줄 런타임')
+            raise ValueError('桌面程序不能选择内置 Codex 命令行运行时')
         # Launch scripts cannot be matched reliably to the resulting GUI process.
         with self.executable.open('rb') as stream:
             script = stream.read(2) == b'#!'
@@ -86,7 +90,7 @@ class DesktopApp:
         expected = os.path.normcase(str(self.executable))
         return _native().processes(lambda path: os.path.normcase(str(Path(path).resolve())) == expected)
 
-    def stop(self, *, runtime_pids=(), gui_pids=None, provider=None, selected_pids=None):
+    def stop(self, *, runtime_pids=(), gui_pids=None, provider=None, selected_pids=None, expected_identities=None):
         if sys.platform == 'win32' and provider in ('codex', 'zcode'):
             from bridge.platforms.windows.codex_quit import stop_codex, stop_zcode
             quit_app = stop_zcode if provider == 'zcode' else stop_codex
@@ -102,6 +106,8 @@ class DesktopApp:
         if selected_pids is not None:
             pids = [pid for pid in pids if pid in selected_pids]
         main = pids if gui_pids is None else [pid for pid in gui_pids if pid in pids]
+        if expected_identities is not None and set(main) - expected_identities.keys():
+            raise ValueError('Codex 桌面进程已变化，请重新初始化连接')
         native = _native()
         if main and sys.platform == 'darwin':
             native.quit_application(self.executable, pids=main)
@@ -110,7 +116,11 @@ class DesktopApp:
                 continue
             if pid not in self.processes():
                 continue
-            native.quit_process(pid)
+            if sys.platform == 'linux' and provider == 'codex':
+                expected = expected_identities[pid] if expected_identities is not None else None
+                native.quit_verified_codex(pid, self.executable, expected)
+            else:
+                native.quit_process(pid)
         # Only a caller that verified the native host's complete idle state may
         # include it here. Never force-kill or terminate unrelated profiles.
         for pid in runtime_pids:
@@ -120,7 +130,7 @@ class DesktopApp:
         deadline = time.monotonic() + 25
         while set(self.processes()) & set(pids):
             if time.monotonic() >= deadline:
-                raise ValueError('데스크톱 프로그램이 종료되지 않았습니다. 컴퓨터에서 프로그램을 닫고 다시 시도하세요. 프로세스가 강제로 종료되지 않았습니다.')
+                raise ValueError('桌面程序尚未退出，请在电脑上关闭后重试；尚未强制结束进程')
             time.sleep(.25)
 
     def launch(self, *, cancelled=None, **options):
@@ -129,19 +139,34 @@ class DesktopApp:
             return launch_windows_desktop(self.executable, cancelled=cancelled, **options)
         return subprocess.Popen([str(self.executable)], **options)
 
-    def start(self):
+    def start(self, *, allow_unprepared=False):
         environment = {'CODEX_HOME': str(self.home)}
-        if sys.platform in ('darwin', 'linux', 'win32'):
-            from bridge.clients.codex.desktop_runtime import launch_environment, wait_stopped
-            shared = launch_environment(self.home, self.executable)
-            if shared:
+        environment_unset = ()
+        shared = {}
+        if sys.platform in SUPPORTED_PLATFORMS:
+            from bridge.clients.codex.desktop_runtime import launch_environment, wait_stopped, DesktopRuntimeOutdated
+            try:
+                shared = launch_environment(self.home, self.executable)
+            except DesktopRuntimeOutdated:
+                if not allow_unprepared:
+                    raise
+                # Explicit opening may use the native App after an upgrade, but
+                # never while an old shared writer is alive or unaccounted for.
+                shared = {}
+                environment_unset = ('CODEX_CLI_PATH', 'CMB_CODEX_DESKTOP_CONFIGURATION',
+                                     'CODEX_APP_SERVER_WS_URL', 'CODEX_APP_SERVER_FORCE_CLI')
+            if shared or environment_unset or sys.platform == 'linux':
                 wait_stopped(self.home)
+            if sys.platform == 'linux' and shared:
+                environment_unset += ('CODEX_SQLITE_HOME', 'CODEX_ELECTRON_USER_DATA_PATH')
             environment.update(shared)
         if sys.platform == 'darwin':
-            _native().start(self.executable, self.home, environment)
+            _native().start(self.executable, self.home, environment,
+                            **({'environment_unset': environment_unset} if environment_unset else {}))
             return
         if sys.platform == 'win32':
-            self.child = self.launch(require_environment=bool(shared), cwd=self.home, env={**os.environ, **environment},
+            inherited = {key: value for key, value in os.environ.items() if key not in environment_unset}
+            self.child = self.launch(require_environment=bool(shared or environment_unset), cwd=self.home, env={**inherited, **environment},
                                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL,
                                      creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, close_fds=True)
@@ -152,4 +177,5 @@ class DesktopApp:
         options = ({'arguments': ('--force-renderer-accessibility',)}
                    if sys.platform == 'linux' and shared and os.environ.get('DISPLAY')
                    and os.environ.get('XDG_SESSION_TYPE') != 'wayland' else {})
-        self.child = native.start(self.executable, self.home, environment, **options)
+        self.child = native.start(self.executable, self.home, environment,
+                                  **({'environment_unset': environment_unset} if environment_unset else {}), **options)

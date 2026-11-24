@@ -3,8 +3,14 @@ const connectionSecretDraft=new Map();
 const connectionSetupState=new Map();
 const connectionExpanded=new Map();
 const connectionAdvancedExpanded=new Map();
-function connectionLabel(mode){return t({quick:'임시 HTTPS · Cloudflare',cloudflare:'고정 도메인 · Cloudflare 터널',server:'고정도메인 · 자체 서버 + SSH',external:'기존 터널/역방향 프록시',nas:'기존 터널/역방향 프록시',tailscale:'고정 HTTPS · Tailscale'}[mode]);}
-function normalizeExternalUrl(value){const trimmed=value.trim();return /^[^\s/:?#@]+(?::\d+)?$/.test(trimmed)?'https://'+trimmed:trimmed;}
+function connectionLabel(mode){return t({quick:'临时 HTTPS · Cloudflare',cloudflare:'固定域名 · Cloudflare Tunnel',server:'固定域名 · 自有服务器 + SSH',external:'已有穿透 / 反向代理',nas:'已有穿透 / 反向代理',tailscale:'固定 HTTPS · Tailscale'}[mode]);}
+function normalizeExternalUrl(value){
+  const trimmed=value.trim();
+  if (/^\[[0-9a-f:.]*:[0-9a-f:.]*\](?::\d+)?$/i.test(trimmed)) return 'https://'+trimmed;
+  if (trimmed.startsWith('[')) return trimmed;
+  if (/^[0-9a-f:.]+$/i.test(trimmed) && (trimmed.match(/:/g)||[]).length>=2) return 'https://['+trimmed+']';
+  return /^[^\s/:?#@]+(?::\d+)?$/.test(trimmed)?'https://'+trimmed:trimmed;
+}
 function connectionCheckIdentity(row){return JSON.stringify([snapshot?.dataDir,snapshot?.runtime.instanceId,snapshot?.runtime.running,row]);}
 function connectionSummary(row){const saved=snapshot?.preferences?.connections?.find(item=>item.id===row.id);const state=!saved||JSON.stringify(saved)!==JSON.stringify(row)?'미저장':saved.enabled?'사용':'구성되었지만 비활성화되었습니다.';return [row.name,row.publicUrl||'',t(state)].filter(Boolean).join(' · ');}
 function setupGuide(link,mode){

@@ -104,7 +104,7 @@ class WindowsClaudeBackgroundLaunch(unittest.TestCase):
         with patch.object(claude_setup, '_main_pids', return_value=[]), \
              patch.object(claude_setup, 'background_start_supported', return_value=False), \
              patch.object(claude_setup.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(ValueError, "이\\ Claude\\ 버전에\\ 대한\\ 백그라운드\\ 실행이\\ 확인되지\\ 않았습니다\\.\\ 컴퓨터에서\\ 앱을\\ 연\\ 다음\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(ValueError, '尚未验证后台启动'):
                 claude_setup.background_running_app(self.executable, self.root)
         spawn.assert_not_called()
         self.manifest()
@@ -112,7 +112,7 @@ class WindowsClaudeBackgroundLaunch(unittest.TestCase):
              patch.object(claude_setup, 'background_start_supported', return_value=True), \
              patch.object(windows_discovery, 'application_execution_alias', return_value=None), \
              patch.object(claude_setup.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(ValueError, "선택한\\ Claude\\ 앱의\\ 백그라운드\\ 실행\\ 별칭을\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터에서\\ 열어서\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(ValueError, '别名'):
                 claude_setup.background_running_app(self.executable, self.root)
         spawn.assert_not_called()
 
@@ -124,7 +124,7 @@ class WindowsClaudeBackgroundLaunch(unittest.TestCase):
         with patch.object(claude_setup, '_main_pids', return_value=[]), \
              patch.object(claude_setup, 'background_start_supported', return_value=True), \
              patch.object(claude_setup.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(ValueError, '취소'):
+            with self.assertRaisesRegex(ValueError, '取消'):
                 claude_setup.background_running_app(self.executable, self.root, cancelled=cancel, launch_gate=gate)
         spawn.assert_not_called()
 
@@ -163,7 +163,7 @@ class ClaudeBackgroundWorker(unittest.TestCase):
             self.adapter._connect_background(self.adapter.setup_cancel, 'fixture', self.temp.name)
         self.assertEqual(wait.call_count, 5)
         self.assertEqual(self.adapter.status()['setupState'], 'needs-developer-mode')
-        self.assertIn('개발자 모드', self.adapter.status()['reason'])
+        self.assertIn('开发者模式', self.adapter.status()['reason'])
         native.assert_not_called()
 
     def test_cancelled_or_replaced_worker_cannot_overwrite_current_state(self):

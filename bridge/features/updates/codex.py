@@ -43,8 +43,8 @@ tell application "System Events"
         set choices to {}
         try
           set choices to every menu item of menu 1 of heading whose name contains "Check for Updates"
-          if (count of choices) is 0 then set choices to every menu item of menu 1 of heading whose name contains "업데이트 확인"
-          if (count of choices) is 0 then set choices to every menu item of menu 1 of heading whose name contains "업데이트 확인"
+          if (count of choices) is 0 then set choices to every menu item of menu 1 of heading whose name contains "检查更新"
+          if (count of choices) is 0 then set choices to every menu item of menu 1 of heading whose name contains "檢查更新"
         on error errorText number errorNumber
           if errorNumber is not -1719 and errorNumber is not -1728 then error errorText number errorNumber
         end try
@@ -64,13 +64,13 @@ end timeout
 end run'''
 
 UPDATE_FAILURE_MESSAGES = {
-    'automationPermission':"시스템 설정 > 개인 정보 보호 및 보안 > 자동화에서 게이트웨이가 시스템 이벤트를 제어하도록 허용한 후 다시 시도하십시오.",
-    'accessibilityPermission':"시스템 설정 > 개인 정보 보호 및 보안 > 접근성에서 게이트웨이를 허용한 후 다시 시도하세요. 이미 활성화된 경우 게이트웨이를 종료했다가 다시 엽니다.",
-    'timeout':"시스템 권한 또는 업데이트 메뉴를 기다리는 동안 시간이 초과되었습니다. 컴퓨터에서 권한 설정을 완료하고 잠금을 해제한 후 다시 시도하세요.",
-    'menuUnavailable':"Codex 업데이트 확인 메뉴를 찾을 수 없습니다. Codex 데스크탑에서 업데이트를 수동으로 확인하세요.",
-    'menuDisabled':"Codex 업데이트 확인 메뉴가 일시적으로 비활성화됩니다. 데스크톱 앱이 준비될 때까지 기다린 후 다시 시도하세요.",
-    'desktopUnavailable':"단일 Codex 데스크톱 프로세스를 식별할 수 없습니다. 선택한 데스크톱 앱을 연 다음 다시 시도하세요.",
-    'handoffFailed':"Codex 업데이트 메뉴를 사용할 수 없습니다. 컴퓨터를 잠금 해제하고 다시 시도하거나 Codex 데스크탑에서 수동으로 업데이트를 확인하세요.",
+    'automationPermission':'请在系统设置的“隐私与安全性 → 自动化”中允许网关控制 System Events，然后重试。',
+    'accessibilityPermission':'请在系统设置的“隐私与安全性 → 辅助功能”中允许网关，然后重试；若已开启，请退出并重新打开网关。',
+    'timeout':'等待系统授权或更新菜单超时。请完成电脑端授权、解锁电脑后重试。',
+    'menuUnavailable':'未找到 Codex 的“检查更新”菜单。请在 Codex 桌面应用中手动检查更新。',
+    'menuDisabled':'Codex 的“检查更新”菜单暂不可用。请等待桌面应用就绪后重试。',
+    'desktopUnavailable':'未找到唯一的 Codex 桌面进程。请打开所选桌面应用后重试。',
+    'handoffFailed':'未能操作 Codex 更新菜单。请解锁电脑后重试，或在 Codex 桌面应用中手动检查更新。',
 }
 
 
@@ -81,7 +81,7 @@ def update_failure(error):
     raw = str(getattr(error, 'stderr', '') or '')
     if '(-1743)' in raw:
         return 'automationPermission'
-    if '(-25211)' in raw or 'not allowed assistive access' in raw.lower() or '보조 액세스가 허용되지 않습니다.' in raw or '보조 액세스가 허용되지 않습니다.' in raw:
+    if '(-25211)' in raw or 'not allowed assistive access' in raw.lower() or '不允许辅助访问' in raw or '不允许进行辅助访问' in raw:
         return 'accessibilityPermission'
     if '(-1712)' in raw:
         return 'timeout'
@@ -93,7 +93,7 @@ def update_failure(error):
 
 def version(value):
     if not isinstance(value, str) or not re.fullmatch(r'\d+(?:\.\d+)*', value):
-        raise ValueError("업데이트 버전 형식을 인식할 수 없습니다.")
+        raise ValueError('更新版本格式无法识别')
     parts = [int(n) for n in value.split('.')]
     while len(parts) > 1 and parts[-1] == 0:
         parts.pop()
@@ -111,10 +111,10 @@ def installed(executable):
         import plistlib
         bundle = next((p for p in app.parents if p.suffix == '.app'), None)
         if bundle is None:
-            raise ValueError("Codex 데스크탑 설치 유형이 인식되지 않습니다.")
+            raise ValueError('未识别 Codex 桌面安装方式')
         info = plistlib.loads((bundle/'Contents/Info.plist').read_bytes())
         if info.get('CFBundleIdentifier') != 'com.openai.codex':
-            raise ValueError("선택한 프로그램은 공식 Codex 데스크톱 앱이 아닙니다.")
+            raise ValueError('所选程序不是原版 Codex 桌面应用')
         metadata = package_metadata(bundle/'Contents/Resources/app.asar')
         return {**metadata, 'version':info['CFBundleShortVersionString'], 'build':info['CFBundleVersion'], 'bundle':str(bundle)}
     archive = app.parent/'resources/app.asar'
@@ -211,29 +211,29 @@ class DesktopUpdates:
                 url = 'https://persistent.oaistatic.com/'+channel+'/windows-store-update.json'
                 manifest = json.loads(self.fetch(url))
                 if manifest.get('storeProductId') != meta['storeProductId'] or manifest.get('packageIdentity') != meta['packageIdentity']:
-                    raise ValueError("업데이트 매니페스트가 설치된 앱과 일치하지 않습니다.")
+                    raise ValueError('更新清单与已安装程序不匹配')
                 build = manifest['buildVersion']
                 newer = version(build) > version(meta['build'])
                 result.update(state='available' if newer else 'checked', canRequest=True, updateMethod='store-handoff',
-                              message="Microsoft Store는 이 장치에 대한 업데이트 자격을 결정합니다. 설치를 위해서는 컴퓨터에 대한 조치가 필요할 수 있습니다.")
+                              message='Microsoft Store 将确认此设备的更新资格，安装可能需要电脑端操作')
                 if newer:
                     result.update(targetBuild=build, targetVersion=build)
             elif sys.platform != 'darwin':
-                result['message'] = "이 설치에 대한 업데이트는 컴퓨터나 시스템 저장소에서 확인하세요."
+                result['message'] = '此安装方式需要在电脑端或系统商店检查更新'
             elif not channel:
-                result['message'] = "이 릴리스 채널은 Codex Desktop에서 확인해야 합니다."
+                result['message'] = '此发布渠道需要由 Codex 桌面应用检查更新'
             else:
                 url = 'https://persistent.oaistatic.com/'+channel+'/appcast.xml'
                 if meta['codexSparkleFeedUrl'] != url:
-                    raise ValueError("데스크톱 업데이트 채널이 변경되었습니다. 앱 자체 업데이터를 사용하세요.")
+                    raise ValueError('桌面更新渠道已变化，请使用原生更新器')
                 raw = self.fetch(url)
                 candidate = appcast(raw, meta['build'], platform.mac_ver()[0])
                 result.update(state='available' if candidate else 'checked', canRequest=True, updateMethod='native-handoff',
-                              message="네이티브 Codex 업데이트 프로그램은 자격, 단계적 롤아웃 및 업데이트 정책을 결정합니다.")
+                              message='安装资格、灰度发布和更新策略由 Codex 原生更新器确认')
                 if candidate:
                     result.update(candidate)
         except Exception:
-            result.update(state='error', message='공식 업데이트 채널을 읽을 수 없습니다. 나중에 다시 시도하거나 컴퓨터에서 확인하세요.',
+            result.update(state='error', message='无法读取官方更新渠道，请稍后重试或在电脑端检查',
                           canRequest=bool(meta.get('bundle') or meta.get('storeProductId')))
             if meta.get('bundle') and sys.platform == 'darwin':
                 result['updateMethod'] = 'native-handoff'
@@ -248,26 +248,26 @@ class DesktopUpdates:
         with opener.open(Request(url, headers={'User-Agent':'Codex-Mobile-Bridge'}), timeout=20) as response:
             raw = response.read(2*1024*1024+1)
         if len(raw) > 2*1024*1024:
-            raise ValueError("업데이트 매니페스트가 너무 큽니다.")
+            raise ValueError('更新清单过大')
         return raw
 
     def request(self, value):
         if set(value) != {'requestId', 'confirmed', 'tasksConfirmed', 'currentBuild'} or value['confirmed'] is not True or value['tasksConfirmed'] is not True:
-            raise ValueError("모든 데스크톱 작업이 완료되었는지 확인하고 앱 자체 업데이터가 열리도록 허용합니다.")
+            raise ValueError('请确认所有桌面任务已结束，并授权打开原生更新器')
         request_id = value['requestId']
         if not isinstance(request_id, str) or str(uuid.UUID(request_id)) != request_id:
-            raise ValueError("잘못된 업데이트 요청 ID.")
+            raise ValueError('更新请求标识无效')
         with self.manager.gate, self.manager.lock, self.lock:
             if request_id in self.requests:
                 if self.requests[request_id] != value['currentBuild']:
-                    raise ValueError('동일한 요청을 다른 버전에 사용할 수 없습니다.')
+                    raise ValueError('同一请求不能用于不同版本')
                 return
             self.manager.check_ready()
             self.manager.idle()
             meta = installed(self.executable())
             if (sys.platform not in ('darwin', 'win32') or not self.value.get('canRequest')
                     or sys.platform == 'win32' and not meta.get('storeProductId') or meta['build'] != value['currentBuild']):
-                raise ValueError("버전 또는 업데이트 기능이 변경되었습니다. 다시 확인하세요.")
+                raise ValueError('当前版本或更新能力已变化，请重新检查')
             self.requests[request_id] = meta['build']
             write_json(self.attempts_path, self.requests)
             pending = {'build':meta['build'], 'executable':os.path.normcase(str(Path(self.executable()).resolve()))}
@@ -285,9 +285,9 @@ class DesktopUpdates:
         try:
             if sys.platform == 'win32':
                 if meta.get('storeProductId') not in STORE_PRODUCTS.values():
-                    raise ValueError("잘못된 스토어 제품 ID.")
+                    raise ValueError('商店产品标识无效')
                 os.startfile('ms-windows-store://pdp/?PRODUCTID='+meta['storeProductId'])
-                message = "Microsoft Store 앱 페이지를 요청했습니다. 컴퓨터에서 업데이트를 확인하고 확인하세요."
+                message = '已请求打开 Microsoft Store 的应用页面，请在电脑端检查和确认更新'
             else:
                 processes = DesktopApp(self.executable(), self.manager.home).processes()
                 if len(processes) != 1:
@@ -296,9 +296,9 @@ class DesktopUpdates:
                                         capture_output=True, text=True)
                 if result.stdout.strip() != 'opened':
                     raise ValueError('handoffFailed')
-                message = "네이티브 업데이트 프로그램이 열렸습니다. 컴퓨터에 설치를 확인하십시오. 업데이트가 아직 완료되지 않았습니다."
+                message = '已打开 Codex 原生更新器，请在电脑端确认安装；此操作不代表更新完成'
         except Exception as error:
             failure = update_failure(error)
-            message = ("시스템 저장소를 열 수 없습니다. 컴퓨터에서 업데이트를 확인하세요." if sys.platform == 'win32' else UPDATE_FAILURE_MESSAGES[failure])
+            message = ('未能打开系统商店，请在电脑端检查更新' if sys.platform == 'win32' else UPDATE_FAILURE_MESSAGES[failure])
         with self.lock:
             self.value.update(state='needsDesktop', canRequest=bool(failure), message=message, failureReason=failure)

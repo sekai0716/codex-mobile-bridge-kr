@@ -46,7 +46,7 @@ class ProgressiveResumeTests(unittest.TestCase):
 
     def test_old_receipt_cannot_activate_another_session_or_replacement_adapter(self):
         self.poll()
-        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
+        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
             self.manager.call('zcode', 'resume', 'sess_b', self.request)
         replacement = NativeRecovery()
         self.manager.adapters['zcode'] = replacement

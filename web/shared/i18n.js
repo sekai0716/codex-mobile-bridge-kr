@@ -42,6 +42,8 @@ const BridgeI18n=(()=>{
     if(match)return format('{provider} did not accept the notification ({code}: {reason}).',language,{provider:({'飞书':'Feishu','钉钉':'DingTalk'})[match[1]]||match[1],code:match[2],reason:translateTo(match[3],language)});
     match=/^(Feishu|DingTalk|Discord|Telegram|飞书|钉钉)\s*(응답 형식이 잘못되었습니다\.|알림이 수락되지 않았습니다\. 주소와 네트워크를 확인하세요\.|알림이 수락되지 않음（HTTP (\d+)）|响应格式不正确|未接受通知，请检查地址和网络|未接受通知（HTTP (\d+)）)$/.exec(source);
     if(match){const provider=({'飞书':'Feishu','钉钉':'DingTalk'})[match[1]]||match[1],http=match[3]||match[4];return format(http?'{provider} did not accept the notification (HTTP {code}).':/^(?:응답|响应)/.test(match[2])?'Invalid response from {provider}.':'{provider} did not accept the notification. Check the endpoint and network.',language,{provider,code:http});}
+    match=/^当前 Antigravity 原生环境暂未提供 \/(\S+) (指令|模式)$/.exec(source);
+    if(match)return format(match[2]==='模式'?'当前 Antigravity 原生环境暂未提供 /{name} 模式':'当前 Antigravity 原生环境暂未提供 /{name} 指令',language,{name:match[1]});
     return source;
   }
   function translateTo(value,language){
@@ -64,6 +66,6 @@ const BridgeI18n=(()=>{
   function source(text){return own(aliases,text)||own(en,text)?text:own(legacyByText,text)?legacyByText[text]:keyFor(text);}
   return {t,translateTo,translateEnglish:text=>translateTo(text,'en'),translateKorean:text=>translateTo(text,'ko'),normalizeLanguage,
     apply,setLanguage,source,language:()=>lang,locale:()=>lang==='en'?'en-US':lang==='zh'?'zh-CN':'ko-KR',
-    dictionary:legacyEnglish,canonicalDictionary:en,packs:translations};
+    dictionary:{...legacyEnglish,...en},canonicalDictionary:en,packs:translations};
 })();
 if(typeof module!=='undefined')module.exports=BridgeI18n;

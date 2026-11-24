@@ -33,6 +33,26 @@ def ssh_read(alias, source, timeout=18):
         return _ssh_read(alias, source, timeout)
 
 
+def _parse_ssh_json(stdout):
+    """Parse JSON from remote stdout while ignoring login shell banner noise."""
+    text = (stdout or '').strip()
+    if not text:
+        raise ValueError('Empty remote output')
+    try:
+        return json.loads(text)
+    except ValueError:
+        lines = [line for line in text.splitlines() if line.strip()]
+        for index in range(len(lines) - 1, -1, -1):
+            candidate = '\n'.join(lines[index:])
+            if not candidate.lstrip().startswith(('{', '[')):
+                continue
+            try:
+                return json.loads(candidate)
+            except ValueError:
+                continue
+        raise
+
+
 def _ssh_read(alias, source, timeout=18):
     command = ssh_command(alias)
     try:
@@ -40,8 +60,8 @@ def _ssh_read(alias, source, timeout=18):
         if result.returncode == 255:
             raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.')
         if result.returncode:
-            raise RemoteUnavailable('SSH 읽지 못했습니다. 컴퓨터의 호스트를 확인하세요. SSH 연결')
-        return json.loads(result.stdout)
+            raise RemoteUnavailable('SSH 读取失败，请检查电脑上该主机的 SSH 连接')
+        return _parse_ssh_json(result.stdout)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise SshTransportUnavailable('SSH 호스트를 일시적으로 사용할 수 없습니다. 컴퓨터의 연결을 확인하세요.') from exc
     except ValueError as exc:
@@ -223,6 +243,17 @@ class RemoteStore:
         return self.call('discovery_diagnostics', {'thread_id': thread_id})
 
 
+def _catalog_source():
+    source = source_text('clients/codex/catalog.py').replace(
+        'from bridge.features.accounts.models import model_catalog', '').replace(
+        'from bridge.clients.codex.configuration import magpie_managed', '')
+    # SSH helpers rediscover their explicit runtime on every request. Local
+    # Windows installation inventory is neither available nor needed there.
+    start = source.index('    def _windows_runtime_stamp(self):\n')
+    end = source.index('    def invalidate_models(self):\n', start)
+    return source[:start] + '    def _windows_runtime_stamp(self):\n        return None\n\n' + source[end:]
+
+
 class RemoteCatalog:
     def __init__(self, alias):
         self.alias = alias
@@ -254,9 +285,7 @@ class RemoteCatalog:
         source = source_text('features/auth/tls.py') + '\n'
         source += source_text('features/accounts/models.py').replace('from bridge.features.auth.tls import client_context', '') + '\n'
         source += source_text('clients/codex/configuration.py') + '\n'
-        source += source_text('clients/codex/catalog.py').replace(
-            'from bridge.features.accounts.models import model_catalog', '').replace(
-            'from bridge.clients.codex.configuration import magpie_managed', '')
+        source += _catalog_source()
         source += '\nimport shutil\nhome=Path(os.environ.get("CODEX_HOME", str(Path.home()/".codex")))\n'
         source += 'runtime=Catalog.find_ssh_runtime(home) or str(Path.home()/".local/bin/codex")\n'
         source += 'reader=Catalog(home, runtime, allow_background_refresh=False, auth_status_only=True)\n'
@@ -393,9 +422,7 @@ class RemoteCliModels:
         source += source_text('features/accounts/models.py').replace(
             'from bridge.features.auth.tls import client_context', '') + '\n'
         source += source_text('clients/codex/configuration.py') + '\n'
-        source += source_text('clients/codex/catalog.py').replace(
-            'from bridge.features.accounts.models import model_catalog', '').replace(
-            'from bridge.clients.codex.configuration import magpie_managed', '') + '\n'
+        source += _catalog_source() + '\n'
         source += source_text('platforms/linux/codex_daemon_env.py') + '\n'
         source += '_linux_read_process_environment = read_process_environment\n'
         source += source_text('platforms/macos/force_exit.py') + '\n'
@@ -516,7 +543,7 @@ class AppHosts:
         """
         host = self.hosts().get(project['host'])
         if not host or host['alias'] != project.get('hostIdentity'):
-            raise ValueError('기존 SSH 호스트 구성이 변경되었습니다. 프로젝트를 다시 선택하세요.')
+            raise ValueError('原 SSH 主机配置已变化，请重新选择项目')
         path = self.home / 'codex-app' / 'config.json'
         if path.is_symlink() or path.parent.is_symlink():
             raise ValueError('Codex App 프로젝트 구성 경로를 사용할 수 없습니다. 컴퓨터에서 시도해 보세요. App 항목 추가')
@@ -558,13 +585,13 @@ class AppHosts:
             if not any(item['remotePath'] == project['cwd'] for item in projects):
                 projects.append({'remotePath': project['cwd'], 'label': project['name']})
         except (TypeError, KeyError, ValueError) as exc:
-            raise ValueError('Codex App 적용할 다른 원격 구성이 있습니다. 먼저 구성해 주세요. App 이것을 추가하세요 SSH 다른 연결에 영향을 미치지 않도록 프로젝트') from exc
+            raise ValueError('Codex App 存在其他待应用的远程配置，请先在电脑 App 添加此 SSH 项目，避免影响其他连接') from exc
         return path, original, config
 
     def write_project_import(self, prepared, write):
         path, original, config = prepared
         if path.is_symlink() or path.parent.is_symlink() or (path.read_bytes() if path.exists() else None) != original:
-            raise ValueError('Codex App 구성이 변경되었습니다. 프로젝트를 다시 선택하세요.')
+            raise ValueError('Codex App 配置已变化，请重新选择项目')
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         write(path, config)
 
@@ -614,7 +641,7 @@ class AppHosts:
                     project = next((p for p in projects if p['cwd'] and p['cwd'] == row.get('cwd')), None)
             row.update(host=host, hostLabel=label,
                        projectKey=host + '|' + (legacy_ids.get(project['id'], project['id']) if project else 'unassigned'),
-                       projectName=project['name'] if project else '분류되지 않음',
+                       projectName=project['name'] if project else '未归类',
                        recency=row.get('recency_at_ms') or (row.get('recency_at') or 0) * 1000 or row.get('updated_at_ms') or (row.get('updated_at') or 0) * 1000)
         return rows
 
@@ -626,10 +653,10 @@ def upload_file(alias, thread, identifier, name, data, digest, *, reader=None):
 p=Path(os.environ.get('CODEX_HOME', str(Path.home()/'.codex')))/'mobile-bridge'/'uploads'/v['thread']/v['id']/v['name']
 p.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
 b=base64.b64decode(v['data'],validate=True)
-assert hashlib.sha256(b).hexdigest()==v['sha256']
+if hashlib.sha256(b).hexdigest()!=v['sha256']: raise ValueError('Uploaded file digest mismatch')
 if p.is_symlink(): raise ValueError('Invalid attachment path')
 if p.exists():
-    assert hashlib.sha256(p.read_bytes()).hexdigest()==v['sha256']
+    if hashlib.sha256(p.read_bytes()).hexdigest()!=v['sha256']: raise ValueError('Existing file digest mismatch')
 else:
     tmp=p.parent/(v['id']+'.part')
     with tmp.open('wb') as f: f.write(b)

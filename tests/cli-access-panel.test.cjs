@@ -91,7 +91,7 @@ test('URL or key changes invalidate draft models without allowing an old respons
  ui.key.input.value='new-key';ui.clearDraftModels();assert.equal(ui.model.input.value,'');assert.equal(ui.modelSelect.hidden,true);
 });
 test('empty or failed model lookup keeps manual entry available and never saves',async()=>{
- const ui=draftPanel();ui.request=async()=>({models:[]});await ui.discoverModels();assert.match(ui.modelFeedback.textContent,/수동으로 입력/);assert.equal(ui.modelSelect.hidden,true);assert.equal(ui.save.disabled,false);
+ const ui=draftPanel();ui.request=async()=>({models:[]});await ui.discoverModels();assert.match(ui.modelFeedback.textContent,/手动填写模型 ID/);assert.equal(ui.modelSelect.hidden,true);assert.equal(ui.save.disabled,false);
  ui.request=async()=>{throw Error('Offline');};await ui.discoverModels();assert.equal(ui.modelFeedback.textContent,'Offline');assert.equal(ui.save.disabled,false);
 });
 

@@ -52,16 +52,16 @@ def read_source(path, cwd, home=None):
     """Recheck roots on the owning host and walk the original path without symlinks."""
     target = Path(path)
     if not target.is_absolute() or target.suffix.lower() not in ('.html', '.htm'):
-        raise PermissionError("잘못된 시각화 파일 경로")
+        raise PermissionError('可视化文件路径无效')
     roots = [Path(cwd)] if cwd else []
     roots.append(Path(home or os.environ.get('CODEX_HOME') or Path.home() / '.codex') / 'visualizations')
     resolved = target.resolve(strict=True)
     if not any(root.resolve() in resolved.parents for root in roots):
-        raise PermissionError("시각화 파일이 허용된 디렉터리 외부에 있습니다.")
+        raise PermissionError('可视化文件超出授权目录')
     # Preserve original components: collapsing symlink/.. before the guarded
     # walk can read a different file from the one authorized above.
     with Workspace(target.anchor).download(target.relative_to(target.anchor).as_posix(), limit=MAX_BYTES) as (_, stream):
         raw = stream.read(MAX_BYTES + 1)
     if len(raw) > MAX_BYTES:
-        raise ValueError("시각화가 1MiB를 초과합니다.")
+        raise ValueError('可视化内容超过 1 MB')
     return {'text': raw.decode('utf-8'), 'revision': hashlib.sha256(raw).hexdigest()}

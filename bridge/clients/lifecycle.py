@@ -14,33 +14,37 @@ def launch_deepseek(descriptor, restart=False):
     Codex and Claude are deliberately outside this helper's scope.
     """
     if descriptor.get('id') != 'deepseek' or not descriptor.get('installed'):
-        raise ValueError("DeepSeek Harness 데스크톱 앱을 찾을 수 없습니다.")
+        raise ValueError('未找到 DeepSeek Harness 桌面应用')
     if descriptor.get('nativeProfile'):
         if restart:
-            raise ValueError('다시 열기 전에 먼저 작업을 확인하고 이 독립적인 구성을 정상적으로 종료하십시오.')
+            raise ValueError('请先核验任务并正常退出此独立配置，再重新开启')
         from bridge.clients.profile_process import launch_profile
         return launch_profile(descriptor)
     executable, home = descriptor.get('executable'), descriptor.get('dataDirectory')
-    if not executable or not home or not Path(executable).is_file() or (Path(home).exists() and not Path(home).is_dir()):
-        raise ValueError("DeepSeek Harness 앱 또는 데이터 디렉터리를 사용할 수 없습니다. 다시 스캔하세요.")
+    if (not executable or not home or
+            not Path(executable).is_file() and not descriptor.get('pendingInstallation') or
+            Path(home).exists() and not Path(home).is_dir()):
+        raise ValueError('DeepSeek Harness 应用或数据目录不可用，请重新扫描')
     app = DesktopApp(executable, home)
     running = bool(inspect_client(descriptor)['running'])
     if running:
         state = inspect_client(descriptor)
         running = state['running']
         if running and not state['mainPids']:
-            raise ValueError("남은 Harness 백그라운드 프로세스가 발견되었으며 해당 작업을 확인할 수 없습니다. 컴퓨터에서 Harness를 종료한 후 다시 시도하십시오.")
+            raise ValueError('检测到残留 Harness 后台实例且无法核对任务状态，请在电脑端退出 Harness 后重试')
         if state['unknown']:
-            raise ValueError("여러 개의 또는 인식할 수 없는 Harness 인스턴스가 발견되었습니다. 다시 시도하기 전에 컴퓨터에서 확인하세요.")
+            raise ValueError('检测到多个或无法识别的 Harness 实例，请在电脑端检查后重试')
     if running and not restart:
         return {'running': True, 'launched': False, 'restarted': False,
                 'restartRequired': bool(descriptor.get('restartRequired'))}
+    # A retained old owner may be inspected, but a restart needs a launchable image.
+    _app(descriptor, launching=True)
     if running:
         stop_client(descriptor, state=state)
     working = app.home
     if sys.platform == 'darwin':
         if not any(p.suffix == '.app' for p in app.executable.parents):
-            raise ValueError("DeepSeek Harness 실행 파일은 앱 번들 내에 있어야 합니다.")
+            raise ValueError('DeepSeek Harness 桌面程序必须位于应用程序包中')
     else:
         # Harness initializes its own profile; launch from an existing ancestor.
         working = next((p for p in [app.home, *app.home.parents] if p.is_dir()), Path.home())
@@ -56,12 +60,13 @@ def launch_deepseek(descriptor, restart=False):
     return {'running': True, 'launched': True, 'restarted': running, 'restartRequired': False}
 
 
-def _app(descriptor):
+def _app(descriptor, *, launching=False):
     if descriptor.get('id') not in ('codex', 'claude', 'deepseek', 'zcode') or not descriptor.get('installed'):
-        raise ValueError("구성된 데스크톱 앱을 찾을 수 없습니다. 다시 스캔하세요.")
+        raise ValueError('未找到已配置的桌面应用，请重新扫描')
     executable, home = descriptor.get('executable'), descriptor.get('dataDirectory')
-    if not executable or not home or not Path(executable).is_file():
-        raise ValueError("데스크톱 앱 또는 해당 데이터 디렉터리를 사용할 수 없습니다. 다시 스캔하세요.")
+    if (not executable or not home or
+            not Path(executable).is_file() and (launching or not descriptor.get('pendingInstallation'))):
+        raise ValueError('桌面应用或数据目录不可用，请重新扫描')
     return DesktopApp(executable, home)
 
 
@@ -142,24 +147,25 @@ def _process_state(descriptor, app, pids, commands):
             'runtimePids': hosts, 'unknown': unknown}
 
 
-def stop_client(descriptor, *, state):
+def stop_client(descriptor, *, state, expected_identities=None):
     if sys.platform == 'win32' and descriptor.get('id') == 'claude':
         return stop_claude(descriptor, state=state)
     # Revalidate process identities immediately before sending native quit.
     current = inspect_client(descriptor)
     if current['unknown'] or set(current['pids']) - set(state['pids']):
-        raise ValueError("앱 프로세스가 변경되어 작업 상태를 확인할 수 없습니다. 닫기 전에 다시 확인하세요.")
+        raise ValueError('客户端进程已变化，无法确认任务状态，请重新检查后再关闭')
     from bridge.clients.profile_process import require_owned
     require_owned(descriptor, current)
     app = _app(descriptor)
     app.stop(runtime_pids=current['runtimePids'], gui_pids=current['mainPids'], provider=descriptor.get('id'),
-             selected_pids=current['pids'])
+             selected_pids=current['pids'],
+             **({'expected_identities': expected_identities} if expected_identities is not None else {}))
 
 
 def force_stop_client(descriptor, *, state):
     """Explicit interruption; task evidence is bypassed, identity checks are not."""
     if descriptor.get('nativeProfile') or descriptor.get('excludeProfiles'):
-        raise ValueError('다중 구성 클라이언트는 아직 독립 강제 종료를 확인하지 않았습니다. 일반 종료를 사용하십시오.')
+        raise ValueError('多配置客户端尚未验证独立强制退出，请使用正常退出')
     if sys.platform == 'win32':
         from bridge.platforms.windows.force_exit import force_stop_client as force
         return force(descriptor, state=state)
@@ -208,8 +214,8 @@ def stop_claude(descriptor, *, state):
     """Invoke Claude's normal menu once, then observe its asynchronous cleanup."""
     from bridge.clients.claude.setup import native_action
     if descriptor.get('id') != 'claude':
-        raise ValueError("이 종료 작업은 Claude 데스크톱에서만 사용할 수 있습니다.")
-    changed = "Claude 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하세요."
+        raise ValueError('此退出操作仅用于 Claude 桌面端')
+    changed = 'Claude 进程已变化，请重新检查后再退出'
     current = inspect_client(descriptor)
     if not current['running']:
         return
@@ -222,13 +228,13 @@ def stop_claude(descriptor, *, state):
     # The connection monitor's cancellation file must not cancel native quit.
     result = native_action('quit', pid=current['mainPids'][0], executable=str(app.executable))
     if result.get('quitState') not in ('submitted', 'exited'):
-        raise ValueError(result.get('reason') or "Claude 작업을 처리하거나 컴퓨터에 프롬프트를 저장한 후 다시 시도하세요.")
+        raise ValueError(result.get('reason') or '请在电脑端处理 Claude 的任务或保存提示后重试')
     deadline = time.monotonic() + 75
     while remaining := inspect_client(descriptor)['pids']:
         if set(remaining) - set(current['pids']):
             raise ValueError(changed)
         if time.monotonic() >= deadline:
-            raise ValueError("Claude가 종료되지 않았습니다. 작업을 처리하거나 컴퓨터에 프롬프트를 저장한 후 다시 시도하세요.")
+            raise ValueError('Claude 尚未退出，请在电脑端处理任务或保存提示后重试')
         time.sleep(.25)
 
 
@@ -237,8 +243,8 @@ def stop_deepseek(descriptor, adapter, *, state):
     import json
     from bridge.clients.deepseek.adapter import LIFECYCLE_REVISIONS
     if descriptor.get('id') != 'deepseek':
-        raise ValueError("이 종료 작업은 Harness 데스크톱에서만 사용할 수 있습니다.")
-    changed = "Harness 프로세스가 변경되었습니다. 종료하기 전에 다시 확인하세요."
+        raise ValueError('此退出操作仅用于 Harness 桌面端')
+    changed = 'Harness 进程已变化，请重新检查后再退出'
 
     def verify():
         current = inspect_client(descriptor)
@@ -253,7 +259,7 @@ def stop_deepseek(descriptor, adapter, *, state):
     require_owned(descriptor, current)
     status = adapter.call('status')
     if status.get('connected') is not True:
-        raise ValueError("Harness 데스크탑이 연결되어 있지 않아 종료 상태를 확인할 수 없습니다.")
+        raise ValueError('Harness 桌面未连接，无法确认退出状态')
     try:
         endpoint = json.loads((adapter.directory/'endpoint.json').read_bytes())
         if (endpoint['pid'] != current['runtimePids'][0] or
@@ -272,7 +278,7 @@ def stop_deepseek(descriptor, adapter, *, state):
                 not isinstance(rows, list) or any(not isinstance(row, dict) or
                     row.get('runtimeKnown') is not True or row.get('status') not in ('idle', 'stopped', 'completed') or
                     row.get('requests') for row in rows)):
-            raise ValueError("작업이 실행 중이거나 승인 대기 중이거나 상태를 알 수 없습니다. 종료하기 전에 컴퓨터를 확인하십시오.")
+            raise ValueError('有任务运行、等待确认或状态未知，请先在电脑端检查后再退出')
         try:
             if json.loads((adapter.directory/'endpoint.json').read_bytes()) != endpoint:
                 raise ValueError(changed)
@@ -286,27 +292,27 @@ def stop_deepseek(descriptor, adapter, *, state):
                                           'expectedGeneration': endpoint['generation']})
         if (result.get('status') != 'accepted' or result.get('pid') != endpoint['pid'] or
                 result.get('generation') != endpoint['generation']):
-            raise ValueError("Harness가 종료 요청을 승인하지 않았습니다. 컴퓨터를 확인하고 다시 시도하세요.")
+            raise ValueError('Harness 未确认退出请求，请在电脑端检查后重试')
     deadline = time.monotonic() + 25
     while remaining := inspect_client(descriptor)['pids']:
         if set(remaining) - set(current['pids']):
             raise ValueError(changed)
         if time.monotonic() >= deadline:
-            raise ValueError("Harness가 종료되지 않았습니다. 컴퓨터에서 프롬프트 종료를 처리하고 다시 시도하세요. 강제 종료된 프로세스가 없습니다.")
+            raise ValueError('Harness 尚未退出，请在电脑端处理退出提示后重试；尚未强制结束进程')
         time.sleep(.25)
 
 
-def launch_client(descriptor, *, allow_native_relaunch=False):
+def launch_client(descriptor, *, allow_native_relaunch=False, allow_unprepared_codex=False):
     if descriptor.get('nativeProfile'):
         from bridge.clients.profile_process import launch_profile
         return launch_profile(descriptor, allow_native_relaunch=allow_native_relaunch)
     if descriptor.get('id') == 'deepseek':
         return launch_deepseek(descriptor)
-    app = _app(descriptor)
     if inspect_client(descriptor)['running']:
         return {'running': True, 'launched': False}
+    app = _app(descriptor, launching=True)
     if descriptor['id'] == 'codex':
-        app.start()
+        app.start(**({'allow_unprepared': True} if allow_unprepared_codex else {}))
     elif descriptor['id'] == 'zcode':
         from bridge.clients.zcode.installation import launch
         launch(app.executable, app.home, debug_port=descriptor.get('debugFallbackPort'))
@@ -330,13 +336,13 @@ def profile_running_app(descriptor, restart=False, cancelled=None, allow_launch=
     from bridge.clients.profile_process import require_owned, launch_profile
     state = inspect_client(descriptor)
     if cancelled is not None and cancelled.is_set():
-        raise ValueError("Claude 연결이 취소되었습니다.")
+        raise ValueError('已取消 Claude 连接')
     if restart:
-        raise ValueError('다시 연결하기 전에 먼저 작업을 확인하고 정상적으로 구성을 종료하십시오.')
+        raise ValueError('请先核验任务并正常退出该配置，再重新连接')
     require_owned(descriptor, state, allow_native_relaunch=allow_native_relaunch, cancelled=cancelled)
     if not state['running']:
         if not allow_launch:
-            raise ValueError('먼저 이것을 활성화해 주세요 Claude 구성 및 다시 연결')
+            raise ValueError('请先开启此 Claude 配置，再重新连接')
         if descriptor.get('nativeProfile'):
             launch_profile(descriptor, cancelled=cancelled)
         else:
@@ -347,11 +353,11 @@ def profile_running_app(descriptor, restart=False, cancelled=None, allow_launch=
         deadline = time.monotonic()+20
         while not (state := inspect_client(descriptor))['running']:
             if cancelled is not None and cancelled.is_set():
-                raise ValueError("Claude 연결이 취소되었습니다.")
+                raise ValueError('已取消 Claude 连接')
             if time.monotonic() >= deadline:
-                raise ValueError('Claude 아직 시작되지 않았습니다. 나중에 다시 시도해 주세요.')
+                raise ValueError('Claude 尚未启动，请稍后重试')
             time.sleep(.2)
     if state.get('unknown') or len(state.get('mainPids', [])) != 1:
-        raise ValueError('이를 확인할 수 없습니다 Claude 구성된 유일한 기본 프로세스')
+        raise ValueError('无法确认此 Claude 配置的唯一原生进程')
     require_owned(descriptor, state)
     return state['mainPids'][0]

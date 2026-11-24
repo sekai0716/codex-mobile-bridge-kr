@@ -328,7 +328,7 @@ class SideChat:
         if preset not in ('ask', 'auto-review', 'full-access'):
             raise ValueError('잘못된 권한 설정')
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError("전체 액세스 확인")
+            raise ValueError('请确认完全访问权限')
         settings = {'permissions': ':danger-full-access' if preset == 'full-access' else ':workspace',
                     'approvalPolicy': 'never' if preset == 'full-access' else 'on-request',
                     'approvalsReviewer': 'auto_review' if preset == 'auto-review' else 'user'}

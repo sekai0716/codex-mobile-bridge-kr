@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const i18nAssets=require('../web/assets.json')['/i18n.js'].map(file=>'web/'+file);
 
 // Run the actual phone handlers with an isolated DOM and notification API.
 async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=false}={}){
@@ -19,7 +20,7 @@ async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=
   let nextPost,nextGet;
   const response=(data,status=200)=>({ok:status===200,status,json:async()=>data});
   let listResponse=()=>response({sessions:[],unavailableHosts:[]}),knownRows=[];
-  const context=vm.createContext({CliConnectionsPanel:class{},SessionMenu:class{bind(){}close(){}},ClientNavigation:class{constructor(){this.provider="codex";this.clients=[];}async refresh(){}acknowledgeList(provider,value){acknowledgements.push({provider,value});}},DesktopSessionsView:class{bindListCache(){}previewCachedList(){return false;}clear(){}},Workbench:class{constructor(){this.current={};}async resolveChat(id){return {rootId:id};}open(){}reset(){}setThumbnails(){}relabel(){}},navigator:{userAgent:'test'},document:{addEventListener(){},documentElement:{classList:{contains(){return false;}}},getElementById:id=>nodes.get(id),querySelector:selector=>selector==='.archive-filter'?archiveFilter:{disabled:false},querySelectorAll:selector=>selector==='[data-notification-channel]'?channelButtons:[],createElement:node},
+  const context=vm.createContext({ComposerToolbar:class{addChoices(){return [];}requestSync(){}actionMode(){return this.controls?.sendMode?.value||'send';}sync(){}},CliConnectionsPanel:class{},SessionMenu:class{bind(){}close(){}},ClientNavigation:class{constructor(){this.provider="codex";this.clients=[];}async refresh(){}acknowledgeList(provider,value){acknowledgements.push({provider,value});}},DesktopSessionsView:class{bindListCache(){}previewCachedList(){return false;}clear(){}},Workbench:class{constructor(){this.current={};}async resolveChat(id){return {rootId:id};}open(){}reset(){}setThumbnails(){}relabel(){}},navigator:{userAgent:'test'},document:{addEventListener(){},documentElement:{classList:{contains(){return false;}}},getElementById:id=>nodes.get(id),querySelector:selector=>selector==='.archive-filter'?archiveFilter:{disabled:false},querySelectorAll:selector=>selector==='[data-notification-channel]'?channelButtons:[],createElement:node},
     renderMarkdown(){},window:{addEventListener(){}},localStorage,sessionStorage:scopedStorage,
     location:{hash:'',pathname:'/',search:''},history:{state:null,replaceState(state){this.state=state;},pushState(state){this.state=state;},back(){}},confirm:()=>true,setTimeout(){},clearTimeout(){},setInterval(){},
     ChatTimeline:class{constructor(){this.abort=new AbortController();}async start(){}dispose(){this.abort.abort();}relabel(){}refreshActions(){}},
@@ -62,7 +63,7 @@ async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=
       return response(saved.get(url)||{available:true,watching:false,notifyOnCompletion:false,requests:'inherit',completion:'inherit'});
     }});
   require('./fixtures/codex-entry-predicates.cjs')(context);
-  for(const file of ['web/hosts/environment.js','web/hosts/browser-navigation.js','web/shared/locales/en.js','web/shared/locales/ko-KR.js','web/shared/locales/zh-CN.js','web/shared/locales/legacy.js','web/shared/i18n.js','web/features/chat/list-sync.js','web/features/accounts/account.js','web/features/chat/modes.js','web/features/chat/attachments.js','web/features/chat/activity.js','web/features/chat/fast-mode.js','web/features/chat/message-actions.js','web/features/chat/permissions.js','web/features/chat/account-usage.js','web/features/chat/composer-commands.js','web/shell/app.js']){
+  for(const file of ['web/hosts/environment.js','web/hosts/browser-navigation.js',...i18nAssets,'web/features/chat/list-sync.js','web/features/accounts/account.js','web/features/chat/modes.js','web/features/chat/attachments.js','web/features/chat/activity.js','web/features/chat/fast-mode.js','web/features/chat/message-actions.js','web/shared/composer-icons.js','web/features/chat/permissions.js','web/features/chat/account-usage.js','web/features/chat/composer-commands.js','web/shell/app.js']){
     let source=fs.readFileSync(path.join(__dirname,'..',file),'utf8');
     if(skipStartup&&file==='web/shell/app.js')source=source.replace('startFromLink(initialPairingToken);initialPairingToken=null;','initialPairingToken=null;');
     vm.runInContext(source,context);
@@ -80,7 +81,7 @@ async function fixture({sessionStore=new Map(),localStore=new Map(),skipStartup=
 test('homepage retains the archive checkbox and automatic/steer mode labels',async()=>{
   const ui=await fixture();
   assert.match(ui.html, /id="archived" type="checkbox"/);
-  for(const text of ['최근의','프로젝트','기본 전송','현재 작업 조종','기본 모드','계획 모드','목표 모드'])assert.ok(ui.html.includes(text));
+  for(const value of ['auto','steer','default','plan','goal'])assert.match(ui.html,new RegExp('<option value="'+value+'"[^>]*data-i18n='));
 });
 
 test('request and completion choices are independent and persist',async()=>{

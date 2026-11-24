@@ -25,7 +25,7 @@ class SshIsolationTests(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 5)
 
     def test_file_input_preserves_utf8_and_binary_output(self):
-        value = '프로젝트 / 공간\n'
+        value = '项目 / 空格\n'
         result = run_with_input([sys.executable, '-c',
             'import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())'], value,
             timeout=5, capture_output=True)
@@ -143,7 +143,7 @@ class SshIsolationTests(unittest.TestCase):
         self.assertEqual([(row['host'], row['cwd']) for row in rows], [('ssh', '/fixture/remote')])
         bridge.for_host.assert_called_once_with('ssh')
         remote.list.assert_called_once_with(limit=500)
-        with self.assertRaisesRegex(ValueError, '프로젝트 환경이 존재하지 않습니다.'):
+        with self.assertRaisesRegex(ValueError, '项目环境不存在'):
             bridge.projects(host='unknown')
 
     def test_manual_retry_bypasses_backoff_and_coalesces(self):
@@ -309,6 +309,22 @@ class OperationGateTests(unittest.TestCase):
             release.set();self.assertTrue(exclusive.wait(1))
         finally:
             release.set();reader.join(2);writer.join(2)
+
+    def test_ssh_read_ignores_login_shell_banner_before_json_and_rejects_unparseable_output(self):
+        for stdout, expected in (
+            ('Welcome to Ubuntu\nLast login: now\n{"available": true}\n', {'available': True}),
+            ('banner line\n[\n  {"id": "t1"}\n]\n', [{'id': 't1'}]),
+        ):
+            with self.subTest(stdout=stdout), patch(
+                    'bridge.clients.codex.remote.subprocess.run',
+                    return_value=SimpleNamespace(returncode=0, stdout=stdout)):
+                self.assertEqual(ssh_read('banner-host', 'read'), expected)
+        for bad in ('Welcome banner only\n', '{"ok": true}\ntrailing noise\n', ''):
+            with self.subTest(bad=bad), patch(
+                    'bridge.clients.codex.remote.subprocess.run',
+                    return_value=SimpleNamespace(returncode=0, stdout=bad)):
+                with self.assertRaises(RemoteUnavailable):
+                    ssh_read('bad-json-host', 'read')
 
     def test_exclusive_account_change_blocks_new_host_operation(self):
         gate=OperationGate();entered=threading.Event()

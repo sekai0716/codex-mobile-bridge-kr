@@ -13,6 +13,10 @@ from bridge.features.sessions.cli_release import CliConnections
 from tests.test_cli_force import CliForceFixture
 
 
+def release_threads():
+    return SimpleNamespace(Thread=Mock(), RLock=threading.RLock, Event=threading.Event)
+
+
 class CliScopeTests(CliForceFixture):
     def setUp(self):
         super().setUp()
@@ -82,7 +86,7 @@ class CliScopeTests(CliForceFixture):
         self.bridge.activate.assert_not_called()
         body = {'id': str(uuid.uuid4()), 'mode': 'scopeWait', 'scopeKey': preview['scopeKey'],
                 'connections': preview['connections'], 'generation': preview['generation']}
-        with patch('bridge.features.sessions.cli_release.threading.Thread'):
+        with patch('bridge.features.sessions.cli_release.threading', release_threads()):
             job = manager.submit(body)
         manager._run_scope(manager.jobs[job['id']], manager.callbacks)
         self.assertEqual([row['status'] for row in manager.jobs[job['id']]['results']], ['released', 'released'])
@@ -118,7 +122,7 @@ class CliScopeTests(CliForceFixture):
         self.idle.side_effect = CliTasksPending('busy fixture')
         self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         (self.home/'config.toml').write_text('model="changed"')
-        with self.assertRaisesRegex(ValueError, "CLI\\ 구성,\\ 원래\\ 프로세스\\ 또는\\ 영향\\ 범위가\\ 변경되었습니다\\.\\ 다시\\ 미리보세요\\."):
+        with self.assertRaisesRegex(ValueError, '重新预览'):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'failed')
         self.stop.assert_not_called()
@@ -139,7 +143,7 @@ class CliScopeTests(CliForceFixture):
 
     def test_scope_previews_reject_keys_from_other_scope(self):
         manager = self.manager()
-        with self.assertRaisesRegex(ValueError, '현재 범위에 속하지 않습니다.'):
+        with self.assertRaisesRegex(ValueError, '不属于当前范围'):
             manager.submit({'mode': 'scopePreview', 'scopeKey': 'other-home', 'connections': ['key-a']})
         self.stop.assert_not_called()
 
@@ -150,12 +154,12 @@ class CliScopeTests(CliForceFixture):
         body = {'mode': 'scopeWait', 'id': str(uuid.uuid4()), 'scopeKey': scope_key,
                 'connections': preview['connections'], 'generation': preview['generation']}
         self.idle.side_effect = CliTasksPending('busy fixture')
-        with patch('bridge.features.sessions.cli_release.threading.Thread'):
+        with patch('bridge.features.sessions.cli_release.threading', release_threads()):
             waiting = manager.submit(body)
         self.scope.release(self.thread_id, 'key-a', waiting['id'], manager.jobs[waiting['id']]['scopeGeneration'])
         self.bridge.submissions[self.thread_id + ':unknown'] = {'status': 'unknown', 'text': 'retained'}
         preview = manager.submit({'mode': 'scopePreview', 'scopeKey': scope_key, 'connections': ['key-b']})
-        with patch('bridge.features.sessions.cli_release.threading.Thread'):
+        with patch('bridge.features.sessions.cli_release.threading', release_threads()):
             forced = manager.submit({'mode': 'scopeForce', 'id': str(uuid.uuid4()), 'scopeKey': scope_key,
                 'connections': preview['connections'], 'generation': preview['generation']})
         manager._run_scope(manager.jobs[forced['id']], manager.callbacks)
@@ -170,7 +174,7 @@ class CliScopeTests(CliForceFixture):
         operation = str(uuid.uuid4())
         self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.scope.cancel(operation)['status'], 'cancelled')
-        with self.assertRaisesRegex(ValueError, '취소'):
+        with self.assertRaisesRegex(ValueError, '取消'):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.stop.assert_not_called()
 
@@ -178,7 +182,7 @@ class CliScopeTests(CliForceFixture):
         manager = self.manager()
         preview = manager.submit({'mode': 'scopePreview', 'scopeKey': self.scope.descriptor()['scopeKey'], 'all': True})
         with patch.object(manager, '_connections', return_value=self.rows()[:1]):
-            with self.assertRaisesRegex(ValueError, "연결이\\ 변경되었거나\\ 현재\\ 범위에\\ 속하지\\ 않습니다\\.\\ 다시\\ 선택하십시오\\."):
+            with self.assertRaisesRegex(ValueError, '变化'):
                 manager.submit({'mode': 'scopeWait', 'id': str(uuid.uuid4()), 'scopeKey': preview['scopeKey'],
                                 'connections': preview['connections'], 'generation': preview['generation']})
         self.stop.assert_not_called()
@@ -188,7 +192,7 @@ class CliScopeTests(CliForceFixture):
         manager = self.manager()
         preview = manager.submit({'mode': 'scopePreview', 'scopeKey': self.scope.descriptor()['scopeKey'], 'all': True})
         self.stop.side_effect = OSError('normal exit acknowledgment unknown')
-        with patch('bridge.features.sessions.cli_release.threading.Thread'):
+        with patch('bridge.features.sessions.cli_release.threading', release_threads()):
             job = manager.submit({'mode': 'scopeWait', 'id': str(uuid.uuid4()), 'scopeKey': preview['scopeKey'],
                                   'connections': preview['connections'], 'generation': preview['generation']})
         manager._run_scope(manager.jobs[job['id']], manager.callbacks)
@@ -197,7 +201,7 @@ class CliScopeTests(CliForceFixture):
         self.assertTrue(all(row['status'] == 'unknown' for row in reopened.jobs[job['id']]['results']))
         for absent in (False, True):
             with patch('bridge.features.sessions.cli_scope.daemon_generation_absent', return_value=absent), \
-                    patch('bridge.features.sessions.cli_release.threading.Thread'):
+                    patch('bridge.features.sessions.cli_release.threading', release_threads()):
                 check = reopened.submit({'mode': 'check', 'id': str(uuid.uuid4()), 'connections': preview['connections']})
             with patch('bridge.features.sessions.cli_scope.daemon_generation_absent', return_value=absent):
                 reopened._run(reopened.jobs[check['id']], reopened.callbacks)
@@ -212,7 +216,7 @@ class CliScopeTests(CliForceFixture):
             if self.idle.call_count == 2:
                 self.scope.cancel(operation)
         self.idle.side_effect = idle
-        with self.assertRaisesRegex(ValueError, '취소|변화'):
+        with self.assertRaisesRegex(ValueError, '取消|变化'):
             self.scope.release(self.thread_id, 'key-a', operation, preview['generation'])
         self.assertEqual(self.bridge._cli_recovery_record()['phase'], 'cancelled')
         self.stop.assert_not_called()
@@ -234,14 +238,17 @@ class CliScopeTests(CliForceFixture):
             except BaseException as error:
                 errors.append(error)
         workers = [threading.Thread(target=submit) for _ in range(2)]
+        local_threads = release_threads()
         with patch.object(manager, '_scope_preview', side_effect=preview_together), \
-                patch('bridge.features.sessions.cli_release.threading.Thread') as background:
+                patch('bridge.features.sessions.cli_release.threading', local_threads):
+            self.assertIsInstance(threading.Thread(target=lambda: None), type(workers[0]))
             for worker in workers:
                 worker.start()
             for worker in workers:
                 worker.join(3)
                 self.assertFalse(worker.is_alive())
-            background.assert_called_once()
+            local_threads.Thread.assert_called_once()
+            self.assertEqual(local_threads.Thread.call_args.kwargs['name'], 'cli-release')
         self.assertFalse(errors)
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0], results[1])
@@ -275,7 +282,7 @@ class CliScopeTests(CliForceFixture):
                             cancelled = manager.submit({'mode': 'scopeCancel', 'id': job['id']})
                             self.assertTrue(all(row['status'] == 'cancelled' for row in cancelled['results']))
                         else:
-                            with self.assertRaisesRegex(ValueError, '종료 단계'):
+                            with self.assertRaisesRegex(ValueError, '退出阶段'):
                                 manager.submit({'mode': 'scopeCancel', 'id': job['id']})
                     finally:
                         resume.set()

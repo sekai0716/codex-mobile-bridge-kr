@@ -69,9 +69,9 @@ class WslFeatures:
     def _goal_control(self, identifier, request_id, action, *, objective=None, expected=None, ui_locale=None):
         uuid.UUID(identifier); uuid.UUID(request_id)
         if expected is not None and not isinstance(expected, dict):
-            raise ValueError('대상 상태가 잘못되었습니다.')
+            raise ValueError('目标状态无效')
         if objective is not None and (not isinstance(objective, str) or not 0 < len(objective.strip()) <= 4000):
-            raise ValueError("목표를 1~4,000자로 입력하세요.")
+            raise ValueError('请输入 1–4000 字的目标内容')
         value = {'action': action, 'objective': objective, 'expected': expected}
         key = identifier + ':goal:' + request_id
         with self.write_lock, self.session(identifier, attach=False).action_lock:
@@ -83,13 +83,13 @@ class WslFeatures:
             current = self._read_goal(identifier, runtime)
             if expected is not None and (goal_identity(current) != goal_identity(expected)
                     or (current or {}).get('status') != expected.get('status')):
-                raise ValueError("목표가 변경되었습니다. 새로고침하고 다시 시도하세요.")
+                raise ValueError('目标已发生变化，请刷新后重试')
             text = objective.strip() if objective is not None else (current or {}).get('objective', '')
             decision, error, status = plan_goal_command(action, text, current)
             if decision == 'invalid':
                 raise ValueError(error)
             if action == 'create' and thread.get('status', {}).get('type') == 'active':
-                raise ValueError('작업이 실행 중입니다. 목표를 설정하기 전에 완료될 때까지 기다리십시오.')
+                raise ValueError('任务正在运行，请等待完成后设置目标')
 
             def dispatch():
                 if decision == 'execute':
@@ -105,7 +105,7 @@ class WslFeatures:
                 proved = fresh is None if action == 'cancel' else bool(
                     fresh and fresh.get('objective') == text and fresh.get('status') == status)
                 if not proved:
-                    raise IPCError('아직 목표 작전 결과는 확인되지 않았다')
+                    raise IPCError('目标操作结果尚未确认')
                 return {'status': status, 'confirmed': True, 'result': fresh,
                         'duplicate': decision == 'duplicate', 'transitionId': request_id}
 
@@ -140,7 +140,7 @@ class WslFeatures:
 
     def send_goal(self, identifier, text, submission_id, *, mode='send', skills=None, attachments=None, ui_locale=None):
         if mode != 'send' or skills or attachments:
-            raise ValueError('대상 모드는 직접 전송된 일반 텍스트 대상만 허용합니다.')
+            raise ValueError('目标模式只接受直接发送的纯文本目标')
         result = self._goal_control(identifier, submission_id, 'create', objective=text, ui_locale=ui_locale)
         return {**result, 'id': submission_id,
                 'status': 'accepted' if result.get('confirmed') and
@@ -154,7 +154,7 @@ class WslFeatures:
 
     def set_goal_status(self, identifier, status, request_id, ui_locale=None, expected=None):
         if status not in ('active', 'paused'):
-            raise ValueError('대상 상태가 잘못되었습니다.')
+            raise ValueError('目标状态无效')
         return self._goal_control(identifier, request_id, 'resume' if status == 'active' else 'pause',
                                   expected=expected, ui_locale=ui_locale)
 

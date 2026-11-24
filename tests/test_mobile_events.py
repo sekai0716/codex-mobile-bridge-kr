@@ -84,7 +84,7 @@ class MobileEventTests(unittest.TestCase):
         manager = Notifications(None, self.path, lambda: ['https://gateway.example'])
         manager.defaults({'requests': True, 'completion': True})
         row = {'id': THREAD, 'host': 'local'}
-        title = '채팅 제목' * 40
+        title = '聊天标题' * 40
         for completed in (False, True):
             for include_title in (False, True):
                 with self.subTest(completed=completed, include_title=include_title):

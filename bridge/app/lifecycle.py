@@ -49,8 +49,7 @@ class GatewayControl:
         self.record.update(pairingDir=self.pairing_dir.name, instanceId=instance_id, deviceManagement=auth is not None,
                            desktopSessionsManagement=desktop_sessions is not None, harnessManagement=harness is not None, accountsManagement=accounts is not None, accountManagement=account is not None, cliAccessManagement=cli_access is not None, notificationManagement=notifications is not None, networkAdaptationManagement=network_adaptation is not None)
         self.request_path.unlink(missing_ok=True)
-        self.path.write_text(json.dumps(self.record), encoding='utf-8')
-        self.path.chmod(0o600)
+        private_json(self.path, self.record)
         def watch():
             while not self.closed.wait(.2):
                 if read_record(self.request_path) == self.record:
@@ -67,12 +66,12 @@ class GatewayControl:
                                 try:
                                     handler = {'accounts': accounts, 'account': account, 'harness': harness, 'desktop-sessions': desktop_sessions, 'cli-access': cli_access}[value['payload']['action']]
                                     if handler is None:
-                                        raise ValueError('게이트웨이를 업데이트하세요')
+                                        raise ValueError('请更新网关')
                                     result = {'ok': True, 'result': handler(value['payload'].get('value', {}))}
                                 except (AccountError, PermissionError, ValueError) as exc:
                                     result = {'ok': False, 'error': str(exc)}
                                 except Exception:
-                                    result = {'ok': False, 'error': "로컬 작업이 실패했습니다. 런타임 상태를 확인하고 다시 시도하세요."}
+                                    result = {'ok': False, 'error': '本地操作未完成，请检查运行状态后重试'}
                                 if not self.closed.is_set():
                                     try:
                                         private_json(request.with_suffix('.response'), result)
@@ -114,8 +113,7 @@ def request_stop(data_dir, timeout=15):
     if not isinstance(record, dict) or not isinstance(record.get('pid'), int) or not record.get('token'):
         raise RuntimeError('No gateway control record; use Ctrl+C in its terminal if it is running.')
     request = path.with_name('gateway.stop')
-    request.write_text(json.dumps(record), encoding='utf-8')
-    request.chmod(0o600)
+    private_json(request, record)
     deadline = time.monotonic() + timeout
     acknowledged = False
     try:
@@ -133,10 +131,20 @@ def request_stop(data_dir, timeout=15):
 
 
 def private_json(path, value):
-    temporary = path.with_suffix('.tmp')
-    with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w', encoding='utf-8') as stream:
-        json.dump(value, stream)
-    temporary.replace(path)
+    if os.name == 'nt':
+        from bridge.platforms.windows.local_service import write_private
+        write_private(path, json.dumps(value).encode('utf-8'))
+        return
+    descriptor, name = tempfile.mkstemp(prefix=path.name + '.', suffix='.tmp', dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
+            json.dump(value, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def request_pairing(data_dir, payload, timeout=5):
@@ -144,10 +152,10 @@ def request_pairing(data_dir, payload, timeout=5):
     record = read_record(path)
     name = record.get('pairingDir', '') if isinstance(record, dict) else ''
     if not re.fullmatch(r'\.pairing-[a-zA-Z0-9_-]+', name):
-        raise ValueError("QR 로그인을 활성화하려면 게이트웨이를 다시 시작하세요.")
+        raise ValueError('请重新启动网关以启用扫码登录')
     directory = path.parent / name
     if not directory.is_dir() or directory.is_symlink():
-        raise ValueError('게이트웨이가 중지되었습니다.')
+        raise ValueError('网关已停止')
     identifier = secrets.token_hex(16)
     request = directory / (identifier + '.request')
     response = request.with_suffix('.response')
@@ -156,14 +164,14 @@ def request_pairing(data_dir, payload, timeout=5):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if read_record(path) != record:
-                raise ValueError('게이트웨이가 중지되었습니다.')
+                raise ValueError('网关已停止')
             result = read_record(response)
             if isinstance(result, dict):
                 if not result.get('ok'):
-                    raise ValueError(result.get('error', "QR 로그인 작업이 실패했습니다."))
+                    raise ValueError(result.get('error', '扫码登录操作失败'))
                 return result['result']
             time.sleep(.05)
-        raise ValueError("QR 로그인 작업 시간이 초과되었습니다. 다시 시도해 주세요.")
+        raise ValueError('扫码登录操作超时，请重试')
     finally:
         request.unlink(missing_ok=True)
         response.unlink(missing_ok=True)

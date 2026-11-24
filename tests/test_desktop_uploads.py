@@ -93,7 +93,7 @@ class DesktopUploadHTTP(unittest.TestCase):
         self.assertEqual(self.binary('POST', path, b'example', headers)[0], 200)
         result = self.request('POST', '/api/desktop-sessions/deepseek/send', {'sessionId': 'native', 'id': str(uuid.uuid4()), 'text': 'Inspect', 'attachments': [identifier]}, headers)
         self.assertEqual(result[0], 400)
-        self.assertIn('파일 전송', result[2]['error'])
+        self.assertIn('文件传输', result[2]['error'])
 
     def test_local_claude_cli_resolves_private_file_and_image_only_from_ledger(self):
         self.manager.call.return_value = {'session': {'id': 'native', 'backend': 'cli', 'host': 'local'}}

@@ -54,8 +54,10 @@ def validate_stream_state(version, state):
     require(isinstance(state.get('modelProvider'), str) and bool(state['modelProvider']))
     require(isinstance(state.get('cwd'), str) and bool(state['cwd']))
     runtime = state.get('threadRuntimeStatus')
-    # 요청 실패 상태도 읽을 수 있어야 모델 수정과 다음 입력으로 복구할 수 있다.
-    require(isinstance(runtime, dict) and runtime.get('type') in ('idle', 'active', 'running', 'waiting', 'busy', 'systemError'))
+    # An upstream failure can leave a connected desktop thread in systemError;
+    # it is readable and may accept a fresh turn, but it never proves idle.
+    require(isinstance(runtime, dict) and runtime.get('type') in (
+        'idle', 'active', 'running', 'waiting', 'busy', 'systemError'))
     requests = state.get('requests')
     require(isinstance(requests, list))
     for request in requests:
@@ -105,10 +107,17 @@ class DesktopIPC:
         "thread-follower-submit-user-input": 1,
         "thread-follower-submit-mcp-server-elicitation-response": 1,
         "thread-stream-following-changed": 1,
+        "native-metadata": 0,
     }
 
-    def __init__(self, path, on_event=None, on_disconnect=None):
+    def __init__(self, path, on_event=None, on_disconnect=None, *, codex_home=None):
         self.path = str(path)
+        self.original_path = str(path)
+        self.codex_home = codex_home
+        self.hosted = False
+        self.hosted_generation = None
+        self.legacy = None
+        self.legacy_owners = set()
         self.on_event = on_event or (lambda event: None)
         self.on_disconnect = on_disconnect or (lambda: None)
         self.socket = None
@@ -129,6 +138,16 @@ class DesktopIPC:
 
     def endpoint_changed(self):
         """Report a replacement, without interrupting any pending operation."""
+        if self.codex_home is not None:
+            from bridge.clients.codex.desktop_runtime import hosted_endpoint
+            try:
+                hosted = hosted_endpoint(self.codex_home)
+            except (OSError, ValueError, KeyError, TypeError):
+                return False  # An unverified replacement cannot select a route.
+            with self.lock:
+                if self.socket and hosted and (not self.hosted or self.path != hosted['path'] or
+                                               self.hosted_generation != hosted['generation']):
+                    return True
         current = endpoint_identity(self.path)
         with self.lock:
             return bool(self.socket and self.endpoint_identity is not None and
@@ -140,6 +159,16 @@ class DesktopIPC:
                 return
             with self.lock:
                 generation = self.generation
+            hosted = None
+            if self.codex_home is not None:
+                from bridge.clients.codex.desktop_runtime import hosted_endpoint
+                try:
+                    hosted = hosted_endpoint(self.codex_home)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    raise IPCError('原生桌面连接身份无法核验，请在账号管理中检查连接状态。') from exc
+                self.path = hosted['path'] if hosted else self.original_path
+            self.hosted = hosted is not None
+            self.hosted_generation = hosted['generation'] if hosted else None
             try:
                 identity = endpoint_identity(self.path)
                 if deadline is None:
@@ -147,23 +176,28 @@ class DesktopIPC:
                 else:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
+                        raise IPCError("桌面读取超时；尚未取得实时会话状态。")
                     sock = connect_stream(self.path, timeout=min(5, remaining))
             except OSError as exc:
-                raise IPCError("데스크탑 App 연결되지 않았습니다. 열어주세요. Codex App。") from exc
+                raise IPCError("桌面 App 未连接，请打开 Codex App。") from exc
             with self.lock:
                 if generation != self.generation or deadline is not None and time.monotonic() >= deadline:
                     sock.close()
-                    raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
+                    raise IPCError("桌面读取超时；尚未取得实时会话状态。")
                 self.socket = sock
                 self.endpoint_identity = identity
             threading.Thread(target=self._read_loop, args=(sock,), daemon=True).start()
             try:
-                result = self.request("initialize", {"clientType": "codex-mobile-bridge"}, timeout=5, deadline=deadline)
+                params = {"clientType": "codex-mobile-bridge"}
+                if hosted:
+                    params.update({key: hosted[key] for key in ('generation', 'controlToken')})
+                result = self.request("initialize", params, timeout=5, deadline=deadline)
+                if hosted and hosted_endpoint(self.codex_home) != hosted:
+                    raise IPCError('原生桌面连接在握手期间已变化。')
                 with self.lock:
                     if (generation != self.generation or self.socket is not sock or
                             deadline is not None and time.monotonic() >= deadline):
-                        raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
+                        raise IPCError("桌面读取超时；尚未取得实时会话状态。")
                     self.client_id = result["result"]["clientId"]
             except Exception:
                 self.close()
@@ -172,23 +206,25 @@ class DesktopIPC:
     def _send(self, message):
         data = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode()
         if len(data) > self.MAX_REQUEST:
-            raise IPCError("소식이 너무 커")
+            raise IPCError("消息过大")
         with self.write_lock:
             sock = self.socket
             if not sock:
-                raise IPCError("데스크톱 연결이 끊어졌습니다.")
+                raise IPCError("桌面连接已断开")
             try:
                 sock.sendall(struct.pack("<I", len(data)) + data)
             except OSError as exc:
-                raise IPCError("데스크톱 연결이 끊어졌습니다. 재전송 여부를 결정하기 전에 세션을 확인하십시오.。") from exc
+                raise IPCError("桌面连接已断开；请检查会话后再决定是否重发。") from exc
 
-    def request(self, method, params, target=None, host="local", timeout=15, *, deadline=None):
+    def request(self, method, params, target=None, host="local", timeout=15, *, deadline=None, legacy_discovery=False):
         if method not in self.VERSIONS:
-            raise IPCError("지원되지 않는 데스크톱 작업")
+            raise IPCError("不支持的桌面操作")
+        if self.hosted and (target in self.legacy_owners or host != 'local'):
+            return self._legacy_request(method, params, target, host, timeout, deadline)
         if deadline is not None:
             timeout = min(timeout, max(0, deadline - time.monotonic()))
             if timeout <= 0:
-                raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。")
+                raise IPCError("桌面读取超时；尚未取得实时会话状态。")
         request_id = str(uuid.uuid4())
         future = Future()
         with self.lock:
@@ -210,23 +246,46 @@ class DesktopIPC:
             wait = timeout + 1 if deadline is None else min(timeout, max(0, deadline - time.monotonic()))
             response = future.result(timeout=wait)
             if response.get("resultType") != "success":
-                raise IPCError(response.get("error", "데스크톱 요청이 완료되지 않았습니다."))
+                # Only an explicit negative discovery may try the old router.
+                # Timeouts, unknown results and mutations never switch routes.
+                if legacy_discovery and self.hosted and method == 'thread-owner-discovery' and response.get('error') == 'no-client-found':
+                    return self._legacy_request(method, params, target, host, timeout, deadline)
+                error = IPCError(response.get("error", "桌面请求未完成"))
+                error.not_sent = response.get('notSent') is True
+                raise error
             return response
         except TimeoutError as exc:
             if method in ("initialize", "thread-owner-discovery", "thread-follower-load-complete-history"):
-                raise IPCError("데스크탑 읽기 시간 초과; 라이브 세션 상태가 아직 획득되지 않았습니다.。") from exc
-            raise IPCError("데스크톱 응답 시간이 초과되었습니다. 작업이 제출되었을 수 있습니다. 다시 보낼지 여부를 결정하기 전에 세션을 확인하세요.。") from exc
+                raise IPCError("桌面读取超时；尚未取得实时会话状态。") from exc
+            raise IPCError("桌面响应超时；操作可能已提交，请查看会话后再决定是否重发。") from exc
         finally:
             with self.lock:
                 self.pending.pop(request_id, None)
 
-    def owner(self, session_id, host="local"):
+    def _legacy_connection(self, deadline=None):
+        with self.lock:
+            if self.legacy is None:
+                self.legacy = DesktopIPC(self.original_path, self.on_event, self.on_disconnect)
+            client = self.legacy
+        client.connect(deadline=deadline)
+        return client
+
+    def _legacy_request(self, method, params, target, host, timeout, deadline):
+        client = self._legacy_connection(deadline)
+        response = client.request(method, params, target, host, timeout, deadline=deadline)
+        if method == 'thread-owner-discovery' and response.get('handledByClientId'):
+            self.legacy_owners.add(response['handledByClientId'])
+        return response
+
+    def owner(self, session_id, host="local", *, legacy_discovery=True):
         self.connect()
         response = self.request("thread-owner-discovery", {
-            "hostId": host, "conversationId": session_id}, timeout=6)
+            "hostId": host, "conversationId": session_id}, timeout=6, legacy_discovery=legacy_discovery)
         return response["handledByClientId"]
 
     def follow(self, session_id, owner, enabled=True, host="local"):
+        if self.hosted and (owner in self.legacy_owners or host != 'local'):
+            return self._legacy_connection().follow(session_id, owner, enabled, host)
         message = {"type": "broadcast", "sourceClientId": self.client_id,
                    "method": "thread-stream-following-changed", "version": 1,
                    "params": {"hostId": host, "conversationId": session_id, "following": enabled}}
@@ -259,7 +318,7 @@ class DesktopIPC:
                 if not 0 < length <= self.MAX_FRAME:
                     logging.getLogger(__name__).warning(
                         "Codex desktop IPC frame rejected: bytes=%s limit=%s", length, self.MAX_FRAME)
-                    raise IPCError("데스크탑 IPC 프레임 길이가 호환되지 않습니다.")
+                    raise IPCError("桌面 IPC 帧长度不兼容")
                 message = json.loads(self._exact(sock, length))
                 if message.get("type") == "response":
                     with self.lock:
@@ -288,6 +347,9 @@ class DesktopIPC:
             self.generation += 1
             sock = self.socket
         self._disconnect(sock)
+        if self.legacy is not None:
+            self.legacy.close()
+            self.legacy_owners.clear()
 
     def _disconnect(self, sock):
         if sock is None:
@@ -308,6 +370,6 @@ class DesktopIPC:
                     self.endpoint_identity = None
                     for future in self.pending.values():
                         if not future.done():
-                            future.set_exception(IPCError("데스크톱 연결이 끊어졌습니다."))
+                            future.set_exception(IPCError("桌面连接已断开"))
             if disconnected:
                 self.on_disconnect()

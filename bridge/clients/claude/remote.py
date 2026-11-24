@@ -32,14 +32,14 @@ def worker_source():
                             source_text('clients/claude/creation.py'))
     marker = 'from bridge.clients.claude.file_archive import archive_paths, state as archive_file_state, change as archive_file_change, supported as archive_supported, assert_no_cli as archive_assert_no_cli'
     if source.count(marker) != 1:
-        raise ValueError('Claude Code 원격 보관 모듈을 로드할 수 없습니다.')
+        raise ValueError('Claude Code 远端归档模块无法加载')
     helper = source_text('clients/claude/file_archive.py')
     source = source.replace(marker, helper + '\narchive_file_state = state\narchive_file_change = change\narchive_supported = supported\narchive_assert_no_cli = assert_no_cli\n')
     history = source_text('clients/claude/history.py')
     readers = [node for node in ast.parse(history).body if isinstance(node, ast.FunctionDef) and
                node.name in ('image_event', 'session_custom_title', 'local_command_text')]
     if len(readers) != 3:
-        raise ValueError('Claude Code 원격 내역 읽기 모듈을 로드할 수 없습니다.')
+        raise ValueError('Claude Code 远端历史读取模块无法加载')
     return source.replace('from bridge.clients.claude.history import image_event, session_custom_title, local_command_text',
                           '\n\n'.join(ast.get_source_segment(history, node) for node in readers))
 
@@ -57,17 +57,17 @@ def _remote(alias, request, timeout=30):
                 result = run_with_input(_command(alias), json.dumps(request, ensure_ascii=False)+'\n',
                                         capture_output=True, text=True, encoding='utf-8', timeout=timeout)
             except (OSError, subprocess.TimeoutExpired) as exc:
-                raise TransportUnavailable('SSH Claude Code 호스트를 사용할 수 없습니다. 연결을 확인하세요.') from exc
+                raise TransportUnavailable('SSH Claude Code 主机不可用，请检查连接') from exc
             if result.returncode == 255:
-                raise TransportUnavailable('SSH Claude Code 호스트를 사용할 수 없습니다. 연결을 확인하세요.')
+                raise TransportUnavailable('SSH Claude Code 主机不可用，请检查连接')
         if result.returncode != 0:
-            raise BridgeUnavailable('SSH Claude Code 호스트를 사용할 수 없습니다. 연결을 확인하세요.')
+            raise BridgeUnavailable('SSH Claude Code 主机不可用，请检查连接')
         value = json.loads(result.stdout.strip())
         if value.get('ok') is not True:
-            raise BridgeUnavailable(value.get('message') or 'SSH Claude Code 읽기 실패')
+            raise BridgeUnavailable(value.get('message') or 'SSH Claude Code 读取失败')
         return value['value']
     except (ConnectionUnavailable, OSError, subprocess.TimeoutExpired, ValueError, KeyError) as exc:
-        raise BridgeUnavailable('SSH Claude Code 호스트를 사용할 수 없습니다. 연결을 확인하세요.') from exc
+        raise BridgeUnavailable('SSH Claude Code 主机不可用，请检查连接') from exc
 
 
 class RemoteClaudeCli:
@@ -124,7 +124,7 @@ class RemoteClaudeCli:
         try:
             result = self._remote(host['alias'], {'operation': 'list'}, timeout=20)
             if not isinstance(result, dict):
-                raise ValueError('SSH Claude Code 잘못된 목록 형식')
+                raise ValueError('SSH Claude Code 列表格式无效')
             return host_id, host, result
         except (BridgeUnavailable, ValueError):
             return host_id, host, None
@@ -255,14 +255,14 @@ class RemoteClaudeCli:
             with self.lock:
                 row = self.index.get(sid)
         if row is None or self.hosts is None:
-            raise ValueError('찾을 수 없음 SSH Claude Code 대화')
+            raise ValueError('找不到 SSH Claude Code 会话')
         host = self.hosts.hosts().get(row['host'])
         if not host or host['alias'] != row['alias']:
-            raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
+            raise ValueError('原 SSH 主机配置已变化')
         fresh = self._remote(row['alias'], {'operation': 'detail', 'native': row['nativeId'],
                                        'origin': row['origin']})
         if self._row(row['host'], host, fresh)['id'] != sid:
-            raise ValueError('기존 SSH Claude Code 세션 ID가 변경됨')
+            raise ValueError('原 SSH Claude Code 会话身份已变化')
         updated = self._row(row['host'], host, fresh)
         with self.lock:
             self.index[sid] = updated
@@ -282,7 +282,7 @@ class RemoteClaudeCli:
             pending, active = {}, False
         value.update(status='active' if active else 'idle', runtimeKnown=True,
                      connectionState='awaiting' if pending else 'active' if active else 'ready' if live else 'closed',
-                     requests=[{'id': rid, 'tool': event['request'].get('tool_name', '도구'),
+                     requests=[{'id': rid, 'tool': event['request'].get('tool_name', '工具'),
                                 'input': event['request'].get('input', {}),
                                 'needsInput': event['request'].get('tool_name') == 'AskUserQuestion'}
                                for rid, event in pending.items()])
@@ -304,7 +304,7 @@ class RemoteClaudeCli:
             path = Path(item['path'])
             data = path.read_bytes()
             if not 0 < len(data) <= 20*1024*1024:
-                raise ValueError("잘못된 첨부 파일 크기")
+                raise ValueError('文件附件大小无效')
             digest = hashlib.sha256(data).hexdigest()
             remote = self._remote(row['alias'], {'operation': 'upload', 'origin': row['origin'],
                 'scope': scope, 'id': identifier, 'name': item['name'], 'sha256': digest,
@@ -324,7 +324,7 @@ class RemoteClaudeCli:
             if saved:
                 if any(saved.get(key) != value for key, value in
                        (('origin', owned.origin), ('nativeId', owned.native), ('cwd', owned.cwd))):
-                    raise BridgeUnavailable('기존 Claude Code 세션 ID 또는 작업 디렉터리가 변경되었습니다. 메시지 결과를 알 수 없습니다.')
+                    raise BridgeUnavailable('原 Claude Code 会话身份或工作目录已变化，消息结果不明')
                 before = None
                 while time.monotonic() < deadline:
                     try:
@@ -353,11 +353,11 @@ class RemoteClaudeCli:
     def create(self, host_id, alias, origin, cwd, message, directory_identity=None, selection=None):
         host = self.hosts.hosts().get(host_id) if self.hosts else None
         if not host or host['alias'] != alias:
-            raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
+            raise ValueError('原 SSH 主机配置已变化')
         preflight = self._remote(alias, {'operation': 'projects'}, timeout=12)
         fresh = preflight.get('profile')
         if not fresh or fresh['origin'] != origin or not preflight.get('authReady'):
-            raise BridgeUnavailable('기존 SSH Claude Code 계정 구성이 변경되었거나 사용할 수 없습니다.')
+            raise BridgeUnavailable('原 SSH Claude Code 账号配置已变化或不可用')
         native = str(uuid.uuid4())
         sid = model.gateway_id('cli:'+self.transport_kind+':'+host_id+':'+origin, native)
         process = subprocess.Popen(self._command(alias), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -370,7 +370,7 @@ class RemoteClaudeCli:
             process.stdin.flush()
         except OSError:
             process.terminate()
-            raise BridgeUnavailable('SSH Claude Code 새로운 결과를 알 수 없습니다. 세션 목록을 확인하세요.') from None
+            raise BridgeUnavailable('SSH Claude Code 新建结果不明，请检查会话列表') from None
         owned = _Owned(process, origin, native, cwd)
         with owned.condition:
             owned.condition.wait_for(lambda: owned.preflight is not None or owned.finished, timeout=20)
@@ -381,7 +381,7 @@ class RemoteClaudeCli:
             raise BridgeUnavailable(error)
         if owned.preflight is None:
             owned.close()
-            raise BridgeUnavailable('SSH Claude Code 새로운 결과를 알 수 없습니다. 세션 목록을 확인하세요.')
+            raise BridgeUnavailable('SSH Claude Code 新建结果不明，请检查会话列表')
         try:
             owned.catalog = owned.control({'subtype': 'initialize', 'hooks': None}, timeout=30)
             if owned.error:
@@ -398,7 +398,7 @@ class RemoteClaudeCli:
                              'message': {'role': 'user', 'content': message}})
             saved = self._saved_user(alias, owned, message_id, sid)
             if saved is None:
-                raise BridgeUnavailable('SSH Claude Code 새 메시지 생성 결과를 알 수 없습니다. 대화 목록을 확인하세요.')
+                raise BridgeUnavailable('SSH Claude Code 新建消息结果不明，请检查会话列表')
             row = self._row(host_id, host, saved)
             with self.lock:
                 self.index[sid] = row
@@ -414,32 +414,32 @@ class RemoteClaudeCli:
         with self.lock:
             row = self.index.get(sid)
             if row is None or self.hosts is None:
-                raise ValueError('원본을 찾을 수 없습니다 Claude Code 대화')
+                raise ValueError('找不到原 Claude Code 会话')
             host = self.hosts.hosts().get(row['host'])
             if not host or host['alias'] != row['alias']:
-                raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
+                raise ValueError('原 SSH 主机配置已变化')
             owned = self.owned.get(sid)
             live = owned is not None and owned.process.poll() is None
             if live and (owned.origin != row['origin'] or owned.native != row['nativeId'] or owned.error):
-                raise BridgeUnavailable("원래 Claude Code 실행 연결을 확인할 수 없습니다.")
+                raise BridgeUnavailable('原 Claude Code 执行连接身份无法核验')
             request = {'operation': action, 'native': row['nativeId'], 'origin': row['origin']}
             if action == 'archive':
                 if (set(body) not in ({'archived'}, {'archived', 'disconnect'}) or type(body['archived']) is not bool or
                         type(body.get('disconnect', False)) is not bool or (body.get('disconnect') and body['archived'] is not True)):
-                    raise ValueError('Claude 잘못된 보관 설정')
+                    raise ValueError('Claude 归档设置无效')
                 if live:
                     if not body.get('disconnect'):
-                        raise BridgeUnavailable('기존 Claude Code 세션에는 여전히 연결을 수행하기 위한 게이트웨이가 있습니다. 먼저 원본 클라이언트에서 종료해 주세요.')
+                        raise BridgeUnavailable('原 Claude Code 会话仍有网关执行连接，请先在原客户端结束')
                     owned.release_for_archive()
                     live = False
                 request['archived'] = body['archived']
             fresh = self._remote(row['alias'], request)
             updated = self._row(row['host'], host, fresh)
             if updated['id'] != sid:
-                raise ValueError('기존 SSH Claude Code 세션 ID가 변경됨')
+                raise ValueError('原 SSH Claude Code 会话身份已变化')
             current_host = self.hosts.hosts().get(row['host'])
             if not current_host or current_host['alias'] != row['alias']:
-                raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
+                raise ValueError('原 SSH 主机配置已变化')
             self.index[sid] = updated
             self.history = {key: value for key, value in self.history.items() if key[0] != sid}
             return {**self._public(updated), 'archiveSafe': not live and fresh.get('archiveSafe') is True}
@@ -459,31 +459,31 @@ class RemoteClaudeCli:
                 before = body.get('historyBefore')
                 limit = body.get('historyLimit', 40)
                 if before is not None and (not isinstance(before, str) or len(before) > 1024):
-                    raise ValueError('Claude 기록 커서가 잘못되었습니다.')
+                    raise ValueError('Claude 历史游标无效')
                 if type(limit) is not int or not 1 <= limit <= 100:
-                    raise ValueError('Claude 기록 페이징 크기가 잘못되었습니다.')
+                    raise ValueError('Claude 历史分页大小无效')
                 row = cached if live_cached or cached is not None else self._get(sid)
                 if row is None:
                     row = self._get(sid)
                 current_host = self.hosts.hosts().get(row['host']) if self.hosts else None
                 if not current_host or current_host['alias'] != row['alias']:
-                    raise ValueError('기존 SSH 호스트 구성이 변경되었습니다.')
+                    raise ValueError('原 SSH 主机配置已变化')
                 page_key = (sid, before, limit)
                 try:
                     page = self._remote(row['alias'], {'operation': 'history', 'native': row['nativeId'],
                             'origin': row['origin'], 'scope': sid,
                             'historyBefore': before, 'historyLimit': limit})
                     if not isinstance(page, dict) or not isinstance(page.get('events'), list) or not isinstance(page.get('history'), dict):
-                        raise BridgeUnavailable('SSH Claude Code 기록 형식이 잘못되었습니다.')
+                        raise BridgeUnavailable('SSH Claude Code 历史格式无效')
                     if page.get('stamp') != row.get('stamp'):
                         row = self._get(sid)
                         if page.get('stamp') != row.get('stamp'):
-                            raise BridgeUnavailable('SSH Claude Code 기록을 읽는 중에 변경사항이 발생했습니다. 새로고침하세요.')
+                            raise BridgeUnavailable('SSH Claude Code 历史读取期间发生变化，请刷新')
                     with self.lock:
                         self.history = {key: value for key, value in self.history.items() if key[0] != sid}
                         self.history[page_key] = page
                 except BridgeUnavailable as exc:
-                    if not live_cached or before is not None or '호스트를 사용할 수 없습니다' not in str(exc):
+                    if not live_cached or before is not None or '主机不可用' not in str(exc):
                         raise
                     with self.lock:
                         page = self.history.get(page_key)
@@ -520,7 +520,7 @@ class RemoteClaudeCli:
                 public.update(context_fields((row.get('contextEvents') or []) + live_events))
                 messages = model.transcript(history)
                 ready = False
-                notice = '원래 세션 권한 모드를 확인할 수 없습니다. 원격 터미널에서 계속하세요.' if not live and not row['permissionKnown'] else ''
+                notice = '无法确认原会话权限模式，请在远端终端继续' if not live and not row['permissionKnown'] else ''
                 if not live and not row.get('archived') and row['permissionKnown']:
                     try:
                         preflight = self._remote(row['alias'], {'operation': 'resume-preflight',
@@ -542,10 +542,10 @@ class RemoteClaudeCli:
                                          'attachments': True, 'queue': False, 'steer': False, 'skills': live,
                                          'rename': public['capabilities']['rename']}}
             if row.get('archived'):
-                raise BridgeUnavailable('먼저 아카이브를 복원하세요. Claude Code 대화')
+                raise BridgeUnavailable('请先恢复归档的 Claude Code 会话')
             if action == 'catalog':
                 if not live:
-                    return {'models': [], 'capabilities': {'models': False}, 'notice': "먼저 이 Claude Code 채팅을 계속하세요."}
+                    return {'models': [], 'capabilities': {'models': False}, 'notice': '请先继续这条 Claude Code 会话'}
                 return _cli_catalog(owned, public, body.get('refresh') is True)
             if action == 'access' and 'mode' not in body:
                 return {'status': 'accepted', 'mode': public['permissionMode'],
@@ -555,7 +555,7 @@ class RemoteClaudeCli:
                 if live:
                     return {'status': 'ready'}
                 if not row['permissionKnown'] or row['permissionMode'] not in MODES:
-                    raise ResumePreflightBlocked('원래 세션 권한 모드를 확인할 수 없습니다.')
+                    raise ResumePreflightBlocked('无法确认原会话权限模式')
                 process = subprocess.Popen(self._command(row['alias']), stdin=subprocess.PIPE,
                                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                            text=True, encoding='utf-8', bufsize=1, **self._process_options())
@@ -567,7 +567,7 @@ class RemoteClaudeCli:
                     process.stdin.flush()
                 except OSError:
                     process.terminate()
-                    raise BridgeUnavailable('SSH Claude Code 복구 결과를 알 수 없습니다. 원본 세션을 확인하세요.') from None
+                    raise BridgeUnavailable('SSH Claude Code 恢复结果不明，请检查原会话') from None
                 owned = _Owned(process, row['origin'], row['nativeId'], row['cwd'])
                 with owned.condition:
                     owned.condition.wait_for(lambda: owned.preflight is not None or owned.finished, timeout=20)
@@ -578,48 +578,48 @@ class RemoteClaudeCli:
                     raise ResumePreflightBlocked(message)
                 if owned.preflight is None:
                     owned.close()
-                    raise BridgeUnavailable('SSH Claude Code 복구 결과를 알 수 없습니다. 원본 세션을 확인하세요.')
+                    raise BridgeUnavailable('SSH Claude Code 恢复结果不明，请检查原会话')
                 try:
                     owned.catalog = owned.control({'subtype': 'initialize', 'hooks': None}, timeout=30)
                     if owned.error:
                         raise BridgeUnavailable(owned.error)
                     owned.permission = owned.catalog.get('current_permission_mode') or row['permissionMode']
                     if owned.permission != row['permissionMode']:
-                        raise BridgeUnavailable("Claude Code는 원래 권한 모드를 유지하지 않았습니다.")
+                        raise BridgeUnavailable('Claude Code 未保留原会话权限模式')
                 except Exception:
                     owned.close()
                     raise
                 self.owned[sid] = owned
                 return {'status': 'ready'}
             if not live:
-                raise BridgeUnavailable('먼저 계속해주세요 SSH Claude Code 대화')
+                raise BridgeUnavailable('请先继续这条 SSH Claude Code 会话')
             if action == 'rename':
                 return _rename_cli(owned, row, body.get('title'), lambda: self._get(sid))
             if action == 'send':
                 if body.get('mode') in ('queue', 'steer'):
-                    raise ValueError("이 전송 옵션은 아직 Claude Code CLI에 대해 지원되지 않습니다.")
+                    raise ValueError('Claude Code CLI 暂不支持此发送选项')
                 selected = body.get('plugins') or []
                 if not isinstance(selected, list) or len(selected) > 1:
-                    raise ValueError('Claude Code CLI 메시지당 한 번만 전화를 걸 수 있습니다. Skill')
+                    raise ValueError('Claude Code CLI 每条消息只能调用一个 Skill')
                 if selected and selected[0] not in {skill['id'] for skill in _skill_catalog(owned.catalog)
                                                     if skill['selectable']}:
-                    raise ValueError("해당 스킬을 더 이상 사용할 수 없습니다. 새로고침하고 다시 선택하세요.")
+                    raise ValueError('技能已不可用，请刷新后选择')
                 with owned.condition:
                     if owned.active or owned.pending:
-                        raise BridgeUnavailable("다른 메시지를 보내기 전에 현재 Claude Code 작업이 완료될 때까지 기다리세요.")
+                        raise BridgeUnavailable('请等待当前 Claude Code 任务结束后再发送')
                 files = self._upload_files(row, body.get('resolvedFiles') or [])
                 message = ('/'+selected[0]+(' '+body['text'] if body['text'].strip() else '')
                            if selected else body['text'])
                 content = _message_content({**body, 'text': message, 'resolvedFiles': files})
                 with owned.condition:
                     if owned.active or owned.pending:
-                        raise BridgeUnavailable("다른 메시지를 보내기 전에 현재 Claude Code 작업이 완료될 때까지 기다리세요.")
+                        raise BridgeUnavailable('请等待当前 Claude Code 任务结束后再发送')
                     owned.active = True
                     message_id = str(uuid.uuid4())
                     owned.write({'type': 'user', 'uuid': message_id,
                                  'message': {'role': 'user', 'content': content}})
                 if self._saved_user(row['alias'], owned, message_id, sid) is None:
-                    raise BridgeUnavailable('SSH Claude Code 알 수 없는 전송 결과입니다. 원래 대화를 확인하세요.')
+                    raise BridgeUnavailable('SSH Claude Code 发送结果不明，请检查原会话')
             elif action == 'compact':
                 _compact_cli(owned, body['id'])
             elif action == 'stop':
@@ -629,49 +629,45 @@ class RemoteClaudeCli:
             elif action == 'access':
                 mode = body.get('mode')
                 if mode not in MODES:
-                    raise ValueError("Claude Code에서 제공하는 권한 모드를 선택하세요.")
+                    raise ValueError('请选择 Claude Code 提供的权限模式')
                 if mode == 'bypassPermissions' and body.get('confirmed') is not True:
-                    raise ValueError('전체 액세스에는 명시적인 확인이 필요합니다.')
+                    raise ValueError('完全访问需要明确确认')
                 result = owned.control({'subtype': 'set_permission_mode', 'mode': mode})
                 if result.get('mode') != mode:
-                    raise BridgeUnavailable("Claude Code가 권한 모드를 확인하지 않았습니다.")
+                    raise BridgeUnavailable('Claude Code 未确认权限模式')
                 with owned.condition:
                     deadline = time.monotonic() + 5
                     while owned.permission != mode and owned.process.poll() is None and time.monotonic() < deadline:
                         owned.condition.wait(max(0, deadline-time.monotonic()))
                     if owned.permission != mode:
-                        raise BridgeUnavailable('Claude Code 유효 권한 모드가 아직 보고되지 않았습니다. 확인을 새로 고치십시오.')
+                        raise BridgeUnavailable('Claude Code 尚未报告生效的权限模式，请刷新检查')
             elif action == 'respond':
                 rid = body.get('requestId')
                 with owned.condition:
                     pending = owned.pending.get(rid)
                 if not pending:
-                    raise ValueError("요청이 이미 처리되었거나 만료되었습니다.")
+                    raise ResumePreflightBlocked('请求已处理或过期')
                 decision = {'accept': 'allow', 'decline': 'deny'}.get(body.get('decision'))
                 if not decision:
-                    raise ValueError("한 번 허용 또는 거부를 선택하세요.")
+                    raise ResumePreflightBlocked('请选择本次允许或拒绝')
                 response = {'behavior': decision}
                 if decision == 'allow':
-                    updated = dict(pending['request'].get('input', {}))
+                    raw_input = pending['request'].get('input')
                     if pending['request'].get('tool_name') == 'AskUserQuestion':
-                        answers = {}
-                        for index, question in enumerate(updated.get('questions') or []):
-                            key = str(question.get('id') or question.get('question') or index)
-                            values = ((body.get('answers') or {}).get(key) or {}).get('answers') or []
-                            if not values or not all(isinstance(value, str) for value in values):
-                                raise ValueError("모든 질문에 답변하세요")
-                            answers[question['question']] = ', '.join(values)
-                        updated['answers'] = answers
+                        updated = model.respond_answers(raw_input, body.get('answers'),
+                                                        error_cls=ResumePreflightBlocked)
+                    else:
+                        updated = dict(raw_input) if isinstance(raw_input, dict) else {}
                     response['updatedInput'] = updated
                 else:
-                    response['message'] = '사용자가 이 작업을 거부했습니다.'
+                    response['message'] = '用户拒绝了本次操作'
                 with owned.condition:
                     if owned.pending.pop(rid, None) is not pending:
-                        raise ValueError("요청이 이미 처리되었거나 만료되었습니다.")
+                        raise ResumePreflightBlocked('请求已处理或过期')
                 owned.write({'type': 'control_response', 'response': {'subtype': 'success',
                              'request_id': rid, 'response': response}})
             else:
-                raise ValueError("이 Claude Code 작업은 지원되지 않습니다.")
+                raise ValueError('不支持的 Claude Code 操作')
             return {'status': 'accepted'}
 
     def close(self):

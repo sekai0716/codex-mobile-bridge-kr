@@ -65,7 +65,7 @@ class DraftTests(unittest.TestCase):
         self.assertNotIn('saved-fixture-key', json.dumps(self.store.edit(identifier)))
         count = len(self.requests)
         for changes in ({'baseUrl': self.base+'/other'}, {'apiFormat': 'openai-chat-completions'}):
-            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, "개정하다\\ API\\ 주소,\\ 동의사항,\\ 인증방법을\\ 입력하신\\ 후\\ 다시\\ 입력해주세요\\.\\ API\\ Key"):
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, '重新填写'):
                 self.probe(id=identifier, apiKey='', **changes)
         self.assertEqual(len(self.requests), count)
 
@@ -84,7 +84,7 @@ class DraftTests(unittest.TestCase):
         self.assertNotIn('X-api-key', self.requests[-1][2])
 
     def test_redirect_and_invalid_target_never_receive_reused_credentials(self):
-        with self.assertRaisesRegex(ValueError, "공급자에게\\ 리디렉션이\\ 필요합니다\\.\\ 마지막\\ API\\ URL를\\ 입력하고\\ 다시\\ 시도하세요\\."):
+        with self.assertRaisesRegex(ValueError, '跳转'):
             self.probe(baseUrl=self.base+'/redirect')
         self.assertEqual([row[1] for row in self.requests], ['/redirect/models'])
         count = len(self.requests)
@@ -99,7 +99,7 @@ class DraftTests(unittest.TestCase):
             value = self.manager.client_accounts('deepseek', {'operation': 'models-draft', 'apiKey': 'fixture-key'})
             self.assertEqual(value, {'models': ['deepseek-model']})
             read.assert_called_once_with('https://api.deepseek.com', 'fixture-key')
-            with self.assertRaisesRegex(ValueError, "이\\ 클라이언트는\\ 공식만\\ 지원합니다\\.\\ API\\ 주소"):
+            with self.assertRaisesRegex(ValueError, '官方 API 地址'):
                 self.manager.client_accounts('deepseek', {'operation': 'models-draft', 'baseUrl': self.base, 'apiKey': 'fixture-key'})
             self.assertEqual(read.call_count, 1)
         self.assertEqual(self.requests, [])

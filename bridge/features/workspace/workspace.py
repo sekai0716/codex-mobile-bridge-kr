@@ -129,6 +129,11 @@ def display_absolute_path(path):
     return path
 
 
+def _has_git_component(parts):
+    """Reject .git segments regardless of filesystem case sensitivity."""
+    return any(part.rstrip(' .').casefold() == '.git' for part in parts)
+
+
 class Workspace:
     def __init__(self, root, *, directory_fd=None):
         if not root or not Path(root).is_absolute():
@@ -302,12 +307,12 @@ class Workspace:
             with os.fdopen(handle, 'rb') as stream:
                 info = os.fstat(stream.fileno())
                 if not stat.S_ISREG(info.st_mode): raise ValueError('일반 파일만 지원')
-                if download and info.st_size > MAX_TRANSFER: raise ValueError('파일이 초과되었습니다. 20 MB 다운로드 제한')
+                if download and info.st_size > MAX_TRANSFER: raise ValueError('文件超过 20 MB 下载限制')
                 limit = MAX_TRANSFER if download or Path(path).suffix.lower() in IMAGES else MAX_PREVIEW
                 data = stream.read(limit + 1)
         result = {'name': parts[-1], 'path': path, 'size': info.st_size, 'modified': info.st_mtime, 'kind': 'binary'}
         if len(data) > limit:
-            if download: raise ValueError('파일이 초과되었습니다. 20 MB 다운로드 제한')
+            if download: raise ValueError('文件超过 20 MB 下载限制')
             return result
         if download:
             return {**result, 'data': base64.b64encode(data).decode()}
@@ -332,7 +337,7 @@ class Workspace:
                 try: info = os.fstat(handle)
                 finally: os.close(handle)
             if not stat.S_ISREG(info.st_mode): raise ValueError('일반 파일만 지원')
-            if limit is not None and info.st_size > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
+            if limit is not None and info.st_size > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
             if info.st_size > MAX_TRANSFER:
                 stamp = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
                 with _cached_transfer(('file', str(self.root), path, stamp), lambda: self._download(path, '', '', limit), range_header, if_range) as value:
@@ -357,7 +362,7 @@ class Workspace:
                 with os.fdopen(handle, 'rb') as stream:
                     before = os.fstat(stream.fileno())
                     if not stat.S_ISREG(before.st_mode): raise ValueError('일반 파일만 지원')
-                    if limit is not None and before.st_size > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
+                    if limit is not None and before.st_size > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
                     def copy_range(selection):
                         digest, size = hashlib.sha256(), 0
                         stream.seek(0); snapshot.seek(0); snapshot.truncate()
@@ -365,7 +370,7 @@ class Workspace:
                             chunk = stream.read(65536)
                             if not chunk: break
                             end = size + len(chunk)
-                            if limit is not None and end > limit: raise ValueError('파일이 초과되었습니다. %d MB 다운로드 제한' % (limit // 1024 // 1024))
+                            if limit is not None and end > limit: raise ValueError('文件超过 %d MB 下载限制' % (limit // 1024 // 1024))
                             digest.update(chunk)
                             left = max(size, selection['offset'])
                             right = min(end, selection['offset'] + selection['length'])
@@ -374,7 +379,7 @@ class Workspace:
                         after = os.fstat(stream.fileno())
                         if ((before.st_size, before.st_mtime_ns, before.st_ctime_ns) !=
                                 (after.st_size, after.st_mtime_ns, after.st_ctime_ns) or size != before.st_size):
-                            raise ValueError('파일이 변경 중입니다. 나중에 다시 다운로드하세요.')
+                            raise ValueError('文件正在变化，请稍后重新下载')
                         return '"sha256-' + digest.hexdigest() + '"'
                     # Hash all bytes, but normally retain only the requested
                     # chunk. No file-sized allocation or repeated full snapshot.
@@ -389,8 +394,7 @@ class Workspace:
 
     def upload(self, path, encoded):
         parts = self.parts(path)
-        protected_parts = [part.rstrip(' .').casefold() for part in parts] if os.name == 'nt' else parts
-        if not parts or '.git' in protected_parts: raise PermissionError('프로젝트 내의 일반 파일 위치를 선택하세요.')
+        if not parts or _has_git_component(parts): raise PermissionError('请选择项目内的普通文件位置')
         try: data = base64.b64decode(encoded, validate=True)
         except (ValueError, TypeError): raise ValueError('잘못된 업로드 콘텐츠') from None
         if len(data) > MAX_TRANSFER: raise ValueError('각 파일은 다음을 초과할 수 없습니다. 20 MB')
@@ -654,14 +658,9 @@ class GitWorkspace:
             if process.poll() is None: process.kill(); process.wait()
 
     def status(self):
-        code, top, _ = self.run(['rev-parse', '--show-toplevel'])
-        if code: return {'available': False, 'message': '현재 프로젝트는 아님 Git 작업 공간 또는 창고에 접근할 수 없습니다.'}
-        repository = Path(os.fsdecode(top.rstrip(b'\n'))).resolve()
-        code, gitdir, _ = self.run(['rev-parse', '--absolute-git-dir'])
-        if code: raise ValueError('읽을 수 없음 Git 창고 위치')
-        self.gitdir = Path(os.fsdecode(gitdir.rstrip(b'\n')))
-        prefix = self.workspace.root.relative_to(repository).as_posix()
-        self.prefix = '' if prefix == '.' else prefix + '/'
+        context = self.repository_context()
+        if not context['available']: return context
+        prefix = context['path_prefix']
         code, raw, truncated = self.run(['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all',
                                           '--renames', '--ignore-submodules=dirty', '--', '.'])
         if code or truncated: raise ValueError('Git 변경 목록이 너무 크거나 읽을 수 없습니다. 컴퓨터의 저장소를 확인하세요.')
@@ -695,10 +694,24 @@ class GitWorkspace:
                 fingerprint.update(str((entry['path'], info.st_mtime_ns, info.st_ctime_ns, info.st_size)).encode('utf-8', 'replace'))
             except FileNotFoundError: pass
         operation = 'merge' if (self.gitdir / 'MERGE_HEAD').exists() else 'other' if any((self.gitdir / name).exists() for name in ('rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD')) else None
-        return {'available': True, 'project': self.workspace.root.name, 'repository': repository.name, 'scope': prefix, 'branch': headers.get('branch.head', ''),
+        return {'available': True, 'project': self.workspace.root.name, 'repository': context['repository'], 'scope': context['scope'], 'branch': headers.get('branch.head', ''),
                 'version': fingerprint.hexdigest(), 'operation': operation,
                 'commit': headers.get('branch.oid', ''), 'upstream': headers.get('branch.upstream'),
                 'ahead': int(counts[0]) if counts else None, 'behind': -int(counts[1]) if counts else None, 'entries': entries}
+
+    def repository_context(self):
+        """Prepare the repository boundary without enumerating working-tree changes."""
+        code, top, _ = self.run(['rev-parse', '--show-toplevel'])
+        if code: return {'available': False, 'message': '当前项目不是 Git 工作区，或仓库不可访问'}
+        repository = Path(os.fsdecode(top.rstrip(b'\n'))).resolve()
+        code, gitdir, _ = self.run(['rev-parse', '--absolute-git-dir'])
+        if code: raise ValueError('无法读取 Git 仓库位置')
+        self.gitdir = Path(os.fsdecode(gitdir.rstrip(b'\n')))
+        relative = self.workspace.root.relative_to(repository).as_posix()
+        self.prefix = '' if relative == '.' else relative + '/'
+        code, head, _ = self.run(['rev-parse', '--verify', 'HEAD'])
+        commit = head.decode('ascii', 'ignore').strip() if code == 0 else '(initial)'
+        return {'available': True, 'repository': repository.name, 'scope': relative, 'path_prefix': self.prefix, 'commit': commit}
 
     def blob(self, spec):
         code, data, truncated = self.run(['cat-file', 'blob', spec], MAX_PREVIEW)
@@ -820,7 +833,8 @@ class GitWorkspace:
         return value
 
     def history(self, limit=40, ref='all'):
-        state = self.require_repository()
+        state = self.repository_context()
+        if not state['available']: raise ValueError(state['message'])
         if not isinstance(limit, int) or not 1 <= limit <= 1000 or ref not in ('all', 'current'):
             raise ValueError('기록 쿼리가 잘못되었습니다.')
         revisions = ['--all'] if ref == 'all' else []
@@ -839,7 +853,9 @@ class GitWorkspace:
         return {'commits': commits[:limit], 'hasMore': len(commits) > limit, 'scope': state['scope']}
 
     def commit_detail(self, revision):
-        self.require_repository(); self.revision(revision)
+        context = self.repository_context()
+        if not context['available']: raise ValueError(context['message'])
+        self.revision(revision)
         code, raw, truncated = self.run(['show', '-s', '--format=%H%x00%P%x00%an%x00%aI%x00%B', revision, '--'], MAX_PREVIEW)
         if code or truncated: raise ValueError('제출 세부정보를 읽을 수 없습니다.')
         oid, parents, author, date, message = raw.decode('utf-8', 'replace').split('\0', 4)
@@ -937,7 +953,7 @@ class GitWorkspace:
                 raise ValueError('이 작업은 전체 창고에 영향을 미칩니다. 창고의 루트디렉토리에 해당하는 채팅에서 작업해주세요.')
             if action in ('stage', 'unstage'):
                 parts = self.workspace.parts(path)
-                if not parts or '.git' in parts: raise ValueError('프로젝트에서 변경 파일을 선택하세요.')
+                if not parts or _has_git_component(parts): raise ValueError('请选择项目中的变更文件')
                 entry = next((e for e in state['entries'] if e['path'] == path), None)
                 if not entry or entry['submodule']: raise ValueError('파일 상태가 변경되었거나 하위 모듈입니다. 컴퓨터에서 새로고침하여 처리하세요.')
                 # Existing parent components must not redirect staging outside the project.

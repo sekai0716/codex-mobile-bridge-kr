@@ -140,14 +140,14 @@ def resolve_profile(family, home, *, platform=None):
     """Describe one explicit native profile; never create or import its data."""
     platform = sys.platform if platform is None else platform
     if family not in ('deepseek', 'claude'):
-        raise ValueError('이 애플리케이션은 현재 독립적인 데스크톱 구성 추가를 지원하지 않습니다.')
+        raise ValueError('此应用暂不支持新增独立桌面配置')
     if platform not in ('darwin', 'linux', 'win32'):
-        raise ValueError('현재 시스템은 독립적인 데스크탑 구성을 지원하지 않습니다.')
+        raise ValueError('当前系统暂不支持独立桌面配置')
     if not isinstance(home, (str, Path)) or not str(home).strip() or '\x00' in str(home):
-        raise ValueError('독립적인 구성 디렉터리를 선택하세요.')
+        raise ValueError('请选择独立配置目录')
     home = Path(home).expanduser()
     if not home.is_absolute():
-        raise ValueError('독립 구성 디렉터리는 절대 경로여야 합니다.')
+        raise ValueError('独立配置目录必须是绝对路径')
     home = home.resolve()
     if family == 'deepseek':
         roots = {'runtimeHome': home, 'userData': home/'desktop-user-data'}
@@ -171,7 +171,7 @@ def launch_parameters(profile, *, platform=None):
     """Return only the selected App's native arguments and environment changes."""
     expected = resolve_profile(profile.family, profile.home, platform=platform)
     if profile.kind != expected.kind or dict(profile.roots) != dict(expected.roots):
-        raise ValueError('독립적으로 구성된 기본 디렉터리가 일치하지 않습니다. 다시 로드하여 액세스하세요.')
+        raise ValueError('独立配置的原生目录不一致，请重新加载接入')
     if profile.family == 'deepseek':
         environment = {'DSH_HOME': str(profile.roots['runtimeHome'])}
     else:

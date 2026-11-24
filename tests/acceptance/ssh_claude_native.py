@@ -268,7 +268,7 @@ def main():
                     try:
                         cli.call('send', sid, {'text': 'DISCONNECT_TURN'})
                     except BridgeUnavailable as exc:
-                        assert '알 수 없는 결과' in str(exc)
+                        assert '结果不明' in str(exc)
                     else:
                         raise AssertionError('Severed SSH write was reported accepted')
                 assert len(writes) == 1

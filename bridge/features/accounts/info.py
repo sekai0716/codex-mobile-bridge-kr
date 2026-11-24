@@ -155,15 +155,15 @@ class AccountInfo:
         manager = self.manager
         section = value.get('section')
         if section not in ('usage','models') or not isinstance(value.get('refresh', False), bool):
-            raise ValueError('잘못된 계정 세부정보 요청')
+            raise ValueError('账号详情请求无效')
         with manager.lock:
             manager.check_ready()
             row = self.current_login() if value.get('id') == CURRENT_LOGIN_ID else manager.row(value.get('id'))
             if not row or row['id'] != value.get('id'):
-                raise ValueError('계정 ID가 변경되었습니다. 목록을 새로고침하세요.')
+                raise ValueError('账号身份已变化，请刷新列表')
             row = dict(row)
             if section == 'usage' and row['kind'] != 'chatgpt':
-                raise ValueError("API 연결은 공식 계정 사용을 제공하지 않습니다.")
+                raise ValueError('API 接入不提供官方额度')
             info = self.entries.setdefault(row['id'], {})
             cached = info.get(section) or {}
             route_key = self.route_key_for(row['id']) if section == 'usage' or row.get('transient') else None
@@ -194,25 +194,25 @@ class AccountInfo:
                     login = (identity.get('login') or {}).get('context') or {}
                     if (identity.get('kind') != 'chatgpt' or login.get('accountKey') != row['accountKey'] or
                             login.get('_routeCacheKey') != expected_route):
-                        raise ValueError('현재 접속은 이쪽이 아닙니다 ChatGPT 계정')
+                        raise ValueError('当前接入不是此 ChatGPT 账号')
                     catalog = self.manager.bridge.catalog_reader.get_kind('models', str(self.manager.home),
                                                                           refresh=refresh, provider='openai')
                     current = self.read_identity()
                     current_login = (current.get('login') or {}).get('context') or {}
                     if (current.get('kind') != 'chatgpt' or current_login.get('accountKey') != row['accountKey'] or
                             current_login.get('_routeCacheKey') != expected_route):
-                        raise ValueError('계정 ID가 변경되었습니다.')
+                        raise ValueError('账号身份已变化')
                     result = {'models': catalog.get('models', []), 'accountKey': row['accountKey'],
                               'cache': catalog.get('cache'),
                               **({'error': catalog['modelError']} if catalog.get('modelError') else {})}
                 else:
                     result = self.manager.account({'id': CURRENT_LOGIN_ID, 'operation': 'read', 'refresh': refresh})
                     if not result.get('visible') or result.get('accountKey') != row['accountKey']:
-                        raise ValueError('계정 ID가 변경되었습니다.')
+                        raise ValueError('账号身份已变化')
                 result.update(status='error' if result.get('error') else 'ready', checkedAt=time.time())
             except Exception:
                 result = {'status': 'error', 'checkedAt': time.time(), 'accountKey': row['accountKey'],
-                          'error': "사용할 수 없습니다. 로그인을 확인하고 다시 시도하세요." if section == 'usage' else '모델 목록을 일시적으로 사용할 수 없습니다. 현재 액세스 권한을 확인하고 다시 시도해 주세요.'}
+                          'error': '额度暂不可用，请检查登录后重试' if section == 'usage' else '模型列表暂不可用，请检查当前接入后重试'}
             with self.manager.lock:
                 info = self.entries.setdefault(CURRENT_LOGIN_ID, {})
                 # A replaced slot belongs to a newer query, even for the same login.
@@ -237,7 +237,7 @@ class AccountInfo:
                 identity = manager.api_model_identity(row)
                 models, updated_at, error = manager.api_models(row, refresh, with_timestamp=True)
                 if manager.api_model_identity(row) != identity:
-                    raise ValueError('현재 접근 권한이 변경되었습니다. 모델 목록을 다시 읽어주세요.')
+                    raise ValueError('当前接入已变化，请重新读取模型列表')
                 result = {'models': models, 'cache': {'state': 'fresh' if not error and time.time()-updated_at < 12*60*60 else 'stale',
                                                      'updatedAt': updated_at, 'identity': identity}, **({'error': error} if error else {})}
             else:
@@ -254,13 +254,13 @@ class AccountInfo:
                     if home != manager.home:
                         private_bytes(home/'config.toml', b'cli_auth_credentials_store = "file"\nmodel_provider = "openai"\n')
                     if token_owner(read_json(home/'auth.json', {})) != row.get('tokenOwner'):
-                        raise ValueError('계정 ID가 일치하지 않습니다.')
+                        raise ValueError('账号身份不匹配')
                     with ManagedRPC(home, manager.runtime) as rpc:
                         context = Account.login_context(rpc) if native_login else Account.context(rpc)
                         if (not context or context.get('loginType') != 'chatgpt' or context.get('email') != row.get('email') or
                                 native_login and (context['accountKey'] != login['context']['accountKey'] or
                                                   context.get('_routeCacheKey') != login['context'].get('_routeCacheKey'))):
-                            raise ValueError('계정 ID가 일치하지 않습니다.')
+                            raise ValueError('账号身份不匹配')
                         if section == 'usage':
                             if native_login:
                                 expected_route = context.get('_routeCacheKey')
@@ -271,7 +271,7 @@ class AccountInfo:
                                 current = Account.login_context(rpc)
                                 if (not current or current.get('_routeCacheKey') != context.get('_routeCacheKey') or
                                         current['accountKey'] != context['accountKey']):
-                                    raise ValueError('계정 ID가 변경되었습니다.')
+                                    raise ValueError('账号身份已变化')
                         else:
                             reader = (manager.bridge.catalog_reader if home == manager.home
                                       else manager.saved_model_catalog(row['id']))
@@ -279,13 +279,13 @@ class AccountInfo:
                             result = {'models': catalog.get('models', []), 'cache': catalog.get('cache'),
                                       **({'error': catalog['modelError']} if catalog.get('modelError') else {})}
                     if token_owner(read_json(home/'auth.json', {})) != row.get('tokenOwner'):
-                        raise ValueError('계정 ID가 변경되었습니다.')
+                        raise ValueError('账号身份已变化')
                     if home == manager.home:
                         private_bytes(manager.directory(row['id'])/'auth.json', (home/'auth.json').read_bytes())
             result.update(status='error' if result.get('error') else 'ready', checkedAt=time.time())
         except Exception:
             result = {'status':'error','checkedAt':time.time(),
-                      'error':"사용할 수 없습니다. 로그인을 확인하고 다시 시도하세요." if section == 'usage' else "모델 목록을 사용할 수 없습니다. 연결을 확인하고 다시 시도하세요."}
+                      'error':'额度暂不可用，请检查登录后重试' if section == 'usage' else '模型列表暂不可用，请检查接入后重试'}
         with manager.lock:
             if self.entries.get(row['id'], {}).get(section) is not pending:
                 return

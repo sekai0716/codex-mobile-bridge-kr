@@ -14,7 +14,7 @@ def supports_window_send():
 
 def operation(action, executable, sid, title, text='', *, expected_pid=None):
     if action != 'resume':
-        raise ValueError('이는 지원되지 않습니다. ZCode 창 작업')
+        raise ValueError('不支持此 ZCode 窗口操作')
     root = project_root()
     helper = (root if getattr(sys, 'frozen', False) else root/'dist')/'client-helpers/zcode-bridge-helper'
     try:
@@ -24,7 +24,7 @@ def operation(action, executable, sid, title, text='', *, expected_pid=None):
             capture_output=True, text=True, timeout=14)
         reply = json.loads(result.stdout)
     except (OSError, subprocess.TimeoutExpired, ValueError):
-        raise ValueError('ZCode 확인을 위해 원래 창이 반환되지 않았습니다. 다시 시도할지 결정하기 전에 세션을 확인하세요.') from None
+        raise ValueError('ZCode 原窗口未返回确认，请先查看该会话再决定是否重试') from None
     if reply.get('status') not in ('ready', 'submitted'):
-        raise ValueError(reply.get('reason') or '작동불가 ZCode 원래 창')
+        raise ValueError(reply.get('reason') or '无法操作 ZCode 原窗口')
     return reply

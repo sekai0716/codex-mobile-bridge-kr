@@ -12,19 +12,19 @@ FILE = 'provider_config.json'
 
 def provider(value, identifier, name, url, previous=None):
     if set(value) - {'operation', 'action', 'provider', 'id', 'name', 'baseUrl', 'apiKey', 'apiFormat', 'models'}:
-        raise ValueError('ZCode API 구성에 지원되지 않는 필드가 포함되어 있습니다.')
+        raise ValueError('ZCode API 配置包含不支持的字段')
     api_format = value.get('apiFormat')
     if api_format not in {row['value'] for row in API_FORMATS}:
-        raise ValueError('선택해주세요 ZCode 지원됨 API 규약')
+        raise ValueError('请选择 ZCode 支持的 API 协议')
     key = value.get('apiKey', '')
     if key == '' and previous:
         key = previous['config']['access']['apiKey']
     if not isinstance(key, str) or not re.fullmatch(r'[\x21-\x7e]{1,8192}', key):
-        raise ValueError("유효한 API 키를 입력하세요.")
+        raise ValueError('请输入有效的 API Key')
     models = value.get('models')
     if (not isinstance(models, list) or not 1 <= len(models) <= 200 or any(
             not isinstance(model, str) or not re.fullmatch(r'[^\s\x00-\x1f\x7f]{1,200}', model) for model in models)):
-        raise ValueError("지원되는 모델 ID를 한 줄에 하나씩 최대 200개까지 입력하세요.")
+        raise ValueError('请填写上游支持的模型 ID，每行一个，最多 200 个')
     models = list(dict.fromkeys(models))
     return {'providerId': previous['providerId'] if previous else 'cmb-api:'+identifier,
             'providerName': name, 'enabled': True,
@@ -52,7 +52,7 @@ def rules(value):
                     any(not isinstance(item, str) for item in config['providerOrder']))):
             raise ValueError()
     except (KeyError, TypeError, ValueError):
-        raise ValueError('ZCode 네이티브 API 구성 형식을 인식할 수 없습니다. 먼저 App 전체 구성 초기화') from None
+        raise ValueError('ZCode 原生 API 配置格式尚未识别，请先在原 App 完成配置初始化') from None
     return providers
 
 
@@ -78,9 +78,9 @@ def apply(value, saved):
         result['config']['providerConfigRules']['providerRules'].append(target)
     else:
         if target['config'].get('group') != 'standard-personal':
-            raise ValueError('이 Provider 이미 원작에서 App 다른 유형으로 변경 후 다시 저장해주세요 API 연결')
+            raise ValueError('此 Provider 已由原 App 改为其他类型，请重新保存 API 接入')
         if any(not isinstance(target['config'].get(key) or {}, dict) for key in ('api', 'access')):
-            raise ValueError('ZCode 네이티브 API 구성 형식을 인식할 수 없습니다. 먼저 App 전체 구성 초기화')
+            raise ValueError('ZCode 原生 API 配置格式尚未识别，请先在原 App 完成配置初始化')
         # Change only the fields exposed by the editor. Preserve native headers,
         # model properties and all other providers, OAuth state and default model.
         target.update(providerName=saved['providerName'], enabled=True)

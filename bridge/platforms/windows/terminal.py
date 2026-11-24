@@ -54,10 +54,10 @@ def _process_snapshot(kernel):
     kernel.Process32FirstW.argtypes = [W.HANDLE, C.POINTER(PROCESSENTRY32W)]
     kernel.Process32NextW.argtypes = [W.HANDLE, C.POINTER(PROCESSENTRY32W)]
     snapshot = kernel.CreateToolhelp32Snapshot(2, 0)
-    if not snapshot or snapshot == C.c_void_p(-1).value: raise OSError('터미널 프로세스를 확인할 수 없습니다')
+    if not snapshot or snapshot == C.c_void_p(-1).value: raise OSError('无法核验终端进程')
     try:
         item = PROCESSENTRY32W(); item.dwSize = C.sizeof(item); result = []
-        if not kernel.Process32FirstW(snapshot, C.byref(item)): raise OSError('터미널 프로세스를 확인할 수 없습니다')
+        if not kernel.Process32FirstW(snapshot, C.byref(item)): raise OSError('无法核验终端进程')
         while True:
             result.append((item.th32ProcessID, item.th32ParentProcessID, item.szExeFile))
             if not kernel.Process32NextW(snapshot, C.byref(item)): break
@@ -69,15 +69,15 @@ def _shell_pid(kernel, bootstrap_pid, shell):
     entries = _process_snapshot(kernel)
     children = [(pid, name) for pid, parent, name in entries if parent == bootstrap_pid]
     if len(children) != 1 or children[0][1].casefold() != ntpath.basename(shell).casefold():
-        raise ValueError("터미널 셸 프로세스를 식별할 수 없습니다.")
+        raise ValueError('无法确认终端 shell 进程')
     pid = children[0][0]
     if any(parent == pid for _, parent, _ in entries):
-        raise ValueError("포그라운드 프로그램이 실행되는 동안 쉘 디렉토리를 확인할 수 없습니다")
+        raise ValueError('前台程序运行时无法确认 shell 当前目录')
     return pid
 
 
 def _process_cwd(kernel, pid, shell, job):
-    if C.sizeof(C.c_void_p) != 8: raise ValueError("Windows 경로 완성에는 64비트 게이트웨이가 필요합니다.")
+    if C.sizeof(C.c_void_p) != 8: raise ValueError('Windows 路径补全需要 64 位网关')
     kernel.OpenProcess.argtypes = [W.DWORD, W.BOOL, W.DWORD]
     kernel.OpenProcess.restype = W.HANDLE
     kernel.ReadProcessMemory.argtypes = [W.HANDLE, C.c_void_p, C.c_void_p, C.c_size_t, C.POINTER(C.c_size_t)]
@@ -85,46 +85,46 @@ def _process_cwd(kernel, pid, shell, job):
     kernel.GetProcessTimes.argtypes = [W.HANDLE, *([C.POINTER(C.c_uint64)] * 4)]
     kernel.IsProcessInJob.argtypes = [W.HANDLE, W.HANDLE, C.POINTER(W.BOOL)]
     handle = kernel.OpenProcess(0x0410, False, pid)
-    if not handle: raise ValueError("터미널 쉘 프로세스를 읽을 수 없습니다")
+    if not handle: raise ValueError('无法读取终端 shell 进程')
     try:
         owned = W.BOOL()
         if not kernel.IsProcessInJob(handle, job, C.byref(owned)) or not owned.value:
-            raise OSError('단말기 shell 이 터미널에 속하지 않습니다')
+            raise OSError('终端 shell 不属于此终端')
         def identity():
             path = C.create_unicode_buffer(32768); size = W.DWORD(len(path))
             if not kernel.QueryFullProcessImageNameW(handle, 0, path, C.byref(size)):
-                raise OSError('단말기를 확인할 수 없습니다 shell 길')
+                raise OSError('无法确认终端 shell 路径')
             expected = ntpath.normcase(ntpath.normpath(shell))
             actual = ntpath.normcase(ntpath.normpath(path.value))
-            if actual != expected: raise OSError('단말기 shell 신분이 바뀌었어요')
+            if actual != expected: raise OSError('终端 shell 身份已变化')
             times = [C.c_uint64() for _ in range(4)]
             if not kernel.GetProcessTimes(handle, *(C.byref(value) for value in times)):
-                raise OSError('단말기를 확인할 수 없습니다 shell 시작 시간')
+                raise OSError('无法确认终端 shell 启动时间')
             return times[0].value
         started = identity()
         ntdll = C.WinDLL('ntdll', use_last_error=True)
         ntdll.NtQueryInformationProcess.argtypes = [W.HANDLE, W.DWORD, C.c_void_p, W.DWORD, C.POINTER(W.DWORD)]
         ntdll.NtQueryInformationProcess.restype = C.c_long
         def read(address, size):
-            if not address or not 0 < size <= 32768: raise OSError('터미널의 현재 디렉터리 주소가 잘못되었습니다.')
+            if not address or not 0 < size <= 32768: raise OSError('终端当前目录地址无效')
             buffer = C.create_string_buffer(size); count = C.c_size_t()
             if not kernel.ReadProcessMemory(handle, C.c_void_p(address), buffer, size, C.byref(count)) or count.value != size:
-                raise OSError('터미널 현재 디렉터리를 읽을 수 없습니다.')
+                raise OSError('无法读取终端当前目录')
             return buffer.raw
         basic = C.create_string_buffer(48)
         if ntdll.NtQueryInformationProcess(handle, 0, basic, len(basic), None) != 0:
-            raise OSError('터미널을 읽을 수 없습니다 shell 상태')
+            raise OSError('无法读取终端 shell 状态')
         peb = struct.unpack_from('<Q', basic.raw, 8)[0]
         params = struct.unpack('<Q', read(peb + 0x20, 8))[0]
         unicode = read(params + 0x38, 16)
         length = struct.unpack_from('<H', unicode)[0]
         address = struct.unpack_from('<Q', unicode, 8)[0]
-        if not length or length % 2 or length > 32768: raise OSError('터미널의 현재 디렉터리 형식이 잘못되었습니다.')
+        if not length or length % 2 or length > 32768: raise OSError('终端当前目录格式无效')
         cwd = ntpath.normpath(read(address, length).decode('utf-16-le'))
-        if identity() != started or not ntpath.isabs(cwd): raise OSError("터미널 디렉터리를 확인할 수 없습니다")
+        if identity() != started or not ntpath.isabs(cwd): raise OSError('无法确认终端当前目录')
         return cwd
     except (OSError, UnicodeError):
-        raise ValueError("터미널 디렉토리를 변경하지 않고는 터미널 디렉토리를 결정할 수 없습니다") from None
+        raise ValueError('无法只读确认终端当前目录') from None
     finally: kernel.CloseHandle(handle)
 
 
@@ -154,7 +154,7 @@ def _load_conpty(kernel):
         return
     files = ['conpty.dll', *(arch + '/OpenConsole.exe' for arch in ('x64', 'arm64', 'x86'))]
     if not all((folder / name).is_file() for name in files):
-        raise OSError('Windows 터미널 구성요소가 불완전합니다. 게이트웨이를 다시 설치하십시오.')
+        raise OSError('Windows 终端组件不完整，请重新安装网关')
     library = C.WinDLL(str(folder / 'conpty.dll'), use_last_error=True)
     for name in ('CreatePseudoConsole', 'ResizePseudoConsole', 'ClosePseudoConsole'):
         setattr(kernel, name, getattr(library, 'Conpty' + name))
@@ -188,7 +188,7 @@ def api(conpty=False):
     }
     for name, (restype, argtypes) in signatures.items():
         try: function = getattr(kernel, name)
-        except AttributeError: raise ValueError("연속 터미널에는 Windows 10 1809 이상이 필요합니다.") from None
+        except AttributeError: raise ValueError('连续终端需要 Windows 10 1809 或更新版本') from None
         function.restype, function.argtypes = restype, argtypes
     return kernel
 
@@ -222,11 +222,11 @@ def cmd_working_directory(root):
 
 class WindowsTerminalSession(TerminalSession):
     def current_cwd(self):
-        if self.done.is_set() or self.stopping.is_set(): raise ValueError('터미널이 닫혔습니다. 다시 열어주세요.')
+        if self.done.is_set() or self.stopping.is_set(): raise ValueError('终端已关闭，请重新打开')
         pid = _shell_pid(self.kernel, self.bootstrap_pid, self.shell)
         cwd = _process_cwd(self.kernel, pid, self.shell, self.job)
         if _shell_pid(self.kernel, self.bootstrap_pid, self.shell) != pid or self.done.is_set():
-            raise ValueError("터미널 디렉터리를 확인할 수 없습니다")
+            raise ValueError('无法确认终端当前目录')
         return cwd
 
     def __init__(self, root, cols=80, rows=24):
@@ -329,7 +329,7 @@ class WindowsTerminalSession(TerminalSession):
                 if job is None: break
                 raw, result = job
                 try:
-                    if self.stopping.is_set(): raise OSError('터미널이 닫혔습니다. 다시 열어주세요.')
+                    if self.stopping.is_set(): raise OSError('终端已关闭，请重新打开')
                     offset = 0
                     while offset < len(raw):
                         count = W.DWORD(); data = C.create_string_buffer(raw[offset:])
@@ -343,17 +343,17 @@ class WindowsTerminalSession(TerminalSession):
 
     def write(self, identifier, data):
         uuid.UUID(str(identifier))
-        if not isinstance(data, str) or not data or len(data.encode('utf-8')) > 16384: raise ValueError('잘못된 터미널 입력')
+        if not isinstance(data, str) or not data or len(data.encode('utf-8')) > 16384: raise ValueError('无效终端输入')
         raw = data.encode('utf-8'); digest = hashlib.sha256(raw).digest()
         with self.input_lock:
-            if self.done.is_set() or self.stopping.is_set(): raise ValueError('터미널이 닫혔습니다. 다시 열어주세요.')
+            if self.done.is_set() or self.stopping.is_set(): raise ValueError('终端已关闭，请重新打开')
             result = self.inputs.get(identifier)
             if result is None:
                 result = {'digest': digest, 'done': threading.Event()}; self.inputs[identifier] = result
                 self.writes.put((raw, result))
-            if result['digest'] != digest: raise ValueError('입력 번호가 이미 다른 용도로 사용되었습니다.')
+            if result['digest'] != digest: raise ValueError('输入编号已用于其他内容')
             self.touched = time.monotonic()
-            if not result['done'].wait(3): raise TimeoutError('터미널 입력이 혼잡합니다. 다시 시도해 주세요.')
+            if not result['done'].wait(3): raise TimeoutError('终端输入拥堵，请重试')
             if result.get('error'): raise result['error']
             while len(self.inputs) > 256: self.inputs.popitem(last=False)
         return {'accepted': True}
@@ -365,7 +365,7 @@ class WindowsTerminalSession(TerminalSession):
             if self.kernel.ResizePseudoConsole(self.console, COORD(cols, rows)) < 0: raise OSError('ResizePseudoConsole failed')
         return {'resized': True}
 
-    def stop(self, reason='터미널이 폐쇄되었습니다'):
+    def stop(self, reason='终端已关闭'):
         if self.done.is_set() or self.stopping.is_set(): return
         self.reason = reason
         threading.Thread(target=self._close_console, daemon=True).start()

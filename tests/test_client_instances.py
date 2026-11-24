@@ -73,40 +73,40 @@ class ClientInstancesTests(unittest.TestCase):
                 self.registry.resolve(family, entry)
         changed = self.registry.configure(row['id'], False)
         self.assertFalse(changed['enabled'])
-        with self.assertRaisesRegex(ValueError, "이\\ 액세스\\ 인스턴스가\\ 닫혔습니다\\."):self.registry.resolve('claude', row['id'])
+        with self.assertRaisesRegex(ValueError, '关闭'):self.registry.resolve('claude', row['id'])
         self.assertFalse(self.registry.resolve('claude', row['id'], require_enabled=False).enabled)
-        with self.assertRaisesRegex(ValueError, 'ZCode.*기본'):
+        with self.assertRaisesRegex(ValueError, 'ZCode.*默认'):
             self.registry.register(self.request(self.home('zcode'), family='zcode'))
         self.assertIsNone(self.registry.resolve('zcode'))
 
     def test_user_fields_cannot_supply_a_native_claim_or_change_the_resolver_home(self):
         home = self.home('other')
         for key in ('native', 'roots', 'stateRoot', 'gatewayRoot', 'enabled', 'id', 'verified'):
-            with self.subTest(field=key), self.assertRaisesRegex(ValueError, '필드'):
+            with self.subTest(field=key), self.assertRaisesRegex(ValueError, '字段'):
                 self.registry.register({**self.request(home), key: 'injected'})
         self.resolver.side_effect = None
         self.resolver.return_value = {'home': str(home), 'roots': {'userData': str(home)}}
-        with self.assertRaisesRegex(ValueError, "기본\\ 디렉터리\\ 구문\\ 분석기가\\ 유효한\\ 구성\\ 선언을\\ 제공하지\\ 않았습니다\\."):self.registry.register(self.request(home))
+        with self.assertRaisesRegex(ValueError, '声明'):self.registry.register(self.request(home))
         self.resolver.return_value = NativeProfile('deepseek', 'desktop-profile', home, {'runtimeHome':home})
-        with self.assertRaisesRegex(ValueError, "기본\\ 구성\\ 선언이\\ 선택한\\ 플랫폼\\ 또는\\ 액세스\\ 방법과\\ 일치하지\\ 않습니다\\."):self.registry.register(self.request(home))
+        with self.assertRaisesRegex(ValueError, '匹配'):self.registry.register(self.request(home))
         self.resolver.return_value = resolve_profile('claude', self.default, platform='darwin')
-        with self.assertRaisesRegex(ValueError, "기본\\ 디렉터리\\ 확인자는\\ 선택한\\ 구성\\ 디렉터리를\\ 변경합니다\\."):self.registry.register(self.request(home))
+        with self.assertRaisesRegex(ValueError, '改变'):self.registry.register(self.request(home))
         self.assertEqual(self.registry.list(), [])
 
     def test_default_and_registered_roots_include_aliases_and_native_sibling_directories(self):
         alias = self.root/'default-alias'
         alias.symlink_to(self.default, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, '기본'):self.registry.register(self.request(alias))
+        with self.assertRaisesRegex(ValueError, '默认'):self.registry.register(self.request(alias))
         third = self.home('default-claude-3p')
-        with self.assertRaisesRegex(ValueError, '기본'):self.registry.register(self.request(third))
+        with self.assertRaisesRegex(ValueError, '默认'):self.registry.register(self.request(third))
         home = self.home('other')
         self.registry.register(self.request(home))
         alias = self.root/'other-alias';alias.symlink_to(home, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, "선택한\\ 디렉토리가\\ 등록된\\ 접근권한과\\ 중복됩니다\\.\\ 기존\\ 출입구를\\ 이용해주세요\\."):self.registry.register(self.request(alias))
+        with self.assertRaisesRegex(ValueError, '已登记'):self.registry.register(self.request(alias))
         nested = home/'nested';nested.mkdir()
-        with self.assertRaisesRegex(ValueError, "선택한\\ 디렉토리가\\ 등록된\\ 접근권한과\\ 중복됩니다\\.\\ 기존\\ 출입구를\\ 이용해주세요\\."):self.registry.register(self.request(nested, family='deepseek'))
+        with self.assertRaisesRegex(ValueError, '已登记'):self.registry.register(self.request(nested, family='deepseek'))
         sibling = self.home('other-3p')
-        with self.assertRaisesRegex(ValueError, "선택한\\ 디렉토리가\\ 등록된\\ 접근권한과\\ 중복됩니다\\.\\ 기존\\ 출입구를\\ 이용해주세요\\."):self.registry.register(self.request(sibling, family='deepseek'))
+        with self.assertRaisesRegex(ValueError, '已登记'):self.registry.register(self.request(sibling, family='deepseek'))
 
     def test_distinct_paths_with_same_file_identity_are_duplicates(self):
         from bridge.features.clients import instances
@@ -114,7 +114,7 @@ class ClientInstancesTests(unittest.TestCase):
         self.registry.register(self.request(home))
         identity = instances._directory_identity
         with patch.object(instances, '_directory_identity', side_effect=lambda p: identity(home if p == second else p)):
-            with self.assertRaisesRegex(ValueError, "선택한\\ 디렉토리가\\ 등록된\\ 접근권한과\\ 중복됩니다\\.\\ 기존\\ 출입구를\\ 이용해주세요\\."):
+            with self.assertRaisesRegex(ValueError, '已登记'):
                 self.registry.register(self.request(second, family='deepseek'))
 
     def test_replacing_registered_home_or_initialized_root_fails_without_fallback(self):
@@ -123,7 +123,7 @@ class ClientInstancesTests(unittest.TestCase):
             row = self.registry.register(self.request(home))
             target = home if replace_home else third
             target.rename(target.with_name(target.name+'-old'));target.mkdir()
-            with self.subTest(home=replace_home), self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):
+            with self.subTest(home=replace_home), self.assertRaisesRegex(ValueError, '身份已变化'):
                 self.registry.resolve('claude', row['id'], require_enabled=False)
 
     def test_missing_native_roots_pin_only_on_explicit_request_and_then_reject_replacement(self):
@@ -135,21 +135,21 @@ class ClientInstancesTests(unittest.TestCase):
         self.assertEqual(self.registry.path.read_bytes(), before)
         self.assertEqual(self.registry.pin_initialized_roots(row['id']).pending_roots, ())
         code.rename(home/'previous-code');code.mkdir()
-        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):self.registry.resolve('claude', row['id'], require_enabled=False)
+        with self.assertRaisesRegex(ValueError, '身份已变化'):self.registry.resolve('claude', row['id'], require_enabled=False)
 
     def test_new_native_symlink_cannot_redirect_a_reserved_missing_root(self):
         home = self.home('other');row = self.registry.register(self.request(home))
         external = self.home('external');(home/'claude-code-config').symlink_to(external, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):self.registry.resolve('claude', row['id'], require_enabled=False)
-        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):self.registry.pin_initialized_roots(row['id'])
+        with self.assertRaisesRegex(ValueError, '身份已变化'):self.registry.resolve('claude', row['id'], require_enabled=False)
+        with self.assertRaisesRegex(ValueError, '身份已变化'):self.registry.pin_initialized_roots(row['id'])
 
     def test_changed_native_declaration_and_changed_defaults_fail_closed(self):
         home = self.home('other');row = self.registry.register(self.request(home))
         self.defaults.append(resolve_profile('deepseek', home, platform='linux'))
-        with self.assertRaisesRegex(ValueError, '기본'):self.registry.resolve('claude', row['id'], require_enabled=False)
+        with self.assertRaisesRegex(ValueError, '默认'):self.registry.resolve('claude', row['id'], require_enabled=False)
         self.defaults.pop()
         self.resolver.side_effect = lambda p: NativeProfile('claude','desktop-profile',p,{'userData':p,'code':p/'new-code'})
-        with self.assertRaisesRegex(ValueError, "기본\\ 구성\\ 디렉터리\\ 설명이\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):self.registry.resolve('claude', row['id'], require_enabled=False)
+        with self.assertRaisesRegex(ValueError, '声明已变化'):self.registry.resolve('claude', row['id'], require_enabled=False)
 
     def test_enable_state_has_one_source_and_preserves_other_runtime_configuration(self):
         row = self.registry.register(self.request(self.home('other')))
@@ -165,7 +165,7 @@ class ClientInstancesTests(unittest.TestCase):
         self.assertEqual(json.loads(config.read_text()), {'enabled': {'claude': False, 'deepseek': False}, 'claudeHome': str(target.profile.home), 'fixture': {'keep': True}})
         self.assertEqual(self.registry.path.read_bytes(), registered)
         config.unlink();config.symlink_to(self.registry.path)
-        with self.assertRaisesRegex(ValueError, '심볼릭 링크'):self.registry.list()
+        with self.assertRaisesRegex(ValueError, '符号链接'):self.registry.list()
 
     def test_bad_types_and_persisted_root_proofs_are_rejected(self):
         home = self.home('other')
@@ -176,7 +176,7 @@ class ClientInstancesTests(unittest.TestCase):
         value = json.loads(self.registry.path.read_text())
         value['entries'][0]['roots']['home']['unexpected'] = True
         self.registry.path.write_text(json.dumps(value))
-        with self.assertRaisesRegex(ValueError, "액세스\\ 디렉터리\\ ID\\ 레코드가\\ 잘못되었습니다\\."):self.registry.list()
+        with self.assertRaisesRegex(ValueError, '身份记录'):self.registry.list()
 
     def test_state_directory_redirection_is_rejected_even_without_a_symlink_flag(self):
         row = self.registry.register(self.request(self.home('other')))
@@ -185,7 +185,7 @@ class ClientInstancesTests(unittest.TestCase):
         target.state_root.symlink_to(external, target_is_directory=True)
         # A Windows junction can redirect resolution without is_symlink().
         with patch.object(type(target.state_root), 'is_symlink', return_value=False):
-            with self.assertRaisesRegex(ValueError, '심볼릭 링크'):
+            with self.assertRaisesRegex(ValueError, '符号链接'):
                 self.registry.configure(row['id'], True)
         self.assertEqual(list(external.iterdir()), [])
 
@@ -208,13 +208,13 @@ class ClientInstancesTests(unittest.TestCase):
         self.registry.configure(row['id'], True)
         home.rename(self.root/'old');home.mkdir()
         self.assertFalse(self.registry.configure(row['id'], False)['enabled'])
-        with self.assertRaisesRegex(ValueError, "독립\\ 구성\\ 디렉터리의\\ ID가\\ 변경되었습니다\\.\\ 다시\\ 구성하세요\\."):
+        with self.assertRaisesRegex(ValueError, '身份已变化'):
             self.registry.configure(row['id'], True)
 
     def test_native_roots_cannot_overlap_the_gateway_private_store(self):
         self.gateway.mkdir()
-        with self.assertRaisesRegex(ValueError, "기본\\ 구성\\ 디렉터리는\\ 게이트웨이\\ 데이터\\ 디렉터리와\\ 겹칠\\ 수\\ 없습니다\\."):self.registry.register(self.request(self.gateway))
-        with self.assertRaisesRegex(ValueError, "기본\\ 구성\\ 디렉터리는\\ 게이트웨이\\ 데이터\\ 디렉터리와\\ 겹칠\\ 수\\ 없습니다\\."):self.registry.register(self.request(self.root))
+        with self.assertRaisesRegex(ValueError, '网关资料'):self.registry.register(self.request(self.gateway))
+        with self.assertRaisesRegex(ValueError, '网关资料'):self.registry.register(self.request(self.root))
 
     def test_registry_is_strict_and_write_failure_preserves_previous_record(self):
         row = self.registry.register(self.request(self.home('first')))
@@ -224,7 +224,7 @@ class ClientInstancesTests(unittest.TestCase):
         self.assertEqual(self.registry.path.read_bytes(), before)
         self.assertEqual(self.registry.list(), [row])
         data = json.loads(before);data['entries'][0]['native'] = {'verified': True};self.registry.path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(ValueError, "잘못된\\ 액세스\\ 등록\\ ID"):self.registry.list()
+        with self.assertRaisesRegex(ValueError, '身份无效'):self.registry.list()
         self.assertIsNone(self.registry.resolve('claude'), 'Default resolution does not depend on a broken independent store')
 
     def test_multiple_registry_objects_reload_before_atomic_mutation(self):
@@ -244,7 +244,7 @@ class ClientInstancesTests(unittest.TestCase):
         state.mkdir(parents=True)
         (state/'receipts.json').write_text('preserve receipts')
         self.registry.configure(one['id'], True)
-        with self.assertRaisesRegex(ValueError, "구성을\\ 제거하기\\ 전에\\ 이\\ 클라이언트에\\ 대한\\ 모바일\\ 액세스를\\ 비활성화하십시오\\."):
+        with self.assertRaisesRegex(ValueError, '停用'):
             self.registry.remove('claude', one['id'])
         self.registry.configure(one['id'], False)
         home.rename(self.root/'moved-native')
@@ -273,12 +273,12 @@ class DelegatedCodexInstancesTests(unittest.TestCase):
             row=registry.register({'family':'codex','kind':'codex-local','home':str(home),'label':'Independent'})
             registry.configure(row['id'],False);self.assertIs(entries.get(row['id'],management=True),owner)
             owner.submissions['fixture']={'status':'unknown'}
-            with self.assertRaisesRegex(ValueError,"이\\ 클라이언트에는\\ 대기\\ 중이거나\\ 대기\\ 중인\\ 작업이\\ 있습니다\\.\\ 제거하기\\ 전에\\ 작업을\\ 처리하세요\\."):registry.remove('codex',row['id'])
+            with self.assertRaisesRegex(ValueError,'待核对'):registry.remove('codex',row['id'])
             owner.submissions.clear();owner.terminals.jobs['fixture']=SimpleNamespace(done=threading.Event())
-            with self.assertRaisesRegex(ValueError,"이\\ 클라이언트에는\\ 닫히지\\ 않은\\ 터미널이\\ 있습니다\\.\\ 먼저\\ 터미널을\\ 닫은\\ 후\\ 제거하세요\\."):registry.remove('codex',row['id'])
+            with self.assertRaisesRegex(ValueError,'终端'):registry.remove('codex',row['id'])
             owner.terminals.jobs.clear()
             with patch.object(owner.entry_gate,'acquire',return_value=False) as acquire:
-                with self.assertRaisesRegex(ValueError,'처리'):registry.remove('codex',row['id'])
+                with self.assertRaisesRegex(ValueError,'正在处理'):registry.remove('codex',row['id'])
                 acquire.assert_called_once_with(timeout=3)
             owner.close.assert_not_called()
             registry.remove('codex',row['id']);owner.close.assert_called_once()
@@ -302,7 +302,7 @@ class DelegatedCodexInstancesTests(unittest.TestCase):
             self.assertFalse(registry.path.exists())
             self.assertEqual(registry.list(), [row])
             registry.configure(row['id'],False)
-            with self.assertRaisesRegex(ValueError,"이\\ 액세스\\ 인스턴스가\\ 닫혔습니다\\."):registry.resolve('codex',row['id'])
+            with self.assertRaisesRegex(ValueError,'关闭'):registry.resolve('codex',row['id'])
             factory.assert_not_called()
 
 

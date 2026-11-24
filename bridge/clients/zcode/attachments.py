@@ -40,7 +40,7 @@ def read_image(home, sid, source):
     ref, mime, size = (source.get(k) for k in ('ref', 'mime', 'size'))
     match = _ARTIFACT.fullmatch(ref) if isinstance(ref, str) else None
     if not match or match[1] != sid or mime not in _IMAGE_MIMES or type(size) is not int or not 0 < size <= MAX_FILE:
-        raise ValueError('ZCode 잘못된 이미지 참조')
+        raise ValueError('ZCode 图片引用无效')
     with _history(home) as db:
         _target(db, sid)
         visible = db.execute("""
@@ -56,7 +56,7 @@ def read_image(home, sid, source):
               AND coalesce(json_extract(m.data,'$.synthetic'),0)=0 LIMIT 1
             """, (sid, ref, mime)).fetchone()
     if not visible:
-        raise ValueError('사진이 더 이상 이 채팅에 속하지 않습니다.')
+        raise ValueError('图片已不属于此聊天')
     # Artifacts contain data URLs, not raw images. Only open the exact session's
     # upload using the same no-follow directory/regular-file checks as project reads.
     storage = Workspace(Path(home).parent)
@@ -67,14 +67,14 @@ def read_image(home, sid, source):
         with os.scandir(handle if handle is not None else folder) as entries:
             names = [entry.name for entry in entries if pattern.fullmatch(entry.name)]
         if len(names) != 1:
-            raise ValueError('ZCode 네이티브 이미지를 사용할 수 없습니다.')
+            raise ValueError('ZCode 原生图片不可用')
         with os.fdopen(storage.open_file(folder, handle, names[0], os.O_RDONLY), 'rb') as stream:
             info = os.fstat(stream.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_size != len(prefix) + encoded_size or stream.read(len(prefix)) != prefix:
-                raise ValueError('ZCode 원본 이미지가 변경되었습니다.')
+                raise ValueError('ZCode 原生图片已变化')
             data = stream.read(encoded_size + 1)
     if len(data) != encoded_size:
-        raise ValueError('ZCode 원본 이미지가 불완전합니다.')
+        raise ValueError('ZCode 原生图片不完整')
     return {'mediaType': mime, 'data': data.decode('ascii')}
 
 

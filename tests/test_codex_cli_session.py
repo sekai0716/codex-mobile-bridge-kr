@@ -119,27 +119,67 @@ class CliSessionTests(unittest.TestCase):
         emit('item/started', turnId='turn-1', item=user)
         emit('item/started', turnId='turn-1', item={**reply, 'timestamp': stamp + 1000})
         emit('item/completed', turnId='turn-1', item=reply)
-        emit('turn/completed', turn={'id': 'turn-1', 'status': 'completed', 'items': [reply]})
-        rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
+        emit('turn/completed', turn={'id': 'turn-1', 'status': 'completed', 'items': [reply],
+                                     'completedAt': stamp / 1000 + 125})
+        turn = normalize_state(self.states[-1][1])['turns'][0]
+        self.assertEqual(turn['startedAt'], stamp)
+        self.assertEqual(turn['completedAt'], stamp + 125000)
+        rows = turn['messages']
         self.assertEqual([row.get('timestamp') for row in rows], [stamp, stamp + 1000])
 
-    def test_plan_deltas_and_notifications_keep_one_step_list_per_turn(self):
+    def test_streamed_agent_text_survives_empty_item_replacements(self):
         self.sessions.attach('thread-a', explicit=True)
         def emit(method, **params):
             self.sessions._event({'method': method, 'params': {'threadId': 'thread-a', **params}})
-        emit('turn/started', turn={'id': 'turn-1', 'status': 'inProgress'})
-        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta='Plan')
-        emit('item/started', turnId='turn-1', item={'id': 'proposal', 'type': 'plan', 'text': ''})
-        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta=' A')
-        for status in ('inProgress', 'completed'):
-            emit('turn/plan/updated', turnId='turn-1', plan=[{'step': 'first', 'status': status}])
-        emit('item/completed', turnId='turn-1', item={'id': 'proposal', 'type': 'plan', 'text': 'Plan A'})
-        emit('item/plan/delta', turnId='turn-1', itemId='proposal', delta='stale')
-        rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
-        self.assertEqual([row['text'] for row in rows], ['Plan A', '☑ first'])
-        emit('turn/completed', turn={'id': 'turn-1', 'status': 'completed', 'items': [{'id': 'proposal', 'type': 'plan', 'text': 'Plan A'}]})
-        rows = normalize_state(self.states[-1][1])['turns'][0]['messages']
-        self.assertEqual([row['text'] for row in rows], ['Plan A', '☑ first'])
+        emit('turn/started', turn={'id': 'turn-1', 'status': 'inProgress', 'items': []})
+        emit('item/started', turnId='turn-1', item={'id': 'reply', 'type': 'agentMessage', 'text': ''})
+        emit('item/agentMessage/delta', turnId='turn-1', itemId='reply', delta='streamed reply')
+        emit('item/completed', turnId='turn-1', item={'id': 'reply', 'type': 'agentMessage', 'text': ''})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['text'], 'streamed reply')
+        emit('turn/completed', turn={'id': 'turn-1', 'status': 'completed',
+                                     'items': [{'id': 'reply', 'type': 'agentMessage', 'text': ''}]})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['text'], 'streamed reply')
+
+    def test_late_agent_started_event_does_not_erase_delta(self):
+        self.sessions.attach('thread-a', explicit=True)
+        def emit(method, **params):
+            self.sessions._event({'method': method, 'params': {'threadId': 'thread-a', **params}})
+        emit('turn/started', turn={'id': 'turn-1', 'status': 'inProgress', 'items': []})
+        emit('item/agentMessage/delta', turnId='turn-1', itemId='reply', delta='early reply')
+        emit('item/started', turnId='turn-1', item={'id': 'reply', 'type': 'agentMessage', 'text': ''})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['text'], 'early reply')
+
+    def test_empty_reasoning_completion_keeps_deltas_only_without_summary(self):
+        self.sessions.attach('thread-a', explicit=True)
+        def emit(method, **params):
+            self.sessions._event({'method': method, 'params': {'threadId': 'thread-a', **params}})
+        emit('turn/started', turn={'id': 'turn-1', 'status': 'inProgress', 'items': []})
+        emit('item/started', turnId='turn-1', item={'id': 'reason', 'type': 'reasoning', 'summary': [], 'content': []})
+        emit('item/reasoning/textDelta', turnId='turn-1', itemId='reason', delta='reason delta')
+        emit('item/completed', turnId='turn-1', item={'id': 'reason', 'type': 'reasoning', 'summary': [], 'content': []})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['content'], ['reason delta'])
+        emit('item/completed', turnId='turn-1', item={'id': 'reason', 'type': 'reasoning', 'summary': ['safe summary'], 'content': []})
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['summary'], ['safe summary'])
+        self.assertEqual(self.states[-1][1]['turns'][0]['items'][0]['content'], [])
+
+    def test_thread_snapshot_turn_clocks_convert_native_seconds_without_inventing_completion(self):
+        stamp = 1794211440000
+        self.fake.thread['turns'] = [
+            {'id': 'done', 'status': 'completed', 'startedAt': stamp / 1000, 'completedAt': stamp / 1000 + 125},
+            {'id': 'active', 'status': 'inProgress', 'startedAt': stamp / 1000 + 126}]
+        self.sessions.attach('thread-a', explicit=True)
+        turns = normalize_state(self.states[-1][1])['turns']
+        self.assertEqual((turns[0]['startedAt'], turns[0]['completedAt']), (stamp, stamp + 125000))
+        self.assertIsNone(turns[1]['completedAt'])
+
+    def test_resuming_same_native_turn_clears_previous_completion_clock(self):
+        self.sessions.attach('thread-a', explicit=True)
+        for method, turn in (
+                ('turn/completed', {'id': 'turn-1', 'status': 'completed', 'completedAt': 1794211565}),
+                ('turn/started', {'id': 'turn-1', 'status': 'inProgress', 'startedAt': 1794211566})):
+            self.sessions._event({'method': method, 'params': {'threadId': 'thread-a', 'turn': turn}})
+        self.assertNotIn('turnCompletedAtMs', self.states[-1][1]['turns'][0])
+        self.assertIsNone(normalize_state(self.states[-1][1])['turns'][0]['completedAt'])
 
     def test_passive_attach_does_not_connect_or_resume(self):
         self.sessions._start_daemon = Mock()
@@ -208,7 +248,7 @@ class CliSessionTests(unittest.TestCase):
         token = self.sessions.metadata['thread-a']['connectionToken']
         self.fake.thread['status'] = {'type': 'systemError'}
         self.fake.server_info['userAgent'] = 'codex-mobile-bridge-cli/0.163.0 (fixture)'
-        with self.assertRaisesRegex(ValueError, '버전'):
+        with self.assertRaisesRegex(ValueError, '版本'):
             self.sessions.release_connection('thread-a', token)
         self.assertFalse(any(method == 'thread/unsubscribe' for method, _ in self.fake.sent))
         request = self.fake.request
@@ -226,7 +266,7 @@ class CliSessionTests(unittest.TestCase):
         self.sessions.store.get = Mock(return_value={'origin': 'cli', 'cwd': expected['cwd'],
                                                     'model_provider': expected['modelProvider']})
         before_resume = Mock()
-        with self.assertRaisesRegex(AppServerUnsupported, "대상\\ 세션이\\ 여전히\\ 기본적으로\\ 로드되어\\ 있습니다\\.\\ 먼저\\ 명시적으로\\ 확인하세요\\.\\ CLI\\ 서비스\\ 유지관리\\ 공급자가\\ 마이그레이션되지\\ 않았습니다\\.。"):
+        with self.assertRaisesRegex(AppServerUnsupported, '目标会话仍被原生加载，请先明确确认 CLI 服务维护；未迁移提供商。'):
             self.sessions.attach('thread-a', explicit=True, target_provider='new-provider',
                                  expected_identity=expected, before_resume=before_resume)
         before_resume.assert_not_called()
@@ -238,7 +278,7 @@ class CliSessionTests(unittest.TestCase):
         expected = {'id': 'thread-a', 'cwd': '/another/project', 'modelProvider': 'original-provider'}
         self.sessions.store.get = Mock(return_value={'origin': 'cli', 'cwd': self.fake.thread['cwd'],
                                                     'model_provider': self.fake.thread['modelProvider']})
-        with self.assertRaisesRegex(AppServerUnsupported, '원래 세션 ID'):
+        with self.assertRaisesRegex(AppServerUnsupported, '原会话身份或已确认的目标接入已变化'):
             self.sessions.attach('thread-a', explicit=True, target_provider='new-provider', expected_identity=expected)
         self.assertFalse(any(method == 'thread/resume' for method, _ in self.fake.sent))
 
@@ -516,7 +556,7 @@ class CliSessionTests(unittest.TestCase):
         _, unavailable = self.sessions.permission_options('thread-a')
         self.assertFalse(unavailable['options'][0]['available'])
         self.assertIn('CLI', unavailable['options'][0]['reason'])
-        self.assertNotIn('데스크탑', unavailable['options'][0]['reason'])
+        self.assertNotIn('桌面', unavailable['options'][0]['reason'])
 
     def test_native_catalog_and_skill_input_use_joined_daemon(self):
         import hashlib
@@ -837,6 +877,9 @@ class CliSessionTests(unittest.TestCase):
         self.sessions.attach('thread-a', explicit=True)
         self.sessions.metadata['thread-a']['modelProvider'] = 'custom'
         self.fake.thread['modelProvider'] = 'custom'
+        original = self.fake.request
+        self.fake.request = lambda method, params, **kwargs: ({'config': {'model_provider': 'custom'}}
+            if method == 'config/read' else original(method, params, **kwargs))
         result = self.sessions.get_kind('thread-a', 'models')
         self.assertEqual(result['modelSource'], 'api')
         self.assertEqual(result['models'], [])
@@ -891,7 +934,7 @@ class CliSessionTests(unittest.TestCase):
                 'bridge.features.accounts.models.build_opener') as factory:
             result = self.sessions.get_kind('thread-a', 'models')
         self.assertEqual(result['models'], [])
-        self.assertIn('시작 환경', result['modelError'])
+        self.assertIn('启动环境', result['modelError'])
         factory.assert_not_called()
 
     def test_local_env_key_uses_daemon_value_and_exact_native_efforts(self):
@@ -1140,6 +1183,45 @@ class CliSessionTests(unittest.TestCase):
         self.sessions._event(started)
         self.assertEqual(self.states[-1][1]['turns'][-1]['status'], 'inProgress')
         self.assertNotIn('willRetry', self.states[-1][1]['turns'][-1])
+
+    def test_native_retry_error_does_not_trail_resumed_output_as_a_terminal_failure(self):
+        from bridge.features.sessions.timeline import Timeline
+        self.sessions.attach('thread-a', explicit=True)
+        self.sessions._event({'method': 'turn/started', 'params': {
+            'threadId': 'thread-a', 'turn': {'id': 'retry-turn', 'status': 'inProgress', 'items': []}}})
+        error = {'message': 'Temporary response stream interruption'}
+        timeline = Timeline()
+        sent = list(self.fake.sent)
+        for sequence in (1, 2):
+            self.sessions._event({'method': 'error', 'params': {
+                'threadId': 'thread-a', 'turnId': 'retry-turn', 'willRetry': True, 'error': error}})
+            self.sessions._event({'method': 'item/agentMessage/delta', 'params': {
+                'threadId': 'thread-a', 'turnId': 'retry-turn', 'itemId': 'reply', 'delta': 'resumed output'}})
+            state = self.states[-1][1]
+            timeline.update({**normalize_state(state), 'sequence': sequence})
+            self.assertEqual([row['role'] for row in timeline.page()['rows']], ['assistant'])
+            # Presentation must not rewrite native retry/error evidence or replay the turn.
+            self.assertEqual(state['turns'][-1]['error'], error)
+            self.assertIs(state['turns'][-1]['willRetry'], True)
+        self.assertEqual(self.fake.sent, sent)
+        self.sessions._event({'method': 'error', 'params': {
+            'threadId': 'thread-a', 'turnId': 'retry-turn', 'willRetry': False, 'error': error}})
+        timeline.update({**normalize_state(self.states[-1][1]), 'sequence': 3})
+        self.assertEqual([row['role'] for row in timeline.page()['rows']], ['assistant', 'error'])
+        self.assertEqual(timeline.page()['rows'][-1]['turnId'], 'retry-turn')
+
+    def test_retry_presentation_preserves_terminal_legacy_and_item_errors(self):
+        error = {'message': 'Native error'}
+        for status, retry in (('failed', True), ('failed', False), ('inProgress', None)):
+            with self.subTest(status=status, retry=retry):
+                turn = {'turnId': 'turn', 'status': status, 'error': error, 'items': []}
+                if retry is not None:
+                    turn['willRetry'] = retry
+                self.assertEqual(normalize_state({'turns': [turn]})['turns'][0]['error'], error)
+        view = normalize_state({'turns': [{'turnId': 'turn', 'status': 'inProgress', 'willRetry': True,
+            'error': error, 'items': [{'id': 'tool-error', 'type': 'error', 'message': 'Tool failed'}]}]})
+        self.assertEqual(view['turns'][0]['messages'][0]['role'], 'error')
+        self.assertEqual(view['turns'][0]['messages'][0]['text'], 'Tool failed')
 
     def test_completed_turn_keeps_user_item_omitted_from_event(self):
         self.fake.thread['turns'] = [{'id': 'turn-1', 'status': 'inProgress', 'items': [

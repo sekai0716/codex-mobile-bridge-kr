@@ -3,7 +3,6 @@ import os
 import threading
 import unittest
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,6 +59,26 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
     def run_initialization(self):
         self.manager.control(self.value)
         test_accounts.wait_for_account_worker(self)
+
+    def test_external_management_allows_transport_preparation_without_config_writes(self):
+        self.manager.index['accessManagement'] = 'external'
+        before = self.manager.snapshot_files()
+        self.run_initialization()
+        self.assertEqual(self.manager.state['phase'], 'complete')
+        self.mocks['configure'].assert_called_once()
+        self.assertEqual(self.manager.snapshot_files(), before)
+        with self.assertRaisesRegex(ValueError, '外部工具管理'):
+            self.manager.require_managed_writes()
+
+    def test_automatic_external_transport_preparation_keeps_task_checks(self):
+        self.manager.index['accessManagement'] = 'external'
+        self.mocks['connect'].side_effect = [None, Mock()]
+        before = self.manager.snapshot_files()
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
+        self.assertEqual(self.manager.desktop_preparation['state'], 'ready')
+        self.bridge.assert_desktop_idle.assert_called_once()
+        self.mocks['configure'].assert_called_once()
+        self.assertEqual(self.manager.snapshot_files(), before)
 
     def test_desktop_ipc_before_native_handshake_does_not_fail_or_restart(self):
         from bridge.clients.codex.app_server import AppServerUnavailable
@@ -121,6 +140,22 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.assertEqual(self.manager.desktop_preparation['state'], 'ready')
         self.bridge.assert_desktop_idle.assert_called_once_with(allow_stopped_app=True, desktop_only=True,
             desktop_executable=self.app.executable, timeout=3)
+
+    def test_recovery_monitor_does_not_reopen_an_app_the_user_quit(self):
+        self.mocks['connect'].return_value = None
+        self.mocks['inspect'].side_effect = [self.stopped]
+        self.assertTrue(self.manager.prepare_desktop_runtime(self.app, allow_cold_start=False))
+        self.assertEqual(self.manager.desktop_preparation['state'], 'waiting')
+        self.bridge.assert_desktop_idle.assert_not_called()
+        self.mocks['configure'].assert_not_called()
+        self.app.start.assert_not_called()
+
+    def test_recovery_monitor_prepares_a_running_replacement_after_task_audit(self):
+        self.mocks['connect'].side_effect = [None, Mock()]
+        self.assertFalse(self.manager.prepare_desktop_runtime(self.app, allow_cold_start=False))
+        self.bridge.assert_desktop_idle.assert_called_once()
+        self.mocks['stop'].assert_called_once()
+        self.app.start.assert_called_once()
 
     def test_startup_busy_and_unknown_tasks_defer_without_blocking_account_state(self):
         self.mocks['connect'].return_value = None
@@ -192,97 +227,6 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.assertEqual(desktop_runtime.preparation(self.home)['state'], 'pending')
         self.app.start.assert_called_once()
 
-    def failed_verification(self):
-        identifier = str(uuid.uuid4())
-        desktop_runtime.record_preparation(self.home, identifier)
-        self.manager.state = {'requestId':identifier, 'operation':'desktopRuntime'}
-        self.manager.phase('failed',error='데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
-        self.manager.desktop_preparation_scheduler = lambda register: register()
-        self.mocks['connect'].return_value = None
-        return identifier
-
-    def test_scheduled_retry_waits_through_unknown_and_active_work_then_claims_once(self):
-        identifier = self.failed_verification()
-        schedule = {'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True}
-        for _ in range(2):
-            self.assertEqual(self.manager.control(schedule)['desktopRuntime']['deferred']['state'], 'waiting')
-        self.bridge.assert_desktop_idle.side_effect = [TaskStateUnavailable('unknown'), ValueError('busy'), None]
-        self.mocks['inspect'].side_effect = [self.running] * 4 + [self.stopped]
-        for _ in range(2):
-            self.assertTrue(self.manager.prepare_desktop_runtime(self.app))
-            self.mocks['stop'].assert_not_called()
-            self.mocks['configure'].assert_not_called()
-            self.app.start.assert_not_called()
-        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
-        self.assertEqual(desktop_runtime.deferred_preparation(self.home,identifier),'consumed')
-        self.assertEqual(desktop_runtime.preparation(self.home)['requestId'],identifier)
-        self.mocks['stop'].assert_called_once()
-        self.mocks['configure'].assert_called_once()
-        self.app.start.assert_called_once()
-        with self.assertRaises(ValueError): self.manager.control(schedule)
-
-    def test_schedule_refuses_uncertain_outcomes_and_a_cancel_is_terminal(self):
-        identifier = self.failed_verification()
-        schedule = {'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True}
-        with self.assertRaises(ValueError): self.manager.control({**schedule,'requestId':str(uuid.uuid4())})
-        self.manager.phase('verifying')
-        with self.assertRaises(ValueError): self.manager.control(schedule)
-        self.manager.phase('failed', error='unknown stop result')
-        with self.assertRaises(ValueError): self.manager.control(schedule)
-        self.manager.phase('failed', error='데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
-        self.manager.control(schedule)
-        self.manager.control({'action':'cancelDeferredDesktopRuntime','requestId':identifier})
-        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
-        with self.assertRaises(ValueError): self.manager.control(schedule)
-        self.assertEqual(desktop_runtime.deferred_preparation(self.home,identifier),'cancelled')
-        self.mocks['stop'].assert_not_called()
-
-    def test_other_gateway_cannot_claim_a_consumed_retry_even_after_failed_verification(self):
-        identifier = self.failed_verification()
-        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
-        self.manager.wait_ready.side_effect = ValueError('데스크톱 연결 및 대상 계정을 확인할 수 없습니다. 컴퓨터를 확인하세요.')
-        self.manager.prepare_desktop_runtime(self.app)
-        other = accounts_module.Accounts(self.bridge)
-        self.assertEqual(desktop_runtime.preparation(self.home)['state'],'pending')
-        self.assertFalse(other.prepare_desktop_runtime(self.app))
-        self.app.start.assert_called_once()
-        self.mocks['configure'].assert_called_once()
-        self.mocks['stop'].assert_called_once()
-
-    def test_cancel_while_audit_is_running_keeps_desktop_untouched(self):
-        identifier = self.failed_verification()
-        self.manager.control({'action':'deferDesktopRuntime', 'requestId':identifier, 'confirmed':True})
-        self.bridge.assert_desktop_idle.side_effect = lambda **kwargs: self.manager.cancel_deferred_desktop_runtime()
-        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
-        self.assertEqual(desktop_runtime.deferred_preparation(self.home, identifier), 'cancelled')
-        self.mocks['stop'].assert_not_called()
-        self.mocks['configure'].assert_not_called()
-        self.app.start.assert_not_called()
-
-    def test_two_claims_share_one_permission(self):
-        identifier = self.failed_verification()
-        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
-        running = threading.Barrier(2)
-        def claim():
-            running.wait(3)
-            return desktop_runtime.update_deferred_preparation(self.home, identifier, 'consume')
-        with ThreadPoolExecutor(max_workers=2) as workers:
-            results = [workers.submit(claim) for _ in range(2)]
-            self.assertCountEqual([result.result(timeout=5) for result in results], ['consumed', None])
-
-    def test_a_transient_connection_failure_does_not_restart_after_scheduled_success(self):
-        identifier = self.failed_verification()
-        self.manager.control({'action':'deferDesktopRuntime','requestId':identifier,'confirmed':True})
-        self.mocks['connect'].side_effect = [None, Mock(), None]
-        self.mocks['inspect'].side_effect = [self.running, self.running, self.stopped, self.running]
-        self.assertFalse(self.manager.prepare_desktop_runtime(self.app))
-        self.assertEqual(desktop_runtime.preparation(self.home)['state'], 'complete')
-        other = accounts_module.Accounts(self.bridge)
-        self.assertFalse(other.prepare_desktop_runtime(self.app))
-        self.mocks['stop'].assert_called_once()
-        self.mocks['configure'].assert_called_once()
-        self.app.start.assert_called_once()
-
     def test_a_verified_shared_owner_resolves_a_pending_launch(self):
         request_id = str(uuid.uuid4())
         desktop_runtime.record_preparation(self.home, request_id)
@@ -345,17 +289,17 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
 
     def test_requires_confirmation_and_rejects_independent_or_other_platform(self):
         for key in ('confirmed', 'tasksConfirmed'):
-            with self.assertRaisesRegex(ValueError, '확인'):
+            with self.assertRaisesRegex(ValueError, '确认'):
                 self.manager.control({**self.value, key: False})
-        with self.assertRaisesRegex(ValueError, "잘못된\\ 초기화\\ 요청\\ ID"):
+        with self.assertRaisesRegex(ValueError, '标识'):
             self.manager.control({**self.value, 'requestId': 'invalid'})
         self.bridge.host = 'codex:independent'
-        with self.assertRaisesRegex(ValueError, "독립\\ 실행형\\ 구성은\\ 기본값을\\ 관리하지\\ 않습니다\\.\\ Codex\\ Desktop"):
+        with self.assertRaisesRegex(ValueError, '独立配置'):
             self.manager.control(self.value)
         self.assertFalse(self.manager.desktop_runtime_status()['supported'])
         self.bridge.host = 'local'
         with patch.object(accounts_module, 'sys', SimpleNamespace(platform='freebsd')):
-            with self.assertRaisesRegex(ValueError, "이\\ 항목은\\ Codex\\ 네이티브\\ 연결\\ 초기화를\\ 지원하지\\ 않습니다\\."):
+            with self.assertRaisesRegex(ValueError, '不支持'):
                 self.manager.control(self.value)
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
@@ -422,7 +366,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['stop'].assert_not_called()
 
     def test_unavailable_confirmation_requires_failed_audit_and_never_skips_busy_tasks(self):
-        with self.assertRaisesRegex(ValueError, "계속\\ 진행할지\\ 결정하기\\ 전에\\ 네이티브\\ 연결\\ 초기화에\\ 영향을\\ 받는\\ 작업\\ 상태를\\ 확인하세요\\."):
+        with self.assertRaisesRegex(ValueError, '核验'):
             self.manager.control({**self.value, 'acknowledgeUnavailable': True})
         self.bridge.assert_desktop_idle.side_effect = TaskStateUnavailable('tasks unavailable')
         self.run_initialization()
@@ -478,6 +422,38 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
             self.assertIn('USERPROFILE', environment.call_args.args[3])
         self.mocks['stop'].assert_called_once()
         self.mocks['launcher_settings'].assert_called_once_with(self.app.executable)
+
+    def test_linux_initialization_checks_boot_and_process_identity_before_normal_stop(self):
+        identity = {'pid': 41, 'image': str(self.app.executable), 'bootId': 'fixture-boot',
+                    'startTicks': 12345, 'parent': 10}
+        self.mocks['identity'].return_value = identity
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
+             patch('bridge.platforms.linux.codex_daemon_env.read_process_environment',
+                   return_value=({'CODEX_HOME': str(self.home)}, None)) as environment, \
+             patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
+            self.run_initialization()
+            self.assertEqual(self.manager.state['phase'], 'complete')
+            self.assertTrue(self.manager.desktop_runtime_status()['supported'])
+        self.assertEqual(environment.call_args.args[1],
+                         {'processIdentity': {'bootId': 'fixture-boot', 'startTicks': 12345}})
+        self.assertEqual(self.mocks['stop'].call_args.kwargs['expected_identities'], {41: identity})
+        self.mocks['configure'].assert_called_once()
+        self.app.start.assert_called_once()
+
+    def test_linux_shared_account_switch_rechecks_idle_and_process_before_stop(self):
+        identity = {'pid': 41, 'image': str(self.app.executable), 'bootId': 'fixture-boot',
+                    'startTicks': 12345, 'parent': 10}
+        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
+             patch.object(desktop_runtime, 'launch_environment', return_value={'CODEX_CLI_PATH': 'fixture'}), \
+             patch.object(self.manager, '_desktop_runtime_snapshot', side_effect=[
+                 (self.running, {41: identity}),
+                 (self.running, {41: {**identity, 'startTicks': 12346}})]):
+            with self.assertRaisesRegex(ValueError, '进程已变化'):
+                self.manager._stop_desktop_for_account_change(self.app)
+        self.bridge.assert_desktop_idle.assert_called_once_with(allow_stopped_app=False,
+                                                               desktop_executable=self.app.executable)
+        self.mocks['stop'].assert_not_called()
+        self.app.stop.assert_not_called()
 
     def test_pending_gateway_submission_blocks_initialization_before_worker(self):
         self.bridge.submissions['chat:submission'] = {'status': 'unknown', 'title': 'Pending chat'}
@@ -562,7 +538,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.manager.phase('starting', operation='desktopRuntime', requestId=self.value['requestId'])
         restarted = accounts_module.Accounts(self.bridge)
         self.assertEqual(restarted.state['phase'], 'failed')
-        self.assertIn('다시 초기화', restarted.state['error'])
+        self.assertIn('重新初始化', restarted.state['error'])
         restarted.assert_editable()
         self.mocks['stop'].assert_not_called()
         self.app.start.assert_not_called()
@@ -571,7 +547,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['inspect'].side_effect = None
         self.mocks['inspect'].return_value = {**self.running, 'mainPids': [41, 42]}
         self.run_initialization()
-        self.assertIn("단일 Codex 데스크톱 프로세스를 확인할 수 없습니다. 컴퓨터를 확인하고 다시 시도하세요.", self.manager.state['error'])
+        self.assertIn('唯一', self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
@@ -579,7 +555,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         changed = {**self.identity, 'birth': [101, 1]}
         self.mocks['identity'].side_effect = [self.identity, self.identity, changed, changed]
         self.run_initialization()
-        self.assertIn('프로세스가 변경되었습니다.', self.manager.state['error'])
+        self.assertIn('进程已变化', self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
@@ -603,14 +579,14 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
                 self.mocks['inspect'].return_value = self.running
                 self.mocks['environment'].return_value = environment, None
                 self.run_initialization()
-                self.assertIn("실행 중인 Codex는 다른 구성 디렉터리를 사용합니다. 이 연결을 초기화할 수 없습니다.", self.manager.state['error'])
+                self.assertIn('其他配置目录', self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.mocks['configure'].assert_not_called()
 
     def test_user_data_dir_argument_or_unreadable_environment_cannot_quit_native_app(self):
         self.mocks['commands'].return_value = {41: str(self.app.executable)+' "--user-data-dir=/fixture/isolated"'}
         self.run_initialization()
-        self.assertIn("실행 중인 Codex는 다른 구성 디렉터리를 사용합니다. 이 연결을 초기화할 수 없습니다.", self.manager.state['error'])
+        self.assertIn('其他配置目录', self.manager.state['error'])
         self.mocks['stop'].assert_not_called()
         self.value['requestId'] = str(uuid.uuid4())
         self.mocks['commands'].return_value = {41: str(self.app.executable)}
@@ -643,7 +619,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         status = self.manager.desktop_runtime_status()
         self.assertTrue(status['supported'])
         self.assertFalse(status['configured'])
-        self.assertIn("공유 연결 설정을 읽을 수 없습니다. 연결을 다시 초기화하십시오.", status['error'])
+        self.assertIn('无法读取', status['error'])
         self.mocks['connect'].assert_not_called()
 
     def test_switch_lock_conflict_does_not_change_accounts_or_exit(self):
@@ -684,7 +660,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.manager.index['accounts'] = [row]
         self.manager.info.current = Mock(return_value={'id': None})
         def apply(selected, app):
-            with self.assertRaisesRegex(ValueError, '공유 액세스가 아직 사용 중이거나 종료되었습니다.'):
+            with self.assertRaisesRegex(ValueError, '共享接入仍在使用或退出中'):
                 with self.real_initialization_lock(self.home):
                     pass
             self.manager.phase('complete')
@@ -704,35 +680,6 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
             with self.manager.desktop_runtime_lifecycle():
                 pass
         self.mocks['initialize_lock'].assert_not_called()
-
-    def test_linux_initialization_verifies_native_launch_generation(self):
-        self.identity.update(bootId='fixture-boot', startTicks=12345)
-        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
-             patch('bridge.platforms.linux.codex_daemon_env.read_process_environment',
-                   return_value=({'CODEX_HOME': str(self.home)}, None)) as environment, \
-             patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
-            self.assertTrue(self.manager.desktop_runtime_status()['supported'])
-            self.run_initialization()
-        self.assertEqual(self.manager.state['phase'], 'complete')
-        record = environment.call_args.args[1]
-        self.assertEqual(record, {'processIdentity': {'bootId': 'fixture-boot', 'startTicks': 12345}})
-        self.mocks['environment'].assert_not_called()
-        self.mocks['stop'].assert_called_once()
-        self.mocks['configure'].assert_called_once()
-        self.app.start.assert_called_once()
-
-    def test_linux_busy_desktop_is_not_restarted_or_configured(self):
-        self.identity.update(bootId='fixture-boot', startTicks=12345)
-        self.bridge.assert_desktop_idle.side_effect = ValueError('Desktop is busy')
-        with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
-             patch('bridge.platforms.linux.codex_daemon_env.read_process_environment',
-                   return_value=({'CODEX_HOME': str(self.home)}, None)), \
-             patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
-            self.run_initialization()
-        self.assertEqual(self.manager.state['phase'], 'failed')
-        self.mocks['stop'].assert_not_called()
-        self.mocks['configure'].assert_not_called()
-        self.app.start.assert_not_called()
 
     def test_native_runtime_exit_is_awaited_only_after_ipc_disconnect(self):
         order = []

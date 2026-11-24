@@ -26,14 +26,14 @@ class WindowsUpdatePreflightTests(unittest.TestCase):
             updates.require_update_ready(self.worker)
 
     def test_live_same_installation_holder_blocks_without_stopping_it(self):
-        with self.assertRaisesRegex(ValueError, "먼저\\ 작업을\\ 종료하고\\ 정상적으로\\ 종료해주세요\\.\\ ZCode，게이트웨이를\\ 다시\\ 업데이트하세요\\.。"):
+        with self.assertRaisesRegex(ValueError, '正常退出 ZCode'):
             self.check()
 
     def test_absent_exited_reused_pid_and_other_installation_do_not_block(self):
         self.check(pids=())
         self.check(owner=ProcessLookupError())
         self.check(owner=[{**self.owner, 'image': 'other-installation'}])
-        with self.assertRaisesRegex(ValueError, "인스턴스를\\ 실행하는\\ 게이트웨이가\\ 변경되었습니다\\.\\ 업데이트를\\ 다시\\ 시도해\\ 주세요\\.。"):
+        with self.assertRaisesRegex(ValueError, '实例已变化'):
             self.check(owner=[self.owner, {**self.owner, 'created': 12}])
 
     def test_current_role_is_rechecked_and_query_failure_is_not_ignored(self):

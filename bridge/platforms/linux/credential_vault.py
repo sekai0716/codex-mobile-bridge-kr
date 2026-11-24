@@ -13,7 +13,7 @@ def target(service, user):
         collection.ensure_not_locked()
         items = list(collection.search_items({'service': service, 'username': user}))
         if len(items) > 1:
-            raise ValueError('기본 로그인 자격 증명과 일치하는 항목이 여러 개 있습니다. 먼저 원래 클라이언트에서 처리하시기 바랍니다.')
+            raise ValueError('原生登录凭据存在多个匹配项，请先在原客户端处理')
         item = items[0] if items else None
         if item:
             item.ensure_not_locked()

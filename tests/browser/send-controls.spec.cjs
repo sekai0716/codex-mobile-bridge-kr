@@ -92,59 +92,26 @@ test('reconnect warnings belong to the selected chat and clear as soon as it rec
   expect(result).toEqual({hadWarning:true,hiddenDuringSwitch:true,secondClean:true,returnedClean:true});
 });
 
-test('known desktop connection blockers explain the cause, protect writes and preserve the draft',async({page})=>{
+test('a new chat waits for history and its native owner before sending',async({page})=>{
   await prepare(page);
-  const setup='The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.';
-  const account='The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.';
-  const generic='Could not reconnect this chat to Codex. Try reconnecting this chat again.';
-  await page.evaluate(({setup,account})=>{
-    const fixture=sendControlsFixture,original=window.fetch;
-    fixture.meta={...fixture.meta,connected:false,desktopRestartRecommended:true,rebuildRecommended:true,
-      access:{source:'desktop',readOnly:false,canSend:true,canChangeModel:true,canReconnect:true}};
-    window.fetch=(url,...args)=>new URL(url,location.href).pathname.endsWith('/reconnect')?
-      Promise.resolve(new Response(JSON.stringify({error:account}),{status:409})):original(url,...args);
-    renderState({...fixture.meta,connectionError:setup});
-  },{setup,account});
-  await expect(page.locator('#notice-text')).toContainText('데스크톱 작업이 모두 끝나면');
-  await expect(page.locator('#message')).toBeEnabled();await page.locator('#message').fill('보존할 초안');
-  await expect(page.locator('#send')).toBeDisabled();await expect(page.locator('#model-button')).toBeDisabled();
-  await expect(page.locator('#reconnect-manager')).toBeHidden();
-  await page.locator('#reconnect').click();
-  await expect(page.locator('#notice-text')).toContainText('두 앱에서 같은 계정');
-  await page.evaluate(()=>{renderState(sendControlsFixture.meta);$('composer').requestSubmit();});
-  await expect(page.locator('#send')).toBeDisabled();await expect(page.locator('#model-button')).toBeDisabled();
-  await expect(page.locator('#message')).toHaveValue('보존할 초안');await expect(page.locator('#notice-text')).toContainText('두 앱에서 같은 계정');
-  expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
-  await page.evaluate(()=>renderState({...sendControlsFixture.meta,connected:true}));
-  await expect(page.locator('#notice')).toBeHidden();await expect(page.locator('#send')).toBeEnabled();await expect(page.locator('#model-button')).toBeEnabled();
-  await page.evaluate(generic=>renderState({...sendControlsFixture.meta,connectionError:generic}),generic);
-  await expect(page.locator('#notice-text')).toContainText('다시 연결을 눌러');
-  await expect(page.locator('#send')).toBeEnabled();await expect(page.locator('#message')).toHaveValue('보존할 초안');
-});
-
-test('a verified empty local chat can send its first message while waiting for the owner',async({page})=>{
-  await prepare(page);await page.evaluate(()=>{
+  await page.evaluate(()=>{
     const fixture=sendControlsFixture;
     fixture.meta={...fixture.meta,status:'idle',connected:false,activating:true,loadingHistory:true,
-      creationSettings:{status:'pending',model:'fixture',effort:'high',canConnectOnSend:true},
-      access:{source:'desktop',runtime:null,readOnly:false,canSend:true,canReconnect:true}};
+      access:{source:'desktop',runtime:'desktop',readOnly:false,canSend:true,canReconnect:true}};
     renderState(fixture.meta);
   });
-  await expect(page.locator('#message')).toBeEnabled();await expect(page.locator('#send')).toBeEnabled();
-  await expect(page.locator('#send-mode')).toBeDisabled();await expect(page.locator('#work-mode')).toBeDisabled();
-  await expect(page.locator('#reconnect')).toBeHidden();await expect(page.locator('#notice-text')).toContainText('새 채팅을 준비');
-  await page.locator('#message').fill('send once while connecting');
-  await page.locator('#composer').evaluate(form=>{form.requestSubmit();form.requestSubmit();});
-  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
-  const write=await page.evaluate(()=>sendControlsFixture.writes[0]);expect(write.text).toBe('send once while connecting');expect(write.mode).toBe('send');expect(write.workMode).toBe('default');
-  expect(write.id).toMatch(/^[a-f0-9-]{36}$/);
-  const guards=await page.evaluate(()=>{
-    const view=sendControlsFixture.meta;
-    return [ {host:'remote'},{id:'other-thread'},{attachedParent:{id:'parent'}},{temporary:true},{readOnlyReason:'policy'},
-      {access:{...view.access,readOnly:true}},{access:{...view.access,canSend:false}},{access:{...view.access,source:'cli'}},
-      {creationSettings:{...view.creationSettings,canConnectOnSend:false}}].map(change=>{renderState({...view,...change});return $('send').disabled;});
+  await expect(page.locator('#send')).toBeDisabled();
+  await page.locator('#message').fill('First message');
+  expect(await page.evaluate(()=>sendControlsFixture.writes.length)).toBe(0);
+  await page.evaluate(()=>{
+    const fixture=sendControlsFixture;
+    fixture.meta={...fixture.meta,connected:true,activating:false,loadingHistory:false};
+    renderState(fixture.meta);
   });
-  expect(guards.every(Boolean)).toBe(true);
+  await expect(page.locator('#send')).toBeEnabled();
+  await page.locator('#send').click();
+  await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
+  expect(await page.evaluate(()=>sendControlsFixture.writes[0].text)).toBe('First message');
 });
 
 test('shared browser opens at readable scale and maps scaled input to the selected frame',async({page})=>{
@@ -535,69 +502,72 @@ for (const theme of ['dark','light']) {
   });
 }
 
-test('desktop composer mode menus fit above compact controls and keep keyboard selection',async({page},testInfo)=>{
+test('desktop composer choices fit above compact controls and keep keyboard selection',async({page},testInfo)=>{
   await page.setViewportSize({width:2350,height:460});await prepare(page);
   await page.locator('[data-open-appearance]:visible').first().click();
   await page.locator('#appearance-chat-width').selectOption('full');
   await page.locator('#appearance-dialog button[data-close].primary').click();
-  const send=page.locator('#send-mode'),work=page.locator('#work-mode'),menu=page.locator('#composer-mode-options');
-  const fields=[send,work];
-  for(const field of fields){
-    const box=await field.boundingBox();expect(box.width).toBeLessThan(180);
-    await field.click();await expect(menu).toBeVisible();
-    const popup=await menu.boundingBox();expect(popup.y).toBeGreaterThanOrEqual(0);
-    expect(popup.y+popup.height).toBeLessThanOrEqual(box.y);expect(popup.x+popup.width).toBeLessThanOrEqual(2350);
-    await expect(menu.getByRole('option').last()).toBeInViewport();
-    await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(field).toBeFocused();
-  }
-  await send.click();await expect(menu.getByRole('option').last()).toBeDisabled();await page.locator('#message').click();
-  await expect(menu).toHaveCount(0);
-  await work.press('Space');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+  const work=page.locator('#work-mode'),caret=page.locator('#composer .composer-submit-caret'),menu=page.locator('.composer-submit-menu[open]');
+  await page.locator('#composer .toolbar-more').click();
+  await page.locator('.toolbar-menu[open]').getByRole('button',{name:'계획 모드',exact:true}).click();
   await expect(work).toHaveValue('plan');
   await page.evaluate(()=>sendControlsFixture.update('active'));
-  await send.click();await menu.getByRole('option').last().click();await expect(send).toHaveValue('steer');
+  await page.locator('#message').fill('전송 메뉴 테스트');
+  await expect(caret).toBeVisible();
+  const box=await caret.boundingBox();expect(box.width).toBeLessThan(180);
+  await caret.click();await expect(menu).toBeVisible();
+  const popup=await menu.boundingBox();expect(popup.y).toBeGreaterThanOrEqual(0);
+  expect(popup.y+popup.height).toBeLessThanOrEqual(box.y);expect(popup.x+popup.width).toBeLessThanOrEqual(2350);
+  await expect(menu.getByRole('menuitemradio').last()).toBeInViewport();
+  await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(caret).toBeFocused();
+  await caret.press('Home');await expect(menu.getByRole('menuitemradio').first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+  await expect(menu).toBeHidden();
+  await expect(page.locator('#send-mode')).toHaveValue('steer');
   await expect(work).toBeDisabled();
-  const corners=page.locator('#composer .composer-tools .tool-button:visible');
+  const corners=page.locator('#composer :is(.composer-tools .tool-button,#model-button):visible');
   expect(await corners.count()).toBeGreaterThanOrEqual(5);
   expect(await corners.evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).borderRadius==='9px'))).toBe(true);
   await expect(page.locator('#composer .context-usage-ring')).toHaveCSS('border-radius','50%');
-  await send.click();await testInfo.attach('desktop-modes',{body:await page.screenshot(),contentType:'image/png'});
-  await page.setViewportSize({width:390,height:844});await expect(menu).toHaveCount(0);
-  expect(await send.evaluate(node=>node.getBoundingClientRect().width)).toBeGreaterThan(40);
+  await caret.click();await testInfo.attach('desktop-modes',{body:await page.screenshot(),contentType:'image/png'});
+  await page.setViewportSize({width:390,height:844});
+  await expect(menu.getByRole('menuitemradio').last()).toBeInViewport();
 });
 
-test('Codex send mode stays in its original position and sends idle, queues busy or steers',async({page},testInfo)=>{
+test('Codex composer sends idle, queues busy or steers with no repeat after an unknown write',async({page},testInfo)=>{
   await prepare(page);
-  const input=page.locator('#message'),send=page.locator('#send'),mode=page.locator('#send-mode');
-  await expect(mode).toBeVisible();await expect(page.locator('#send-options')).toHaveCount(0);
+  const input=page.locator('#message'),send=page.locator('#send'),caret=page.locator('#composer .composer-submit-caret');
   await expect(send).toHaveAttribute('aria-label','메시지 보내기');
   await input.fill('대기 중 일반 전송');await send.click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(1);
   expect(await page.evaluate(()=>sendControlsFixture.writes[0].mode)).toBe('send');
   await page.evaluate(()=>sendControlsFixture.update('active'));
-  await expect(send).toHaveAttribute('aria-label','완료 후 보내기');await expect(page.locator('#stop')).toBeVisible();
-  await input.fill('작업 후 대기열 전송');await send.click();
+  await expect(page.locator('#composer .composer-submit-stop')).toBeVisible();
+  await input.fill('작업 후 대기열 전송');
+  await expect(send).toHaveAttribute('aria-label','완료 후 보내기');await send.click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(2);
   expect(await page.evaluate(()=>sendControlsFixture.writes[1].mode)).toBe('queue');
   await expect(input).toHaveValue('');
+  await input.fill('현재 작업에 추가 지시');
   for(const width of [320,390,1280]){
     await page.setViewportSize({width,height:844});
-    const choice=await mode.boundingBox(),work=await page.locator('#work-mode').boundingBox();
-    expect(choice.x+choice.width).toBeLessThanOrEqual(work.x+1);expect(Math.abs(choice.y-work.y)).toBeLessThan(2);
+    await expect(caret).toBeInViewport();
     expect(await page.locator('#composer').evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`send-menu-${width}.png`)});
   }
-  await mode.selectOption('steer');
+  await caret.click();await page.locator('.composer-submit-menu[open]').getByRole('menuitemradio',{name:/현재 작업에 바로 보내기/}).click();
   await expect(send).toHaveAttribute('aria-label','현재 작업에 바로 보내기');
   await expect(page.locator('#work-mode')).toBeDisabled();
-  await input.fill('현재 작업에 추가 지시');await send.click();
+  await send.click();
   await expect.poll(()=>page.evaluate(()=>sendControlsFixture.writes.length)).toBe(3);
   expect(await page.evaluate(()=>({mode:sendControlsFixture.writes[2].mode,workMode:sendControlsFixture.writes[2].workMode}))).toEqual({mode:'steer',workMode:null});
-  await page.evaluate(()=>sendControlsFixture.update('idle'));await expect(mode).toBeVisible();await expect(mode).toHaveValue('auto');
+  await page.evaluate(()=>sendControlsFixture.update('idle'));
   await expect(send).toHaveAttribute('aria-label','메시지 보내기');
-  await page.evaluate(()=>sendControlsFixture.update('active',{endpointId:'wsl:fixture',access:{source:'cli',runtime:'wsl',canSend:true},capabilities:{queue:false}}));
+  await input.fill('지원되지 않는 후속 작업');
+  await page.evaluate(()=>sendControlsFixture.update('active',{endpointId:'wsl:fixture',access:{source:'cli',runtime:'wsl',canSend:true},capabilities:{queue:false,steer:false}}));
   await expect(send).toBeDisabled();
-  await mode.selectOption('steer');await expect(send).toBeEnabled();
+  await page.evaluate(()=>sendControlsFixture.update('active',{capabilities:{queue:false,steer:true}}));
+  await expect(send).toBeEnabled();
   await page.evaluate(()=>sendControlsFixture.update('idle',{endpointId:undefined,access:undefined,capabilities:undefined}));
   await page.evaluate(()=>{sendControlsFixture.update('active');sendControlsFixture.reply='unknown';});
   await input.fill('결과 미확인 전송');await send.click();
@@ -788,8 +758,8 @@ test('account quota keeps all toolbar buttons on one row and exposes refresh and
   await page.evaluate(async()=>{sendControlsFixture.quotaWindows=[{windowDurationMins:10080,remainingPercent:75,resetsAt:1800500000}];await accountUsageControl.refresh(true);});
   await expect(quota).toHaveText('주간 75%');
   await page.setViewportSize({width:320,height:844});
-  const weekly=await quota.boundingBox(),model=await page.locator('#model-button').boundingBox();
-  expect(Math.abs(weekly.y+weekly.height/2-model.y-model.height/2)).toBeLessThan(4);
+  const weekly=await quota.boundingBox(),context=await page.locator('#composer .context-usage').boundingBox();
+  expect(Math.abs(weekly.y+weekly.height/2-context.y-context.height/2)).toBeLessThan(4);
   expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
   await page.screenshot({path:testInfo.outputPath('weekly-only-320.png')});
   for(const windows of [
@@ -798,7 +768,7 @@ test('account quota keeps all toolbar buttons on one row and exposes refresh and
   ]){
     await page.evaluate(async windows=>{sendControlsFixture.quotaWindows=windows;await accountUsageControl.refresh(true);},windows);
     await expect(quota).toContainText('100%');
-    const ys=await page.locator('#composer .composer-tools').evaluate(node=>[...node.querySelectorAll('button')].filter(n=>!n.hidden).map(n=>{const r=n.getBoundingClientRect();return r.top+r.height/2;}));
+    const ys=await page.locator('#composer .composer-tools').evaluate(node=>[...node.querySelectorAll('button')].filter(n=>!n.hidden&&n.getBoundingClientRect().width).map(n=>{const r=n.getBoundingClientRect();return r.top+r.height/2;}));
     expect(Math.max(...ys)-Math.min(...ys)).toBeLessThan(4);
     expect(await page.locator('#composer').evaluate(n=>n.scrollWidth<=n.clientWidth+1)).toBe(true);
   }

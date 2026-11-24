@@ -60,7 +60,9 @@ npm run test:browser
 
 `scripts/smoke-*` 항목의 중간 부분은 실제 애플리케이션을 시작하거나 패키지 제품에 의존합니다. 실행하기 전에 헤더를 살펴보고 fixture，부작용이 없는 일반 단위 테스트로 취급하지 마세요.。
 
-기본 사이드 채팅 사용 `test_native_side_chat.py`、`test_store.py` 및 브라우저 `native-side-chat.spec.cjs` 영구 생성, 상위-하위 소유권, 표준 채팅 라우팅 및 종료 보기가 삭제되지 않았는지 확인합니다. 오래된 `test_side_chat.py` 임시 런타임은 유지되며 업그레이드 전에 열렸던 이전 페이지만 보호됩니다. 새로운 사이드 채팅에서는 더 이상 이 런타임을 사용하지 않습니다. 독립된 측면 입력 영역 및 액세서리 UI 고정 장치가 제거되었으며 이제 표준 세션의 해당 사용 사례가 재사용됩니다.。
+新版 Codex Desktop 接入的定向入口为 `test_hosted_desktop.py`。`python3 -B scripts/smoke-hosted-desktop.py --codex <已安装原生运行时绝对路径>` 在 `.tmp/` 新建私有配置，以真实原生执行器和 loopback 模型验证生产 Bridge 的历史读取、发送、中断、审批取消及同一执行器重连。该入口不连接用户的 App、账号或正式 daemon；原 App 启动握手、真实 GUI 同步与 Windows 成品另行验收。
+
+原生侧边聊天使用 `test_native_side_chat.py`、`test_store.py` 和浏览器的 `native-side-chat.spec.cjs` 验证持久化创建、父子归属、标准聊天路由与关闭视图不删除。旧 `test_side_chat.py` 中保留临时运行时回归，仅保护升级前已打开的旧页面；新增侧边聊天不再使用该运行时。独立侧边输入区和附件 UI 夹具已移除，现复用标准会话的相应用例。
 
 `node scripts/smoke-wsl-app-ui.cjs` 독립하여 Edge 실제 구성 디렉터리 로드 Web 페이지 및 작곡 API，실제 실행 `tests/browser/codex-entries.browser.js`，독립적인 애플리케이션 관리, 목록 격리 확인、Magpie 모델명, 초안 보존 및 WSL 휴대폰은 새로운 독립 채팅, 디렉터리 브라우저를 만들고, 상위 디렉터리를 선택하여 새 폴더를 만들고, 새 프로젝트를 만들고, 명시적으로 페이지를 넘길 수 있습니다. 기본적으로 사용됨 Windows Edge，또한 사용 가능 `CMB_BROWSER` 지정하다 Chromium 실행 파일; 자체 브라우저 프로세스만 시작하고 스크린샷과 결과는 `.tmp/`，실제 게이트웨이에 연결되지 않거나 Codex。기본 공유 서비스를 위한 SegWit은 계속해서 제공됩니다. `scripts/smoke-wsl-shared-server.py --codex <분명한 Linux 실행 시간>` 혼자 실행。
 

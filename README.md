@@ -21,9 +21,7 @@
 
 # Codex Mobile Bridge · 다중 클라이언트 원격 워크벤치
 
-> 이 저장소는 [Codex Mobile Bridge](https://github.com/try2love/codex-mobile-bridge)의 **한국어 포크**입니다. 원문의 구성·기능 설명·기여자·라이선스를 유지하면서 UI, 문서, 주석을 한국어로 옮기고 의존성 보안 업데이트를 관리합니다. **이 포크의 설치 파일은 아직 배포하지 않았습니다.** 아래 업스트림 다운로드에는 이 포크의 한국어화와 수정이 포함되지 않습니다.
->
-> 업데이트 조회 대상은 `sekai0716/codex-mobile-bridge-kr`입니다. 별도 서명 릴리스가 준비될 때까지 데스크톱 내장 업데이터는 비활성화되어 있습니다. 원본 스크린샷·영상에 포함된 중국어는 그대로이며, 이 포크의 실기기 설치·연결 검증과 구분해 읽어 주세요.
+> **v2.2.2-preview.3：** [预览版下载](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.2-preview.3) · [更新说明](RELEASE_NOTES.md)。适配新版 Codex 原生连接，新增完整历史版本选择、安装包下载缓存管理，改善版本切换配置恢复与 Windows 配置权限；首次正常准备可能需要重启 Codex 一次。preview.1 的 Mac/Windows 用户及 preview.2 用户可检查更新，Linux preview.1 需手动安装；稳定版仍为 [v2.2.1](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.1)。
 
 > **v2.2.1:** [업스트림 정식 버전](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.2.1) · [릴리스 노트](RELEASE_NOTES.md). 최신 Codex App의 네이티브 연결을 사용하려면 업데이트를 권장합니다. Antigravity와 채팅 내 대화형 차트를 추가하고 긴 대화·모델 캐시를 개선했습니다.
 
@@ -938,7 +936,11 @@ python3 -B -m unittest discover -s tests -v
 
 [LINUX DO](https://linux.do/) 커뮤니티와 회원 여러분의 지원에 감사드립니다.
 
-[@heiqiu47](https://github.com/heiqiu47)은 [PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167)·[PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169)에서 채팅 내 대화형 차트와 Codex 프로토콜 호환성에, [@windowmmk](https://github.com/windowmmk)는 [PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171)에서 큰 로그의 네이티브 포트 검색 수정에 기여했습니다.
+感谢 [@heiqiu47](https://github.com/heiqiu47) 的 [PR #201](https://github.com/try2love/codex-mobile-bridge/pull/201) 输入区定制、[@mc373906408](https://github.com/mc373906408) 的 [PR #182](https://github.com/try2love/codex-mobile-bridge/pull/182) 明暗图标、[@hmho000](https://github.com/hmho000) 的 [PR #200](https://github.com/try2love/codex-mobile-bridge/pull/200) 启动修复，以及 [@windowmmk](https://github.com/windowmmk) 的 Antigravity、SSH、文件与消息管理改进。各项关联与采纳范围见 [preview.2 更新说明](RELEASE_NOTES.md)。原作者贡献与后续修订分别保留。
+
+感谢 [@windowmmk](https://github.com/windowmmk) 在 [PR #173](https://github.com/try2love/codex-mobile-bridge/pull/173)、[#178](https://github.com/try2love/codex-mobile-bridge/pull/178)、[#179](https://github.com/try2love/codex-mobile-bridge/pull/179)、[#180](https://github.com/try2love/codex-mobile-bridge/pull/180) 和 [#189–#198](RELEASE_NOTES.md) 中贡献 Antigravity 原生指令、模型强度、停止、分屏及多客户端稳定性修复。
+
+感谢 [@heiqiu47](https://github.com/heiqiu47) 在 [PR #167](https://github.com/try2love/codex-mobile-bridge/pull/167) 与 [PR #169](https://github.com/try2love/codex-mobile-bridge/pull/169) 中贡献聊天内交互图表和 Codex 协议兼容，以及 [@windowmmk](https://github.com/windowmmk) 在 [PR #171](https://github.com/try2love/codex-mobile-bridge/pull/171) 中修复大型日志中的原生端口发现。
 
 [@windowmmk](https://github.com/windowmmk)는 [PR #150](https://github.com/try2love/codex-mobile-bridge/pull/150)에서 채택된 Antigravity 연결의 기반을 제공하고 [PR #170](https://github.com/try2love/codex-mobile-bridge/pull/170)에서 네이티브 대기 요청 처리, 모델 사용 한도, 기록 이미지 개선에 기여했습니다. [@heiqiu47](https://github.com/heiqiu47)은 [PR #146](https://github.com/try2love/codex-mobile-bridge/pull/146)·[PR #157](https://github.com/try2love/codex-mobile-bridge/pull/157)에서 사용자 지정 HTTPS 포트와 macOS 메뉴 막대 아이콘을 제공했습니다. 원저자의 커밋은 모두 유지했으며 선택적 반영·수정·통합 조정은 별도 커밋으로 기록했습니다.
 

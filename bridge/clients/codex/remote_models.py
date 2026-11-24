@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 
 
-REMOTE_MODEL_ERROR = '확인할 수 없습니다 SSH 네이티브 CLI 데몬의 시작 환경을 다시 연결한 후 모델을 새로 고치십시오.'
-REMOTE_MODEL_CHANGED = 'SSH 네이티브 CLI 데몬 프로세스가 변경되었습니다. 다시 연결한 후 모델을 새로고침하세요.'
+REMOTE_MODEL_ERROR = '无法核验 SSH 原生 CLI 守护进程的启动环境，请重新连接后刷新模型'
+REMOTE_MODEL_CHANGED = 'SSH 原生 CLI 守护进程已变化，请重新连接后刷新模型'
 
 
 def _remote_executable(home):
@@ -23,7 +23,7 @@ def _remote_executable(home):
 
 def _environment_snapshot(home, cwd, provider, config, account):
     if sys.platform not in ('linux', 'darwin'):
-        raise ValueError('SSH 네이티브 CLI 모델 쿼리는 현재 이 시스템을 지원하지 않습니다.')
+        raise ValueError('SSH 原生 CLI 模型查询暂不支持此系统')
     if not isinstance(home, str) or not Path(home).is_absolute() or not isinstance(cwd, str) or not Path(cwd).is_absolute():
         raise ValueError(REMOTE_MODEL_ERROR)
     if not isinstance(config, dict) or not isinstance(account, dict) or not isinstance(provider, str) or not provider:
@@ -64,9 +64,9 @@ def remote_model_worker(value):
     """Read only the selected daemon environment; never return its values."""
     operation = value.get('operation')
     if operation not in ('identity', 'models'):
-        return {'error': '알 수 없는 모델 디렉터리 작업'}
+        return {'error': '未知模型目录操作'}
     if sys.platform not in ('linux', 'darwin'):
-        return {'error': 'SSH 네이티브 CLI 모델 쿼리는 현재 이 시스템을 지원하지 않습니다.'}
+        return {'error': 'SSH 原生 CLI 模型查询暂不支持此系统'}
     home, cwd, provider = value.get('home'), value.get('cwd'), value.get('provider')
     config, account = value.get('config'), value.get('account') or {}
     try:
@@ -77,7 +77,7 @@ def remote_model_worker(value):
         return {'identity': identity}
     native = value.get('nativeModels') or []
     if not isinstance(native, list):
-        return {'error': 'CLI 모델 메타데이터 형식이 잘못되었습니다.'}
+        return {'error': 'CLI 模型元数据格式无效'}
 
     def request(method, params):
         if method == 'config/read':
@@ -86,13 +86,13 @@ def remote_model_worker(value):
             return {'account': account}
         if method == 'model/list':
             return {'data': native}
-        raise CatalogError('CLI 모델 디렉터리는 읽기 전용 요청만 허용합니다.')
+        raise CatalogError('CLI 模型目录只允许只读请求')
 
     try:
         reader = Catalog(home, _remote_executable(home), allow_background_refresh=False)
         result = reader.read_models(request, cwd, provider, metadata_request=request, environment=environment)
         if result.get('modelSource') != 'api':
-            return {'error': '현재 네이티브 CLI 액세스가 불가능합니다. API 모델 디렉토리입니다. 모델을 수동으로 입력하세요. ID'}
+            return {'error': '当前原生 CLI 接入不是 API 模型目录，请手动填写模型 ID'}
         _, after = _environment_snapshot(home, cwd, provider, config, account)
         if identity != after:
             return {'error': REMOTE_MODEL_CHANGED}

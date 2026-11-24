@@ -34,6 +34,10 @@ class ZCodeLifecycleTests(unittest.TestCase):
         self.platform.start()
         self.addCleanup(self.platform.stop)
         self.manager = DesktopSessions(self.root, gateway_running=True)
+        # This protocol fixture supplies its own installation and process observations.
+        inventory = patch.object(self.manager, '_refresh_installation_inventory', return_value=False)
+        inventory.start()
+        self.addCleanup(inventory.stop)
         self.addCleanup(self.manager.close)
         self.adapter = self.manager.adapters['zcode']
         self.assertIs(type(self.adapter), ZCodeDesktop)
@@ -144,8 +148,8 @@ class ZCodeLifecycleTests(unittest.TestCase):
             self.assertEqual(pipe.call.call_count, 2)
             self.assertIsNone(adapter.application_owner)
             pipe.owner.return_value = owner
-            pipe.call.side_effect = ValueError('ZCode 기존 App 세션 서비스 프로토콜이 호환되지 않습니다')
-            with self.assertRaisesRegex(ValueError, '프로토콜이 호환되지 않습니다'):
+            pipe.call.side_effect = ValueError('ZCode 原 App 会话服务协议不兼容')
+            with self.assertRaisesRegex(ValueError, '协议不兼容'):
                 adapter.start_private_application(owner)
             self.assertIsNone(adapter.application_owner)
             pipe.start.assert_not_called()
@@ -229,7 +233,7 @@ class ZCodeLifecycleTests(unittest.TestCase):
         self.manager._configure_zcode()
         with patch('bridge.clients.lifecycle.stop_client') as stop, \
                 patch('bridge.clients.zcode.adapter.listener_identity') as port:
-            with self.assertRaisesRegex(ValueError, '작업 상태를 확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认任务状态'):
                 self.toggle(True, initializeDesktop=True, connectionMode='private-pipe')
             fake.owner.side_effect = PermissionError('identity mismatch')
             with self.assertRaises(PermissionError):
@@ -256,7 +260,7 @@ class ZCodeLifecycleTests(unittest.TestCase):
             self.assertEqual(current['connectionMode'], 'private-pipe')
             self.assertIsNone(self.manager._descriptor('zcode')['debugFallbackPort'])
             listener.assert_not_called()
-        with self.assertRaisesRegex(ValueError, "이\\ 기기의\\ 호환\\ 포트가\\ 제거되었습니다\\.\\ 로컬\\ 연결\\ 또는\\ 공식\\ 원격\\ 제어를\\ 선택하십시오\\."):
+        with self.assertRaisesRegex(ValueError, '已移除'):
             self.manager.control({'action': 'zcode-compatibility', 'enabled': True})
 
     def test_private_initialization_restarts_normally_only_after_task_confirmation(self):
@@ -281,7 +285,7 @@ class ZCodeLifecycleTests(unittest.TestCase):
         pipe.start.side_effect = start
         with patch('bridge.clients.lifecycle.stop_client', side_effect=stop) as quit_app, \
                 patch('bridge.clients.lifecycle.launch_client') as ordinary:
-            with self.assertRaisesRegex(ValueError, '작업 상태를 확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认任务状态'):
                 self.toggle(True, initializeDesktop=True, connectionMode='private-pipe')
             quit_app.assert_not_called()
             pipe.start.assert_not_called()
@@ -307,7 +311,7 @@ class ZCodeLifecycleTests(unittest.TestCase):
         with patch('bridge.clients.lifecycle.stop_client') as stop, \
                 patch('bridge.clients.lifecycle.launch_client') as start, \
                 patch('bridge.clients.zcode.adapter.listener_identity') as listener:
-            with self.assertRaisesRegex(ValueError, '기존 App 연결이 확인되지 않았습니다.'):
+            with self.assertRaisesRegex(ValueError, '原 App 未确认连接'):
                 self.toggle(True, initializeDesktop=True, connectionMode='private-pipe')
             self.assertIsNone(self.manager.adapters['zcode'].application_owner)
             self.assertNotIn('zcodeCompatibility', self.manager.config)
@@ -331,20 +335,20 @@ class ZCodeLifecycleTests(unittest.TestCase):
 
     def test_normal_quit_requires_confirmation_for_unknown_and_rejects_known_work(self):
         with patch('bridge.clients.lifecycle.stop_client') as stop:
-            with self.assertRaisesRegex(ValueError, '작업 상태를 확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认任务状态'):
                 self.toggle(False, quitDesktop=True)
             self.toggle(False, quitDesktop=True, acknowledgeUnavailable=True)
             stop.assert_called_once()
             stop.reset_mock()
             with patch.object(self.adapter, 'status', return_value={'connected': True}), \
                     patch.object(self.adapter, 'call', return_value={'sessions': [{'status': 'active'}]}):
-                with self.assertRaisesRegex(ValueError, "작업이\\ 실행\\ 중이거나\\ 확인\\ 대기\\ 중입니다\\.\\ 앱을\\ 닫거나\\ 다시\\ 시작하기\\ 전에\\ 완료하세요\\."):
+                with self.assertRaisesRegex(ValueError, '有任务运行'):
                     self.toggle(False, quitDesktop=True, acknowledgeUnavailable=True)
             stop.assert_not_called()
 
     def test_force_requires_explicit_consent_and_keeps_identity_check(self):
         with patch('bridge.clients.lifecycle.force_stop_client') as force:
-            with self.assertRaisesRegex(ValueError, "백그라운드\\ 강제\\ 종료\\ 요청이\\ 잘못되었습니다\\."):
+            with self.assertRaisesRegex(ValueError, '强制结束请求无效'):
                 self.toggle(False, quitDesktop=True, forceDesktop=True)
             force.assert_not_called()
             self.toggle(False, quitDesktop=True, forceDesktop=True, forceConfirmed=True)

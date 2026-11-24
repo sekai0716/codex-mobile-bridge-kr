@@ -111,7 +111,7 @@ class FileDesktop:
                     except OSError:
                         # The offer may already be visible to the renderer. Do not
                         # reopen this writer after an uncertain acknowledgement.
-                        self.message = 'Claude 교체 확인 쓰기에 실패했습니다. 수동으로 다시 연결해 주세요.'
+                        self.message = 'Claude 接替确认写入失败，请手动重新连接'
                     return
         except asyncio.CancelledError:
             pass
@@ -155,7 +155,7 @@ class FileDesktop:
     def write(self, value):
         packet = self.pack(value)
         if len(packet.encode('utf-8')) > MAX_REQUEST:
-            raise ValueError("Claude 메시지와 인코딩된 이미지는 10 MiB 미만이어야 합니다. 첨부파일을 줄여보세요.")
+            raise ValueError('Claude 单次消息与图片编码后不能超过 10 MiB，请减少附件')
         target = self.directory / 'request.json'
         temp = self.directory / 'request.tmp'
         temp.write_text(packet, encoding='utf-8')
@@ -176,7 +176,7 @@ class FileDesktop:
             try:
                 self.staged_reply.collect(path, self.generation, MAX_PACKET, self.pack)
             except ImportError:
-                self.message = 'Claude 세션 없는 액세스에는 소스 버전 데스크톱 종속성을 설치해야 합니다.'
+                self.message = 'Claude 无会话接入需要安装源码版桌面依赖'
                 self.staged_reply = None
         try:
             stat = path.stat()
@@ -221,11 +221,11 @@ class FileDesktop:
     async def call(self, surface, method, *args, timeout=30):
         deadline = time.monotonic() + timeout
         try:await asyncio.wait_for(self.lock.acquire(), timeout=timeout)
-        except asyncio.TimeoutError as exc:raise BridgeUnavailable("Claude 다른 용무가 있습니다. 나중에 옵션을 새로고침하세요.") from exc
+        except asyncio.TimeoutError as exc:raise BridgeUnavailable("Claude 正忙，请稍后刷新选项") from exc
         try:
             acknowledged = False
             if not self.connected or method not in self.capabilities.get(surface, []):
-                raise BridgeUnavailable("Claude 데스크탑 파일 커넥터가 연결 해제되었거나 이 작업을 지원하지 않습니다.")
+                raise BridgeUnavailable('Claude Desktop 文件桥接未连接或不支持此操作')
             self.seq += 1
             seq = self.seq
             if method in MUTATIONS:
@@ -237,7 +237,7 @@ class FileDesktop:
                      'method': method, 'args': list(args)})
             except OSError as exc:
                 self.unconfirmed_mutations.discard(seq)
-                raise BridgeUnavailable('로컬 브리지 파일에 쓸 수 없습니다. 파일 점유 및 디렉터리 권한을 확인하십시오.') from exc
+                raise BridgeUnavailable('无法写入本地桥接文件，请检查文件占用和目录权限') from exc
             except ValueError:
                 self.unconfirmed_mutations.discard(seq)
                 raise
@@ -250,9 +250,9 @@ class FileDesktop:
                     acknowledged = True
                     return reply.get('result')
                 if not self.connected:
-                    raise BridgeUnavailable("Claude 데스크탑 파일 커넥터가 연결 해제되었습니다. 수술 결과가 불확실할 수 있습니다.")
+                    raise BridgeUnavailable('Claude Desktop 文件桥接已断开；操作结果可能不确定')
                 await asyncio.sleep(.2)
-            raise BridgeUnavailable('Claude Desktop 응답 시간이 초과되었습니다. 원래 세션을 확인하고 다시 제출하지 마십시오.')
+            raise BridgeUnavailable('Claude Desktop 响应超时；请检查原会话，不要重复提交')
 
         finally:
             # Only this writer may clear its last request. An uncertain mutation

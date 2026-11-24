@@ -378,8 +378,8 @@ class GlobalReminderTests(unittest.TestCase):
             self.monitor.scan()
             self.monitor.scan()
             send.assert_called_once()
-            self.assertEqual(send.call_args.args[1], 'Codex 미리보기 역학 재설정')
-            self.assertIn("타사 소스에 재설정 미리보기가 포함되어 있지만 아직 완료되었는지 확인되지 않았습니다.。\n데이터：", send.call_args.args[2])
+            self.assertEqual(send.call_args.args[1], 'Codex 重置预告动态')
+            self.assertIn('第三方来源收录了重置预告，尚未确认完成。', send.call_args.args[2])
 
     def test_stale_data_and_disabled_notifications_are_silent(self):
         with patch('bridge.features.accounts.monitor.time.time', return_value=NOW):
@@ -403,7 +403,7 @@ class GlobalReminderTests(unittest.TestCase):
             self.monitor.scan()
             value.update(officialSignal=None, lastResetAt=NOW+2)
             self.monitor.scan()
-            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 미리보기 역학 재설정', 'Codex 활동 재설정'])
+            self.assertEqual([call.args[1] for call in send.call_args_list], ['Codex 重置预告动态', 'Codex 重置动态'])
         self.monitor.configure({'globalResetSignal': False})
         self.assertFalse(self.monitor.preferences['globalReset'])
         self.assertFalse(self.monitor.preferences['globalResetSignal'])

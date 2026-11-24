@@ -52,7 +52,7 @@ class ProjectTrust(unittest.TestCase):
         with self.assertRaises(CreationUnavailable): self.run_trust(True)
         self.assertFalse(self.trusted)
         self.cwd.rename(self.root/'old'); self.cwd.mkdir()
-        with self.assertRaisesRegex(ValueError, "프로젝트\\ 디렉터리가\\ 변경되었습니다\\.\\ 디렉터리를\\ 다시\\ 선택하세요\\."): self.run_trust(True)
+        with self.assertRaisesRegex(ValueError, '已变化'): self.run_trust(True)
         self.assertFalse(self.trusted)
 
     def test_unknown_write_is_not_retried(self):
@@ -74,9 +74,9 @@ class ProjectTrust(unittest.TestCase):
             state = bridge.project_trust(project['key'])
             self.assertTrue(state['required']); self.assertEqual(rpc.call_args.args[0], 'chosen')
             bridge.project_trust(project['key'], True, state['confirmation'])
-            with self.assertRaisesRegex(ValueError, "선택한\\ 항목이\\ 변경되었습니다\\.\\ 다시\\ 확인해\\ 주세요\\."): bridge.project_trust(project['key'], True, 'stale')
+            with self.assertRaisesRegex(ValueError, '已变化'): bridge.project_trust(project['key'], True, 'stale')
             bridge.hosts.hosts = lambda: {'ssh': {'alias': 'different'}}
-            with self.assertRaisesRegex(ValueError, '호스트 구성이 변경되었습니다.'): bridge.project_trust(project['key'])
+            with self.assertRaisesRegex(ValueError, '主机配置已变化'): bridge.project_trust(project['key'])
 
     def test_project_host_uses_exact_metadata_not_ambiguous_prefix(self):
         bridge = Bridge(self.root, self.root/'data'); self.addCleanup(bridge.close)
@@ -114,8 +114,8 @@ class NativeImport(unittest.TestCase):
         path = self.root/'codex-app/config.json'; path.parent.mkdir()
         for rows in [[{'sshAlias': 'other'}], [{'sshAlias': 'selected', 'projects': [{'remotePath': '/pending'}]}]]:
             path.write_text(json.dumps({'remoteConnections': rows}))
-            with self.assertRaisesRegex(ValueError, "Codex\\ App\\ 적용할\\ 다른\\ 원격\\ 구성이\\ 있습니다\\.\\ 먼저\\ 구성해\\ 주세요\\.\\ App\\ 이것을\\ 추가하세요\\ SSH\\ 다른\\ 연결에\\ 영향을\\ 미치지\\ 않도록\\ 프로젝트"): self.hosts.project_import(self.project)
+            with self.assertRaisesRegex(ValueError, '其他待应用'): self.hosts.project_import(self.project)
         path.unlink(); prepared = self.hosts.project_import(self.project)
         path.write_text('{}')
-        with self.assertRaisesRegex(ValueError, '구성이 변경되었습니다.'): self.hosts.write_project_import(prepared, private_json)
+        with self.assertRaisesRegex(ValueError, '配置已变化'): self.hosts.write_project_import(prepared, private_json)
         self.assertEqual(path.read_text(), '{}')

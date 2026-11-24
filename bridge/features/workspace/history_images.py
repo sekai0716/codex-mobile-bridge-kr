@@ -39,22 +39,22 @@ class HistoryImages:
         with self.lock:
             reference = self.references.get(identifier)
             if reference is None or reference[:2] != (provider, sid):
-                raise ValueError('이미지 참조가 만료되었습니다. 채팅을 새로 고치고 다시 시도해 주세요.')
+                raise ValueError('图片引用已失效，请刷新聊天后重试')
             self.references.move_to_end(identifier)
             source = dict(reference[2])
         # Revalidate membership in native history on every load, including after
         # a profile switch or message deletion. Cached identifiers grant no access.
         value = load(source)
         if not isinstance(value, dict):
-            raise ValueError('네이티브 이미지 응답이 잘못되었습니다.')
+            raise ValueError('原生图片响应无效')
         data, mime = value.get('data'), value.get('mediaType')
         if not isinstance(data, str) or len(data) > ((MAX_FILE + 2) // 3) * 4:
-            raise ValueError('이미지가 미리보기 크기 제한을 초과했습니다.')
+            raise ValueError('图片超出预览大小限制')
         try:
             raw = base64.b64decode(data, validate=True)
         except ValueError:
-            raise ValueError('원본 이미지 콘텐츠가 잘못되었습니다.') from None
+            raise ValueError('原生图片内容无效') from None
         if not 0 < len(raw) <= MAX_FILE or image_type(raw) != mime or mime is None:
-            raise ValueError('기본 이미지 형식은 미리보기를 지원하지 않습니다.')
+            raise ValueError('原生图片格式不支持预览')
         return {'previewBytes': raw, 'previewMime': mime,
                 'previewSha256': hashlib.sha256(raw).hexdigest(), 'name': 'image'}, 'native'

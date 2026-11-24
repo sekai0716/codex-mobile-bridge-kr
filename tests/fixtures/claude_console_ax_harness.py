@@ -147,12 +147,12 @@ final class Connector {
     func activate() throws { scenario.activated = true }
     func check() throws {
         if scenario.name == "focus_loss" && scenario.tick >= 2 {
-            try fail("needs-attention", "초점이 나갔어 Claude，자동 연결이 중지되었습니다. 다시 시도해 주세요.")
+            try fail("needs-attention", "焦点已离开 Claude，自动连接已停止，请重试")
         }
     }
     func checkWindow(_ window: AXUIElement) throws {
         try check()
-        if !CFEqual(window, scenario.focused) { try fail("needs-attention", "Claude 창문이 바뀌었어요") }
+        if !CFEqual(window, scenario.focused) { try fail("needs-attention", "Claude 窗口已改变") }
     }
     func key(_ code: Int, flags: Flags = []) throws { scenario.hotkeys += 1 }
 __CONSOLE__
@@ -176,15 +176,15 @@ def main():
     expected = {
         "late_window": "result=success prompt=prompt tick=3",
         "late_subtree": "result=success prompt=prompt tick=4",
-        "focus_loss": "result=needs-attention reason=초점이 나갔어 Claude",
+        "focus_loss": "result=needs-attention reason=焦点已离开 Claude",
         "existing_open_focused": "result=success prompt=prompt tick=0",
         "existing_open_refocus": "result=success prompt=prompt tick=1",
-        "other_app_refocus": "result=needs-attention reason=Claude 창문이 바뀌었어요",
-        "ordinary_refocus": "result=needs-attention reason=Claude 창문이 바뀌었어요",
-        "ambiguous_refocus": "result=needs-attention reason=Claude 창문이 바뀌었어요",
-        "focused_stale": "result=failed reason=찾을 수 없음 Claude Console",
-        "no_prompt": "result=failed reason=찾을 수 없음 Claude Console",
-        "tab_press_rejected": "result=failed reason=찾을 수 없음 Claude Console",
+        "other_app_refocus": "result=needs-attention reason=Claude 窗口已改变",
+        "ordinary_refocus": "result=needs-attention reason=Claude 窗口已改变",
+        "ambiguous_refocus": "result=needs-attention reason=Claude 窗口已改变",
+        "focused_stale": "result=failed reason=未找到 Claude Console",
+        "no_prompt": "result=failed reason=未找到 Claude Console",
+        "tab_press_rejected": "result=failed reason=未找到 Claude Console",
         "lost_prompt": "result=success prompt=prompt tick=1",
         "cold_ax_off": "result=success prompt=prompt tick=1",
         "cold_ax_unsupported": "result=success prompt=prompt tick=0",

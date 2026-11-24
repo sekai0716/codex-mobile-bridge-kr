@@ -27,7 +27,8 @@ test('unavailable, cross-host and cyclic parents never create a child workspace'
 });
 function routeController(overrides={}){
  const source=fs.readFileSync('web/shell/app.js','utf8'),start=source.indexOf('async function openChat('),end=source.indexOf('  messageActions.dialog.close();workbench.open',start);
- const c=vm.createContext({clientNavigation:{provider:'codex'},sharedSessionMenu:null,messageActions:{pending:false},chatOpenGeneration:0,currentId:'parent',currentHost:'local',chatTimeline:{abort:{signal:{aborted:false}}},workbench:{current:{id:'parent',chatId:'parent'},select(){}},listRows:[],api:async()=>({meta:{}}),sessionUrl:id=>id,toast(){},t:x=>x,$:()=>({classList:{add(){}}}),window:{BridgePresentation:{openChat(){}}},browserNavigation:{sync(){}},reportVisibleChat(){},...overrides});
+ assert.ok(start>=0&&end>start,'Exercise the real chat route selection');
+ const c=vm.createContext({clientNavigation:{provider:'codex'},sharedSessionMenu:null,messageActions:{pending:false},chatOpenGeneration:0,currentId:'parent',currentHost:'local',chatTimeline:{abort:{signal:{aborted:false}}},workbench:{current:{id:'parent',chatId:'parent'},select(){}},listRows:[],api:async()=>({meta:{}}),sessionUrl:id=>id,toast(){},t:x=>x,$:()=>({classList:{add(){}}}),window:{BridgePresentation:{openChat(){}}},browserNavigation:{sync(){}},reportVisibleChat(){},renderChatTitle(){},...overrides});
  vm.runInContext(source.slice(start,end)+'return route;}',c);return c;
 }
 test('selecting the current parent cancels a pending child notification route',async()=>{

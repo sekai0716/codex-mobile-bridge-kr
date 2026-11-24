@@ -81,7 +81,7 @@ def main():
     test_root = args.test_root.absolute()
     require('.tmp' in test_root.parts and not test_root.is_symlink(), 'Use a project .tmp directory')
     run = test_root / ('terminal-http-' + uuid.uuid4().hex[:8])
-    workspace = run / ('workspace 중국어 space' if args.extended_cwd else 'workspace')
+    workspace = run / ('workspace 中文 space' if args.extended_cwd else 'workspace')
     (workspace / 'nested').mkdir(parents=True)
     stored_cwd = '\\\\?\\' + str(workspace) if args.extended_cwd else str(workspace)
 

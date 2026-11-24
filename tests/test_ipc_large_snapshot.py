@@ -24,7 +24,7 @@ class LargeSnapshotTests(unittest.TestCase):
         large = state()
         large['id'] = session_b.id
         large['turns'] = [{'turnId': 'large-turn', 'status': 'completed', 'items': [
-            {'id': 'large-item', 'type': 'agentMessage', 'text': 'x' * (65 * 1024 * 1024) + '\n중국어🚀'}]}]
+            {'id': 'large-item', 'type': 'agentMessage', 'text': 'x' * (65 * 1024 * 1024) + '\n中文🚀'}]}]
         message = {'type': 'broadcast', 'sourceClientId': 'owner',
                    'method': 'thread-stream-state-changed', 'version': 11,
                    'params': {'hostId': 'local', 'conversationId': session_b.id,
@@ -99,7 +99,7 @@ class FrameBudgetTests(unittest.TestCase):
         ipc = DesktopIPC('unused')
         ipc.socket = Mock()
         with patch.object(ipc, 'MAX_REQUEST', 10):
-            with self.assertRaisesRegex(IPCError, '소식이 너무 커'):
+            with self.assertRaisesRegex(IPCError, '消息过大'):
                 ipc._send({'text': 'not a small request'})
         ipc.socket.sendall.assert_not_called()
 

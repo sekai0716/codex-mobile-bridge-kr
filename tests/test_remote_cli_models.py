@@ -77,9 +77,9 @@ class RemoteCliModelsTests(unittest.TestCase):
         daemon = "count=0\ndef read_daemon_environment(home, executable, names):\n global count\n count+=1\n return ({'FIXTURE_API_KEY':'target-secret'}, (7, count, executable))"
         catalog = "def model_catalog(*args, **kwargs): return [{'id':'route/model-a','name':'A','efforts':[]}]"
         result, _ = self.worker('models', daemon, catalog)
-        self.assertEqual(result, {'error': 'SSH 네이티브 CLI 데몬 프로세스가 변경되었습니다. 다시 연결한 후 모델을 새로고침하세요.'})
+        self.assertEqual(result, {'error': 'SSH 原生 CLI 守护进程已变化，请重新连接后刷新模型'})
         result, _ = self.worker('models', "def read_daemon_environment(*args): raise OSError('private environment')", catalog)
-        self.assertEqual(result, {'error': '확인할 수 없습니다 SSH 네이티브 CLI 데몬의 시작 환경을 다시 연결한 후 모델을 새로 고치십시오.'})
+        self.assertEqual(result, {'error': '无法核验 SSH 原生 CLI 守护进程的启动环境，请重新连接后刷新模型'})
 
     @unittest.skipUnless(sys.platform in ('linux', 'darwin'), 'SSH CLI model helper requires a Linux or macOS target')
     def test_environment_selection_respects_auth_file_and_static_credentials(self):
@@ -108,7 +108,7 @@ class RemoteCliModelsTests(unittest.TestCase):
         catalog = "def model_catalog(*args, **kwargs): raise AssertionError('native catalog should not query upstream')"
         result, _ = self.worker('models', daemon, catalog, provider='openai',
                                 config={'model_provider': 'openai', 'model_catalog_json': '/native/models.json'})
-        self.assertEqual(result, {'error': '현재 네이티브 CLI 액세스가 불가능합니다. API 모델 디렉토리입니다. 모델을 수동으로 입력하세요. ID'})
+        self.assertEqual(result, {'error': '当前原生 CLI 接入不是 API 模型目录，请手动填写模型 ID'})
 
     @unittest.skipUnless(sys.platform in ('linux', 'darwin'), 'SSH CLI model helper requires a Linux or macOS target')
     def test_openai_custom_query_auth_reads_target_key_and_base_without_account(self):
@@ -123,7 +123,7 @@ class RemoteCliModelsTests(unittest.TestCase):
         daemon = "sys.platform = 'win32'\ndef read_daemon_environment(*args): raise AssertionError('unsupported target read')"
         catalog = "def model_catalog(*args, **kwargs): raise AssertionError('unsupported target HTTP')"
         result, _ = self.worker('identity', daemon, catalog)
-        self.assertEqual(result, {'error': 'SSH 네이티브 CLI 모델 쿼리는 현재 이 시스템을 지원하지 않습니다.'})
+        self.assertEqual(result, {'error': 'SSH 原生 CLI 模型查询暂不支持此系统'})
 
     def test_wrapper_sends_encoded_snapshot_and_exposes_only_public_result(self):
         identity = 'a' * 64

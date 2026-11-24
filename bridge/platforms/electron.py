@@ -9,12 +9,12 @@ def package_manifest(archive):
     with Path(archive).open('rb') as stream:
         header = stream.read(16)
         if len(header) != 16:
-            raise ValueError("데스크톱 앱 메타데이터가 불완전합니다.")
+            raise ValueError('桌面程序元数据不完整')
         _, header_size, _, json_size = struct.unpack('<4I', header)
         if not 0 < json_size <= 16*1024*1024 or header_size < json_size:
-            raise ValueError("데스크톱 앱 메타데이터가 불완전합니다.")
+            raise ValueError('桌面程序元数据不完整')
         index = json.loads(stream.read(json_size))['files']['package.json']
         if index.get('unpacked') or not 0 < index['size'] < 1024*1024:
-            raise ValueError("데스크톱 앱 메타데이터가 불완전합니다.")
+            raise ValueError('桌面程序元数据不完整')
         stream.seek(8+header_size+int(index['offset']))
         return json.loads(stream.read(index['size']))

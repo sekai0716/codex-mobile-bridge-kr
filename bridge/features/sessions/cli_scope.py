@@ -32,14 +32,14 @@ class CliScope:
             try:
                 return self._target_snapshot(thread, key, self.bridge._cli_recovery_record())[0]
             except (OSError, ValueError, KeyError):
-                return {'canRelease': False, 'canForce': False, 'message': '목표 CLI 프로세스와 구성이 아직 확인되지 않았습니다. 원래의 구독 취소는 여전히 개별적으로 확인할 수 있습니다.。'}
+                return {'canRelease': False, 'canForce': False, 'message': '目标 CLI 进程与配置尚未核验；原逐条退订仍可单独核对。'}
         force = self.bridge.cli_force
         try:
             cli = force._scope()
             preview, executable, *_ = force._snapshot(cli, thread, key, self.bridge._cli_recovery_record())
         except (OSError, ValueError, KeyError):
-            return {'canRelease': False, 'canForce': False, 'message': '원본 확인 불가 CLI 구성 및 프로세스。'}
-        preview.update(canRelease=False, message='이 구성에 대한 전체 공유를 해제합니다. CLI 기타 연결 및 목록에 없는 작업을 포함한 서비스 기본값은 안전한 완료를 기다리는 것입니다.。')
+            return {'canRelease': False, 'canForce': False, 'message': '当前无法核验原 CLI 配置与进程。'}
+        preview.update(canRelease=False, message='将释放此配置的整个共享 CLI 服务，包含其它连接和未列出的任务；默认等待安全结束。')
         try:
             with closing(CodexAppServer(cli.client.socket_path, cli=executable,
                                         client_name='codex-mobile-bridge-target-check')) as probe:
@@ -52,8 +52,8 @@ class CliScope:
     def _result(self, record, status):
         return {'status': status, 'scopeKey': record['scopeKey'], 'impact': record['scopeImpact'],
                 'operationId': record['scopeRequestId'], 'canCancel': status == 'waiting',
-                'notice': '기본 작성기가 종료되었으며 이 구성에 대한 원래 연결이 해제되었습니다.。' if status == 'released'
-                else '이 구성의 모든 작업이 안전하게 끝나기를 기다리고 있습니다. 아직 종료되지 않았거나 원주민 직업이 해제되지 않았습니다.。'}
+                'notice': '原生写入者已退出，此配置的原连接已释放。' if status == 'released'
+                else '正在等待此配置的全部任务安全结束；尚未退出或释放原生占用。'}
 
     def record_released(self, result):
         if self.target is not None:
@@ -89,7 +89,7 @@ class CliScope:
                 record['phase'] = 'released'
                 self.save(self.bridge.data_dir/'cli-daemon-recovery.json', record)
                 return self._result(record, 'released')
-            return {'status': 'unknown', 'notice': '대상 원래 종료가 아직 확인 대기 중입니다. 재배포되지 않은 수표。'}
+            return {'status': 'unknown', 'notice': '目标原代退出仍待核验；检查未重新派发。'}
         bridge, cli = self.bridge, self.bridge.cli_sessions
         record = bridge._cli_recovery_record()
         if (not record.get('scopeRequestId') or key not in record.get('connections', ())
@@ -103,7 +103,7 @@ class CliScope:
             self.save(bridge.data_dir/'cli-daemon-recovery.json', record)
             return self._result(record, 'released')
         return {'status': 'waiting' if record['phase'] == 'waiting' else 'unknown',
-                'notice': '기존 CLI 출시 결과는 아직 확인되지 않았습니다. 검사가 서비스를 다시 종료하지 않습니다.。'}
+                'notice': '原 CLI 释放结果尚待核验；检查不会重新退出服务。'}
 
     def cancel(self, operation_id):
         bridge = self.bridge
@@ -111,16 +111,16 @@ class CliScope:
             record = bridge._cli_recovery_record()
             own = record.get('scopeRequestId') == operation_id
             if operation_id in self.dispatched or own and record.get('phase') != 'waiting':
-                raise ReleaseNotSent('릴리스가 종료 단계에 진입했거나 종료되어 취소할 수 없습니다. 결과를 확인해 주세요.')
+                raise ReleaseNotSent('释放已进入退出阶段或已经结束，不能取消；请核验结果')
             self.cancelled.add(operation_id)
             if own:
                 record['phase'] = 'cancelled'
                 self.save(bridge.data_dir/'cli-daemon-recovery.json', record)
-            return {'status': 'cancelled', 'notice': '이 대기가 취소되었으며 이 요청에 대해 서비스가 종료되지 않았습니다.。'}
+            return {'status': 'cancelled', 'notice': '已取消本次等待，未为此请求退出服务。'}
 
     def check_cancelled(self, operation_id):
         if operation_id in self.cancelled:
-            raise ReleaseNotSent('출시 대기가 취소되었습니다. 서비스가 종료되지 않았습니다')
+            raise ReleaseNotSent('释放等待已取消；未退出服务')
 
     @staticmethod
     def release_environment(cli, executable, probe):
@@ -144,7 +144,7 @@ class CliScope:
             if own and current['phase'] in ('draining', 'released'):
                 return self.check(key) or {'status': 'unknown'}
             if own and current['phase'] != 'waiting':
-                raise ReleaseNotSent('릴리스 대기가 취소되었거나 구성이 변경되었습니다. 서비스가 종료되지 않았습니다')
+                raise ReleaseNotSent('释放等待已取消或配置已变化；未退出服务')
             previous = current['scopeBefore'] if own else current
             preview, executable, generation, configuration, identity, _ = force._snapshot(cli, thread, key, previous)
             if binding != preview['generation']:
@@ -154,11 +154,11 @@ class CliScope:
                         if current.get('scopeRequestId') == operation_id and current['phase'] == 'waiting':
                             current['phase'] = 'failed'
                             self.save(bridge.data_dir/'cli-daemon-recovery.json', current)
-                raise ReleaseNotSent('CLI 구성, 원래 프로세스 또는 영향 범위가 변경되었습니다. 다시 미리보세요.')
+                raise ReleaseNotSent('CLI 配置、原进程或影响范围已变化，请重新预览')
             if not own:
                 if (current.get('unresolvedResume') or current.get('phase') in (
                         'waiting', 'draining', 'starting', 'resuming', 'configuringUnknown')):
-                    return {'status': 'waiting', 'notice': '이 구성에는 유지 관리가 완료되지 않았거나 결과를 알 수 없습니다. 검증 후 계속하거나 명시적으로 강제로 해제할 수 있습니다.。'}
+                    return {'status': 'waiting', 'notice': '此配置已有未完成的维护或未知结果；可核对后继续或明确强制释放。'}
                 current = {'purpose': 'release', 'phase': 'waiting', 'operationId': operation_id,
                     'scopeRequestId': operation_id, 'scopeKey': preview['scopeKey'], 'scopeBinding': binding,
                     'scopeBefore': previous, 'scopeProcessGeneration': generation, 'scopeImpact': preview['impact'],
@@ -179,11 +179,11 @@ class CliScope:
                 with closing(CodexAppServer(cli.client.socket_path, cli=executable,
                                             client_name='codex-mobile-bridge-final-idle-check')) as probe:
                     if not graceful_restart_supported(probe.connect()):
-                        raise ReleaseNotSent('이 기본 버전은 아직 정상적인 비우기 기능을 확인하지 않았습니다.')
+                        raise ReleaseNotSent('此原生版本尚未核验正常排空能力')
                     LocalCliSync.check_idle_daemon(probe, cli.home)
                     preserved, observed = self.release_environment(cli, executable, probe)
                     if observed != generation:
-                        raise ReleaseNotSent('CLI 기본 프로세스가 변경되었으며 서비스를 종료하지 않았습니다.')
+                        raise ReleaseNotSent('CLI 原生进程已变化，未退出服务')
             except (CliTasksPending, AppServerError, OSError):
                 return self._result(current, 'waiting')
             try:
@@ -230,13 +230,13 @@ class CliScope:
         from bridge.features.sessions.cli_force import _digest
         from pathlib import PurePosixPath
         if self.bridge.closed.is_set() or not self.target.enabled():
-            raise ReleaseNotSent('목표 CLI 접근이 폐쇄되었습니다')
+            raise ReleaseNotSent('目标 CLI 接入已关闭')
         value = self.target.control.inspect()
         row = self.target.saved(thread, value['generation']['home'])
         if (row.get('id') != thread or row.get('origin') != 'cli'
                 or not isinstance(row.get('cwd'), str) or not PurePosixPath(row['cwd']).is_absolute()
                 or not isinstance(row.get('model_provider'), str) or not row['model_provider']):
-            raise ReleaseNotSent('대상이 확인된 소스가 아닙니다. CLI 대화')
+            raise ReleaseNotSent('目标不是已核验的原 CLI 会话')
         identity = {'id': thread, 'cwd': row['cwd'], 'modelProvider': row['model_provider']}
         impact = self.target.impact(value['generation']['home'])
         if not any(item['sessionId'] == thread for item in impact):
@@ -246,7 +246,7 @@ class CliScope:
         binding = _digest([descriptor['scopeKey'], self._target_generation(value), value['configuration'], identity, key, impact, previous])
         return {**descriptor, 'generation': binding, 'impact': impact, 'canForce': value['canForce'],
                 'canRelease': value['canRelease'], 'taskState': 'unknown',
-                'message': '대상 구성의 전체 공유를 해제합니다. CLI 서비스는 목록에 없는 작업에 영향을 미칠 수 있습니다. 기본값은 안전한 완료를 기다리는 것입니다.。'}, value, identity
+                'message': '将释放目标配置的整个共享 CLI 服务，可能影响未列出的任务；默认等待安全结束。'}, value, identity
 
     def _target_failed_wait(self, operation_id):
         with self.bridge.cli_maintenance.lock:
@@ -270,24 +270,24 @@ class CliScope:
                     self.record_released(result)
                 return result
             if own and current['phase'] != 'waiting':
-                raise ReleaseNotSent('이 릴리스가 취소되었거나 상태가 변경되었습니다.')
+                raise ReleaseNotSent('本次释放已取消或状态已变化')
             previous = current['scopeBefore'] if own else current
             try:
                 preview, value, identity = self._target_snapshot(thread, key, previous)
             except (ValueError, OSError) as error:
                 if own:
                     self._target_failed_wait(operation_id)
-                raise ReleaseNotSent('대상 읽기 전용 ID 확인에 실패했습니다. 종료가 전달되지 않았습니다. 다시 미리 보세요.') from error
+                raise ReleaseNotSent('目标只读身份核验失败；未派发退出，请重新预览') from error
             if binding != preview['generation']:
                 if own:
                     self._target_failed_wait(operation_id)
-                raise ReleaseNotSent('대상 호스트, 프로세스, 구성 또는 연결이 변경되었습니다. 다시 미리보세요.')
+                raise ReleaseNotSent('目标主机、进程、配置或连接已变化，请重新预览')
             if not preview['canForce' if force else 'canRelease']:
-                raise ReleaseNotSent('대상의 기본 제어 기능이 아직 검증되지 않았습니다.')
+                raise ReleaseNotSent('目标原生控制能力尚未核验')
             if not own:
                 if not force and (current.get('unresolvedResume') or current.get('phase') in (
                         'waiting', 'draining', 'starting', 'resuming', 'configuringUnknown')):
-                    return {'status': 'waiting', 'notice': '대상에 완료되지 않은 유지 관리가 있습니다. 이 대기를 취소하거나 명시적으로 강제로 해제할 수 있습니다.。'}
+                    return {'status': 'waiting', 'notice': '目标已有未完成维护；可取消本次等待或明确强制释放。'}
                 current = {'purpose': 'release', 'phase': 'waiting', 'scopeRequestId': operation_id,
                     'operationId': operation_id, 'scopeKey': preview['scopeKey'], 'scopeImpact': preview['impact'],
                     'scopeBefore': previous, 'scopeBinding': binding, 'targetGeneration': value['generation'],
@@ -312,14 +312,14 @@ class CliScope:
             if self._target_generation(fresh) != self._target_generation(value) or fresh['configuration'] != value['configuration']:
                 if not force or own:
                     self._target_failed_wait(operation_id)
-                raise ReleaseNotSent('대상 기본 프로세스 또는 구성이 변경되었습니다. 출구가 파견되지 않았습니다')
+                raise ReleaseNotSent('目标原生进程或配置已变化；未派发退出')
             with bridge.cli_maintenance.lock:
                 self.check_cancelled(operation_id)
                 recorded = bridge._cli_recovery_record()
                 valid = (recorded == previous if force and not own else
                          recorded.get('scopeRequestId') == operation_id and recorded.get('phase') == 'waiting')
                 if not valid:
-                    raise ReleaseNotSent('대상 릴리스 의도가 변경되었습니다. 출구가 파견되지 않았습니다')
+                    raise ReleaseNotSent('目标释放意图已变化；未派发退出')
                 current['phase'] = 'draining'
                 self.save(bridge.data_dir/'cli-daemon-recovery.json', current)
                 self.dispatched.add(operation_id)
@@ -332,7 +332,7 @@ class CliScope:
                 result = target.control.dispatch(operation_id, 'force' if force else 'graceful', value['generation'])
             except (ValueError, OSError):
                 return {'status': 'unknown', 'forceDispatched': force, 'cancelledQueued': cancelled,
-                        'notice': '대상 종료 요청의 결과를 알 수 없습니다. 원본 버전을 확인해주세요. 자동으로 재전송되지 않습니다.。'}
+                        'notice': '目标退出请求结果未知；请核验原代，不会自动重发。'}
             if result['status'] == 'exited':
                 current['phase'] = 'released'
                 self.save(bridge.data_dir/'cli-daemon-recovery.json', current)
@@ -340,5 +340,5 @@ class CliScope:
                 self.record_released(result)
             else:
                 result = {'status': 'unknown' if force else 'waiting', 'canCancel': False,
-                          'notice': '대상 종료가 요청되었으며 원래 생성이 아직 확인 중입니다. 사업 운영이 재생되지 않았습니다.。'}
+                          'notice': '目标退出已请求，仍在核验原代；未重放业务操作。'}
             return {**result, 'forceDispatched': force, 'cancelledQueued': cancelled}

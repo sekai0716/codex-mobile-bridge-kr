@@ -26,9 +26,9 @@ def legacy_send(manager, sid, body):
             old = manager.db.execute('SELECT fingerprint,result FROM requests WHERE id=?', (rid,)).fetchone()
             if old:
                 if old[0] != fingerprint:
-                    raise ValueError("동일한 요청 ID를 다른 작업에 사용할 수 없습니다.")
+                    raise ValueError('相同请求 ID 不能用于不同操作')
                 return json.loads(old[1])
-            result = {'status': 'unknown', 'id': rid, 'message': "결과 확인이 필요합니다. 원래 데스크톱 세션을 검토합니다. 동일한 요청은 두 번 실행되지 않습니다."}
+            result = {'status': 'unknown', 'id': rid, 'message': '结果待核对，请检查桌面原会话；相同请求不会重复执行'}
             manager.db.execute('INSERT INTO requests VALUES (?,?,?)', (rid, fingerprint, json.dumps(result)))
             manager.db.commit()
         result = manager.adapters['deepseek'].call('send', sid, body)
@@ -60,7 +60,7 @@ class RecoveredReceipts(unittest.TestCase):
         self.assertEqual(first['status'], 'unknown')
         self.assertEqual(self.new.call('deepseek', 'send', 'native-session', self.body), first)
         self.adapter.call.assert_not_called()
-        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
+        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
             self.new.call('deepseek', 'send', 'another-session', self.body)
 
     def test_shared_claim_keeps_inflight_request_at_most_once(self):
@@ -89,7 +89,7 @@ class RecoveredReceipts(unittest.TestCase):
 
     def test_missing_old_receipts_never_creates_empty_history_and_sends(self):
         self.adapter.receipts_path = self.old.directory/'missing.sqlite'
-        with self.assertRaisesRegex(ValueError, '작업 기록을 확인할 수 없습니다.'):
+        with self.assertRaisesRegex(ValueError, '操作记录不可用'):
             self.new.call('deepseek', 'send', 'native-session', self.body)
         self.adapter.call.assert_not_called()
         self.assertFalse(self.adapter.receipts_path.exists())
@@ -157,7 +157,7 @@ class RecoveredReceipts(unittest.TestCase):
             self.assertTrue(real_db.in_transaction)  # Limitation of the already-shipped old owner.
             shared = self.new._receipts(self.adapter)
             shared.execute('PRAGMA busy_timeout=50')
-            with self.assertRaisesRegex(ValueError, "다른\\ 게이트웨이가\\ 연결\\ 작업\\ 기록을\\ 사용하고\\ 있습니다\\.\\ 기존\\ 게이트웨이를\\ 중지하고\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(ValueError, '接入的操作记录正被另一网关占用，请停止旧网关后重试'):
                 self.new.call('deepseek', 'send', 'native-session', {'id': str(uuid.uuid4()), 'text': 'another explicit message'})
             self.assertFalse(shared.in_transaction)
             self.assertEqual(self.adapter.call.call_count, 1)

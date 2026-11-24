@@ -21,7 +21,7 @@ def initializer(executable):
     if not executable.is_file() or not manifest.is_file():
         return None
     if manifest.stat().st_size > 1024*1024:
-        raise ValueError('DSH 기본 초기화 선언이 너무 큽니다. 애플리케이션을 다시 스캔하세요.')
+        raise ValueError('DSH 原生初始化声明过大，请重新扫描应用')
     value = json.loads(manifest.read_text(encoding='utf-8-sig'))
     if not isinstance(value, dict) or value.get('name') not in ('dsh-plugin-desktop', '@deepseek-ai/dsh-desktop'):
         return None
@@ -53,7 +53,7 @@ console.log(JSON.stringify({directory,prepared:true}));
 def prepare(profile, descriptor):
     """No GUI, network install, account import, or model call is requested."""
     if profile.family != 'deepseek':
-        raise ValueError('이 구성은 다음에 속하지 않습니다. DSH')
+        raise ValueError('此配置不属于 DSH')
     directory = profile.home/'profiles/desktop'
     manifest = directory/'package.json'
     if manifest.exists():
@@ -61,7 +61,7 @@ def prepare(profile, descriptor):
     found = initializer(descriptor.get('executable', ''))
     if found is None:
         if sys.platform == 'win32':
-            raise ValueError('이 DSH 애플리케이션은 독립적인 구성 초기화 항목을 제공하지 않습니다. 애플리케이션을 업데이트하거나 초기화된 독립 디렉터리를 선택하세요.')
+            raise ValueError('此 DSH 应用未提供独立配置初始化入口，请更新应用或选择已经初始化的独立目录')
         return False  # Existing verified macOS first-start path remains unchanged.
     executable, package, helper = found
     guard = descriptor.get('profileGuard')
@@ -82,15 +82,15 @@ def prepare(profile, descriptor):
                                 timeout=25, **options)
     except subprocess.TimeoutExpired:
         # subprocess owns the exact helper handle; no GUI process was launched.
-        raise ValueError('DSH 독립 구성 초기화 시간이 초과되어 데스크탑 애플리케이션이 시작되지 않았습니다. 나중에 다시 시도해 주세요.') from None
+        raise ValueError('DSH 独立配置初始化超时，尚未启动桌面应用，请稍后重试') from None
     if result.returncode:
-        raise ValueError('DSH 기본 독립 구성 초기화에 실패했으며 데스크톱 애플리케이션이 아직 시작되지 않았습니다.')
+        raise ValueError('DSH 原生独立配置初始化失败，尚未启动桌面应用')
     if guard:
         guard()
     if any(_stamp(path) != stamp for path, stamp in before.items()):
-        raise ValueError('DSH 초기화 중에 애플리케이션이 변경되었습니다. 다시 스캔해 주세요.')
+        raise ValueError('DSH 应用在初始化期间发生变化，请重新扫描')
     if any((path.read_bytes(), path.stat().st_mtime_ns) != saved for path, saved in preserved.items()):
-        raise ValueError('기본 초기화로 인해 기존 구성이 변경되었으며 데스크탑 애플리케이션이 시작되지 않았습니다. 선택한 독립디렉터리를 확인해주세요.')
+        raise ValueError('原生初始化改变了已有配置，尚未启动桌面应用，请检查所选独立目录')
     try:
         receipt = json.loads(result.stdout.decode('utf-8').strip().splitlines()[-1])
         if receipt.get('prepared') is not True or Path(receipt['directory']).resolve() != directory.resolve():
@@ -100,5 +100,5 @@ def prepare(profile, descriptor):
                 or not (directory/'cordis.patch.yml').is_file() or not (directory/'pnpm-workspace.yaml').is_file()):
             raise ValueError()
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
-        raise ValueError('DSH 독립 구성 준비가 확인되지 않았으며 데스크톱 응용 프로그램이 시작되지 않았습니다.') from None
+        raise ValueError('DSH 未确认独立配置准备完成，尚未启动桌面应用') from None
     return True

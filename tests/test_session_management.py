@@ -123,7 +123,7 @@ class SessionManagement(unittest.TestCase):
                 raise ConnectionError('lost reply')
             return send
         request_id = str(uuid.uuid4())
-        with self.assertRaisesRegex(ValueError, "아카이브\\ 결과가\\ 확인되지\\ 않았습니다\\.\\ 원래\\ 채팅을\\ 확인하세요\\.\\ 이\\ 작업은\\ 반복되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '待核对'):
             commands.perform(self.sid, True, request_id, lambda: native, prepare)
         result = ArchiveCommands(self.home).perform(self.sid, True, request_id, lambda: native, prepare)
         self.assertEqual(result['status'], 'confirmed')
@@ -192,7 +192,7 @@ class SessionManagement(unittest.TestCase):
         bridge.host = 'local'; bridge.codex_home = self.home
         bridge.accounts = SimpleNamespace(blockers=lambda: [])
         bridge.remote_bridges = {}; bridge.lock = threading.RLock(); bridge.live = {}
-        bridge.ipc = SimpleNamespace(path='fixture')
+        bridge.ipc = SimpleNamespace(path='fixture', original_path='fixture')
         bridge.store = SimpleNamespace()
         missing = IPCError('desktop absent'); missing.__cause__ = FileNotFoundError('endpoint')
         follower = Mock(); follower.connect.side_effect = missing
@@ -201,7 +201,7 @@ class SessionManagement(unittest.TestCase):
         follower.close.assert_called_once()
         (self.home / '.codex-global-state.json').write_text('{}')
         with patch.object(Path, 'read_text', side_effect=FileNotFoundError('metadata changed')):
-            with self.assertRaisesRegex(ValueError, "Codex\\ 데스크톱\\ 및\\ SSH\\ 채팅을\\ 읽을\\ 수\\ 없습니다\\.\\ 연결을\\ 확인하고\\ 다시\\ 시도하십시오\\."):
+            with self.assertRaisesRegex(ValueError, '读取'):
                 bridge.assert_desktop_idle(identifiers=[self.sid], allow_missing_ipc=True)
 
     def test_stopped_app_requires_missing_ipc_and_fresh_verified_gui_absence(self):
@@ -210,7 +210,7 @@ class SessionManagement(unittest.TestCase):
         bridge.accounts = SimpleNamespace(blockers=lambda: [], index={'desktopExecutable': '/fixture/Codex'})
         bridge.catalog_reader = SimpleNamespace(executable='/fixture/codex')
         bridge.remote_bridges = {}; bridge.lock = threading.RLock(); bridge.live = {}
-        bridge.ipc = SimpleNamespace(path='fixture'); bridge.store = SimpleNamespace()
+        bridge.ipc = SimpleNamespace(path='fixture', original_path='fixture'); bridge.store = SimpleNamespace()
         missing = IPCError('desktop absent'); missing.__cause__ = FileNotFoundError('endpoint')
         follower = Mock(); follower.connect.side_effect = missing
         app = Mock(); app.processes.return_value = []
@@ -219,13 +219,13 @@ class SessionManagement(unittest.TestCase):
             desktop.assert_called_once_with('/fixture/Codex', self.home)
             app.validate.assert_called_once_with('/fixture/codex')
             app.processes.return_value = [123]
-            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认'):
                 bridge.assert_desktop_idle(identifiers=[self.sid], allow_stopped_app=True)
             app.processes.side_effect = PermissionError('process visibility denied')
-            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认'):
                 bridge.assert_desktop_idle(identifiers=[self.sid], allow_stopped_app=True)
             follower.connect.side_effect = IPCError('timeout')
-            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法确认'):
                 bridge.assert_desktop_idle(identifiers=[self.sid], allow_stopped_app=True)
 
     def test_wsl_archive_and_unarchive_preserve_entry_runtime_and_guard_receipts(self):
@@ -263,7 +263,7 @@ class SessionManagement(unittest.TestCase):
         self.assertEqual(writes, [('turn/interrupt', {'threadId': self.sid, 'turnId': 'turn-fixture'})])
         self.assertFalse(entry.archive(self.sid, False, str(uuid.uuid4()))['archived'])
         entry.receipts = {self.sid + ':send:x': {'result': {'status': 'unknown'}}}
-        with self.assertRaisesRegex(ValueError, "이\\ 채팅에는\\ 대기\\ 중이거나\\ 확인되지\\ 않은\\ 작업이\\ 있습니다\\.\\ 먼저\\ 원본\\ WSL\\ 세션을\\ 확인하세요\\."): entry.archive(self.sid, True, str(uuid.uuid4()))
+        with self.assertRaisesRegex(ValueError, '待核对'): entry.archive(self.sid, True, str(uuid.uuid4()))
 
 
 class SessionManagementHttp(unittest.TestCase):
@@ -361,7 +361,7 @@ class SessionManagementHttp(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertEqual(result['code'], 'archive_rejected')
         self.assertEqual(result['reason'], 'active_writer')
-        self.assertNotIn("확인되지 않은 결과", result['error'])
+        self.assertNotIn('结果待核对', result['error'])
         self.assertEqual(json.loads(self.bridge.archive_commands.path.read_text()), {})
         self.assertFalse(self.bridge.store.get(self.sid)['archived'])
 

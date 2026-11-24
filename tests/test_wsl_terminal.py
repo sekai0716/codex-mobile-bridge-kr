@@ -11,12 +11,12 @@ class WslTerminalTests(unittest.TestCase):
     def setUp(self):
         self.terminals = WslTerminals()
         self.thread, self.identifier = str(uuid.uuid4()), str(uuid.uuid4())
-        self.entry = SimpleNamespace(host='wsl:fixture', row={'distribution': 'Ubuntu', 'user': 'fixture', 'home': '/home/fixture/독립적인 구성'},
+        self.entry = SimpleNamespace(host='wsl:fixture', row={'distribution': 'Ubuntu', 'user': 'fixture', 'home': '/home/fixture/独立配置'},
                                      store=Mock())
-        self.entry.store.get.return_value = {'cwd': '/home/fixture/프로젝트'}
+        self.entry.store.get.return_value = {'cwd': '/home/fixture/项目'}
         self.session = Mock()
         self.session.done.is_set.return_value = False
-        self.session.read.return_value = {'output': '중국어', 'running': True}
+        self.session.read.return_value = {'output': '中文', 'running': True}
 
     def call(self, action, owner='phone', **params):
         return self.terminals.terminal(self.entry, self.thread, owner, action,
@@ -30,17 +30,17 @@ class WslTerminalTests(unittest.TestCase):
     def test_open_uses_wsl_user_python_and_linux_cwd_without_windows_path_validation(self):
         factory = self.open()
         args, kwargs = factory.call_args
-        self.assertEqual(args, (None, '/home/fixture/프로젝트', 80, 24))
+        self.assertEqual(args, (None, '/home/fixture/项目', 80, 24))
         with patch('bridge.features.endpoints.wsl_terminal.wsl.command', return_value=['wsl.exe', 'python3']) as command:
-            argv = kwargs['transport']('print("UTF8 중국어")')
+            argv = kwargs['transport']('print("UTF8 中文")')
             self.assertEqual(argv[:4], ['wsl.exe', 'python3', '-u', '-c'])
             import os
             with patch.dict(os.environ, {'HOME': '/home/fixture', 'CODEX_HOME': '/default'}, clear=True):
                 exec(argv[4], {})
-                self.assertEqual(os.environ['CODEX_HOME'], '/home/fixture/독립적인 구성')
+                self.assertEqual(os.environ['CODEX_HOME'], '/home/fixture/独立配置')
                 self.assertEqual(os.environ['HOME'], '/home/fixture')
         command.assert_called_once_with('Ubuntu', 'fixture')
-        self.assertEqual(self.call('poll')['output'], '중국어')
+        self.assertEqual(self.call('poll')['output'], '中文')
 
     def test_owner_isolation(self):
         self.open()
@@ -50,20 +50,20 @@ class WslTerminalTests(unittest.TestCase):
     def test_unknown_input_result_is_not_replayed(self):
         self.open()
         self.session.write.side_effect = TimeoutError('unknown')
-        with self.assertRaises(TimeoutError): self.call('input', inputId='input-id', data='echo 중국어\r')
-        self.session.write.assert_called_once_with('input-id', 'echo 중국어\r')
+        with self.assertRaises(TimeoutError): self.call('input', inputId='input-id', data='echo 中文\r')
+        self.session.write.assert_called_once_with('input-id', 'echo 中文\r')
 
     def test_resize_completion_close_and_lifecycle(self):
         self.open()
         self.call('resize', cols=100, rows=30)
         self.session.resize.assert_called_once_with(100, 30)
-        self.call('complete', text='cat 개', selectionStart=5)
-        self.session.complete.assert_called_once_with('cat 개', 5)
+        self.call('complete', text='cat 项', selectionStart=5)
+        self.session.complete.assert_called_once_with('cat 项', 5)
         self.assertEqual(self.call('close'), {'closed': True})
         self.session.stop.assert_called_once_with()
         self.session.done.wait.return_value = True
         self.terminals.close()
-        self.assertEqual(self.session.stop.call_args.args, ('게이트웨이가 중지되었습니다.',))
+        self.assertEqual(self.session.stop.call_args.args, ('网关已停止',))
 
     def test_invalid_root_and_poll_parameters(self):
         self.entry.store.get.return_value = {'cwd': 'C:\\project'}

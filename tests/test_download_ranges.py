@@ -43,7 +43,7 @@ class DownloadSnapshotTests(unittest.TestCase):
                 modified = True
                 with self.path.open('ab') as writer: writer.write(b'x')
         with patch('bridge.features.workspace.workspace.hashlib.sha256', return_value=SimpleNamespace(update=update, hexdigest=digest.hexdigest)):
-            with self.assertRaisesRegex(ValueError, "파일이\\ 변경\\ 중입니다\\.\\ 나중에\\ 다시\\ 다운로드하세요\\."):
+            with self.assertRaisesRegex(ValueError, '变化|限制'):
                 with Workspace(self.root).download('example.bin', 'bytes=0-9'): pass
 
     def test_ssh_stream_executes_secure_workspace_source_and_transfers_only_range(self):
@@ -279,7 +279,7 @@ class FileActionsTests(unittest.TestCase):
         path = self.root / 'large.bin'
         with path.open('wb') as handle: handle.truncate(MAX_TRANSFER + 10)
         self.assertEqual(transfer_settings(self.root)['clickDownloadMiB'], 20)
-        with self.assertRaisesRegex(ValueError, "파일이\\ 초과되었습니다\\.\\ 20\\ MB\\ 다운로드\\ 제한"):
+        with self.assertRaisesRegex(ValueError, '限制'):
             with self.workspace.download('large.bin'): pass
         transfer_settings(self.root, {'clickDownloadMiB': 30})
         self.assertEqual(transfer_settings(self.root)['clickDownloadMiB'], 30)
@@ -288,7 +288,7 @@ class FileActionsTests(unittest.TestCase):
         with patch.object(self.workspace, '_download', side_effect=AssertionError('must reuse snapshot')):
             with self.workspace.download('large.bin', 'bytes=3-5', tag, limit=None) as (meta, stream):
                 self.assertEqual(stream.read(), b'\0' * 3)
-        with self.assertRaisesRegex(ValueError, '다운로드 제한'):
+        with self.assertRaisesRegex(ValueError, '限制'):
             with self.workspace.download('large.bin', 'bytes=3-5', tag, limit=1): pass
         for value in ({'clickDownloadMiB': True}, {'clickDownloadMiB': 0}, {'clickDownloadMiB': 2, 'extra': True}):
             with self.assertRaises(ValueError): transfer_settings(self.root, value)

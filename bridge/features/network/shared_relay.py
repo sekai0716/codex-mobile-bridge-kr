@@ -23,6 +23,10 @@ def save_config(directory, value, name='shared-relay.json'):
     directory = Path(directory)
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     path = directory / name
+    if os.name == 'nt':
+        from bridge.platforms.windows.local_service import write_private
+        write_private(path, json.dumps(value, ensure_ascii=False).encode('utf-8'))
+        return
     temporary = path.with_suffix('.tmp')
     with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w', encoding='utf-8') as stream:
         json.dump(value, stream, ensure_ascii=False)
@@ -56,9 +60,9 @@ class Controller:
             with opener.open(req, timeout=12) as response:
                 return json.loads(response.read(65536))
         except urllib.error.HTTPError as exc:
-            raise RelayError('릴레이가 요청을 거부합니다. 초대 코드, 승인 또는 서비스 주소를 확인하세요.（HTTP %s）。' % exc.code, exc.code) from None
+            raise RelayError('中继拒绝请求，请检查邀请码、授权或服务地址（HTTP %s）。' % exc.code, exc.code) from None
         except (OSError, ValueError):
-            raise ValueError('릴레이에 연결할 수 없습니다. 확인하세요. HTTPS 주소, 인증서 및 네트워크。') from None
+            raise ValueError('无法连接中继，请检查 HTTPS 地址、证书和网络。') from None
 
     def control(self, value):
         if not isinstance(value, dict):
@@ -67,19 +71,19 @@ class Controller:
         cfg = read_config(self.directory)
         if action == 'register':
             if cfg.get('deviceToken'):
-                raise ValueError('현재 장치를 먼저 비활성화한 후 다른 릴레이를 등록하세요.。')
+                raise ValueError('请先撤销当前设备，再注册其他中继。')
             if value.get('consent') is not True:
-                raise ValueError('이 릴레이가 컴퓨터 작업을 전달하도록 허용하려면 확인하세요.。')
+                raise ValueError('请确认允许此中继转发电脑操作。')
             url = origin(value.get('url', ''), self.test_http)
             result = self.request(url + '/relay/register', {'invitation': value.get('invitation'), 'name': value.get('name')})
             if not all(isinstance(result.get(k), str) and result[k] for k in ('deviceId', 'deviceToken', 'deviceName')):
-                raise ValueError('잘못된 릴레이 등록 응답。')
+                raise ValueError('中继注册响应无效。')
             save_config(self.directory, {**result, 'url': url, 'enabled': True})
             return {'registered': True, 'url': url, 'deviceName': result['deviceName'], 'online': False}
         if action == 'status' and not cfg.get('deviceToken'):
             return {'registered': False, 'online': False}
         if not cfg.get('deviceToken'):
-            raise ValueError('공유릴레이를 먼저 등록해주세요。')
+            raise ValueError('请先注册共享中继。')
         url = origin(cfg['url'], self.test_http)
         if action == 'disable':
             save_config(self.directory, {**cfg, 'enabled': False})
@@ -162,7 +166,7 @@ class Connector:
             mime = content_type(message.get('contentType'))
             range_headers = download_headers(message.get('headers', {}))
             if not self.enabled():
-                return result(503, {'error': '로컬 공유 릴레이가 작동 중지되었습니다.。'})
+                return result(503, {'error': '本机共享中继已关闭。'})
             if phone not in self.sessions:
                 if len(self.sessions) >= 16:
                     raise ValueError('Too many local phone sessions; reconnect the gateway')
@@ -196,7 +200,7 @@ class Connector:
                     # The standard full 200 fallback cannot fit one relay frame.
                     # Ask clients to restart at zero instead of retrying forever
                     # with the old validator or buffering an oversized response.
-                    return result(409, {'error': '파일이 변경되었습니다. 다시 다운로드해 주세요.。', 'code': 'download_changed'})
+                    return result(409, {'error': '文件已变化，请重新下载。', 'code': 'download_changed'})
                 data = bytearray()
                 async for chunk in response.content.iter_chunked(65536):
                     data.extend(chunk)
@@ -213,7 +217,7 @@ class Connector:
             if streaming:
                 await stream[0].send_json({'type': 'abort', 'id': identifier})
                 return None
-            return result(504, {'error': '컴퓨터 게이트웨이 응답이 중단되었습니다. 계속하기 전에 작업 결과를 확인하세요.。', 'code': 'outcome_unknown'})
+            return result(504, {'error': '电脑网关响应中断，请检查操作结果后再继续。', 'code': 'outcome_unknown'})
 
     async def run(self):
         import aiohttp

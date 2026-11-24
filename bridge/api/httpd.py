@@ -39,7 +39,7 @@ from bridge.features.sessions.goal import GoalError
 from bridge.clients.codex.catalog import CatalogError, CatalogIdentityChanged
 from bridge.features.sessions.store import StoreUnavailable
 from bridge.clients.codex.remote import RemoteUnavailable
-from bridge.features.sessions.create import ArchiveRejected, CreationError, SideChatConnectionUnavailable, SideChatReceiptUnknown
+from bridge.features.sessions.create import ArchiveRejected, CreationError, SideChatReceiptUnknown
 from bridge.features.accounts.account import AccountError
 from bridge.features.terminals.manager import TerminalSessionMissing
 from bridge.api.html_preview import SHELL_PATH, SHELL_FILE, SHELL_CSP
@@ -65,7 +65,7 @@ def _prepared_static(data, content_type, use_gzip):
 from bridge.features.sessions.cli_release import CliConnections
 from bridge.app.lifecycle import private_json
 
-THREAD_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})(?:/(events|send|stop|history|respond|reconnect|cli-network|queue|queue-send|catalog|settings|permissions|poll|timeline|changes|detail|notifications|uploads|message-action|message-management|rename|pin|archive|delete|organization|compact))?$")
+THREAD_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})(?:/(events|send|stop|history|respond|reconnect|cli-network|queue|queue-send|catalog|settings|permissions|poll|timeline|conversation|process|changes|detail|notifications|uploads|message-action|message-management|rename|pin|archive|delete|organization|compact))?$")
 UPLOAD_PREVIEW_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/uploads/([0-9a-f-]{36})/preview$")
 UPLOAD_THUMB_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/uploads/([0-9a-f-]{36})/thumb$")
 DESKTOP_IMAGE_ROUTE = re.compile(r"^/api/sessions/([0-9a-f-]{36})/desktop-images/([0-9a-f]{64})$")
@@ -761,6 +761,13 @@ class Handler(BaseHTTPRequestHandler):
                     body = {key: query[key][0] for key in ('environment', 'projectKey', 'path') if key in query}
                     body['refresh'] = query.get('refresh') == ['true']
                 if not write and parts[3] == 'detail':
+                    if query.get('historyMode') == ['conversation']:
+                        body['historyMode'] = 'conversation'
+                        for key in ('historyProcess', 'historyDetail', 'historyAfter', 'historyVersion'):
+                            if key in query:
+                                body[key] = query[key][0]
+                        if 'historyOffset' in query:
+                            body['historyOffset'] = max(0, int(query['historyOffset'][0]))
                     body['historyLimit'] = max(1, min(100, int(query.get('historyLimit', ['40'])[0])))
                     if query.get('historyBefore'):
                         before = query['historyBefore'][0]
@@ -938,11 +945,6 @@ class Handler(BaseHTTPRequestHandler):
                 if self.server.auth.config.get('mode') == 'none':
                     raise PermissionError('비밀번호 없는 액세스는 데스크탑 연결을 초기화할 수 없습니다. 데스크탑 측에서 조작하십시오.')
                 body = self.read_json()
-                if isinstance(body,dict) and body.get('action') in ('deferDesktopRuntime','cancelDeferredDesktopRuntime'):
-                    expected = {'action','requestId','confirmed'} if body['action'] == 'deferDesktopRuntime' else {'action','requestId'}
-                    if set(body) != expected or body.get('confirmed', True) is not True:
-                        raise ValueError('Invalid deferred connection request.')
-                    return self.output(202, account_bridge.accounts.control(body))
                 if (not isinstance(body, dict)
                         or set(body) - {'acknowledgeUnavailable'} != {'requestId', 'confirmed', 'tasksConfirmed'}
                         or 'acknowledgeUnavailable' in body and body['acknowledgeUnavailable'] is not True):
@@ -965,10 +967,11 @@ class Handler(BaseHTTPRequestHandler):
                 if self.server.auth.config.get('mode') == 'none':
                     raise PermissionError("인증 없이는 계정 전환이 불가능합니다. 데스크톱 앱을 사용하세요.")
                 body = self.read_json()
-                if (set(body) - {'id', 'requestId', 'confirmed', 'tasksConfirmed', 'syncLocalCli'}
+                if (set(body) - {'id', 'requestId', 'confirmed', 'tasksConfirmed', 'syncLocalCli', 'sharedDaemonConfirmed'}
                         or not {'id', 'requestId', 'confirmed', 'tasksConfirmed'} <= set(body)
-                        or 'syncLocalCli' in body and not isinstance(body['syncLocalCli'], bool)):
-                    raise ValueError('계정 전환 요청에 지원되지 않는 필드가 포함되어 있습니다.')
+                        or 'syncLocalCli' in body and not isinstance(body['syncLocalCli'], bool)
+                        or 'sharedDaemonConfirmed' in body and not isinstance(body['sharedDaemonConfirmed'], bool)):
+                    raise ValueError('账号切换请求包含不支持的字段')
                 return self.output(202, account_bridge.accounts.switch(body))
             if not write and path == '/api/account':
                 return self.output(200, account_bridge.account.read(refresh=query.get('cached', [''])[0] != '1'))
@@ -1476,15 +1479,21 @@ class Handler(BaseHTTPRequestHandler):
             if not write:
                 if action == 'permissions':
                     return self.output(200, bridge.linux_permission_options(thread_id))
-                if action == 'timeline':
-                    return self.output(200, bridge.timeline_read(thread_id, limit=int(query.get('limit', ['20'])[0]), before=query.get('before', [None])[0]))
+                if action in ('timeline', 'conversation'):
+                    return self.output(200, bridge.timeline_read(thread_id, limit=int(query.get('limit', ['20'])[0]), before=query.get('before', [None])[0],
+                                                               **({'projection': 'conversation'} if action == 'conversation' else {})))
+                if action == 'process':
+                    return self.output(200, bridge.timeline_read(thread_id, 'process', cursor=query.get('cursor', [''])[0],
+                                                               after=query.get('after', [None])[0], limit=int(query.get('limit', ['20'])[0])))
                 if action == 'detail':
                     return self.output(200, bridge.timeline_read(thread_id, 'detail', cursor=query.get('key', [''])[0],
                                                                offset=int(query.get('offset', ['0'])[0]), version=query.get('version', [None])[0],
-                                                               **({'file_index': int(query['file'][0])} if 'file' in query else {})))
+                                                               **({'projection': 'conversation'} if query.get('projection') == ['conversation'] else {})))
                 if action == 'changes':
                     return self.changes(bridge, thread_id, int(query.get('after', ['-1'])[0]),
-                                        query.get('epoch', [''])[0], query.get('start', [''])[0])
+                                        query.get('epoch', [''])[0], query.get('start', [''])[0],
+                                        query.get('paged', [''])[0] == '1', query.get('through', [None])[0],
+                                        projection='conversation' if query.get('projection') == ['conversation'] else None)
                 if action is None:
                     return self.output(200, bridge.view(thread_id, background=True))
                 if action == "catalog":
@@ -1546,17 +1555,11 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("요청 응답 형식이 잘못되었습니다.")
                 result = bridge.respond(thread_id, body.get("requestId"), response)
             elif action == "reconnect":
-                prepare = body.get('prepareCreation')
-                if 'prepareCreation' in body and (prepare is not True or body.get('activate') is not True
-                                                   or set(body) != {'activate', 'prepareCreation'}
-                                                   or not hasattr(bridge, '_prepare_created_chat')):
-                    raise ValueError('잘못된 새 채팅 연결 요청')
                 if 'rebuild' in body and (body.get('rebuild') is not True or body.get('activate') is not True or set(body) != {'activate', 'rebuild'}):
                     raise ValueError('잘못된 재연결 요청')
                 if body.get('activate') is True:
                     if hasattr(bridge, 'reconnect_session'):
-                        session = bridge.reconnect_session(thread_id, rebuild=bool(body.get('rebuild')),
-                                                           **({'prepare_creation': True} if prepare else {}))
+                        session = bridge.reconnect_session(thread_id, rebuild=bool(body.get('rebuild')))
                     else:
                         # WSL entries own their CLI runtime, not a Desktop IPC follower.
                         session = bridge.rebuild_connection(thread_id) if body.get('rebuild') else bridge.activate(thread_id)
@@ -1590,7 +1593,7 @@ class Handler(BaseHTTPRequestHandler):
         except SubmissionRejected as exc:
             self.close_connection = True
             self.output(400, {"error": str(exc), "code": "send_not_submitted"})
-        except (CatalogIdentityChanged, SideChatConnectionUnavailable, SideChatReceiptUnknown) as exc:
+        except (CatalogIdentityChanged, SideChatReceiptUnknown) as exc:
             self.close_connection = True
             self.output(409, {"error": str(exc), "code": exc.code})
         except ValueError as exc:
@@ -1725,7 +1728,7 @@ class Handler(BaseHTTPRequestHandler):
                 session.viewers -= 1
                 session.touched = time.monotonic()
 
-    def changes(self, bridge, thread_id, after, epoch, start):
+    def changes(self, bridge, thread_id, after, epoch, start, paged=False, through=None, projection=None):
         session = bridge.session(thread_id, background=True)
         with session.condition:
             session.viewers += 1
@@ -1733,7 +1736,9 @@ class Handler(BaseHTTPRequestHandler):
             with session.condition:
                 session.condition.wait_for(lambda: session.sequence != after or epoch != session.timeline.epoch or bridge.closed.is_set(), timeout=12)
             if self.authorized():
-                self.output(200, bridge.timeline_read(thread_id, 'changes', after=after, epoch=epoch, start=start))
+                self.output(200, bridge.timeline_read(thread_id, 'changes', after=after, epoch=epoch, start=start,
+                                                            **({'projection': projection} if projection else {}),
+                                                            **({'paged': True, 'through': through} if paged else {})))
         finally:
             with session.condition:
                 session.viewers -= 1

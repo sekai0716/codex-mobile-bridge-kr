@@ -20,11 +20,11 @@ def _distributions(running=True, *, strict=False):
                                 capture_output=True, timeout=8, **_options())
     except (OSError, subprocess.TimeoutExpired) as exc:
         if strict:
-            raise OSError("WSL 상태를 확인할 수 없습니다. 새로고침하고 다시 시도하세요.") from exc
+            raise OSError('WSL 状态暂未确认，请刷新后重试') from exc
         return []
     if result.returncode:
         if strict:
-            raise OSError("WSL 상태를 확인할 수 없습니다. 새로고침하고 다시 시도하세요.")
+            raise OSError('WSL 状态暂未确认，请刷新后重试')
         return []  # Missing WSL/no distros is not a reason to break desktop reads.
     data = result.stdout
     text = data.decode('utf-16-le' if b'\0' in data else 'utf-8-sig', errors='strict')
@@ -50,11 +50,11 @@ def command(distribution, user=None, allow_start=False):
     # permission to wake a distribution later during a background request.
     available = _distributions(False) if allow_start else running_distributions()
     if not isinstance(distribution, str) or distribution not in available:
-        raise OSError("WSL 배포가 중지되었거나 사용할 수 없습니다. 컴퓨터에서 시작한 다음 다시 연결하세요.")
+        raise OSError('WSL 发行版已停止或不可用，请在电脑端启动后重新连接')
     args = ['wsl.exe', '--distribution', distribution]
     if user is not None:
         if not isinstance(user, str) or not user or user.startswith('-') or any(c in user for c in '\0\r\n'):
-            raise ValueError('WSL 잘못된 사용자')
+            raise ValueError('WSL 用户无效')
         args += ['--user', user]
     return args + ['--exec', 'python3']
 
@@ -64,25 +64,25 @@ def read(distribution, source, user=None, timeout=20, allow_start=False):
         result = subprocess.run(command(distribution, user, allow_start=allow_start) + ['-'], input=source.encode('utf-8'),
                                 capture_output=True, timeout=timeout, **_options())
     except subprocess.TimeoutExpired as exc:
-        raise TimeoutError('WSL 읽기 시간 초과') from exc
+        raise TimeoutError('WSL 读取超时') from exc
     if result.returncode:
-        raise OSError('WSL 읽지 못했습니다. 릴리스 버전을 확인하세요. Python 및 사용자 권한')
+        raise OSError('WSL 读取失败，请检查发行版中的 Python 和用户权限')
     if len(result.stdout) > 24 * 1024 * 1024:
-        raise OSError('WSL 응답이 너무 큼')
+        raise OSError('WSL 响应过大')
     try:
         return json.loads(result.stdout.decode('utf-8'))
     except (ValueError, UnicodeError) as exc:
-        raise OSError('WSL 인식할 수 없는 데이터가 반환되었습니다.') from exc
+        raise OSError('WSL 返回了无法识别的数据') from exc
 
 
 def configuration_source(user, directory):
     """Validate a selected Linux user's existing directory inside that WSL user."""
     if (not isinstance(user, str) or not user.strip() or user != user.strip()
             or user.startswith('-') or any(ord(c) < 32 or ord(c) == 127 for c in user)):
-        raise ValueError("WSL Linux 사용자 이름을 입력합니다.")
+        raise ValueError('请填写 WSL Linux 用户名')
     if (not isinstance(directory, str) or not directory.startswith('/') or directory.startswith('//')
             or '\\' in directory or any(ord(c) < 32 or ord(c) == 127 for c in directory)):
-        raise ValueError("WSL 구성 디렉터리에 대한 절대 Linux 경로를 입력합니다.")
+        raise ValueError('请填写 WSL 配置目录的 Linux 绝对路径')
     return 'requested_user='+repr(user)+'\nrequested_directory='+repr(directory)+'\n'+r'''
 import json,os,pwd
 from pathlib import Path
@@ -241,21 +241,21 @@ def download(distribution, source, user=None):
             result = subprocess.run(command(distribution, user) + ['-'], input=source.encode('utf-8'),
                                     stdout=stream, stderr=subprocess.DEVNULL, timeout=60, **_options())
         except subprocess.TimeoutExpired as exc:
-            raise TimeoutError('WSL 다운로드 시간 초과') from exc
+            raise TimeoutError('WSL 下载超时') from exc
         if result.returncode:
-            raise OSError('WSL 다운로드 실패')
+            raise OSError('WSL 下载失败')
         size = stream.tell()
         stream.seek(0)
         header = stream.readline(8193)
         if not header.endswith(b'\n') or len(header) > 8192:
-            raise ValueError('WSL 다운로드 설명이 잘못되었습니다.')
+            raise ValueError('WSL 下载描述无效')
         metadata = json.loads(header)
         if 'error' in metadata:
             if metadata.get('permission'):
                 raise PermissionError(metadata['error'])
             raise ValueError(metadata['error'])
         if type(metadata.get('length')) is not int or not 0 <= metadata['length'] <= 2**53 - 1 or metadata['length'] != size - len(header):
-            raise ValueError('WSL 불완전한 다운로드')
+            raise ValueError('WSL 下载不完整')
         yield metadata, stream
 
 
@@ -330,7 +330,7 @@ class Stream:
     def recv(self, size):
         with self.condition:
             if not self.condition.wait_for(lambda: self.buffer or self.eof or self.closed, timeout=self.timeout):
-                raise TimeoutError('WSL 바이트 스트림 시간 초과')
+                raise TimeoutError('WSL 字节流超时')
             result = bytes(self.buffer[:size])
             del self.buffer[:size]
             self.condition.notify_all()
@@ -338,7 +338,7 @@ class Stream:
 
     def sendall(self, data):
         if self.closed:
-            raise OSError('WSL 바이트 스트림이 닫혔습니다.')
+            raise OSError('WSL 字节流已关闭')
         completed = Future()
         def write():
             try:
@@ -346,13 +346,13 @@ class Stream:
                 self.process.stdin.flush()
                 completed.set_result(None)
             except (OSError, ValueError) as exc:
-                completed.set_exception(OSError('WSL 바이트 스트림 쓰기 실패'))
+                completed.set_exception(OSError('WSL 字节流写入失败'))
         threading.Thread(target=write, daemon=True).start()
         try:
             completed.result(timeout=12)
         except FutureTimeout as exc:
             self.close()
-            raise TimeoutError('WSL 바이트 스트림 쓰기 시간이 초과되었습니다. 결과를 확인해야 합니다.') from exc
+            raise TimeoutError('WSL 字节流写入超时，结果待核对') from exc
 
     def settimeout(self, timeout):
         self.timeout = timeout

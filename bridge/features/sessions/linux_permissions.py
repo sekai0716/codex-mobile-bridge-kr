@@ -13,12 +13,12 @@ def enabled(host='local'):
     return sys.platform == 'linux' and host == 'local'
 
 
-UNKNOWN = "권한 기능을 확인할 수 없습니다. 데스크탑 설정을 확인한 후 이 패널을 다시 여십시오."
-RESTRICTED = "이 작업 공간 또는 관리자 정책은 이 권한 모드를 허용하지 않습니다."
-FULL_HIDDEN = "Codex 데스크탑 설정에서 전체 액세스 옵션을 활성화한 다음 이 패널을 다시 엽니다."
-AUTO_UNKNOWN = "승인 가능 여부가 확인되지 않았습니다. 먼저 데스크탑에서 이 모드를 선택한 다음 이 패널을 다시 엽니다."
-AUTO_DISABLED = "현재 Codex 런타임 또는 구성에서는 승인이 비활성화되어 있습니다."
-PROFILE_UNAVAILABLE = "이 권한 프로필을 사용할 수 없습니다. 데스크탑에서 Codex를 확인하거나 업데이트하세요."
+UNKNOWN = '无法确认当前权限能力，请在桌面检查设置后重新打开此面板。'
+RESTRICTED = '当前工作区或管理员策略不允许此权限模式。'
+FULL_HIDDEN = '请先在 Codex 桌面设置中开启“完全访问权限”选项，再重新打开此面板。'
+AUTO_UNKNOWN = '尚未确认桌面已开放“帮我批准”；请先在桌面选择此模式，再重新打开此面板。'
+AUTO_DISABLED = '当前 Codex 运行时或配置未启用“帮我批准”。'
+PROFILE_UNAVAILABLE = '当前运行时未提供此权限配置，请在桌面检查或更新 Codex。'
 
 
 def read_permission_facts(request, cwd):

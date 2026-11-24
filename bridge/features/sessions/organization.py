@@ -9,17 +9,17 @@ class OrganizationNotSent(ValueError):
 
 def validate_change(snapshot, change):
     if not isinstance(change, dict) or set(change) != {'kind', 'targetId', 'expectedId'}:
-        raise OrganizationNotSent("잘못된 채팅 조직 설정입니다.")
+        raise OrganizationNotSent('会话分类设置无效')
     kind, target, expected = change['kind'], change['targetId'], change['expectedId']
     if kind not in ('project', 'section') or any(value is not None and
             (not isinstance(value, str) or not value or len(value) > 200) for value in (target, expected)):
-        raise OrganizationNotSent("잘못된 채팅 조직 설정입니다.")
+        raise OrganizationNotSent('会话分类设置无效')
     candidates = snapshot['projects' if kind == 'project' else 'sections']
     if target is not None and target not in {row['id'] for row in candidates}:
-        raise OrganizationNotSent("목적지가 삭제되었습니다. 새로고침하고 다시 시도하세요.")
+        raise OrganizationNotSent('目标项目或分区已移除，请刷新后重试')
     current = snapshot[kind + 'Id']
     if current != target and current != expected:
-        raise OrganizationNotSent("다른 클라이언트에서 채팅 구성이 변경되었습니다. 새로고침하고 다시 시도하세요.")
+        raise OrganizationNotSent('会话分类已在其他客户端更新，请刷新后重试')
 
 
 def _same_cwd(left, right):
@@ -51,16 +51,16 @@ def _pages(request, method):
         if cursor is None:
             return rows
         if not isinstance(cursor, str) or cursor in seen:
-            raise ValueError("네이티브 사이드바 목록이 변경되었습니다. 새로고침하고 다시 시도하세요.")
+            raise ValueError('原生侧边栏列表已变化，请刷新后重试')
         seen.add(cursor)
-    raise ValueError("네이티브 사이드바 목록이 너무 큽니다. 먼저 Codex로 정리하세요.")
+    raise ValueError('原生侧边栏列表过长，请在电脑端整理后重试')
 
 
 def organization(request, identifier, change=None, *, expected_cwd=None):
     uuid.UUID(identifier)
     before = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
     if before.get('id') != identifier or expected_cwd is not None and not _same_cwd(before.get('cwd'), expected_cwd):
-        raise OrganizationNotSent("원래 채팅 디렉터리가 변경되었습니다. 새로고침하고 다시 시도하세요.")
+        raise OrganizationNotSent('原会话工作目录已变化，请刷新后重试')
     projects = _pages(request, 'project/list')
     sections = _pages(request, 'threadSection/list')
     if change is not None:
@@ -72,7 +72,7 @@ def organization(request, identifier, change=None, *, expected_cwd=None):
             fresh = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
             latest = fresh.get('projectId') if kind == 'project' else (fresh.get('section') or {}).get('id')
             if latest != current or any(fresh.get(key) != before.get(key) for key in ('id', 'cwd', 'modelProvider')):
-                raise OrganizationNotSent("다른 클라이언트에서 채팅 구성이 변경되었습니다. 새로고침하고 다시 시도하세요.")
+                raise OrganizationNotSent('会话分类已在其他客户端更新，请刷新后重试')
             if kind == 'project':
                 request('thread/metadata/update', {'threadId': identifier, 'projectId': target or ''})
             else:
@@ -80,7 +80,7 @@ def organization(request, identifier, change=None, *, expected_cwd=None):
         after = request('thread/read', {'threadId': identifier, 'includeTurns': False})['thread']
         actual = after.get('projectId') if kind == 'project' else (after.get('section') or {}).get('id')
         if actual != target or any(after.get(key) != before.get(key) for key in ('id', 'cwd', 'modelProvider')):
-            raise ValueError("네이티브 조직 결과를 확인해야 합니다. 채팅 목록을 새로 고칩니다.")
+            raise ValueError('原生分类结果待核对，请刷新会话列表')
         before = after
     return {'id': identifier, 'projectId': before.get('projectId'),
             'identity': {key: before.get(key) for key in ('id', 'cwd', 'modelProvider')},

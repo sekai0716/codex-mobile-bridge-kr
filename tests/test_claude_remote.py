@@ -93,7 +93,7 @@ class RemoteWorkerContract(unittest.TestCase):
         self.cwd.rmdir()
         blocked = self.run_worker(request)['value']
         self.assertFalse(blocked['ready'])
-        self.assertIn('원래 프로젝트 디렉터리가 존재하지 않습니다.', blocked['notice'])
+        self.assertIn('原项目目录不存在', blocked['notice'])
         self.assertIn(str(self.cwd), blocked['notice'])
         self.assertFalse(self.cwd.exists())
         self.assertFalse((self.config/'mobile-bridge').exists())
@@ -127,7 +127,7 @@ class RemoteWorkerContract(unittest.TestCase):
         self.path.write_text('\n'.join(json.dumps(event) for event in events)+'\n')
         blocked = self.run_worker({**request, 'permissionMode': 'default'})['value']
         self.assertFalse(blocked['ready'])
-        self.assertIn('권한 모드', blocked['notice'])
+        self.assertIn('权限模式', blocked['notice'])
 
     def test_resume_preflight_worker_only_runs_readonly_auth_or_version_diagnostics(self):
         calls = []
@@ -149,23 +149,23 @@ class RemoteWorkerContract(unittest.TestCase):
             self.cwd.rmdir()
             blocked = remote_worker.command(request)
             self.assertFalse(blocked['ready'])
-            self.assertIn('원래 프로젝트 디렉터리가 존재하지 않습니다.', blocked['notice'])
+            self.assertIn('原项目目录不存在', blocked['notice'])
             self.assertFalse(self.cwd.exists())
             events = [json.loads(line) for line in self.path.read_text().splitlines()]
             events[0].pop('permissionMode')
             self.path.write_text('\n'.join(json.dumps(event) for event in events)+'\n')
             unknown = remote_worker.command({**request, 'permissionMode': 'default'})
             self.assertFalse(unknown['ready'])
-            self.assertIn('권한 모드', unknown['notice'])
+            self.assertIn('权限模式', unknown['notice'])
             popen.assert_not_called()
             execute.assert_not_called()
         self.assertTrue(calls)
         self.assertFalse((self.config/'mobile-bridge').exists())
 
     def test_worker_reads_utf8_chinese_history_independent_of_host_locale(self):
-        path = self.root/'중국 기록.jsonl'
-        event = {'type': 'user', 'cwd': '/프로젝트/중국어 카탈로그',
-                 'message': {'role': 'user', 'content': '중국어 제목\n텍스트 내용'}}
+        path = self.root/'中文记录.jsonl'
+        event = {'type': 'user', 'cwd': '/项目/中文目录',
+                 'message': {'role': 'user', 'content': '中文标题\n正文内容'}}
         path.write_text(json.dumps(event, ensure_ascii=False)+'\n', encoding='utf-8')
         original = Path.open
         reads = []
@@ -178,12 +178,12 @@ class RemoteWorkerContract(unittest.TestCase):
         with patch.object(Path, 'open', opening):
             self.assertEqual(remote_worker.events(path), [event])
         self.assertEqual(reads, ['utf-8'])
-        saved_path = self.root/'중국 프로젝트'/(self.native + '.jsonl')
+        saved_path = self.root/'中文项目'/(self.native + '.jsonl')
         saved_path.parent.mkdir()
         saved_path.write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
         saved = remote_worker.saved(saved_path, {'origin': 'fixture', 'directory': str(self.config)},
                                     include_events=True)
-        self.assertEqual((saved['title'], saved['cwd']), ('중국어 제목', '/프로젝트/중국어 카탈로그'))
+        self.assertEqual((saved['title'], saved['cwd']), ('中文标题', '/项目/中文目录'))
         self.assertEqual(saved['events'], [event])
 
     def test_standalone_history_pages_and_file_change_invalidate_cursor(self):
@@ -263,19 +263,19 @@ class RemoteWorkerContract(unittest.TestCase):
         with patch.object(remote_worker.sys, 'platform', 'linux'), \
              patch.object(remote_worker, 'pid_domain', return_value=entry['pidDomain']):
             with patch.object(remote_worker, 'linux_process_start', return_value='123456'):
-                with self.assertRaisesRegex(ValueError, "기존\\ Claude\\ Code\\ 세션이\\ 여전히\\ 다른\\ 터미널에서\\ 실행\\ 중입니다\\."):
+                with self.assertRaisesRegex(ValueError, '其他终端运行'):
                     remote_worker.assert_session_closed(found, self.native)
             for token in (None, '123457'):
                 with patch.object(remote_worker, 'linux_process_start', return_value=token):
                     remote_worker.assert_session_closed(found, self.native)
             entry['procStart'] = 'Wed Oct 14 10:00:00 2026'
             registry.write_text(json.dumps(entry))
-            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法核验'):
                 remote_worker.assert_session_closed(found, self.native)
         entry['pidDomain'] = 'linux:other:pid:[456]'
         registry.write_text(json.dumps(entry))
         with patch.object(remote_worker, 'pid_domain', return_value='linux:machine:pid:[123]'):
-            with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(ValueError, '无法核验'):
                 remote_worker.assert_session_closed(found, self.native)
 
     def test_linux_domain_uses_machine_and_pid_namespace(self):
@@ -409,7 +409,7 @@ class RemoteWorkerContract(unittest.TestCase):
              patch.object(remote_worker, 'archive_assert_no_cli'), \
              patch.object(remote_worker, 'assert_session_closed'), \
              patch.object(remote_worker, 'archive_file_change') as change:
-            with self.assertRaisesRegex(ValueError, '바이너리 보관 기능이 변경되었습니다.'):
+            with self.assertRaisesRegex(ValueError, '二进制归档能力已变化'):
                 remote_worker.command({'operation': 'archive', 'native': self.native,
                                        'origin': found['origin'], 'archived': True})
             self.assertEqual(supported.call_count, 2)
@@ -484,9 +484,9 @@ class RemoteAdapterContract(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout='{"ok":true,"value":{}}')
         with patch.object(remote, '_command', return_value=['ssh', 'fixture']), \
              patch.object(remote.subprocess, 'run', side_effect=read) as run:
-            self.assertEqual(remote._remote('fixture', {'cwd': '/프로젝트'}), {})
+            self.assertEqual(remote._remote('fixture', {'cwd': '/项目'}), {})
         self.assertEqual(run.call_args.kwargs['encoding'], 'utf-8')
-        self.assertEqual(json.loads(captured['bytes']), {'cwd': '/프로젝트'})
+        self.assertEqual(json.loads(captured['bytes']), {'cwd': '/项目'})
         self.assertTrue(run.call_args.kwargs['stdin'].closed)
 
     def test_host_and_profile_scope_and_passive_listing(self):
@@ -501,7 +501,7 @@ class RemoteAdapterContract(unittest.TestCase):
         self.assertNotEqual(sid, remote.model.gateway_id('cli:'+self.row['origin'], self.native))
         self.assertTrue(self.cli.contains(sid))
         self.hosts.hosts.return_value['ssh:test']['alias'] = 'different'
-        with self.assertRaisesRegex(ValueError, '호스트 구성이 변경되었습니다.'):
+        with self.assertRaisesRegex(ValueError, '主机配置已变化'):
             self.cli._get(sid)
 
     def test_detail_uses_remote_native_history_usage(self):
@@ -576,7 +576,7 @@ class RemoteAdapterContract(unittest.TestCase):
     def test_detail_exposes_remote_directory_preflight_before_resume(self):
         row = self.cli._row('ssh:test', self.hosts.hosts()['ssh:test'], {**self.row, 'stamp': [1, 2, 3, 4]})
         self.cli.index[row['id']] = row
-        notice = '원래 프로젝트 디렉터리가 존재하지 않습니다.：/remote/project，원격으로 디렉터리를 복원한 후 다시 시도해 주세요.'
+        notice = '原项目目录不存在：/remote/project，请在远端恢复该目录后重试'
         def response(_alias, request, **_kwargs):
             if request['operation'] == 'resume-preflight':
                 self.assertEqual((request['native'], request['cwd'], request['permissionMode']),
@@ -685,13 +685,13 @@ class RemoteAdapterContract(unittest.TestCase):
                                 model=None, permission=None, events=[], catalog={})
         owned.process.poll.return_value = None
         owned.close = Mock()
-        owned.write = Mock(side_effect=BridgeUnavailable("Claude Code로의 배송이 확인되지 않았습니다. 계속하기 전에 채팅을 확인하세요."))
+        owned.write = Mock(side_effect=BridgeUnavailable('Claude Code 写入结果不明，请检查会话'))
         self.cli.owned[sid] = owned
         body = {'text': 'send once', 'resolvedFiles': [], 'resolvedImages': []}
         with patch.object(self.cli, '_get', return_value=row):
-            with self.assertRaisesRegex(BridgeUnavailable, "Claude\\ Code로의\\ 배송이\\ 확인되지\\ 않았습니다\\.\\ 계속하기\\ 전에\\ 채팅을\\ 확인하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '结果不明'):
                 self.cli.call('send', sid, body)
-            with self.assertRaisesRegex(BridgeUnavailable, '기다리세요.'):
+            with self.assertRaisesRegex(BridgeUnavailable, '请等待'):
                 self.cli.call('send', sid, body)
         owned.write.assert_called_once()
         owned.process.poll.return_value = 1
@@ -719,7 +719,7 @@ class RemoteAdapterContract(unittest.TestCase):
     def test_archive_identity_change_is_rejected(self):
         row = self.cli._row('ssh:test', self.hosts.hosts()['ssh:test'], self.row);sid = row['id'];self.cli.index[sid] = row
         with patch.object(self.cli, '_remote', return_value={**self.row, 'origin': 'another-profile'}):
-            with self.assertRaisesRegex(ValueError, "기존\\ SSH\\ Claude\\ Code\\ 세션\\ ID가\\ 변경됨"): self.cli.call('archive-state', sid, {})
+            with self.assertRaisesRegex(ValueError, '身份已变化'): self.cli.call('archive-state', sid, {})
 
     def test_incomplete_archive_rows_preserve_unknown_runtime_and_list_completeness(self):
         broken = {**self.row, 'archived': True, 'archiveIncomplete': True, 'runtimeKnown': False,

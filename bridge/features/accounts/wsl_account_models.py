@@ -21,12 +21,12 @@ class WslAccountModels:
         provider, entry = request['provider'], request['entry']
         with owner.lock:
             if owner.closed:
-                raise ValueError('게이트웨이가 중지 중입니다.')
+                raise ValueError('网关正在停止')
             registry = owner._registry(provider)
             with registry.lock:
                 row = owner._row(provider, entry, enabled=True)
                 if row['distribution'] not in wsl.running_distributions():
-                    raise ValueError('WSL 중지되었습니다. 계속하기 전에 컴퓨터에서 시작하세요.')
+                    raise ValueError('WSL 已停止，请在电脑端启动后操作')
                 snapshot = owner._call(provider, row, {'action': 'read'})
                 card = next((card for card in snapshot['accounts'] if card['id'] == request.get('id')), None)
                 digest = card.get('modelCatalogIdentity') if card else None
@@ -45,17 +45,17 @@ class WslAccountModels:
     def get(self, request):
         row, digest, identity = self._snapshot(request)
         if not identity:
-            return self._public(row, request, {'models': [], 'modelError': '이 액세스된 모델의 경우 원본을 사용하십시오. CLI 확인하다'})
+            return self._public(row, request, {'models': [], 'modelError': '此接入的模型请使用原 CLI 查看'})
         record = self.owner.models_store.read(identity)
         if record and not request.get('refresh'):
             with self.owner.lock:
                 if self.owner.closed:
-                    raise ValueError('게이트웨이가 중지 중입니다.')
+                    raise ValueError('网关正在停止')
                 self._schedule(identity, request, record[0])
                 return self._public(row, request, record[1], record, identity)
         with self.lock:
             if self.closed:
-                raise ValueError('게이트웨이가 중지 중입니다.')
+                raise ValueError('网关正在停止')
             future = self.reads.get(identity)
             creator = future is None
             if creator:
@@ -67,15 +67,15 @@ class WslAccountModels:
             try:
                 result = self.owner._call(request['provider'], row, {**request, 'modelIdentity': digest})
             except (OSError, ValueError, TimeoutError):
-                result = {'models': [], 'modelError': '모델 디렉터리 새로 고침이 실패했습니다. 마지막 결과가 유지되었습니다.'}
+                result = {'models': [], 'modelError': '模型目录刷新失败，已保留上次结果'}
             with self.owner.lock, self.owner._registry(request['provider']).lock:
                 latest, _, latest_identity = self._snapshot(request)
                 if latest_identity != identity or result.get('identityChanged'):
-                    value = self._public(latest, request, {'models': [], 'modelError': '모델 접근권한이 변경되었습니다. 새로고침 후 다시 읽어주세요.'})
+                    value = self._public(latest, request, {'models': [], 'modelError': '模型接入已变化，请刷新后重新读取'})
                 else:
                     with self.lock:
                         if self.closed:
-                            raise ValueError('게이트웨이가 중지 중입니다.')
+                            raise ValueError('网关正在停止')
                         if not result.get('modelError'):
                             at = self.owner.models_store.write(identity, result)
                             record = (at, result)

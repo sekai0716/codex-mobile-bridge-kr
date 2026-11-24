@@ -32,14 +32,14 @@ PROVIDERS = {'official': 'deepseek-account', 'api': 'deepseek-official'}
 
 def _read(path):
     if path.is_symlink():
-        raise ValueError('Harness 계정 파일은 심볼릭 링크일 수 없습니다.')
+        raise ValueError('Harness 账号文件不能是符号链接')
     if not path.exists():
         return None
     try:
         _owned_file(path, private=True)
         return path.read_bytes()
     except (OSError, ValueError):
-        raise ValueError("Harness 계정 파일을 읽을 수 없거나 권한이 잘못되었습니다.") from None
+        raise ValueError('Harness 账号文件不可读或权限不正确') from None
 
 
 def _document(raw):
@@ -49,13 +49,16 @@ def _document(raw):
             return {'version': 1, 'refs': {}, 'records': {}}
         if not isinstance(value, dict) or value.get('version') != 1 or set(value)-{'version', 'refs', 'records'}:
             raise ValueError()
+        for key in ('refs', 'records'):
+            if key in value and value[key] is None:
+                value[key] = {}
         if any(not isinstance(value.get(key, {}), dict) for key in ('refs', 'records')):
             raise ValueError()
         if any(not isinstance(v, str) or not v for v in value.get('refs', {}).values()):
             raise ValueError()
         return value
     except (UnicodeError, ValueError, TypeError, AttributeError):
-        raise ValueError("Harness 자격 증명 형식이 인식되지 않습니다. 계정이 변경되지 않았습니다.") from None
+        raise ValueError('Harness 凭据格式无法识别，尚未修改账号') from None
 
 
 def _credential(document, kind):
@@ -72,7 +75,7 @@ def _credential(document, kind):
                 and payload.get('issuer') == ORIGIN and isinstance(payload.get('token'), str)
                 and re.fullmatch(r'[\x21-\x7e]+', payload['token'])):
             return copy.deepcopy(value)
-    raise ValueError("현재 Harness 자격 증명이 잘못되었습니다. 클라이언트에서 다시 로그인하세요.")
+    raise ValueError('Harness 当前账号凭据无效，请在客户端重新登录')
 
 
 def _fingerprint(kind, value):
@@ -97,12 +100,17 @@ def _replace(raw, kind, value):
         document.setdefault(section, {})[key] = value
         return (json.dumps(document, ensure_ascii=False, indent=2)+'\n').encode()
     lines = raw.decode('utf-8').splitlines(keepends=True)
-    starts = [i for i, line in enumerate(lines) if re.fullmatch(section+r':[ \t]*\r?\n?', line)]
-    replacement = _yaml_lines(key, value, 2)
+    newline = '\r\n' if b'\r\n' in raw else '\n'
+    starts = [i for i, line in enumerate(lines) if re.fullmatch(section+r':[ \t]*(?:\{[ \t]*\}|null|~)?[ \t]*\r?\n?', line)]
+    replacement = [line.replace('\n', newline) for line in _yaml_lines(key, value, 2)]
     if not starts:
         if section in document:
-            raise ValueError("Harness 자격 증명 형식이 인식되지 않습니다. 계정이 변경되지 않았습니다.")
-        return (''.join(lines).rstrip('\r\n')+'\n'+section+':\n'+''.join(replacement)).encode()
+            raise ValueError('Harness 凭据格式无法识别，尚未修改账号')
+        return (''.join(lines).rstrip('\r\n')+newline+section+':'+newline+''.join(replacement)).encode()
+    inline_empty = not re.fullmatch(section+r':[ \t]*\r?\n?', lines[starts[0]])
+    # Only the selected inline section becomes a block; other native bytes stay intact.
+    if inline_empty:
+        lines[starts[0]] = section+':'+newline
     start = starts[0]+1
     end = next((i for i in range(start, len(lines)) if re.match(r'^[^\s#]', lines[i])), len(lines))
     entries = []
@@ -112,7 +120,8 @@ def _replace(raw, kind, value):
             entries.append((i, _scalar(match[1])))
     target = next((n for n, (_, name) in enumerate(entries) if name == key), None)
     if target is None:
-        lines[end:end] = replacement
+        insertion = start if inline_empty else end
+        lines[insertion:insertion] = replacement
     else:
         first = entries[target][0]
         last = entries[target+1][0] if target+1 < len(entries) else end
@@ -122,7 +131,7 @@ def _replace(raw, kind, value):
         lines[first:last] = replacement
     output = ''.join(lines).encode()
     if _credential(_document(output), kind) != value:
-        raise ValueError("저장하기 전에 Harness 자격 증명을 확인할 수 없습니다. 계정이 변경되지 않았습니다.")
+        raise ValueError('Harness 凭据写入验证失败，尚未修改账号')
     return output
 
 
@@ -134,7 +143,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 def _request(path, token):
     """Only fixed account endpoints receive a grant; never follow redirects."""
     if path not in ('/auth-api/v0/users/current', '/api/v0/users/get_user_summary'):
-        raise ValueError("이 Harness 계정 쿼리는 지원되지 않습니다.")
+        raise ValueError('Harness 账号查询不受支持')
     request = urllib.request.Request(ORIGIN+path, headers={'x-dsh-auth-token': token, 'Accept': 'application/json'})
     try:
         with urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPSHandler(context=client_context())).open(request, timeout=15) as response:
@@ -150,22 +159,22 @@ def _request(path, token):
         return data.get('biz_data')
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
-            raise ValueError('Harness 로그인이 만료되었습니다. 클라이언트에서 다시 로그인하세요.') from None
-        raise ValueError("Harness 잔액을 로드할 수 없습니다. 나중에 다시 시도하세요.") from None
+            raise ValueError('Harness 登录已失效，请在客户端重新登录') from None
+        raise ValueError('Harness 余额查询失败，请稍后重试') from None
     except PermissionError:
-        raise ValueError('Harness 로그인이 만료되었습니다. 클라이언트에서 다시 로그인하세요.') from None
+        raise ValueError('Harness 登录已失效，请在客户端重新登录') from None
     except (OSError, ValueError, TypeError, AttributeError):
-        raise ValueError("Harness 잔액을 로드할 수 없습니다. 나중에 다시 시도하세요.") from None
+        raise ValueError('Harness 余额查询失败，请稍后重试') from None
 
 
 def _balance(value):
     if not isinstance(value, dict):
-        raise ValueError("Harness가 인식할 수 없는 잔액 형식을 반환했습니다.")
+        raise ValueError('Harness 余额数据无法识别')
     wallets = {}
     for source, target in (('normal_wallets', 'toppedUp'), ('bonus_wallets', 'granted')):
         rows = value.get(source)
         if not isinstance(rows, list):
-            raise ValueError("Harness가 인식할 수 없는 잔액 형식을 반환했습니다.")
+            raise ValueError('Harness 余额数据无法识别')
         for row in rows:
             try:
                 if not isinstance(row, dict) or row.get('currency') not in ('CNY', 'USD') or not isinstance(row.get('balance'), str):
@@ -174,7 +183,7 @@ def _balance(value):
                 if not amount.is_finite() or abs(amount.adjusted()) > 100:
                     raise ValueError()
             except (InvalidOperation, ValueError):
-                raise ValueError("Harness가 인식할 수 없는 잔액 형식을 반환했습니다.") from None
+                raise ValueError('Harness 余额数据无法识别') from None
             item = wallets.setdefault(row['currency'], {'toppedUp': Decimal(0), 'granted': Decimal(0)})
             item[target] += amount
     return {'wallets': [{'currency': currency, 'remaining': str(values['toppedUp']+values['granted']),
@@ -200,7 +209,7 @@ class DeepSeekAccounts:
         self.directory = Path(directory).expanduser()
         self.home = Path(data_home).expanduser()
         if self.directory.is_symlink():
-            raise ValueError('Harness 계정 디렉터리는 심볼릭 링크일 수 없습니다.')
+            raise ValueError('Harness 账号目录不能是符号链接')
         self.path = self.home/'.credentials.yaml'
         self.lock = threading.RLock()
         raw = _read(self.directory/'index.json')
@@ -214,12 +223,12 @@ class DeepSeekAccounts:
 
     def _row(self, identifier):
         if identifier in ('current-official', 'current-api'):
-            raise ValueError("현재 Harness 연결이 저장되지 않았습니다. 먼저 데스크톱 게이트웨이에 계정을 추가하세요.")
+            raise ValueError('Harness 当前接入尚未保存，请先在桌面添加账号')
         if not isinstance(identifier, str) or not re.fullmatch(r'[0-9a-f]{32}', identifier):
-            raise ValueError("Harness 계정 ID가 잘못되었습니다.")
+            raise ValueError('Harness 账号标识无效')
         row = next((row for row in self.index['accounts'] if row['id'] == identifier), None)
         if row is None:
-            raise ValueError("Harness 계정은 더 이상 존재하지 않습니다. 목록을 새로 고칩니다.")
+            raise ValueError('Harness 账号不存在，请刷新列表')
         return row
 
     def _snapshot(self, row):
@@ -233,7 +242,7 @@ class DeepSeekAccounts:
                 raise ValueError()
             return value
         except (ValueError, TypeError, KeyError):
-            raise ValueError("저장된 Harness 계정이 유효하지 않습니다. 다시 추가하세요.") from None
+            raise ValueError('Harness 已保存账号无效，请重新添加') from None
 
     def public(self):
         with self.lock:
@@ -282,16 +291,16 @@ class DeepSeekAccounts:
             if not kind:
                 kind = 'official' if _credential(document, 'official') is not None else 'api'
             if kind not in SLOTS:
-                raise ValueError("Harness 연결 유형이 잘못되었습니다.")
+                raise ValueError('Harness 接入类型无效')
             value = _credential(document, kind)
             if value is None:
-                raise ValueError("현재 Harness 연결을 찾을 수 없습니다. 먼저 클라이언트에서 API에 로그인하거나 구성하세요.")
+                raise ValueError('未找到 Harness 当前接入，请先在客户端登录或配置 API')
             if kind == 'api' and self.inherit_environment and os.environ.get(API_REF):
-                raise ValueError("Harness API는 실행 환경에 의해 설정됩니다. 로컬 자격 증명은 전환할 수 없습니다.")
+                raise ValueError('Harness API 由启动环境指定，无法切换本地凭据')
             stamp = _fingerprint(kind, value)
             row = next((item for item in self.index['accounts'] if item['kind'] == kind and item['fingerprint'] == stamp), None)
             if not isinstance(name, str) or len(name.strip()) > 100:
-                raise ValueError('Harness 계정 이름이 잘못되었습니다.')
+                raise ValueError('Harness 账号名称无效')
             if row is None:
                 row = {'id': uuid.uuid4().hex, 'name': name.strip() or ('DeepSeek Harness' if kind == 'official' else 'DeepSeek API'),
                        'kind': kind, 'provider': PROVIDERS[kind], 'fingerprint': stamp}
@@ -312,7 +321,7 @@ class DeepSeekAccounts:
                 kind = identifier.removeprefix('current-')
                 value = _credential(_document(_read(self.path)), kind)
                 if value is None:
-                    raise ValueError("현재 Harness 연결을 찾을 수 없습니다. 먼저 클라이언트에서 API에 로그인하거나 구성하세요.")
+                    raise ValueError('未找到 Harness 当前接入，请先在客户端登录或配置 API')
                 row = self._current_row(kind, _fingerprint(kind, value))
             else:
                 row = self._row(identifier)
@@ -346,7 +355,7 @@ class DeepSeekAccounts:
     @staticmethod
     def _name(value):
         if not isinstance(value, str) or not value.strip() or len(value.strip()) > 100:
-            raise ValueError("Harness 계정 이름은 필수이며 100자를 초과할 수 없습니다.")
+            raise ValueError('Harness 账号名称不能为空且不能超过 100 字')
         return value.strip()
 
     def edit(self, identifier):
@@ -363,7 +372,7 @@ class DeepSeekAccounts:
         with self.lock:
             row = self._row(identifier)
             if row['kind'] != 'api':
-                raise ValueError('저장된 것을 선택해주세요 API 연결')
+                raise ValueError('请选择已保存的 API 接入')
             return {'baseUrl': 'https://api.deepseek.com', 'apiKey': self._snapshot(row),
                     'apiFormat': 'openai-chat-completions'}
 
@@ -385,16 +394,16 @@ class DeepSeekAccounts:
             name = self._name(value.get('name'))
             existing = self._row(value['id']) if value.get('id') else None
             if existing and existing['kind'] != 'api':
-                raise ValueError("Harness에서 공식 로그인 자격 증명을 업데이트하세요.")
+                raise ValueError('官方登录只能在 Harness 中修改')
             # Arbitrary providers need their own native plugin and route, not
             # just a credential in DEEPSEEK_API_KEY. Do not silently ignore one.
             if set(value)-{'operation', 'action', 'provider', 'id', 'name', 'apiKey'}:
-                raise ValueError("여기서는 DeepSeek 공식 API 키만 지원됩니다. Harness에서 사용자 정의 연결을 구성합니다.")
+                raise ValueError('此处仅支持 DeepSeek 官方 API Key，自定义接入请在 Harness 中配置')
             key = value.get('apiKey', '')
             if key == '' and existing:
                 key = self._snapshot(existing)
             if not isinstance(key, str) or not re.fullmatch(r'[\x21-\x7e]{1,8192}', key):
-                raise ValueError("유효한 API 키를 입력하세요.")
+                raise ValueError('请输入有效的 API Key')
             identifier = existing['id'] if existing else uuid.uuid4().hex
             path = self.directory/(identifier+'.json')
             before, old_index = _read(path), copy.deepcopy(self.index)
@@ -439,12 +448,12 @@ class DeepSeekAccounts:
     def _writer(self):
         """Use the same exclusive sibling lock as native credentials-local."""
         if not self.home.is_dir():
-            raise ValueError("Harness 데이터 디렉터리를 찾을 수 없습니다.")
+            raise ValueError('未找到 Harness 数据目录')
         lock_path = self.path.with_name(self.path.name+'.lock')
         try:
             descriptor = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
-            raise ValueError("Harness는 계정 데이터를 저장하고 있습니다. 잠시 후 다시 시도하세요.") from None
+            raise ValueError('Harness 正在写入账号，请稍后重试') from None
         try:
             with os.fdopen(descriptor, 'w') as stream:
                 stream.write(str(os.getpid())+'\n')
@@ -457,7 +466,7 @@ class DeepSeekAccounts:
         with self.lock, self._writer():
             row = self._row(identifier)
             if row['kind'] == 'api' and self.inherit_environment and os.environ.get(API_REF):
-                raise ValueError("Harness API는 실행 환경에 의해 설정됩니다. 로컬 자격 증명은 전환할 수 없습니다.")
+                raise ValueError('Harness API 由启动环境指定，无法切换本地凭据')
             value = self._snapshot(row)
             before = _read(self.path)
             after = _replace(before, row['kind'], value)
@@ -482,7 +491,7 @@ class DeepSeekAccounts:
 
     def _rollback_path(self, token):
         if not isinstance(token, str) or not re.fullmatch(r'[0-9a-f]{32}', token):
-            raise ValueError("Harness 계정 복구가 잘못되었습니다. ID.")
+            raise ValueError('Harness 账号恢复标识无效')
         return self.directory/('rollback-'+token+'.json')
 
     def rollback(self, token):
@@ -490,11 +499,11 @@ class DeepSeekAccounts:
             path = self._rollback_path(token)
             raw = _read(path)
             if raw is None:
-                raise ValueError("Harness 계정 복구 기록을 찾을 수 없습니다.")
+                raise ValueError('Harness 账号恢复记录不存在')
             saved = json.loads(raw)
             current = _read(self.path)
             if current is None or hashlib.sha256(current).hexdigest() != saved['expected']:
-                raise ValueError("Harness 계정이 외부에서 변경되었습니다. 복원하기 전에 컴퓨터에서 확인하세요.")
+                raise ValueError('Harness 账号已被外部修改，请在桌面检查后恢复')
             if saved['before'] is None:
                 self.path.unlink()
             else:

@@ -36,7 +36,7 @@ class WindowsDefaultProfileRoots(unittest.TestCase):
                         declaration = next(p for p in instances.defaults() if p.family=='claude' and p.kind=='default')
                         self.assertTrue({active, native_api, legacy_api}.issubset(set(declaration.roots.values())))
                         for occupied in (active, native_api, legacy_api):
-                            with self.subTest(occupied=occupied), self.assertRaisesRegex(ValueError, '기본'):
+                            with self.subTest(occupied=occupied), self.assertRaisesRegex(ValueError, '默认'):
                                 instances.registry.register({'family': 'claude', 'kind': 'desktop-profile',
                                     'home': str(occupied), 'label': 'Must not claim a default account'})
                         self.assertEqual(instances.registry.list(), [])

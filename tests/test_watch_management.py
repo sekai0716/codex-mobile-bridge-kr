@@ -52,7 +52,7 @@ class WatchManagementTests(unittest.TestCase):
         with patch('bridge.app.service.Bridge.for_host', side_effect=AssertionError('No activation or remote connection')):
             self.manager.control(self.action(notifyOnCompletion=True))
             self.manager.control(self.action('remove'))
-            with self.assertRaisesRegex(ValueError, "이\\ 채팅은\\ 더\\ 이상\\ 시청되지\\ 않습니다\\.\\ 목록을\\ 새로\\ 고칩니다\\."):
+            with self.assertRaisesRegex(ValueError, '已移除'):
                 self.manager.control(self.action(notifyOnCompletion=True))
         for invalid in (None, [], {}, self.action('create'), self.action(notifyOnCompletion='yes'), self.action('remove', extra=True)):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
@@ -92,10 +92,10 @@ class WatchManagementTests(unittest.TestCase):
         before = (self.data/'notification-watches.json').read_bytes()
         write_json(self.data/'gateway-control.json', {'pid': 123, 'token': 'fixture'})
         self.desktop.status = lambda: {'running': True}
-        with self.assertRaisesRegex(ValueError, '다시 시작'):
+        with self.assertRaisesRegex(ValueError, '重新启动'):
             self.desktop.notification_watches(self.action('remove'))
         self.desktop.status = lambda: {'running': False}
-        with self.assertRaisesRegex(ValueError, "게이트웨이\\ 상태를\\ 사용할\\ 수\\ 없습니다\\.\\ 곧\\ 새로고침하세요\\."):
+        with self.assertRaisesRegex(ValueError, '暂不可用'):
             self.desktop.notification_watches(self.action('remove'))
         self.assertEqual((self.data/'notification-watches.json').read_bytes(), before)
 

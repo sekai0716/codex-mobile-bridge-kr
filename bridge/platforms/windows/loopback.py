@@ -29,14 +29,14 @@ def _listeners(port):
         size = ctypes.c_uint32()
         code = api(None, ctypes.byref(size), False, family, 3, 0)  # OWNER_PID_LISTENER
         if code not in (0, 122) or size.value < 4:
-            raise OSError('읽을 수 없음 Windows 청취 포트')
+            raise OSError('无法读取 Windows 监听端口')
         buffer = ctypes.create_string_buffer(size.value)
         code = api(buffer, ctypes.byref(size), False, family, 3, 0)
         if code:
-            raise OSError('Windows 확인 중에 수신 대기 포트가 변경되었습니다. 다시 시도해 주세요.')
+            raise OSError('Windows 监听端口在核验期间变化，请重试')
         count = ctypes.c_uint32.from_buffer(buffer).value
         if 4 + count * ctypes.sizeof(row_type) > len(buffer):
-            raise ValueError('Windows 수신 포트 정보가 불완전합니다.')
+            raise ValueError('Windows 监听端口信息不完整')
         for index in range(count):
             row = row_type.from_buffer(buffer, 4 + index * ctypes.sizeof(row_type))
             if socket.ntohs(row.port & 0xffff) == port:
@@ -75,12 +75,12 @@ def _same_user(native, first, second):
 
 def listener_identity(port, executable, *, required=True):
     if type(port) is not int or not 1024 <= port <= 65535:
-        raise ValueError('잘못된 기본 디버그 포트')
+        raise ValueError('无效的本机调试端口')
     rows = _listeners(port)
     if not required and not rows:
         return None  # Both OS listener tables were read successfully.
     if len(rows) != 1 or rows[0][1] != '127.0.0.1':
-        raise ValueError('디버그 포트는 하나의 기본 프로세스에서만 수신 대기해야 합니다. 127.0.0.1')
+        raise ValueError('调试端口必须仅由一个本机进程监听 127.0.0.1')
     native = _Native()
     handle = native.open(rows[0][0], terminate=False)
     try:
@@ -94,7 +94,7 @@ def listener_identity(port, executable, *, required=True):
                 or identity['session'] != native.session
                 or identity['image'] != os.path.normcase(str(Path(executable).resolve()))
                 or _listeners(port) != rows):
-            raise ValueError('포트 및 원본 App 사용자, 데스크톱 세션 또는 프로세스 ID 불일치')
+            raise ValueError('端口与原 App 用户、桌面会话或进程身份不匹配')
         return {key: identity[key] for key in ('pid', 'created', 'session')}
     finally:
         native.close(handle)

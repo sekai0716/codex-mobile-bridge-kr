@@ -24,24 +24,24 @@ class OrganizationCommands:
     def perform(self, identifier, change, read, dispatch):
         uuid.UUID(identifier)
         if not isinstance(change, dict) or set(change) != {'id', 'kind', 'targetId', 'expectedId'}:
-            raise ValueError("잘못된 채팅 조직 설정입니다.")
+            raise ValueError('会话分类设置无效')
         request_id = change['id']
         if not isinstance(request_id, str):
-            raise ValueError("잘못된 채팅 조직 설정입니다.")
+            raise ValueError('会话分类设置无效')
         uuid.UUID(request_id)
         mutation = {key: value for key, value in change.items() if key != 'id'}
         with self.lock:
             entries = json.loads(self.path.read_text(encoding='utf-8')) if self.path.exists() else {}
             old = entries.get(request_id)
             if old and (old['id'] != identifier or old['change'] != mutation):
-                raise ValueError('동일한 요청 ID를 다른 작업에 사용할 수 없습니다.')
+                raise ValueError('相同请求标识不能用于不同操作')
             snapshot = read()
             for entry in entries.values():
                 if entry['id'] == identifier and entry['status'] == 'unknown':
                     field = entry['change']['kind'] + 'Id'
                     if (snapshot.get(field) != entry['change']['targetId'] or
                             snapshot.get('identity') != entry['identity']):
-                        raise ValueError("이전 조직 운영에는 아직 확인이 필요합니다. 원래 클라이언트를 확인하십시오. 다시 제출되지 않습니다.")
+                        raise ValueError('此前分类操作仍待核对；不会重复提交，请先在原客户端核对')
                     entry['status'] = 'confirmed'
             if old:
                 self.save(self.path, entries)
@@ -58,13 +58,13 @@ class OrganizationCommands:
                 if (result.get('status') != 'confirmed' or
                         result.get(mutation['kind'] + 'Id') != mutation['targetId'] or
                         result.get('identity') != snapshot['identity']):
-                    raise ValueError("네이티브 조직 결과를 확인해야 합니다. 채팅 목록을 새로 고칩니다.")
+                    raise ValueError('原生分类结果待核对，请刷新会话列表')
             except (OrganizationNotSent, CreationUnavailable):
                 del entries[request_id]
                 self.save(self.path, entries)
                 raise
             except Exception as exc:
-                raise ValueError("네이티브 조직 결과를 확인해야 합니다. 원래 클라이언트를 확인하십시오. 이 작업은 다시 제출되지 않습니다.") from exc
+                raise ValueError('原生分类结果待核对；不会重复提交，请先在原客户端核对') from exc
             entries[request_id]['status'] = 'confirmed'
             self.save(self.path, entries)
             return result

@@ -21,14 +21,14 @@ class DeepSeekProfileErrorTests(unittest.TestCase):
             profile.parent.mkdir(parents=True)
             profile.write_text('[]')
             adapter = DeepSeek(root/'gateway', root/'home')
-            with self.assertRaisesRegex(BridgeUnavailable, "찾을\\ 수\\ 없음\\ Harness\\ 데스크탑\\ 파일\\.\\ 사용\\ Web\\ 또는\\ 제3자\\ 클라이언트로\\ 문의해\\ 주세요\\.“타사\\ 클라이언트:\\ 수동\\ 설치\\ 및\\ 바인딩”액세스\\ 플러그인을\\ 스캔하고\\ 바인딩합니다\\.\\ 먼저\\ 공식\\ 데스크톱\\ 버전을\\ 시작하고\\ 데이터\\ 디렉터리를\\ 확인하세요\\.。"):
+            with self.assertRaisesRegex(BridgeUnavailable, 'Web.*扫描并绑定'):
                 adapter.call('list')
             self.assertFalse((root/'home/profiles/desktop').exists())
             self.assertFalse(adapter.directory.exists())
             desktop = root/'home/profiles/desktop/cordis.patch.yml'
             desktop.parent.mkdir()
             desktop.write_text('[]')
-            with self.assertRaisesRegex(BridgeUnavailable, "DeepSeek\\ 데스크톱이\\ 연결되지\\ 않았습니다\\.\\ 액세스\\ 플러그인을\\ 설치하고\\ 다시\\ 열어주세요\\.\\ Harness"):
+            with self.assertRaisesRegex(BridgeUnavailable, 'DeepSeek 桌面未连接'):
                 adapter.call('list')
 
 
@@ -98,12 +98,45 @@ class DeepSeekTransportTests(unittest.TestCase):
             self.adapter.call('list')
         self.assertEqual(self.forwarded, [])
 
+    def test_malformed_http_responses_map_to_bridge_unavailable(self):
+        # 半包 HTTPException、非法 JSON 响应体及非字典 HTTPError 错误体都应统一转为 BridgeUnavailable。
+        import http.client
+        import io
+        import urllib.error
+
+        class FakeOpener:
+            def __init__(self, outcome):
+                self.outcome = outcome
+            def open(self, req, timeout=30):
+                if isinstance(self.outcome, Exception):
+                    raise self.outcome
+                return self.outcome
+
+        class RawResponse:
+            def __init__(self, payload):
+                self.payload = payload
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit): return self.payload
+
+        for outcome in (
+            http.client.IncompleteRead(b'{"sessions":', 5),
+            RawResponse(b'<html>502</html>'),
+            RawResponse(b'\xff\xfe'),
+            RawResponse(b'[1, 2]'),
+            urllib.error.HTTPError('http://127.0.0.1/mobile', 502, 'Bad Gateway', {}, io.BytesIO(b'[1, 2]')),
+        ):
+            with self.subTest(outcome=type(outcome).__name__):
+                with patch('urllib.request.build_opener', return_value=FakeOpener(outcome)):
+                    with self.assertRaises(BridgeUnavailable):
+                        self.adapter.call('status')
+
     def test_native_project_mentions_keep_the_existing_plugin_protocol(self):
-        body = {'id': 'fixture-id', 'text': '파일 확인', 'resolvedReferences': [
-            {'path': '/project/중국 문서.md', 'kind': 'file'}, {'path': '/project/folder', 'kind': 'directory'}]}
+        body = {'id': 'fixture-id', 'text': '检查文件', 'resolvedReferences': [
+            {'path': '/project/中文 文件.md', 'kind': 'file'}, {'path': '/project/folder', 'kind': 'directory'}]}
         self.adapter.call('send', 'native-chat', body)
         self.assertEqual(self.bodies, [{'action': 'send', 'sid': 'native-chat', 'body': {
-            'id': 'fixture-id', 'text': '파일 확인\n\n@"/project/중국 문서.md"\n@/project/folder/'}}])
+            'id': 'fixture-id', 'text': '检查文件\n\n@"/project/中文 文件.md"\n@/project/folder/'}}])
         self.assertIn('resolvedReferences', body)
 
 

@@ -99,11 +99,6 @@ class SideChatPanel {
         const message = error instanceof TypeError && !error.status
           ? 'The side chat creation result is unknown. Refresh the side chat list to check.' : error.message;
         this.createError.replaceChildren(this.workbench.node('span', '', message));
-        const setup = error.code === 'side_chat_setup_required';
-        if ((setup || error.code === 'side_chat_setup_waiting') && this.session.host === 'local' && this.workbench.openDesktopConnection) {
-          this.createError.append(' ', this.workbench.button(setup ? 'Open connection setup' : 'View connection status',
-            () => { if (this.workbench.current === this.session) this.workbench.openDesktopConnection(); }));
-        }
         this.createError.hidden=false;
       }
     } finally {

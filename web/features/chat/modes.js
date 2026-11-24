@@ -162,6 +162,7 @@ class WorkModes {
     this.hint.textContent=t(sendMode==='steer'?'추가 입력으로 현재 모드 유지':this.select.value==='plan'?'먼저 토론하고 계획하세요. 확인 후 시행합니다.':this.select.value==='goal'?(goalSupported?'완료, 일시 중지 또는 취소될 때까지 목표를 향해 계속 노력하세요.':goalUnavailableReason):'');
     this.hint.hidden=!this.hint.textContent;
     this.select.title=this.hint.textContent;
+    this.onRender?.();
     const goal=view?.goal,request=view?.goalSubmission;
     const renderStamp=JSON.stringify([goal,request,caps,goalSupported,this.key,BridgeI18n.locale(),busy,this.statusBusy,this.cancelBusy,this.editing,this.actionError,this.storage.getItem('hidden-goal:'+this.key)]);
     if(this.goalRenderStamp===renderStamp)return;this.goalRenderStamp=renderStamp;

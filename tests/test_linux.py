@@ -5,89 +5,55 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import bridge.features.network.interfaces as interfaces
 import bridge.platforms.linux.interfaces as linux_interfaces
+from bridge.platforms.linux import desktop as linux_desktop
 from bridge.clients.codex.catalog import Catalog
 from bridge.features.sessions.create import CreationError, open_in_desktop
 
 
 class LinuxTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform == 'linux', 'Linux desktop process tree')
-    def test_account_switch_quits_main_process_and_waits_for_its_helpers(self):
-        from bridge.clients.desktop_app import DesktopApp
-        app = DesktopApp('/fixture/ChatGPT', '/fixture/config')
-        pids = [41, 42]
-        commands = {41: '/fixture/ChatGPT', 42: '/fixture/ChatGPT --type=renderer'}
-        with patch.object(app, 'processes', side_effect=[pids, pids, []]), \
-             patch('bridge.platforms.linux.desktop.commands', return_value=commands), \
-             patch('bridge.platforms.linux.desktop.quit_process') as quit_process:
-            app.stop(provider='codex')
-        quit_process.assert_called_once_with(41)
+    @unittest.skipUnless(os.name == 'posix', 'synthetic /proc symlinks')
+    def test_deleted_desktop_image_remains_visible_only_for_its_exact_path_and_uid(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.tmp') as folder:
+            root = Path(folder).resolve()
+            expected = root/'old-version'/'desktop'
+            processes = [root/str(pid) for pid in (123, 124, 125)]
+            for process, image in zip(processes, (expected, root/'other-version'/'desktop', expected)):
+                process.mkdir(); (process/'exe').symlink_to(str(image)+' (deleted)')
+                (process/'cmdline').write_bytes(b'desktop\0--profile\0fixture\0')
+            stat = Path.stat
+            def owner(path, *args, **kwargs):
+                return SimpleNamespace(st_uid=os.getuid()+1) if path == processes[2] else stat(path, *args, **kwargs)
+            with patch.object(Path, 'iterdir', return_value=processes), \
+                 patch.object(Path, 'stat', autospec=True, side_effect=owner), \
+                 patch.object(linux_desktop.os, 'readlink', wraps=os.readlink) as readlink:
+                state = {'pids': [], 'commands': {}}
+                linux_desktop.inventory({}, lambda image: state if image == expected else None)
+                self.assertEqual(state, {'pids': [123], 'commands': {123: 'desktop --profile fixture'}})
+                self.assertEqual(linux_desktop.processes(lambda image: image == expected), [123])
+                marked = {int(process.name): str(image) for process, image in
+                          linux_desktop._process_rows(preserve_deleted_marker=True)}
+                self.assertEqual(marked, {
+                    123: str(expected)+' (deleted)',
+                    124: str(root/'other-version'/'desktop')+' (deleted)',
+                })
+                self.assertNotIn(processes[2]/'exe', [call.args[0] for call in readlink.call_args_list])
 
-    @unittest.skipUnless(sys.platform == 'linux', 'Linux deleted-directory semantics')
-    def test_gateway_and_url_opener_outlive_launcher_working_directory(self):
-        # A separate parent process can unlink its own cwd without changing that
-        # of the test runner. Both probe programs capture the real child cwd.
-        root = Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp)
-            probe = """import json, os, pathlib, sys
-from bridge.app.desktop import Desktop
-where = pathlib.Path(os.environ['BRIDGE_TEST_ROOT'])
-entry = pathlib.Path(sys.argv[0]).name
-args = Desktop(sys.argv[3]).argv() if entry != 'xdg-open' else sys.argv[1:]
-(where / (entry + '.json')).write_text(json.dumps([os.getcwd(), os.environ['PWD'], args]))
-"""
-            for name in ('desktop.py', 'codex-mobile-gateway', 'xdg-open'):
-                file = folder / name
-                file.write_text('#!' + sys.executable + '\n' + probe)
-                file.chmod(0o700)
-            launcher = """import json, os, pathlib, sys
-from types import SimpleNamespace
-from unittest.mock import patch
-from bridge.app.desktop import Desktop
-from bridge.features.sessions.create import open_in_desktop
-root = pathlib.Path(os.environ['BRIDGE_TEST_ROOT'])
-mode = sys.argv[1]
-data = root / 'data'
-app = Desktop(data)
-app.status = lambda: {'running': False}
-config = {'codexHome': str(data), 'lan': False, 'connections': []}
-if mode == 'relative':
-    config['codexHome'] = '../data'
-(data / 'desktop.json').write_text(json.dumps(config))
-if mode != 'relative':
-    os.rmdir(os.getcwd())
-    try: os.getcwd()
-    except FileNotFoundError: pass
-    else: raise AssertionError('launcher cwd was not removed')
-if mode == 'xdg-open':
-    open_in_desktop('11111111-1111-4111-8111-111111111111', 'remote host&value')
-else:
-    packaged = mode == 'codex-mobile-gateway'
-    runtime = SimpleNamespace(platform='linux', frozen=packaged, executable=str(root/'codex-mobile-gateway') if packaged else sys.executable)
-    with patch('bridge.app.desktop.project_root', return_value=root), patch('bridge.app.desktop.sys', runtime):
-        child = app.start()
-    _, status = os.waitpid(child['pid'], 0)
-    if status: raise AssertionError((data/'gateway.log').read_text())
-"""
-            for mode in ('desktop.py', 'codex-mobile-gateway', 'xdg-open', 'relative'):
-                with self.subTest(mode=mode):
-                    launcher_dir = folder / ('cwd-' + mode)
-                    launcher_dir.mkdir()
-                    env = {**os.environ, 'BRIDGE_TEST_ROOT':tmp, 'PYTHONPATH':str(root),
-                           'PWD':str(launcher_dir), 'PATH':tmp+os.pathsep+os.environ['PATH']}
-                    subprocess.run([sys.executable, '-c', launcher, mode], cwd=launcher_dir,
-                                   env=env, check=True, timeout=20)
-                    result = 'desktop.py' if mode == 'relative' else mode
-                    wd, pwd, args = json.loads((folder/(result+'.json')).read_text())
-                    self.assertEqual((wd, pwd), ('/', '/'))
-                    if mode == 'xdg-open':
-                        self.assertEqual(args, ['codex://threads/11111111-1111-4111-8111-111111111111?hostId=remote+host%26value'])
-                    else:
-                        self.assertEqual(Path(args[args.index('--codex-home')+1]).resolve(), folder/'data')
+    @unittest.skipUnless(os.name == 'posix', 'synthetic /proc symlinks')
+    def test_live_images_remain_visible_but_relative_or_disappearing_images_do_not(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]/'.tmp') as folder:
+            root = Path(folder).resolve(); image = root/'desktop'; image.touch()
+            processes = [root/str(pid) for pid in (123, 124, 125)]
+            for process in processes: process.mkdir()
+            (processes[0]/'exe').symlink_to(image)
+            relative = processes[1]/'relative'; relative.touch()
+            (processes[1]/'exe').symlink_to('relative')
+            with patch.object(Path, 'iterdir', return_value=processes):
+                self.assertEqual(list(linux_desktop._process_rows()), [(processes[0], image)])
 
     def test_ubuntu_chatgpt_package_layout(self):
         runtime = Path('/usr/lib/chatgpt/resources/codex')

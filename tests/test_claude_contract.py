@@ -94,7 +94,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
             if method == 'setModel': return False
             return await self.call(kind, method, *args, **kwargs)
         self.adapter.desktop.call.side_effect = call
-        with self.assertRaisesRegex(BridgeUnavailable, "데스크톱\\ 앱이\\ 모델\\ 설정을\\ 확인하지\\ 않았습니다\\.\\ 확인하려면\\ 새로고침하세요\\."):
+        with self.assertRaisesRegex(BridgeUnavailable, '未确认模型设置'):
             await self.adapter.dispatch('settings', self.sid(), {'model': 'unconfirmed-model'})
 
     async def test_effort_only_update_does_not_require_resubmitting_model(self):
@@ -123,14 +123,14 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
     async def test_project_references_use_native_mentions_without_upload_bytes(self):
         for kind in ('code', 'cowork'):
             self.calls.clear()
-            body = {'text': '파일 확인', 'id': str(uuid.uuid4()), 'resolvedReferences': [
-                {'path': '/host/project/중국 문서.md', 'name': '중국 문서.md', 'kind': 'file'}]}
+            body = {'text': '检查文件', 'id': str(uuid.uuid4()), 'resolvedReferences': [
+                {'path': '/host/project/中文 文件.md', 'name': '中文 文件.md', 'kind': 'file'}]}
             await self.adapter.dispatch('send', self.sid(kind), body)
             args = next(args for _, method, args in self.calls if method == 'sendMessage')
-            mention = '@"/host/project/중국 문서.md"' if kind == 'code' else '@/host/project/중국 문서.md'
-            self.assertEqual(args[1], '파일 확인\n\n' + mention)
+            mention = '@"/host/project/中文 文件.md"' if kind == 'code' else '@/host/project/中文 文件.md'
+            self.assertEqual(args[1], '检查文件\n\n' + mention)
             self.assertIsNone(args[2]); self.assertIsNone(args[4] if kind == 'code' else args[3])
-            self.assertEqual(body['text'], '파일 확인')
+            self.assertEqual(body['text'], '检查文件')
 
     async def test_invalid_effort_cannot_partially_change_model(self):
         async def call(kind, method, *args, **kwargs):
@@ -138,7 +138,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
                 return {'models': [{'id': 'another'}], 'capabilities': {'models': True}}
             return await self.call(kind, method, *args, **kwargs)
         self.adapter.desktop.call.side_effect = call
-        with self.assertRaisesRegex(ValueError, '추론 강도'):
+        with self.assertRaisesRegex(ValueError, '思考强度'):
             await self.adapter.dispatch('settings', self.sid('cowork'), {'model': 'another', 'effort': ''})
         self.assertFalse(any(method in ('setEffort', 'setModel') for _, method, _ in self.calls))
 
@@ -178,7 +178,7 @@ class ClaudeContract(unittest.IsolatedAsyncioTestCase):
                 if method == 'setPermissionMode': return accepted
                 return await self.call(kind, method, *args, **kwargs)
             self.adapter.desktop.call.side_effect = call
-            with self.assertRaisesRegex(BridgeUnavailable, "Claude가\\ 권한\\ 설정을\\ 확인하지\\ 않았습니다\\.\\ 데스크톱\\ 앱에서\\ 조직\\ 정책을\\ 확인하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '未确认权限设置'):
                 await self.adapter.dispatch('access', self.sid(), {'mode': 'plan'})
 
     def test_null_cowork_folders_are_empty(self):
@@ -247,7 +247,7 @@ class DesktopActionContract(unittest.IsolatedAsyncioTestCase):
         self.manager.call('claude', 'access', 'session', body)
         self.manager.call('claude', 'access', 'session', body)
         self.assertEqual(self.adapter.call.call_count, 1)
-        with self.assertRaisesRegex(ValueError, '동일한 요청 ID'):
+        with self.assertRaisesRegex(ValueError, '相同请求 ID'):
             self.manager.call('claude', 'access', 'session', {**body, 'mode': 'default'})
 
     def test_image_only_send_accepted_but_empty_send_never_dispatched(self):
@@ -262,7 +262,7 @@ class DesktopActionContract(unittest.IsolatedAsyncioTestCase):
         desktop = FileDesktop(Path(self.temp.name), 'test-token')
         path = Path(self.temp.name)/'request.json'
         original = path.read_bytes()
-        request = {'type': 'request', 'args': ['단어' * 32]}
+        request = {'type': 'request', 'args': ['文字' * 32]}
         exact_size = len(desktop.pack(request).encode('utf-8'))
         with patch('bridge.clients.claude.mailbox.MAX_REQUEST', exact_size - 1):
             with self.assertRaisesRegex(ValueError, '10 MiB'): desktop.write(request)
@@ -270,3 +270,97 @@ class DesktopActionContract(unittest.IsolatedAsyncioTestCase):
         with patch('bridge.clients.claude.mailbox.MAX_REQUEST', exact_size): desktop.write(request)
         self.assertEqual(len(path.read_bytes()), exact_size)
         self.assertEqual(MAX_REQUEST, 10485760)
+
+    def test_respond_guards_null_inputs_and_never_leaves_unknown_receipt(self):
+        # 桌面端 pendingToolPermissions 携带 input: null 时应安全归一为空字典。
+        null_input_row = claude_model.session('code', {
+            'sessionId': 'native-null', 'pendingToolPermissions': [
+                {'requestId': 'req-null', 'toolName': 'AskUserQuestion', 'input': None}]})
+        self.assertEqual(null_input_row['requests'][0]['input'], {})
+
+        # 绑定真实 Claude 适配器：非法 answers / decision 应在发出 IPC 前被拦截为 blocked，
+        # 不应在 requests.sqlite 中残留 unknown 并阻塞后续归档。
+        import asyncio
+        loop = asyncio.new_event_loop()
+        loop_thread = threading.Thread(target=loop.run_forever, daemon=True)
+        loop_thread.start()
+        adapter = Claude(Path(self.temp.name)/'real-claude', auto_connect=False)
+        adapter.loop = loop
+        adapter.thread = loop_thread
+        sid = claude_model.gateway_id('code', 'native-1')
+        adapter.index = {sid: {'backend': 'code', 'nativeId': 'native-1'}}
+        adapter.status = lambda *args, **kwargs: {'connected': True, 'reason': ''}
+        pending = {'sessionId': 'native-1', 'turnRunning': False, 'pendingToolPermissions': [
+            {'requestId': 'req-1', 'toolName': 'AskUserQuestion',
+             'input': {'questions': [{'id': 'q1', 'question': '请选择？'}]}}]}
+        archived_state = False
+        responses = []
+        fail_response = False
+        async def fake_call(kind, method, *args, **kwargs):
+            nonlocal archived_state
+            if method == 'getSession':
+                return pending
+            if method == 'respondToToolPermission':
+                responses.append(args)
+                if fail_response:
+                    raise BridgeUnavailable('桌面写入回执丢失')
+                return True
+            if method == 'mobileArchiveState':
+                return {'session': {'sessionId': 'native-1', 'turnRunning': False,
+                                    'isArchived': archived_state, 'pendingToolPermissions': []},
+                        'archiveFlags': {}, 'archiveSafe': True}
+            if method == 'mobileArchive':
+                archived_state = True
+                return {'ok': True}
+            raise AssertionError(f'不应触发写入 IPC: {method}')
+        adapter.desktop = Mock(connected=True, unconfirmed_mutations=None,
+                               capabilities={'code': ['mobileArchive']},
+                               call=AsyncMock(side_effect=fake_call))
+        self.manager.adapters['claude'] = adapter
+        self.manager.config['enabled'] = {'claude': True}
+
+        for body in (
+            {'id': str(uuid.uuid4()), 'requestId': 'req-1', 'decision': 'accept', 'answers': None},
+            {'id': str(uuid.uuid4()), 'requestId': 'req-1', 'decision': 'accept', 'answers': {'q1': None}},
+            {'id': str(uuid.uuid4()), 'requestId': 'req-1', 'decision': 'invalid'},
+            {'id': str(uuid.uuid4()), 'requestId': 'missing', 'decision': 'accept'},
+        ):
+            with self.subTest(body=body):
+                receipt = self.manager.call('claude', 'respond', sid, body)
+                self.assertEqual(receipt['status'], 'blocked')
+
+        for invalid in (None, {}, {'questions': None}, {'questions': {}}, {'questions': []},
+                        {'questions': [None]}, {'questions': [{}]}, {'questions': [{'question': 123}]},
+                        {'questions': [{'question': '   '}]},
+                        {'questions': [{'question': 'Valid?'}, None]}):
+            with self.subTest(native_input=invalid):
+                pending['pendingToolPermissions'][0]['input'] = invalid
+                receipt = self.manager.call('claude', 'respond', sid, {'id': str(uuid.uuid4()),
+                    'requestId': 'req-1', 'decision': 'accept', 'answers': {}})
+                self.assertEqual(receipt['status'], 'blocked')
+        self.assertEqual(responses, [])
+        decline = self.manager.call('claude', 'respond', sid, {'id': str(uuid.uuid4()),
+            'requestId': 'req-1', 'decision': 'decline'})
+        self.assertEqual(decline['status'], 'accepted')
+        self.assertEqual(responses[-1], ('req-1', 'deny'))
+        pending['pendingToolPermissions'][0]['input'] = {'questions': [
+            {'id': 'multi', 'question': 'Choose?', 'multiSelect': True},
+            {'id': 'manual', 'question': 'Explain?'}]}
+        answer_body = {'id': str(uuid.uuid4()), 'requestId': 'req-1', 'decision': 'accept',
+            'answers': {'multi': {'answers': ['A', 'B']}, 'manual': {'answers': ['Custom text']}}}
+        self.assertEqual(self.manager.call('claude', 'respond', sid, answer_body)['status'], 'accepted')
+        self.assertEqual(responses[-1][2]['answers'], {'Choose?': 'A, B', 'Explain?': 'Custom text'})
+
+        archive = self.manager._archive('claude', sid, {'id': str(uuid.uuid4()), 'archived': True})
+        self.assertEqual(archive['status'], 'confirmed')
+        fail_response = True
+        ambiguous = {**answer_body, 'id': str(uuid.uuid4())}
+        self.assertEqual(self.manager.call('claude', 'respond', sid, ambiguous)['status'], 'unknown')
+        sent = len(responses)
+        self.assertEqual(self.manager.call('claude', 'respond', sid, ambiguous)['status'], 'unknown')
+        self.assertEqual(len(responses), sent)
+
+        # 合法 answers 应正常映射并调用原生 respondToToolPermission。
+        self.assertEqual(claude_model.respond_answers(
+            {'questions': [{'id': 'q1', 'question': '请选择？'}]},
+            {'q1': {'answers': ['方案一', '补充']}})['answers'], {'请选择？': '方案一, 补充'})

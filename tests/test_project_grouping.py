@@ -14,7 +14,7 @@ class ProjectGroupingTests(unittest.TestCase):
                     for index, cwd in enumerate(directories)]
             self.hosts.decorate(rows, host, host)
             self.assertEqual({row['projectKey'] for row in rows}, {host + '|unassigned'})
-            self.assertEqual({row['projectName'] for row in rows}, {'분류되지 않음'})
+            self.assertEqual({row['projectName'] for row in rows}, {'未归类'})
             self.assertEqual([row['cwd'] for row in rows], directories)
             self.assertTrue(all(row['model_provider'] == 'fixture' and row['origin'] == 'desktop' for row in rows))
 
@@ -35,7 +35,7 @@ class ProjectGroupingTests(unittest.TestCase):
         row = {'id': 'fixture', 'cwd': 'D:/Work/Project', '_nativeProject': None}
         self.hosts.decorate([row], 'local', 'Local')
         self.assertEqual(row['projectKey'], 'local|unassigned')
-        self.assertEqual(row['projectName'], '분류되지 않음')
+        self.assertEqual(row['projectName'], '未归类')
 
     def test_empty_native_membership_preserves_existing_assignment_during_migration(self):
         self.saved['thread-project-assignments'] = {'fixture': {'projectKind': 'local', 'projectId': 'local'}}

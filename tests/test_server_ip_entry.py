@@ -74,14 +74,14 @@ class ServerIPTests(unittest.TestCase):
             self.assertIn('tls /etc/caddy/tls/fullchain.pem /etc/caddy/tls/privkey.pem', files['Caddyfile'])
             self.assertIn('reverse_proxy http://127.0.0.1:18787', files['Caddyfile'])
             self.assertIn('./tls:/etc/caddy/tls:ro', files['compose.yaml'])
-            self.assertIn('Subject Alternative Name', files['배포 지침.md'])
+            self.assertIn('Subject Alternative Name', files['部署说明.md'])
             self.assertIn('Subject Alternative Name', files['DEPLOYMENT_EN.md'])
-            self.assertNotIn(" 그리고 공용 네트워크를 유지하세요. Host 그게 다야。\n4. 컴퓨터에서 App 구성을 저장하고 게이트웨이를 시작합니다. 컴퓨터가 자동으로 생성합니다. SSH 백홀 연결에서는 서버가 컴퓨터 LAN에 직접 액세스할 필요가 없습니다. IP。\n5. 서버 압축해제 디렉터리에서 실행：\n\n```sh\ndocker compose config\ndocker compose up -d\ndocker compose logs --tail=50\n```\n\nCaddy 자동 신청 및 갱신 HTTPS 인증서, 인증서는 다음 위치에 저장됩니다. Docker 용량. 이 패키지의 host 네트워크 전용 Linux Docker Engine；SSH 앞으로 그리고 Caddy 동일한 호스트에 있어야 합니다. 여기 있지 마세요 Mac/Windows 의 Docker Desktop 이 서버 패키지 실행。\n", files['배포 지침.md'])
+            self.assertNotIn('Caddy 自动申请', files['部署说明.md'])
             self.assertNotIn('PRIVATE KEY', ''.join(files.values()))
         files = access.deployment(entry(publicUrl='https://bridge.example.com'))
         self.assertNotIn('tls /etc/caddy/tls', files['Caddyfile'])
         self.assertNotIn('./tls:', files['compose.yaml'])
-        self.assertIn(" 그리고 공용 네트워크를 유지하세요. Host 그게 다야。\n4. 컴퓨터에서 App 구성을 저장하고 게이트웨이를 시작합니다. 컴퓨터가 자동으로 생성합니다. SSH 백홀 연결에서는 서버가 컴퓨터 LAN에 직접 액세스할 필요가 없습니다. IP。\n5. 서버 압축해제 디렉터리에서 실행：\n\n```sh\ndocker compose config\ndocker compose up -d\ndocker compose logs --tail=50\n```\n\nCaddy 자동 신청 및 갱신 HTTPS 인증서, 인증서는 다음 위치에 저장됩니다. Docker 용량. 이 패키지의 host 네트워크 전용 Linux Docker Engine；SSH 앞으로 그리고 Caddy 동일한 호스트에 있어야 합니다. 여기 있지 마세요 Mac/Windows 의 Docker Desktop 이 서버 패키지 실행。\n", files['배포 지침.md'])
+        self.assertIn('Caddy 自动申请', files['部署说明.md'])
 
     def test_custom_https_port_inspection_uses_configured_port(self):
         for authority, host, port in [('93.184.216.34:8443', '93.184.216.34', 8443),

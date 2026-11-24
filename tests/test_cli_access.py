@@ -126,7 +126,7 @@ class CliAccessTests(unittest.TestCase):
         self.accounts.api_credentials = Mock(return_value=('https://original.invalid/v1', 'fake-saved-key'))
         request = {'provider': 'codex', 'action': 'modelsDraft', 'id': 'saved', 'apiKey': '', 'baseUrl': 'https://different.invalid/v1'}
         with patch('bridge.features.accounts.api_drafts.model_ids', return_value=['model-a']) as models:
-            with self.assertRaisesRegex(ValueError, "API\\ URL를\\ 변경한\\ 후\\ 다시\\ API\\ 키를\\ 입력하세요\\."):
+            with self.assertRaisesRegex(ValueError, '重新填写 API Key'):
                 self.manager.change(request)
             self.accounts.api_credentials.assert_not_called()
             models.assert_not_called()
@@ -186,7 +186,7 @@ class CliAccessTests(unittest.TestCase):
             self.save_api(id=identifier, apiKey='replacement-key')
             return ['old-key-model']
         with patch('bridge.features.accounts.cli_access.model_ids', side_effect=changed):
-            with self.assertRaisesRegex(ValueError, "CLI\\ 액세스\\ 권한이\\ 변경되었습니다\\.\\ 모델\\ 목록을\\ 다시\\ 읽어보세요\\."):
+            with self.assertRaisesRegex(ValueError, '接入已变化'):
                 self.manager.change({'provider': 'claude', 'action': 'test', 'id': identifier})
 
     def test_concurrent_cold_model_reads_share_one_upstream_request(self):
@@ -228,17 +228,17 @@ class CliAccessTests(unittest.TestCase):
 
     def test_probe_rejects_native_and_extra_request_fields(self):
         identifier = self.save_api()
-        with self.assertRaisesRegex(ValueError, "CLI\\ 액세스\\ 요청이\\ 잘못되었습니다\\."):
+        with self.assertRaisesRegex(ValueError, '请求无效'):
             self.manager.change({'provider': 'claude', 'action': 'models', 'id': identifier,
                                  'apiKey': 'untrusted'})
         self.manager.index['claude'][0]['kind'] = 'native'
-        with self.assertRaisesRegex(ValueError, "저장된\\ 것을\\ 선택해주세요\\ API\\ 연결"):
+        with self.assertRaisesRegex(ValueError, '已保存的 API'):
             self.manager.change({'provider': 'claude', 'action': 'models', 'id': identifier})
 
     def test_missing_explicit_native_directory_cannot_be_initialized(self):
         self.native.rmdir()
         self.profile['origin'] = 'environment:'+str(self.native)+':none'
-        with self.assertRaisesRegex(ValueError, '구성 디렉터리를 사용할 수 없습니다.'):
+        with self.assertRaisesRegex(ValueError, '配置目录不可用'):
             self.save_api()
         self.assertFalse(self.native.exists())
 
@@ -282,7 +282,7 @@ class CliAccessTests(unittest.TestCase):
         except OSError:
             self.skipTest('Directory symlinks are unavailable on this host')
         with patch('bridge.features.accounts.cli_access._auth_ready', return_value=True), \
-             self.assertRaisesRegex(ValueError, '구성 디렉터리를 사용할 수 없습니다.'):
+             self.assertRaisesRegex(ValueError, '配置目录不可用'):
             self.manager.change({'provider': 'claude', 'action': 'importCurrent',
                                  'name': 'Alias', 'directory': str(alias)})
         self.assertFalse(self.manager.index['claude'])
@@ -458,8 +458,8 @@ class CliAccessTests(unittest.TestCase):
         sync = Mock()
         sync._codex_runtime.return_value = (True, Mock())
         with self.sync_patch(sync):
-            for extra, message in (({}, '이 액세스를 공유하는 모든 머신이 CLI 임무 종료'),
-                                   ({'tasksConfirmed': True}, '데스크톱 작업이 종료되었는지 확인')):
+            for extra, message in (({}, '请确认所有共享此接入的本机 CLI 任务已结束'),
+                                   ({'tasksConfirmed': True}, '确认.*桌面任务')):
                 with self.assertRaisesRegex(ValueError, message):
                     self.manager.change({'provider': 'codex', 'action': 'switch', 'id': 'saved',
                         'confirmed': True, 'requestId': 'request', **extra})
@@ -549,7 +549,7 @@ class CliAccessTests(unittest.TestCase):
         self.accounts.row = Mock(return_value={'id': 'saved', 'kind': 'api'})
         sync = Mock()
         sync.preflight.return_value = {'desktopRunning': True}
-        with self.sync_patch(sync), self.assertRaisesRegex(ValueError, '다시 시작'):
+        with self.sync_patch(sync), self.assertRaisesRegex(ValueError, '重启'):
             self.manager.change({'provider': 'codex', 'action': 'switch',
                                  'id': 'saved', 'confirmed': True})
         sync.snapshot.assert_not_called()

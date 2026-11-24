@@ -95,7 +95,7 @@ class ClaudeHistoryPrototypeTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / 'history.jsonl'
         self.path.write_bytes(b''.join((json.dumps({'type': 'user' if i % 2 else 'assistant',
-            'uuid': str(i), 'message': {'content': '중국어 \U0001f600 ' + 'x' * 100}}, ensure_ascii=False) + '\n').encode()
+            'uuid': str(i), 'message': {'content': '中文 \U0001f600 ' + 'x' * 100}}, ensure_ascii=False) + '\n').encode()
             for i in range(3000)))
 
     def test_recent_and_older_unicode_do_not_read_full_file(self):
@@ -104,7 +104,7 @@ class ClaudeHistoryPrototypeTests(unittest.TestCase):
         self.assertEqual([r['uuid'] for r in first['events']], list(map(str, range(2980, 3000))))
         self.assertEqual([r['uuid'] for r in second['events']], list(map(str, range(2960, 2980))))
         self.assertLess(first['bytesRead'], first['sourceBytes'] / 4)
-        self.assertIn('중국어', first['events'][0]['message']['content'])
+        self.assertIn('中文', first['events'][0]['message']['content'])
 
     def test_cursor_isolation_and_mutation_rejected(self):
         first = claude.event_page(self.path, 'A')

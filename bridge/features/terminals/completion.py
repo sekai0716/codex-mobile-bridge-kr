@@ -10,14 +10,14 @@ MAX_CANDIDATES = 80
 
 
 def _offset(text, units):
-    if type(units) is not int or units < 0: raise ValueError('잘못된 커서 위치')
+    if type(units) is not int or units < 0: raise ValueError('无效光标位置')
     total = 0
     for index, char in enumerate(text):
         if total == units: return index
         total += 2 if ord(char) > 0xffff else 1
-        if total > units: raise ValueError("커서가 문자 안에 있습니다.")
+        if total > units: raise ValueError('光标位于字符中间')
     if total == units: return len(text)
-    raise ValueError('잘못된 커서 위치')
+    raise ValueError('无效光标位置')
 
 
 def _units(text):
@@ -44,26 +44,26 @@ def _word(text, cursor, windows):
             decoded += char; escaped = False; continue
         if windows:
             if char == '^':
-                raise ValueError("이 명령에는 지원되지 않는 셸 이스케이프가 포함되어 있습니다.")
+                raise ValueError('此命令包含暂不支持的 shell 转义')
             if char == '"': quote = None if quote else '"'; continue
-            if char in '%!': raise ValueError("이 명령에는 지원되지 않는 셸 확장 또는 연산자가 포함되어 있습니다.")
-            if quote is None and char in '&|<>()': raise ValueError("이 명령에는 지원되지 않는 셸 연산자가 포함되어 있습니다.")
+            if char in '%!': raise ValueError('此命令包含暂不支持的 shell 展开或操作符')
+            if quote is None and char in '&|<>()': raise ValueError('此命令包含暂不支持的 shell 操作符')
         else:
             if char == '\\' and quote != "'": escaped = True; continue
             if char in "'\"":
                 if quote == char: quote = None; continue
                 if quote is None: quote = char; continue
             if quote != "'" and char in '$`*?[]{};|&<>()':
-                raise ValueError("이 명령에는 지원되지 않는 셸 확장 또는 연산자가 포함되어 있습니다.")
+                raise ValueError('此命令包含暂不支持的 shell 展开或操作符')
         if char.isspace() and quote is None:
             if index > start: spans.append((start, index))
             start = index + 1; decoded = ''
-    if escaped: raise ValueError("경로는 불완전한 탈출로 끝납니다")
+    if escaped: raise ValueError('路径末尾的转义尚未完成')
     if start < len(text): spans.append((start, len(text)))
     selected = next(((begin, end) for begin, end in spans if begin <= cursor <= end), None)
     if selected is None:
         if cursor < len(text) and not text[cursor].isspace():
-            raise ValueError('커서를 경로 매개변수 안에 두십시오.')
+            raise ValueError('请将光标放在路径参数内')
         return cursor, cursor, ''
     begin, end = selected
     # Decode the selected token only through the cursor. The complete token
@@ -79,15 +79,15 @@ def _word(text, cursor, windows):
                 if quote == char: quote = None; continue
                 if quote is None: quote = char; continue
         value += char
-    if escaped: raise ValueError("경로는 불완전한 탈출로 끝납니다")
+    if escaped: raise ValueError('路径末尾的转义尚未完成')
     return begin, end, value
 
 
 def complete_path(session, text, selection_start):
     if not isinstance(text, str) or len(text) > MAX_DRAFT or '\x00' in text or '\n' in text or '\r' in text:
-        raise ValueError("경로 완성은 최대 4096자의 한 줄 초안을 지원합니다.")
+        raise ValueError('仅支持最多 4096 字符的单行终端草稿')
     cursor = _offset(text, selection_start)
-    if session.done.is_set(): raise ValueError('터미널이 닫혔습니다. 다시 열어주세요.')
+    if session.done.is_set(): raise ValueError('终端已关闭，请重新打开')
     cwd = session.current_cwd()
     windows = ntpath.basename(session.shell).lower() in ('cmd', 'cmd.exe')
     start, end, typed = _word(text, cursor, windows)
@@ -98,12 +98,12 @@ def complete_path(session, text, selection_start):
     if expand_tilde and typed == '~': head, prefix = '~/', ''
     if windows:
         if typed.startswith('~') or (head and not path.isabs(head) and path.splitdrive(head)[0]):
-            raise ValueError("이 Windows 경로 형식은 지원되지 않습니다.")
+            raise ValueError('暂不支持此 Windows 路径形式')
         directory = path.join(cwd, head) if head else cwd
     else:
         directory = os.path.expanduser(head) if expand_tilde and head.startswith('~') else head
         directory = path.join(cwd, directory) if not path.isabs(directory) else directory
-    if len(directory) > 4096: raise ValueError('경로가 너무 깁니다.')
+    if len(directory) > 4096: raise ValueError('路径过长')
     candidates = []; names = []; scanned = 0; truncated = False
     try:
         with os.scandir(directory) as entries:
@@ -122,7 +122,7 @@ def complete_path(session, text, selection_start):
                                    'isDirectory': is_dir})
                 names.append(entry.name)
                 if len(candidates) > MAX_CANDIDATES: truncated = True; candidates.pop(); break
-    except (OSError, ValueError): raise ValueError("이 경로를 읽을 수 없습니다. 디렉터리에 여전히 액세스할 수 있는지 확인") from None
+    except (OSError, ValueError): raise ValueError('无法读取当前路径，请检查目录是否仍可访问') from None
     candidates.sort(key=lambda item: (not item['isDirectory'], item['label'].casefold()))
     common_insert = None
     if not truncated and len(candidates) > 1:

@@ -2,8 +2,10 @@
 import hashlib
 import json
 import os
+import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -32,11 +34,11 @@ class DesktopRuntimeTests(unittest.TestCase):
                  patch('bridge.platforms.windows.discovery_ext.application_execution_alias', return_value=root/'alias.exe') as alias:
                 self.assertEqual(runtime.launcher_settings(application), {'launcher': str((root/'gateway.exe').resolve()), 'sandboxFamily': 'OpenAI.Codex_fixture'})
                 alias.return_value = None
-                with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 앱\\ 실행\\ 별칭\\ 기본\\ 연결\\ 설정이\\ 아직\\ 변경되지\\ 않았습니다"): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, '启动别名'): runtime.launcher_settings(application)
                 identity.return_value = ''
-                with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 패키지\\ ID\\ 기본\\ 연결\\ 설정이\\ 변경되지\\ 않았습니다\\."): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, '安装包身份'): runtime.launcher_settings(application)
             with patch.object(runtime, 'sys', SimpleNamespace(platform='win32', frozen=False)):
-                with self.assertRaisesRegex(ValueError, '컴파일된'): runtime.launcher_settings(application)
+                with self.assertRaisesRegex(ValueError, '已编译'): runtime.launcher_settings(application)
 
     def test_windows_exited_generation_does_not_require_a_live_image_query(self):
         with patch.object(runtime, 'sys', SimpleNamespace(platform='win32')), \
@@ -82,12 +84,12 @@ class DesktopRuntimeTests(unittest.TestCase):
         with patch.object(runtime.subprocess, 'run', return_value=SimpleNamespace(stdout='--stdio')):
             with self.assertRaises(ValueError): runtime.validate_runtime(self.cli)
         with patch.object(runtime.subprocess, 'run', side_effect=subprocess.TimeoutExpired('help', 10)):
-            with self.assertRaisesRegex(ValueError, "확인할\\ 수\\ 없습니다\\ Codex\\ 공유\\ 액세스\\ 기능\\ 원래의\\ App\\ 변함없이\\ 남아있다"): runtime.validate_runtime(self.cli)
+            with self.assertRaisesRegex(ValueError, '原 App 保持不变'): runtime.validate_runtime(self.cli)
 
     @unittest.skipIf(os.name == 'nt', 'POSIX private lock')
     def test_initializers_and_runtime_generations_have_distinct_exclusive_locks(self):
         with runtime.initialization_lock(self.home):
-            with self.assertRaisesRegex(ValueError, '공유 액세스'):
+            with self.assertRaisesRegex(ValueError, '共享接入'):
                 with runtime.initialization_lock(self.home): pass
             with runtime.exclusive_lock(self.home, 'runtime'): pass
 
@@ -113,16 +115,16 @@ class DesktopRuntimeTests(unittest.TestCase):
 
     def test_exit_wait_is_bounded_and_does_not_clear_unknown_or_live_writer(self):
         with runtime.exclusive_lock(self.home, 'runtime'):
-            with self.assertRaisesRegex(ValueError, '종료'):
+            with self.assertRaisesRegex(ValueError, '退出中'):
                 runtime.wait_stopped(self.home, timeout=.01)
         active = self.root / 'active.json'
         runtime._write(active, json.dumps({'ready': False, 'runtime': None}))
-        with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임\\ 시작\\ 결과를\\ 확인해야\\ 합니다\\.\\ 컴퓨터에서\\ 확인하시기\\ 바랍니다\\.\\ 반복적으로\\ 시작되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '启动结果待核对'):
             runtime.wait_stopped(self.home)
         self.assertTrue(active.exists())
         runtime._write(active, json.dumps({'ready': True, 'runtime': {'pid': 3}}))
         with patch.object(runtime, 'runtime_alive', return_value=True):
-            with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."):
+            with self.assertRaisesRegex(ValueError, '尚未退出'):
                 runtime.wait_stopped(self.home)
         self.assertTrue(active.exists())
 
@@ -143,6 +145,81 @@ class DesktopRuntimeTests(unittest.TestCase):
                 app.start()
             wait.assert_called_once_with(self.home)
             native.start.assert_not_called()
+
+    def test_outdated_app_allows_only_explicit_native_start_after_writer_exit(self):
+        from bridge.clients import desktop_app
+        app = desktop_app.DesktopApp(self.home / 'replacement-app', self.home)
+        settings = self.root / 'settings.json'
+        original = settings.read_bytes()
+        native, order = Mock(), []
+        with patch.object(desktop_app.sys, 'platform', 'darwin'), \
+             patch.object(desktop_app, '_native', return_value=native), \
+             patch.object(runtime, 'wait_stopped', side_effect=lambda home: order.append(('stopped', home))) as wait:
+            native.start.side_effect = lambda *args, **kwargs: order.append(('start', args[1]))
+            with self.assertRaises(runtime.DesktopRuntimeOutdated):
+                runtime.launch_environment(self.home, app.executable)
+            with self.assertRaises(runtime.DesktopRuntimeOutdated):
+                app.start()
+            wait.assert_not_called(); native.start.assert_not_called()
+            app.start(allow_unprepared=True)
+            self.assertEqual(order, [('stopped', self.home), ('start', self.home)])
+            self.assertEqual(native.start.call_args.args[2], {'CODEX_HOME': str(self.home)})
+        self.assertEqual(settings.read_bytes(), original)
+
+    def test_explicit_outdated_start_never_bypasses_live_unknown_or_invalid_settings(self):
+        from bridge.clients import desktop_app
+        app = desktop_app.DesktopApp(self.home / 'replacement-app', self.home)
+        settings, active = self.root / 'settings.json', self.root / 'active.json'
+        original = settings.read_bytes()
+        native = Mock()
+        with patch.object(desktop_app.sys, 'platform', 'darwin'), \
+             patch.object(desktop_app, '_native', return_value=native), \
+             patch.object(runtime, 'runtime_alive', return_value=True):
+            for record in ({'ready': False, 'runtime': None}, {'ready': True, 'runtime': {'pid': 3}}):
+                with self.subTest(record=record):
+                    runtime._write(active, json.dumps(record)); previous = active.read_bytes()
+                    with self.assertRaises(ValueError): app.start(allow_unprepared=True)
+                    native.start.assert_not_called()
+                    self.assertEqual(active.read_bytes(), previous)
+                    self.assertEqual(settings.read_bytes(), original)
+            active.unlink(); settings.chmod(0o644)
+            with patch.object(runtime, 'wait_stopped') as wait:
+                with self.assertRaisesRegex(ValueError, '身份无法确认'):
+                    app.start(allow_unprepared=True)
+                wait.assert_not_called(); native.start.assert_not_called()
+            settings.chmod(0o600)
+            with patch.object(runtime, 'settings', side_effect=PermissionError('settings denied')), \
+                 patch.object(runtime, 'wait_stopped') as wait:
+                with self.assertRaisesRegex(PermissionError, 'settings denied'):
+                    app.start(allow_unprepared=True)
+                wait.assert_not_called(); native.start.assert_not_called()
+        self.assertEqual(settings.read_bytes(), original)
+
+    def test_windows_explicit_outdated_gateway_removes_only_shared_injection_variables(self):
+        from bridge.clients import desktop_app
+        app = desktop_app.DesktopApp(self.application, self.home)
+        original = (self.root / 'settings.json').read_bytes()
+        injected = ('CODEX_CLI_PATH', 'CMB_CODEX_DESKTOP_CONFIGURATION',
+                    'CODEX_APP_SERVER_WS_URL', 'CODEX_APP_SERVER_FORCE_CLI')
+        inherited = {key: 'old-injection' for key in injected}
+        inherited.update(CODEX_HOME='inherited-home', HTTPS_PROXY='http://proxy.fixture', PATH='fixture-bin')
+        order = []
+        with patch.object(desktop_app.sys, 'platform', 'win32'), \
+             patch.object(runtime, 'settings', return_value={**self.config, 'launcher': str(self.home / 'old-gateway.exe')}), \
+             patch.object(runtime, 'wait_stopped', side_effect=lambda home: order.append('stopped')) as wait, \
+             patch.object(desktop_app.os, 'environ', inherited), \
+             patch.object(desktop_app.subprocess, 'CREATE_NEW_PROCESS_GROUP', 0x200, create=True), \
+             patch.object(app, 'launch', side_effect=lambda **kwargs: order.append('launch')) as launch:
+            with self.assertRaises(runtime.DesktopRuntimeOutdated): app.start()
+            wait.assert_not_called(); launch.assert_not_called()
+            app.start(allow_unprepared=True)
+            self.assertEqual(order, ['stopped', 'launch'])
+            options = launch.call_args.kwargs
+            self.assertTrue(options['require_environment'])
+            self.assertEqual(options['env'], {'CODEX_HOME': str(self.home), 'HTTPS_PROXY': 'http://proxy.fixture', 'PATH': 'fixture-bin'})
+            self.assertEqual(options['cwd'], self.home)
+            self.assertTrue(all(key not in options['env'] for key in injected))
+        self.assertEqual((self.root / 'settings.json').read_bytes(), original)
 
     def setup_active(self):
         identities = {1: {'pid': 1, 'parent': 0, 'image': self.application, 'birth': [11, 0]},
@@ -229,27 +306,73 @@ class DesktopRuntimeTests(unittest.TestCase):
             with self.assertRaises(AppServerUnavailable): runtime.connect(self.home, self.cli)
             client.assert_not_called()
 
+    @patch.object(runtime.sys, 'platform', 'darwin')
     def test_reparented_native_child_still_blocks_another_writer(self):
         identity = {'pid': 123, 'parent': 122, 'birth': [1, 2], 'started': [3, 4],
                     'image': '/native/CodexCLI.app/codex', 'uid': 501, 'ruid': 501}
-        with patch.object(runtime.sys, 'platform', 'darwin'), \
-             patch.object(runtime, 'process_identity', return_value={**identity, 'parent': 1}):
+        with patch.object(runtime, 'process_identity', return_value={**identity, 'parent': 1}):
             self.assertTrue(runtime.runtime_alive(identity))
-        with patch.object(runtime.sys, 'platform', 'darwin'), \
-             patch.object(runtime, 'process_identity', return_value={**identity, 'birth': [9, 10]}):
+        with patch.object(runtime, 'process_identity', return_value={**identity, 'birth': [9, 10]}):
             self.assertFalse(runtime.runtime_alive(identity))
 
+    @patch.object(runtime.sys, 'platform', 'darwin')
     def test_starting_reservation_blocks_unknown_or_execed_child(self):
-        with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임\\ 시작\\ 결과를\\ 확인해야\\ 합니다\\.\\ 컴퓨터에서\\ 확인하시기\\ 바랍니다\\.\\ 반복적으로\\ 시작되지\\ 않습니다\\."):
+        with self.assertRaisesRegex(ValueError, '启动结果待核对'):
             runtime.require_inactive({'ready': False, 'runtime': None})
         identity = {'pid': 123, 'birth': [1, 2], 'started': [3, 4],
                     'image': '/bin/sh', 'uid': 501, 'ruid': 501}
         record = {'ready': False, 'runtime': identity}
-        with patch.object(runtime.sys, 'platform', 'darwin'), \
-             patch.object(runtime, 'process_identity', return_value={**identity, 'image': '/native/codex', 'birth': [1, 3]}):
-            with self.assertRaisesRegex(ValueError, "원래\\ 공유\\ 런타임이\\ 종료되지\\ 않았습니다\\.\\ 나중에\\ 다시\\ 확인하세요\\."): runtime.require_inactive(record)
+        with patch.object(runtime, 'process_identity', return_value={**identity, 'image': '/native/codex', 'birth': [1, 3]}):
+            with self.assertRaisesRegex(ValueError, '尚未退出'): runtime.require_inactive(record)
         with patch.object(runtime, 'process_identity', side_effect=ProcessLookupError):
             runtime.require_inactive(record)
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux /proc process identity')
+    def test_linux_upgrade_refuses_to_replace_a_live_legacy_writer(self):
+        current = runtime.process_identity(os.getpid())
+        self.assertGreater(current['startTicks'], 0)
+        self.assertEqual(current['ruid'], os.getuid())
+        with self.assertRaises(runtime.DesktopRuntimeOutdated):
+            runtime.launch_environment(self.home, self.application)
+        with self.assertRaises(AppServerUnavailable):
+            runtime.connect(self.home, self.cli)
+        with patch.object(runtime, 'process_identity', return_value={**current, 'image': '/new/image', 'parent': 1}):
+            with self.assertRaisesRegex(ValueError, '尚未退出'):
+                runtime.require_inactive({'runtime': current, 'ready': True})
+        active = self.root / 'active.json'
+        runtime._write(active, json.dumps({'runtime': current, 'ready': True}))
+        with self.assertRaisesRegex(ValueError, '尚未退出'):
+            runtime.configure(self.home, self.application, self.cli)
+        self.assertTrue(active.is_file())
+        runtime._write(active, json.dumps({'runtime': {**current, 'startTicks': current['startTicks'] - 1},
+                                           'ready': True}))
+        runtime.configure(self.home, self.application, self.cli)
+        self.assertFalse(active.exists())
+        self.assertEqual(runtime.settings(self.home)['transport'], 'desktop-stdio')
+        launcher = Path(runtime.launch_environment(self.home, self.application)['CODEX_CLI_PATH'])
+        self.assertEqual(launcher.stat().st_mode & 0o777, 0o700)
+        launcher.write_text('#!/bin/sh\nexit 0\n')
+        with self.assertRaises(runtime.DesktopRuntimeOutdated):
+            runtime.launch_environment(self.home, self.application)
+
+    @unittest.skipUnless(sys.platform == 'linux' and hasattr(os, 'pidfd_open'), 'Linux pidfd')
+    def test_linux_quit_checks_birth_before_sending_normal_signal(self):
+        from bridge.platforms.linux.desktop import quit_verified_codex
+        process = subprocess.Popen([sys.executable, '-c', 'import sys; sys.stdin.buffer.read()'],
+                                   stdin=subprocess.PIPE)
+        try:
+            identity = runtime.process_identity(process.pid)
+            with self.assertRaisesRegex(ValueError, '进程已变化'):
+                quit_verified_codex(process.pid, Path(identity['image']), {**identity, 'startTicks': -1})
+            self.assertIsNone(process.poll())
+            quit_verified_codex(process.pid, Path(identity['image']), identity)
+            self.assertEqual(process.wait(timeout=5), -signal.SIGTERM)
+            self.assertFalse(runtime.runtime_alive(identity))
+        finally:
+            process.stdin.close()
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
 
 
 class MetadataRoutingTests(unittest.TestCase):
@@ -257,7 +380,6 @@ class MetadataRoutingTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(dir=ROOT / '.tmp')
         self.addCleanup(temporary.cleanup)
         self.bridge = SimpleNamespace(host='local', codex_home=Path(temporary.name),
-                                      accounts=SimpleNamespace(desktop_preparation={'state': 'idle'}),
                                       catalog_reader=SimpleNamespace(executable='/fixture-cli'))
 
     def call(self, operation, **options):
@@ -302,17 +424,16 @@ class MetadataRoutingTests(unittest.TestCase):
             with self.assertRaises(CreationError) as failure: self.call(operation)
             self.assertNotIsInstance(failure.exception, CreationUnavailable)
 
-    def test_uninitialized_posix_desktop_refuses_before_starting_another_writer(self):
-        for platform in ('darwin', 'linux'):
-            with self.subTest(platform=platform), patch.object(runtime.sys, 'platform', platform), \
-                 patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
-                 patch.object(runtime, 'connect', return_value=None), \
-                 patch('bridge.features.sessions.create._runtime_operation') as spawn:
-                operation = Mock()
-                with self.assertRaises(CreationUnavailable):
-                    self.call(operation, require_shared=True)
-                operation.assert_not_called()
-                spawn.assert_not_called()
+    def test_uninitialized_mac_desktop_refuses_before_starting_another_writer(self):
+        with patch.object(runtime.sys, 'platform', 'darwin'), \
+             patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
+             patch.object(runtime, 'connect', return_value=None), \
+             patch('bridge.features.sessions.create._runtime_operation') as spawn:
+            operation = Mock()
+            with self.assertRaisesRegex(CreationUnavailable, '自动完成'):
+                self.call(operation, require_shared=True)
+            operation.assert_not_called()
+            spawn.assert_not_called()
 
     def test_unconfigured_other_platform_retains_existing_metadata_runtime(self):
         with patch.object(runtime.sys, 'platform', 'freebsd'), \
@@ -334,9 +455,8 @@ class MetadataRoutingTests(unittest.TestCase):
              patch.object(runtime, 'initialization_lock', return_value=nullcontext()), \
              patch.object(runtime, 'connect', return_value=None), \
              patch('bridge.features.sessions.create._runtime_operation') as spawn:
-            with self.assertRaisesRegex(CreationUnavailable, "No side chat was created") as caught:
+            with self.assertRaisesRegex(CreationUnavailable, '自动完成'):
                 self.call(Mock(), require_shared=True)
-            self.assertEqual(caught.exception.code, 'side_chat_setup_waiting')
             spawn.assert_not_called()
 
     @unittest.skipIf(os.name == 'nt', 'POSIX shared-runtime lock')

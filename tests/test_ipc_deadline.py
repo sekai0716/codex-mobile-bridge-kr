@@ -59,7 +59,7 @@ class DeadlineTests(unittest.TestCase):
         ipc._send = Mock(side_effect=lambda message: clock.__setitem__(0, 10.25))
         with patch('bridge.clients.codex.ipc.time', SimpleNamespace(monotonic=lambda: clock[0])), \
              patch('bridge.clients.codex.ipc.Future', return_value=future):
-            with self.assertRaisesRegex(IPCError, '읽기 시간 초과'):
+            with self.assertRaisesRegex(IPCError, '读取超时'):
                 ipc.request('thread-owner-discovery', {'conversationId': 'fixture'}, timeout=6, deadline=10.5)
         self.assertEqual(ipc._send.call_args.args[0]['timeoutMs'], 500)
         future.result.assert_called_once_with(timeout=.25)
@@ -69,7 +69,7 @@ class DeadlineTests(unittest.TestCase):
         ipc = DesktopIPC('fixture')
         ipc._send = Mock()
         with patch('bridge.clients.codex.ipc.time', SimpleNamespace(monotonic=lambda: 10)):
-            with self.assertRaisesRegex(IPCError, '읽기 시간 초과'):
+            with self.assertRaisesRegex(IPCError, '读取超时'):
                 ipc.request('thread-owner-discovery', {}, deadline=10)
         ipc._send.assert_not_called()
         self.assertEqual(ipc.pending, {})
@@ -79,7 +79,7 @@ class DeadlineTests(unittest.TestCase):
         ipc._send = Mock()
         future = Mock(result=Mock(side_effect=TimeoutError))
         with patch('bridge.clients.codex.ipc.Future', return_value=future):
-            with self.assertRaisesRegex(IPCError, '작업이 제출되었을 수 있습니다.'):
+            with self.assertRaisesRegex(IPCError, '操作可能已提交'):
                 ipc.request('thread-follower-start-turn', {}, timeout=3)
         future.result.assert_called_once_with(timeout=4)
         self.assertEqual(ipc._send.call_count, 1)

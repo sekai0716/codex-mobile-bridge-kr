@@ -16,10 +16,9 @@ from bridge.resources import project_root
 
 from bridge.features.auth.auth import Auth, password_record, session_hours, session_file_lock, INITIAL_CREDENTIAL_NAMES, initial_credentials_path
 from bridge.app.lifecycle import read_record, request_stop, request_pairing
-from bridge.features.notifications.channels import Notifications, read_json, write_json, settings, save_settings, save_webhook_endpoint, webhook_config, publish, publish_bark, publish_pushplus, publish_webhook, visible_webhook, WebhookDeliveryError, resolved_webhook_provider
+from bridge.features.notifications.channels import Notifications, read_json, read_status_json, write_json, settings, save_settings, save_webhook_endpoint, webhook_config, publish, publish_bark, publish_pushplus, publish_webhook, visible_webhook, WebhookDeliveryError, resolved_webhook_provider
 from bridge.features.sessions.store import SessionStore, StoreUnavailable
 from bridge.clients.codex.remote import AppHosts
-from bridge.clients.codex.catalog import Catalog
 import bridge.features.network.access as access
 import bridge.features.network.addresses as network
 import bridge.features.network.interfaces as interfaces
@@ -57,22 +56,24 @@ class Desktop:
             raise ValueError("게이트웨이가 시작 중입니다. 잠시 후 다시 시도하세요.")
         if self.local_bridge is None:
             from bridge.app.service import Bridge
-            from bridge.clients.manager import DesktopSessions
+            from bridge.clients.manager import DesktopSessions, read_client_settings, settings_path
             from bridge.clients.discovery import discover_clients, inventory_current
             p = self.preferences()
-            saved = read_json(self.data_dir/'desktop-sessions/settings.json', {})
+            saved = read_client_settings(settings_path(self.data_dir/'desktop-sessions')) or {}
             inputs = {**p, **{key: value for key, value in saved.items()
                                if key.endswith(('Home', 'Application', 'Applications'))}}
             if saved.get('discoveryPreferences', {}).get('desktopExecutable'):
                 inputs['desktopExecutable'] = saved['discoveryPreferences']['desktopExecutable']
             discovered = saved['discovered'] if inventory_current(saved, inputs) else discover_clients(inputs)
             runtime = p.get('codexBin')
-            # Keep ordinary Windows installations automatic across App updates.
-            # Preserve discovery's fallback for nonstandard desktop bundles.
-            if not runtime and (os.name != 'nt' or not Catalog.find_runtime()):
-                runtime = discovered['codex'].get('runtime')
             self.local_bridge = Bridge(Path(p['codexHome']).expanduser(), self.data_dir,
                                        ipc_path=p.get('ipcPath') or None, codex_bin=runtime or None)
+            if not runtime:
+                reader = self.local_bridge.catalog_reader
+                current = reader.executable
+                # Keep Windows' cached CLI preference and nonstandard bundle fallback.
+                if os.name != 'nt' or not current:
+                    reader.follow_runtime(current, discovered['codex'].get('runtime'))
             self.local_sessions = DesktopSessions(self.data_dir, self.local_bridge)
         return self.local_bridge, self.local_sessions
 
@@ -80,7 +81,7 @@ class Desktop:
         record = read_record(self.data_dir/'gateway-control.json')
         if record:
             if not self.status()['running']:
-                raise ValueError("게이트웨이 상태를 사용할 수 없습니다. 곧 새로고침하세요.")
+                raise ValueError('网关状态暂不可用，请稍后刷新')
             if not record.get(capability):
                 raise ValueError('클라이언트 관리를 활성화하려면 게이트웨이를 다시 시작하세요.')
             self.close_local(check_busy=True)
@@ -173,7 +174,7 @@ class Desktop:
         selected = interfaces.selected_interfaces(preferences.get('lanInterfaces'))
         network_status = {}
         if runtime['running']:
-            value = read_json(self.data_dir/'network-status.json', {})
+            value = read_status_json(self.data_dir/'network-status.json', {})
             if (value.get('pid') == runtime.get('pid') and
                     value.get('instanceId') == runtime.get('instanceId') and
                     value.get('mode') == ('off' if not preferences['lan'] else
@@ -190,7 +191,7 @@ class Desktop:
         hosts = ['127.0.0.1', 'localhost'] + static_addresses if preferences['lan'] else ['127.0.0.1', 'localhost']
         if not preferences['localAccess']:
             hosts = [host for host in hosts if host not in ('127.0.0.1', 'localhost')]
-        quick = read_json(self.data_dir/'cloudflare-status.json', {})
+        quick = read_status_json(self.data_dir/'cloudflare-status.json', {})
         if not runtime['running'] or quick.get('pid') != runtime.get('pid'):
             quick = {}
         quick_url = ''
@@ -208,7 +209,7 @@ class Desktop:
         urls = [url if url == quick_url else url+'/' for url in access.phone_urls(preferences, hosts, quick_url)]
         external = {}
         for entry in preferences['connections']:
-            status = read_json(self.data_dir/('ssh-status-'+entry['id']+'.json'), {})
+            status = read_status_json(self.data_dir/('ssh-status-'+entry['id']+'.json'), {})
             if runtime['running'] and status.get('pid') == runtime.get('pid'):
                 external[entry['id']] = status
         executable = preferences['cloudflared']
@@ -221,9 +222,9 @@ class Desktop:
                 'origins': config.get('origins', []), 'notifications': {**notifications, 'token': '', 'hasToken': bool(notifications['token']), 'barkKey': '', 'hasBarkKey': bool(notifications['barkKey']), 'pushplusToken': '', 'hasPushplusToken': bool(notifications['pushplusToken']), **visible_webhook(notifications)},
                 'watches': self.notification_watches({'action': 'list'}, preferences=preferences)['watches'],
                 'notificationUrls': notification_urls,
-                'securityNotificationStatus': read_json(self.data_dir/'security-notifications.json', {}),
-                'addressNotificationStatus': read_json(self.data_dir/'address-notifications.json', {}),
-                'notificationStatus': read_json(self.data_dir/'notification-status.json', {}),
+                'securityNotificationStatus': read_status_json(self.data_dir/'security-notifications.json', {}),
+                'addressNotificationStatus': read_status_json(self.data_dir/'address-notifications.json', {}),
+                'notificationStatus': read_status_json(self.data_dir/'notification-status.json', {}),
                 'dataDir': str(self.data_dir), 'credentialsAvailable': initial_credentials_path(self.data_dir).is_file(),
                 'networkInterfaces': rows, 'networkStatus': network_status,
                 'networkAdaptation': {**adaptation_settings(self.data_dir),
@@ -239,7 +240,7 @@ class Desktop:
         runtime = self.status()
         if record:
             if not runtime['running']:
-                raise ValueError("게이트웨이 상태를 사용할 수 없습니다. 곧 새로고침하세요.")
+                raise ValueError('网关状态暂不可用，请稍后刷新')
             if not record.get('networkAdaptationManagement'):
                 raise ValueError('네트워크 변경사항의 자동 복구를 조정하려면 새 버전의 게이트웨이를 다시 시작하세요.')
             return request_pairing(self.data_dir, {'action': 'network-adaptation', 'value': value}, timeout=10)
@@ -280,14 +281,14 @@ class Desktop:
         if not Path(preferences['codexHome']).expanduser().is_dir():
             raise FieldError("Codex 데이터 디렉터리가 존재하지 않습니다.", 'codex-home')
         if self.status()['running'] and any(preferences[k] != old_preferences[k] for k in preferences if k != 'autoStart'):
-            raise ValueError("현재 연결이 끊어지지 않도록 네트워크 설정이나 런타임 경로를 변경하기 전에 게이트웨이를 중지하세요.")
+            raise ValueError('请先停止网关再更改网络或运行路径，以免正在使用的地址失效')
         config = self.config()
         old_auth = dict(config['auth'])
         auth = value['auth']
         if auth.get('mode') not in ('password', 'none') or not isinstance(auth.get('username'), str) or not auth['username'].strip() or len(auth['username']) > 200:
             raise FieldError("유효한 사용자 이름과 로그인 방법을 입력하세요.", 'username')
         if auth['mode'] == 'none' and any(c['enabled'] and c['accessMode'] == 'tailscale' and c['tailscaleMode'] == 'funnel' for c in preferences['connections']):
-            raise FieldError("공개 유입경로에 액세스하려면 게이트웨이 로그인이 필요합니다. 휴대폰은 여전히 ​​QR 코드로 페어링할 수 있습니다.", 'auth-mode')
+            raise FieldError('Funnel 公网入口需要启用网关登录验证；手机仍可扫码配对。', 'auth-mode')
         password = auth.get('password', '')
         revoke_bound_devices = auth.get('revokeBoundDevices', True)
         if type(revoke_bound_devices) is not bool:
@@ -303,13 +304,18 @@ class Desktop:
         if not isinstance(origins, list):
             raise FieldError("잘못된 추가 HTTPS 주소", 'origins')
         origins = list(dict.fromkeys(at_field('origins', access.origin, origin) for origin in origins))
-        old_fixed = access.public_urls(old_preferences)
+        old_fixed = set()
+        for old_origin in access.public_urls(old_preferences):
+            try:
+                old_fixed.add(access.origin(old_origin))
+            except ValueError:
+                continue
         origins = [origin for origin in origins if origin not in old_fixed]
         for fixed in access.public_urls(preferences):
             if fixed not in origins:
                 origins.append(fixed)
         if self.status()['running'] and origins != config.get('origins', []):
-            raise ValueError("HTTPS 주소를 변경하기 전에 게이트웨이를 중지한 다음 저장하고 다시 시작하세요.")
+            raise ValueError('请先停止网关再更改 HTTPS 地址，保存后重新启动')
         if any(preferences[k] != old_preferences[k] for k in ('codexHome', 'codexBin', 'ipcPath')):
             self.close_local(check_busy=True)
         # Validate all values before writing any setting.
@@ -395,7 +401,7 @@ class Desktop:
                 try:
                     probe.bind((address, preferences['port']))
                 except OSError as exc:
-                    raise ValueError("선택한 어댑터 주소를 사용할 수 없거나 해당 포트가 사용 중입니다. 어댑터와 포트를 확인하세요. 다른 어댑터는 자동으로 열리지 않습니다.") from exc
+                    raise ValueError('所选网卡地址不可用或端口已被占用，请检查网卡与端口；不会自动开放其他网卡') from exc
                 finally:
                     probe.close()
         command = [sys.executable] if getattr(sys, 'frozen', False) else [sys.executable, str(project_root()/'desktop.py')]
@@ -449,7 +455,7 @@ class Desktop:
                 raise ValueError("Harness를 활성화하려면 게이트웨이를 다시 시작하세요.")
             return request_pairing(self.data_dir, {'action': 'harness', 'value': value}, timeout=80)
         if record:
-            raise ValueError("게이트웨이 상태를 사용할 수 없습니다. 곧 새로고침하세요.")
+            raise ValueError('网关状态暂不可用，请稍后刷新')
         action = value.get('action', 'status')
         if action == 'save':
             save(self.data_dir, value.get('config', {}))
@@ -478,10 +484,10 @@ class Desktop:
             record = read_record(self.data_dir/'gateway-control.json')
             if self.status()['running']:
                 if not record or not record.get('notificationManagement'):
-                    raise ValueError("채팅 알림을 관리하려면 게이트웨이를 다시 시작하세요.")
+                    raise ValueError('请重新启动网关以管理会话通知')
                 request_pairing(self.data_dir, {'action': 'notification-watches', 'value': value}, timeout=35)
             elif record:
-                raise ValueError("게이트웨이 상태를 사용할 수 없습니다. 곧 새로고침하세요.")
+                raise ValueError('网关状态暂不可用，请稍后刷新')
             else:
                 Notifications(None, self.data_dir).control(value)
         rows = read_json(self.data_dir/'notification-watches.json', [])
@@ -609,12 +615,12 @@ class Desktop:
             return server_connection.trust(entry, self.data_dir, value.get('fingerprint'))
         if action == 'inspect':
             return server_connection.inspect(entry, self.data_dir, value.get('secrets'))
-        raise ValueError("이 앱은 SSH 연결 확인만 지원합니다. 서버 소프트웨어 및 권한을 수동으로 구성합니다.")
+        raise ValueError('App 仅支持 SSH 连接检查；服务器安装与权限配置请手动完成。')
 
     def check_entry(self, value):
         status = self.status()
         if not status['running']:
-            raise ValueError("고정된 항목을 확인하기 전에 게이트웨이를 시작하십시오.")
+            raise ValueError('请先启动网关，再检测固定入口')
         return access.check_entry(access.select_connection(self.preferences(), value), instance_id=status.get('instanceId'))
 
     def tailscale_setup(self, value):
@@ -635,7 +641,7 @@ class Desktop:
             # Probe the actual entry, without credentials or redirects, before granting access.
             remote = access.read_auth(origin)
             if remote.get('instanceId') != snapshot['runtime']['instanceId']:
-                raise ValueError("이 주소는 현재 게이트웨이를 가리키지 않습니다. 연결 설정을 확인하세요.")
+                raise ValueError('此地址未指向当前网关，请检查连接配置')
         return request_pairing(self.data_dir, value)
 
     def transfer_settings(self, value=None):

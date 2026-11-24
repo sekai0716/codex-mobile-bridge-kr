@@ -29,25 +29,25 @@ def entry_id(distribution, user, home):
 
 def local_home(value):
     if not isinstance(value, str) or not value.strip() or '\x00' in value:
-        raise ValueError('선택해주세요 Codex 구성 디렉토리')
+        raise ValueError('请选择 Codex 配置目录')
     path = Path(value.strip()).expanduser()
     if not path.is_absolute():
-        raise ValueError('Codex 구성 디렉터리는 절대 경로여야 합니다.')
+        raise ValueError('Codex 配置目录必须是绝对路径')
     # UNC WSL homes belong to the WSL adapter; stat can wake a stopped distro.
     if str(path).startswith(('\\\\', '//')):
-        raise ValueError('통과해주세요 WSL 스캔하여 등록 WSL 예배 규칙서; 로컬 포털은 네트워크 디렉터리를 사용하지 않습니다.')
+        raise ValueError('请通过 WSL 扫描登记 WSL 目录；本机入口不使用网络目录')
     path = path.resolve(strict=True)
     if not path.is_dir() or not any((path/name).exists() for name in ('config.toml', 'auth.json', 'sessions', 'app-server-control')):
-        raise ValueError('선택한 폴더가 존재하지 않습니다 Codex 구성 디렉토리')
+        raise ValueError('所选文件夹不是已有的 Codex 配置目录')
     config = path/'config.toml'
     if config.is_file():
         try:
             settings = load_toml(config.read_text(encoding='utf-8'))
         except (ValueError, OSError) as exc:
-            raise ValueError('선택한 디렉터리를 읽을 수 없습니다. config.toml') from exc
+            raise ValueError('无法读取所选目录的 config.toml') from exc
         sqlite = settings.get('sqlite_home')
         if sqlite and Path(sqlite).expanduser().resolve() != path:
-            raise ValueError('이 구성의 sqlite_home 다른 디렉터리에 위치하며 현재 독립적인 액세스는 지원되지 않습니다.')
+            raise ValueError('此配置的 sqlite_home 位于其他目录，暂不支持独立接入')
     return path
 
 
@@ -72,12 +72,12 @@ class Entries:
         if self.path.exists():
             value = json.loads(self.path.read_text(encoding='utf-8'))
             if value.get('version') != 1 or not isinstance(value.get('entries'), list):
-                raise ValueError('Codex 항목 구성을 인식할 수 없습니다.')
+                raise ValueError('Codex 入口配置无法识别')
             self.entries = value['entries']
             for row in self.entries:
                 expected = local_entry_id(row['home']) if row.get('kind') == 'codex-local' else entry_id(row['distribution'], row['user'], row['home'])
                 if row.get('id') != expected:
-                    raise ValueError('Codex 포털 ID가 일치하지 않습니다.')
+                    raise ValueError('Codex 入口身份不匹配')
         else:
             self.entries = []
 
@@ -97,13 +97,13 @@ class Entries:
                 values.setdefault(key, self.public_row(row, False, True if row.get('kind') == 'codex-local'
                                                       else None if running is None else row.get('distribution') in running))
             return {'wslSupported': self.wsl is not None,
-                    'entries': [{'id': 'desktop', 'label': '데스크탑 Codex', 'kind': 'desktop',
+                    'entries': [{'id': 'desktop', 'label': '桌面 Codex', 'kind': 'desktop',
                                  'enabled': True, 'running': True}, *values.values()]}
 
     def scan(self):
         # First full inventory or explicit scan only; never periodic probing.
         if not self.wsl:
-            raise ValueError('현재 컴퓨터는 지원하지 않습니다. WSL 애플리케이션')
+            raise ValueError('当前电脑不支持 WSL 应用')
         candidates, errors = {}, []
         for distribution in self.wsl.running_distributions():
             try:
@@ -116,7 +116,7 @@ class Entries:
                         'label': 'WSL · ' + distribution + ' · ' + info['user'] +
                                  ('' if item['home'] == info.get('userHome', '') + '/.codex' else ' · ' + item['home'])}
             except (OSError, ValueError, TimeoutError):
-                errors.append({'distribution': distribution, 'error': '읽을 수 있는 항목이 없습니다. Codex 환경이나 Python'})
+                errors.append({'distribution': distribution, 'error': '未找到可读取的 Codex 环境或 Python'})
         with self.lock:
             self.candidates = candidates
         return {**self.public(), 'errors': errors}
@@ -141,20 +141,20 @@ class Entries:
 
     def save_wsl(self, distribution, user, home, label):
         if self.wsl is None:
-            raise ValueError('현재 컴퓨터는 지원하지 않습니다. WSL 애플리케이션')
+            raise ValueError('当前电脑不支持 WSL 应用')
         if (not isinstance(label, str) or not 1 <= len(label.strip()) <= 80
                 or any(ord(c) < 32 or ord(c) == 127 for c in label)):
-            raise ValueError("제어 문자 없이 1~80자의 연결 이름을 입력합니다.")
+            raise ValueError('请输入 1–80 字的接入名称，不能包含控制字符')
         info = self.wsl.probe(distribution, user, home=home)
         if info.get('user') != user or len(info.get('homes', [])) != 1:
-            raise ValueError("선택한 WSL 사용자 및 구성 디렉터리를 확인할 수 없습니다.")
+            raise ValueError('无法核验所选 WSL 用户和配置目录')
         selected = info['homes'][0]
         identifier = entry_id(distribution, user, selected['home'])
         candidate = {'id': identifier, 'distribution': distribution, 'user': user,
                      'home': selected['home'], 'windowsHome': selected.get('windowsHome'), 'label': label.strip()}
         with self.lock:
             if any(row['id'] == identifier for row in self.entries):
-                raise ValueError("이 WSL 구성 디렉터리는 이미 등록되어 있습니다. 기존 항목을 사용합니다.")
+                raise ValueError('此 WSL 配置目录已登记，请使用已有入口')
             previous = self.candidates.get(identifier)
             self.candidates[identifier] = candidate
             try:
@@ -170,16 +170,16 @@ class Entries:
     def save_local(self, home, label):
         home = local_home(home)
         if not isinstance(label, str) or not label.strip() or len(label.strip()) > 80:
-            raise ValueError('입력해주세요 1–80 액세스 이름')
+            raise ValueError('请输入 1–80 字的接入名称')
         identifier = local_entry_id(home)
         with self.lock:
             if self.desktop_home and home.samefile(self.desktop_home):
-                raise ValueError('이 디렉터리는 기본적으로 이미 구성되어 있습니다. Codex 접근 및 사용, 반복적으로 추가할 수 없음')
+                raise ValueError('此目录已由默认 Codex 接入使用，不能重复添加')
             if any(row['id'] == identifier or (row.get('kind') == 'codex-local' and
                     Path(row['home']).exists() and home.samefile(row['home'])) for row in self.entries):
-                raise ValueError('이 Codex 구성 디렉터리가 등록되었습니다. 기존 입구를 이용하세요.')
+                raise ValueError('此 Codex 配置目录已登记，请使用已有入口')
             if len(self.entries) >= 16:
-                raise ValueError('가장 많이 등록된 16 개인 Codex 입구')
+                raise ValueError('最多登记 16 个 Codex 入口')
             self.entries.append({'id': identifier, 'kind': 'codex-local', 'home': str(home),
                                  'label': label.strip(), 'enabled': True,
                                  'directoryIdentity': [home.stat().st_dev, home.stat().st_ino]})
@@ -195,12 +195,12 @@ class Entries:
         with self.lock:
             row = next((row for row in self.entries if row['id'] == identifier and row.get('kind') == 'codex-local'), None)
             if row is None:
-                raise ValueError('Codex 액세스 인스턴스가 등록되지 않았습니다.')
+                raise ValueError('Codex 接入实例未登记')
             if row.get('enabled', True):
-                raise ValueError('구성을 제거하기 전에 이 클라이언트에 대한 모바일 액세스를 비활성화하십시오.')
+                raise ValueError('请先停用此客户端的手机接入，再移除配置')
             owner = self.bridges.get(identifier)
             if owner and not owner.entry_gate.acquire(timeout=3):
-                raise ValueError("이 클라이언트는 작업을 처리 중입니다. 나중에 해당 구성을 다시 제거해 보세요.")
+                raise ValueError('此客户端正在处理操作，请稍后再移除配置')
             try:
                 if owner:
                     owner.assert_detachable()
@@ -230,9 +230,9 @@ class Entries:
                              'installed': True, 'configured': True, 'enabled': row['enabled'], 'selectable': True,
                              'connected': connected, 'running': True if connected else None, 'setupStatus': 'ready',
                              'canQuitDesktop': False, 'canForceQuit': False,
-                             'description': '독립적인 Codex 설정 · VS Code / CLI',
+                             'description': '独立 Codex 配置 · VS Code / CLI',
                              'capabilities': {'create': True, 'accounts': True, 'notifications': True},
-                             'reason': '계정, 프로젝트 및 세션을 독립적으로 관리。'})
+                             'reason': '独立管理账号、项目与会话。'})
                 continue
             if row['kind'] != 'wsl-cli':
                 continue
@@ -246,32 +246,32 @@ class Entries:
                          'running': True if connected else False if row['running'] is False else None,
                          'distributionRunning': row['running'],
                          'setupStatus': 'ready', 'canQuitDesktop': False, 'canForceQuit': False,
-                         'reason': ("휴대폰에서 WSL 채팅을 생성 및 재개하고 게이트웨이에서 API 프로필을 관리하세요. 원래 Codex CLI에서 공식 로그인을 완료하세요."
-                                    if row['running'] is not False else "등록된 WSL 환경을 시작합니다. 채팅을 계속하면 네이티브 CLI가 연결됩니다.")})
+                         'reason': ('可从手机新建、恢复 WSL 会话，并在网关管理 API 接入；官方登录仍在原 Codex CLI 完成。'
+                                    if row['running'] is not False else '可启动已登记的 WSL 环境；继续聊天时再连接原生 CLI。')})
         return rows
 
     def configure(self, identifier, enabled, *, _manual=False):
         if not isinstance(enabled, bool):
-            raise ValueError('입구 스위치가 잘못되었습니다.')
+            raise ValueError('入口开关无效')
         if not isinstance(identifier, str) or not re.fullmatch(r'(?:wsl|codex):[0-9a-f]{32}', identifier):
-            raise ValueError('Codex 입구 ID가 잘못되었습니다. 먼저 구성을 스캔하거나 추가하세요.')
+            raise ValueError('Codex 入口标识无效，请先扫描或添加配置')
         with self.lock:
             row = next((r for r in self.entries if r['id'] == identifier), None)
             if _manual and row is not None:
-                raise ValueError("이 WSL 구성 디렉터리는 이미 등록되어 있습니다. 기존 항목을 사용합니다.")
+                raise ValueError('此 WSL 配置目录已登记，请使用已有入口')
             if row is None:
                 candidate = self.candidates.get(identifier)
                 if candidate is None or not enabled:
-                    raise ValueError('기존 항목을 스캔하고 선택하세요. WSL 입구')
+                    raise ValueError('请先扫描并选择已有 WSL 入口')
                 if self.desktop_home is not None and candidate.get('windowsHome'):
                     # Linux probe canonicalizes home before wslpath conversion.
                     # Never stat a WSL UNC path: that can hang or wake a distro.
                     def normalized(path):
                         return str(PureWindowsPath(path)).casefold().rstrip('\\').replace('\\\\wsl$\\', '\\\\wsl.localhost\\', 1)
                     if normalized(candidate['windowsHome']) == normalized(self.desktop_home):
-                        raise ValueError('이 WSL 입구와 데스크탑이 동일하게 공유됩니다. Codex 디렉터리, 반복적으로 액세스할 수 없음')
+                        raise ValueError('此 WSL 入口与桌面共用同一 Codex 目录，不能重复接入')
                 if len(self.entries) >= 16:
-                    raise ValueError('가장 많이 등록된 16 개인 WSL 입구')
+                    raise ValueError('最多登记 16 个 WSL 入口')
                 row = dict(candidate)
                 if not _manual:
                     self.entries.append(row)
@@ -311,25 +311,25 @@ class Entries:
             except KeyError:
                 continue
             except (OSError, StoreUnavailable) as exc:
-                raise IPCError('공유를 확인할 수 없습니다. IPC 의 구성 소유권, 다른 실행자는 연결되어 있지 않습니다.') from exc
-            raise IPCError('다른 Codex 동일한 구성이 존재합니다. ID 세션, 원본을 확인할 수 없음 owner 소유; 다른 실행자는 연결되어 있지 않습니다')
+                raise IPCError('无法确认共享 IPC 中的配置归属，未连接其他执行器') from exc
+            raise IPCError('其他 Codex 配置中存在同 ID 会话，无法确认原 owner 归属；未连接其他执行器')
 
     def get(self, identifier, *, management=False):
         with self.lock:
             if self.closed.is_set():
-                raise KeyError('게이트웨이가 중지 중입니다.')
+                raise KeyError('网关正在停止')
             row = next((r for r in self.entries if r['id'] == identifier and (r.get('enabled', True) or management and r.get('kind') == 'codex-local')), None)
             if row is None:
-                raise KeyError('Codex 입구가 등록되지 않았거나 닫혔습니다.')
+                raise KeyError('Codex 入口未登记或已关闭')
             if row.get('kind') == 'codex-local':
                 home = local_home(row['home'])
                 if (local_entry_id(home) != identifier or (self.desktop_home and home.samefile(self.desktop_home))
                         or row.get('directoryIdentity') != [home.stat().st_dev, home.stat().st_ino]):
-                    raise ValueError('Codex 구성 디렉터리 ID가 변경되었습니다. 다시 구성하세요.')
+                    raise ValueError('Codex 配置目录身份已变化，请重新配置')
             if identifier not in self.bridges:
                 if row.get('kind') == 'codex-local':
                     if self.local_factory is None:
-                        raise ValueError('로컬 구성 액세스를 사용할 수 없습니다.')
+                        raise ValueError('本机配置接入不可用')
                     self.bridges[identifier] = self.local_factory(row, self.directory / identifier.replace(':', '-'))
                 else:
                     from bridge.features.endpoints.wsl import WslEntry

@@ -16,12 +16,12 @@ SETTINGS = ('providerFamilyDomain', 'providerFamilyDomainUpdatedAt', 'providerFa
 
 def read(path):
     if path.is_symlink():
-        raise ValueError('ZCode 계정 파일은 심볼릭 링크일 수 없습니다.')
+        raise ValueError('ZCode 账号文件不能是符号链接')
     if not path.exists():
         return {}
     value = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(value, dict):
-        raise ValueError('ZCode 계정 파일 형식이 잘못되었습니다.')
+        raise ValueError('ZCode 账号文件格式无效')
     return value
 
 
@@ -38,7 +38,7 @@ class ZCodeAccounts:
         self.directory, self.home, self.metadata = Path(directory), Path(home), metadata
         self.quota_reader = quota_reader
         if self.home.is_symlink():
-            raise ValueError('ZCode 데이터 디렉터리는 심볼릭 링크일 수 없습니다.')
+            raise ValueError('ZCode 数据目录不能是符号链接')
         self.lock = threading.RLock()
         self.quota_cache = None
 
@@ -48,14 +48,14 @@ class ZCodeAccounts:
     def snapshot(self):
         credentials = {k: v for k, v in read(self.home/'credentials.json').items() if account_key(k)}
         if not credentials or any(not isinstance(v, str) or not v.startswith('enc:v1:') for v in credentials.values()):
-            raise ValueError('먼저 부탁드립니다 ZCode 로그인 계정')
+            raise ValueError('请先在 ZCode 登录账号')
         settings = read(self.home/'setting.json')
         return {'credentials': credentials, 'settings': {k: settings[k] for k in SETTINGS if k in settings}}
 
     def _row(self, identifier):
         row = next((r for r in self.index() if r['id'] == identifier), None)
         if not row:
-            raise ValueError('저장됨 ZCode 계정이 존재하지 않습니다')
+            raise ValueError('保存的 ZCode 账号不存在')
         return row
 
     def public(self):
@@ -96,7 +96,7 @@ class ZCodeAccounts:
                 active.insert(0, 'current')
             if quota_for is not None and not any(row['id'] == quota_for and row['kind'] == 'official'
                                                 and row['id'] in active for row in public):
-                raise ValueError("현재 ZCode 계정의 할당량만 사용할 수 있습니다.")
+                raise ValueError('仅支持查看当前 ZCode 登录账号的额度')
             native = (callable(self.quota_reader) and current.get('provider') in ('zai', 'bigmodel') and
                       bool(re.fullmatch(r'[0-9a-f]{64}', current.get('identity', ''))))
             scope = ('native', current['provider'], current['identity']) if native else generation
@@ -122,12 +122,12 @@ class ZCodeAccounts:
                                         {**usage, 'limits': [], 'status': 'error' if usage.get('status') == 'error' else 'unsupported'})
             if not native and generation and quota.login_generation(self.home) != generation:
                 self.quota_cache = None
-                raise ValueError('ZCode 로그인이 변경됩니다. 나중에 다시 시도해 주세요.')
+                raise ValueError('ZCode 登录正在变化，请稍后重试')
             return {'accounts': public, 'activeIds': active, 'activeId': next(iter(active), None),
                     'current': {'name': current.get('name')}, 'canImport': bool(current.get('identity')),
                     'capabilities': {'addApi': True, 'quota': bool(scope), 'apiFormats': list(api_config.API_FORMATS),
                                      'switchRequiresStopped': True},
-                    'enrollmentHint': "현재 공식 계정을 저장하기 전에 ZCode에 로그인하세요. 여기에 API 구성을 저장한 다음 전화 액세스를 비활성화하고 원래 앱을 정상적으로 종료하여 적용하세요. 다시 시작한 후 채팅에서 해당 모델을 선택하십시오."}
+                    'enrollmentHint': '官方账号请先在 ZCode 登录，再保存当前接入。API 可在此保存；停用手机接入并正常退出原 App 后应用，重新启动后在聊天中选择对应模型。'}
 
     def _native_quota(self, current, refresh=False):
         previous = quota.unexpired(self.quota_cache[2], time.time()) if self.quota_cache else {}
@@ -136,33 +136,33 @@ class ZCodeAccounts:
                 after = self.metadata()
             except (OSError, ValueError):
                 self.quota_cache = None
-                raise ValueError('현재 확인 불가 ZCode 나중에 다시 시도해 주세요.') from None
+                raise ValueError('无法确认当前 ZCode 账号，请稍后重试') from None
             if any(after.get(key) != current.get(key) for key in ('provider', 'identity')):
                 self.quota_cache = None
-                raise ValueError('ZCode 로그인이 변경됩니다. 계정을 새로 고치고 다시 시도해 주세요.')
+                raise ValueError('ZCode 登录正在变化，请刷新账号后重试')
         try:
             value = self.quota_reader(refresh)
         except (OSError, ValueError, TimeoutError):
             require_current()
             return {**previous, 'status': 'error', 'source': 'native', 'limits': previous.get('limits', []),
-                    'error': '할당량 쿼리에 실패했습니다. 나중에 다시 시도해 주세요.'}
+                    'error': '额度查询失败，请稍后重试'}
         returned = value.get('account', {}) if isinstance(value, dict) else {}
         if any(returned.get(key) != current.get(key) for key in ('provider', 'identity')):
             self.quota_cache = None
-            raise ValueError('ZCode 로그인이 변경됩니다. 계정을 새로 고치고 다시 시도해 주세요.')
+            raise ValueError('ZCode 登录正在变化，请刷新账号后重试')
         require_current()
         try:
             return quota.native_snapshot(value.get('quota'), current['provider'], time.time())
         except (AttributeError, TypeError, ValueError):
             return {**previous, 'status': 'error', 'source': 'native', 'limits': previous.get('limits', []),
-                    'error': '기존 App 아직 확인 가능한 오늘 할당량이 없습니다. 나중에 다시 시도해 주세요.'}
+                    'error': '原 App 暂未提供可确认的今日额度，请稍后重试'}
 
     def import_current(self, name=''):
         with self.lock:
             before = self.snapshot()
             current = self.metadata()
             if not re.fullmatch(r'[0-9a-f]{64}', current.get('identity', '')) or before != self.snapshot():
-                raise ValueError('ZCode 로그인이 변경됩니다. 나중에 다시 시도해 주세요.')
+                raise ValueError('ZCode 登录正在变化，请稍后重试')
             rows = self.index()
             row = next((r for r in rows if r['kind'] == 'official' and r['identity'] == current['identity']), None)
             if row is None:
@@ -187,7 +187,7 @@ class ZCodeAccounts:
         with self.lock:
             row = self._row(identifier)
             if row['kind'] != 'api':
-                raise ValueError('이 액세스는 API 설정')
+                raise ValueError('此接入不是 API 配置')
             config = self._saved(row)['provider']['config']
             return {'baseUrl': config['api']['baseUrl'], 'apiKey': config['access']['apiKey'],
                     'apiFormat': config['api']['type']}
@@ -195,12 +195,12 @@ class ZCodeAccounts:
     def _saved(self, row):
         selected = read(self.directory/(row['id']+'.json'))
         if stamp(selected) != row['fingerprint']:
-            raise ValueError('저장됨 ZCode 액세스 스냅샷이 변경되었습니다.')
+            raise ValueError('保存的 ZCode 接入快照已变化')
         return selected
 
     def rename(self, identifier, name):
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100:
-            raise ValueError('이름 길이는 다음과 같아야 합니다. 1–100 성격')
+            raise ValueError('名称长度应为 1–100 字')
         with self.lock:
             rows = self.index(); self._row(identifier)
             for row in rows:
@@ -218,18 +218,18 @@ class ZCodeAccounts:
 
     def details(self, identifier, refresh=False):
         if not identifier:
-            raise ValueError('지정하십시오 ZCode 계정')
+            raise ValueError('请指定 ZCode 账号')
         return self._public(identifier, refresh)
 
     def save_api(self, value):
         name = value.get('name')
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100:
-            raise ValueError('이름 길이는 다음과 같아야 합니다. 1–100 성격')
+            raise ValueError('名称长度应为 1–100 字')
         with self.lock:
             rows = self.index()
             existing = self._row(value['id']) if value.get('id') else None
             if existing and existing['kind'] != 'api':
-                raise ValueError('공식 로그인은 다음에서만 가능합니다. ZCode 중간 수정')
+                raise ValueError('官方登录只能在 ZCode 中修改')
             identifier = existing['id'] if existing else str(uuid.uuid4())
             previous = self._saved(existing) if existing else None
             url = Accounts.api_url(value.get('baseUrl', '').strip() if isinstance(value.get('baseUrl'), str) else '')
@@ -286,14 +286,14 @@ class ZCodeAccounts:
 
     def _rollback_path(self, token):
         if not isinstance(token, str) or not re.fullmatch(r'[0-9a-f]{32}', token):
-            raise ValueError('ZCode 계정 복구 ID가 잘못되었습니다.')
+            raise ValueError('ZCode 账号恢复标识无效')
         return self.directory/('rollback-'+token+'.json')
 
     def rollback(self, token):
         with self.lock:
             path = self._rollback_path(token); backup = read(path)
             if any(read(self.home/name) != expected for name, expected in backup['after'].items()):
-                raise ValueError('ZCode 구성이 외부적으로 수정되었습니다. 복구 백업이 유지되었습니다')
+                raise ValueError('ZCode 配置已被外部修改；恢复备份已保留')
             for name, value in backup['before'].items():
                 private_json(self.home/name, value)
             path.unlink()

@@ -48,7 +48,7 @@ test('failed uploads block send and retry keeps the same attachment id',async()=
  const ui=fixture();ui.setUpload(()=>{throw Error('offline');});ui.panel.add([file('a.txt')]);await tick();
  assert.equal(ui.panel.ready(),false);assert.equal(ui.panel.rows[0].status,'failed');
  ui.setUpload(async(key,id,file)=>({id,name:file.name,size:file.size}));
- const card=ui.root.children[0];card.children.find(n=>n.tag==='button'&&n.textContent==='다시 시도').onclick();await tick();
+ const card=ui.root.children[0];card.children.find(n=>n.tag==='button'&&n.textContent==='重试').onclick();await tick();
  assert.equal(ui.calls[0][1],ui.calls[1][1]);assert.equal(ui.panel.ready(),true);
 });
 test('removing a pending upload or logging out prevents delayed results restoring the draft',async()=>{
@@ -113,4 +113,11 @@ test('large host references do not consume upload bytes; upload capability does 
  ui.panel.add([file('blocked.png')]);assert.equal(ui.calls.length,0);
  ui.panel.canUpload=()=>true;ui.panel.add([file('photo.png')]);await tick();
  assert.equal(ui.calls.length,1);assert.equal(ui.panel.references().length,1);assert.equal(ui.panel.ids().length,1);
+});
+
+test('an add menu without upload capability cannot retry a failed attachment',()=>{
+ const ui=fixture();ui.panel.rows.push({id:'failed',name:'old.png',size:5,status:'failed',error:'failed'});
+ ui.panel.canUpload=()=>false;ui.panel.render();
+ const retry=ui.root.children[0].children.find(n=>n.textContent==='重试');
+ assert.equal(retry.disabled,true);retry.onclick();assert.equal(ui.calls.length,0);assert.equal(ui.panel.rows[0].status,'failed');
 });

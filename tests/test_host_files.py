@@ -15,7 +15,7 @@ class HostFileNavigationTests(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.project = self.root/'project'; self.project.mkdir()
         self.other = self.root/'other'; self.other.mkdir()
-        (self.other/'보고서.txt').write_text('host read', encoding='utf-8')
+        (self.other/'报告.txt').write_text('host read', encoding='utf-8')
         self.history = self.root/'records'; self.history.mkdir()
 
     def read(self, action, path='', **params):
@@ -28,7 +28,7 @@ class HostFileNavigationTests(unittest.TestCase):
         self.assertEqual(start['projectPath'], '')
         self.assertEqual(start['parentPath'], self.root.as_posix())
         rows = self.read('list', self.other.as_posix())
-        path = (self.other/'보고서.txt').as_posix()
+        path = (self.other/'报告.txt').as_posix()
         self.assertEqual(rows['entries'][0]['path'], path)
         self.assertIsNone(rows['entries'][0]['projectPath'])
         self.assertEqual(self.read('preview', path)['text'], 'host read')
@@ -49,9 +49,9 @@ class HostFileNavigationTests(unittest.TestCase):
     def test_project_operations_and_sends_do_not_gain_host_scope(self):
         for action in ('upload', 'references', 'git-status', 'git-action'):
             with self.subTest(action=action), self.assertRaises(PermissionError):
-                self.read(action, (self.other/'보고서.txt').as_posix())
+                self.read(action, (self.other/'报告.txt').as_posix())
         with self.assertRaises(PermissionError):
-            operate(str(self.project), 'preview', {'path': '../other/보고서.txt'})
+            operate(str(self.project), 'preview', {'path': '../other/报告.txt'})
         (self.project/'inside.txt').write_text('inside')
         self.assertEqual(self.read('info', 'inside.txt')['projectPath'], 'inside.txt')
         self.assertEqual(self.read('list')['entries'][0]['projectPath'], 'inside.txt')
@@ -62,10 +62,10 @@ class HostFileNavigationTests(unittest.TestCase):
         rows = self.read('list')['entries']
         self.assertEqual(rows[0]['kind'], 'blocked')
         with self.assertRaises((ValueError, PermissionError)):
-            self.read('preview', (self.project/'link/보고서.txt').as_posix())
+            self.read('preview', (self.project/'link/报告.txt').as_posix())
 
     def test_parent_navigation_stops_at_native_filesystem_root(self):
         root = Path(self.root.anchor).as_posix()
         self.assertIsNone(self.read('list', root)['parentPath'])
         with self.assertRaises((ValueError, PermissionError)):
-            self.read('preview', self.other.as_posix()+'/../other/보고서.txt')
+            self.read('preview', self.other.as_posix()+'/../other/报告.txt')

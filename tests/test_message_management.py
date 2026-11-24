@@ -1,4 +1,5 @@
 import copy
+from contextlib import closing
 import json
 from pathlib import Path
 import tempfile
@@ -54,6 +55,57 @@ class MessageManagementTests(unittest.TestCase):
     def action(self,b,action,**fields):
         return b.manage_messages(self.thread, {'action':action,'version':b.message_management(self.thread)['version'],
                                               'expectedAccount':'account-a',**fields})
+
+    def test_native_codex_queue_is_visible_without_becoming_a_gateway_submission(self):
+        import sqlite3
+        b = self.native()
+        b.codex_home = Path(self.temp.name)
+        live = b.live[self.thread]
+        live.origin_verified, live.owner = True, 'desktop-owner'
+        live.state.update(id=self.thread, modelProvider='openai')
+        b.store = Mock()
+        native_id = self.ids[3]
+        payload = json.dumps({'UserInput': {'content': [
+            {'type': 'text', 'text': 'queued in Codex'},
+            {'type': 'localImage', 'path': '/private/folder/photo.png'}], 'client_id': self.ids[4]}})
+        with closing(sqlite3.connect(b.codex_home / 'queue_1.sqlite')) as native, native:
+            native.execute('CREATE TABLE queued_items (id TEXT PRIMARY KEY, thread_id TEXT, payload_json TEXT, queue_order INTEGER, created_at_ms INTEGER)')
+            native.execute('INSERT INTO queued_items VALUES (?,?,?,?,?)', (native_id, self.thread, payload, 0, 1000))
+            native.execute('INSERT INTO queued_items VALUES (?,?,?,?,?)', (self.ids[4], str(uuid.uuid4()), payload, 0, 0))
+        before = copy.deepcopy(b.submissions)
+        result = b.message_management(self.thread, [native_id])
+        self.assertEqual(result['nativeQueue'], [{'id': native_id, 'text': 'queued in Codex',
+            'attachments': ['photo.png'], 'at': 1.0}])
+        self.assertEqual(result['receipts'], [{'id': native_id, 'status': 'notFound'}])
+        self.assertEqual(b.submissions, before)
+        b.session.assert_not_called(); b._dispatch.assert_not_called()
+        with self.assertRaises(ValueError):
+            self.action(b, 'withdraw', id=native_id)
+        live.connected = False
+        # A saved, verified local chat may read its durable native queue.
+        self.assertEqual(b.message_management(self.thread)['nativeQueue'], result['nativeQueue'])
+        live.origin = 'cli'
+        self.assertFalse(b.message_management(self.thread).get('nativeQueue'))
+
+    def test_native_queue_keeps_saved_order_and_does_not_show_already_sending_desktop_rows(self):
+        b = self.native()
+        b.codex_home = Path(self.temp.name)
+        live = b.live[self.thread]
+        live.origin_verified = True
+        state = b.codex_home / '.codex-global-state.json'
+        state.write_text(json.dumps({'queued-follow-ups': {self.thread: [
+            {'id': self.ids[4], 'text': 'first', 'createdAt': 2000},
+            {'id': self.ids[3], 'text': 'second', 'context': {'fileAttachments': [{'path': 'C:/private/file.pdf'}]}},
+            {'id': self.ids[1], 'text': 'sending', 'submission': {'status': 'sending'}},
+            {'id': self.ids[2], 'text': 'another host', 'submission': {'hostId': 'remote:other'}}
+        ]}}), encoding='utf-8')
+        queue = b.message_management(self.thread)['nativeQueue']
+        self.assertEqual([row['id'] for row in queue], [self.ids[4], self.ids[3]])
+        self.assertEqual(queue[1]['attachments'], ['file.pdf'])
+        state.write_text('{', encoding='utf-8')
+        result = b.message_management(self.thread)
+        self.assertIsNone(result['nativeQueue'])
+        self.assertEqual(len(result['queue']), 3)
 
     def test_receipts_are_exact_local_only_and_unknown_never_replayed(self):
         b=self.native();key=self.thread+':'+self.ids[0];b.submissions[key]['status']='unknown'
@@ -180,7 +232,7 @@ class MessageManagementTests(unittest.TestCase):
                                   skills=[{'id':'skill','name':'Same skill','path':'/same/skill'}],permissions={'mode':'same'})
         original=copy.deepcopy(b.submissions[key]);order=list(b.submissions)
         edit_id=str(uuid.uuid4());before=b.message_management(self.thread)
-        request={'action':'edit','id':identifier,'text':'edited텍스트','editId':edit_id,
+        request={'action':'edit','id':identifier,'text':'edited正文','editId':edit_id,
                  'version':before['version'],'expectedAccount':'account-a'}
         result=b.manage_messages(self.thread,request)
         self.assertEqual(list(b.submissions),order)
@@ -188,7 +240,7 @@ class MessageManagementTests(unittest.TestCase):
         with self.assertRaises(ValueError):b.manage_messages(self.thread,request)
         b.submissions=json.loads(b.ledger_path.read_text(encoding='utf-8'))
         self.assertEqual(b.message_management(self.thread,[identifier])['receipts'][0]['edit'],
-                         {'id':edit_id,'text':'edited텍스트','status':'applied'})
+                         {'id':edit_id,'text':'edited正文','status':'applied'})
         session=b.live[self.thread];session.runtime='desktop';session.state['latestModel']='same-model'
         b.uploads=SimpleNamespace(resolve=Mock(return_value=[]));b._call=Mock(return_value={})
         b._dispatch=Bridge._dispatch.__get__(b)
@@ -196,7 +248,7 @@ class MessageManagementTests(unittest.TestCase):
         first=self.thread+':'+self.ids[0];b._send_queued(session,first,b.submissions[first])
         b._send_queued(session,key,original)
         request_body=b._call.call_args.args[2]['turnStart']['request']
-        self.assertEqual(request_body['input'][0]['text'],'edited텍스트')
+        self.assertEqual(request_body['input'][0]['text'],'edited正文')
         self.assertEqual(request_body['clientUserMessageId'],identifier)
         self.assertEqual(request_body['input'][1]['path'],'/same/skill')
         b.uploads.resolve.assert_called_with(self.thread,['upload'])
@@ -217,7 +269,7 @@ class MessageManagementTests(unittest.TestCase):
         b.receipts[key]['entry']['target']={'cwd':'/original','modelProvider':'openai'}
         b.receipts[key]['entry']['attachments']=[]
         b.receipts[key]['entry'].update(skills=[],workMode=None,goalActivation=None)
-        self.action(b,'edit',id=identifier,text='new WSL텍스트',editId=edit_id)
+        self.action(b,'edit',id=identifier,text='new WSL正文',editId=edit_id)
         self.assertEqual(list(b.receipts),order)
         b.receipts=json.loads(b.receipts_path.read_text(encoding='utf-8'));b.data_dir=Path(self.temp.name)
         b.uploads=SimpleNamespace(resolve=Mock(return_value=[]));b._resolve_skills=Mock(return_value=[])
@@ -230,10 +282,10 @@ class MessageManagementTests(unittest.TestCase):
         runtime.request.assert_not_called()
         b._dispatch_queued(self.thread)
         b.read.assert_called_once()
-        self.assertEqual(runtime.request.call_args.args[1]['input'][0]['text'],'new WSL텍스트')
+        self.assertEqual(runtime.request.call_args.args[1]['input'][0]['text'],'new WSL正文')
         self.assertEqual(b.receipts[key]['result']['status'],'accepted')
         receipt=b.message_management(self.thread,[identifier])['receipts'][0]
-        self.assertEqual(receipt['edit'],{'id':edit_id,'text':'new WSL텍스트','status':'applied'})
+        self.assertEqual(receipt['edit'],{'id':edit_id,'text':'new WSL正文','status':'applied'})
         with self.assertRaises(ValueError):self.action(b,'edit',id=identifier,text='late',editId=str(uuid.uuid4()))
 
     def test_edit_racing_dispatch_rejects_without_requeue_or_overwriting(self):

@@ -1,4 +1,4 @@
-"""Verify Linux process generations and read selected launch variables."""
+"""Read selected initial variables from a verified same-user Linux daemon."""
 
 import os
 from pathlib import Path
@@ -16,22 +16,37 @@ def process_executable(root):
         return Path(target.removesuffix(' (deleted)'))
 
 
+def _process_fields(pid, root):
+    try:
+        raw = (root / 'stat').read_bytes()
+    except FileNotFoundError:
+        raise ProcessLookupError('Codex process exited') from None
+    fields = raw.rpartition(b')')[2].split()
+    if not raw.startswith(f'{pid} ('.encode('ascii')) or len(fields) < 20:
+        raise OSError('Codex daemon process identity unavailable')
+    return fields[0], int(fields[1]), int(fields[19])
+
+
+def _process_ids(root):
+    fields = next((line.split()[1:] for line in (root / 'status').read_bytes().splitlines()
+                   if line.startswith(b'Uid:')), ())
+    if len(fields) != 4:
+        raise OSError('Codex process user identity unavailable')
+    return tuple(int(uid) for uid in fields)
+
+
 def desktop_process_identity(pid):
-    """공유 Desktop 연결을 현재 Linux 프로세스 세대와 실제 UID에 묶는다."""
+    """Check that the executable, ancestry and birth belong to one process."""
+    if type(pid) is not int or pid <= 0:
+        raise ValueError('Invalid desktop process ID')
     root = Path('/proc') / str(pid)
 
     def snapshot():
-        raw = (root / 'stat').read_text(encoding='ascii')
-        fields = raw.rpartition(')')[2].split()
-        if not raw.startswith(f'{pid} (') or len(fields) < 20:
-            raise OSError('Desktop process identity unavailable')
-        uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
-                    if line.startswith('Uid:'))
-        zombie = fields[0] == 'Z'
-        image = '' if zombie else str(process_executable(root))
-        return {'pid': pid, 'parent': int(fields[1]), 'uid': int(uids[1]), 'ruid': int(uids[0]),
-                'image': image,
-                'startTicks': int(fields[19]), 'zombie': zombie}
+        state, parent, start = _process_fields(pid, root)
+        uids = _process_ids(root)
+        exited = state in (b'Z', b'X')
+        image = '' if exited else str(process_executable(root))
+        return parent, start, uids, exited, image
 
     try:
         before = snapshot()
@@ -39,24 +54,21 @@ def desktop_process_identity(pid):
         after = snapshot()
     except FileNotFoundError:
         if not root.exists():
-            raise ProcessLookupError('Desktop process exited') from None
+            raise ProcessLookupError('Codex desktop process exited') from None
         raise
-    # PID 재사용, exec 또는 재부모화가 관찰 도중 발생하면 혼합된 신원을 반환하지 않는다.
     if before != after or not boot:
-        raise OSError('Desktop process changed during inspection')
-    return {**after, 'bootId': boot}
+        raise OSError('Codex desktop process changed during inspection')
+    parent, start, uids, exited, image = after
+    return {'pid': pid, 'parent': parent, 'bootId': boot, 'startTicks': start,
+            'ruid': uids[0], 'uid': uids[1], 'zombie': exited, 'image': image}
 
 
 def _identity(pid):
     root = Path('/proc') / str(pid)
-    stat = (root / 'stat').read_text(encoding='ascii')
-    fields = stat.rpartition(')')[2].split()
-    if not stat.startswith(f'{pid} (') or len(fields) < 20:
-        raise OSError('Codex daemon process identity unavailable')
-    uids = next(line.split()[1:] for line in (root / 'status').read_text().splitlines()
-                if line.startswith('Uid:'))
+    _, _, start = _process_fields(pid, root)
+    uids = _process_ids(root)
     image = process_executable(root)
-    return (int(fields[19]), tuple(int(uid) for uid in uids), str(image))
+    return (start, uids, str(image))
 
 
 def read_process_environment(pid, record, executable, names, record_path=None):

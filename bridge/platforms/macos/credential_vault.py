@@ -9,7 +9,7 @@ def read(service, user):
     if result.returncode == 44:  # errSecItemNotFound, not access denial.
         return None
     if result.returncode:
-        raise ValueError('시스템 키체인을 읽을 수 없습니다. 컴퓨터에서 인증을 확인하세요.')
+        raise ValueError('无法读取系统钥匙串，请在电脑端检查授权')
     return result.stdout.removesuffix(b'\n')
 
 
@@ -18,14 +18,14 @@ def write(service, user, value):
         result = subprocess.run(['/usr/bin/security', 'delete-generic-password', '-s', service,
                                  '-a', user], capture_output=True, timeout=30)
         if result.returncode not in (0, 44):
-            raise ValueError('원래 시스템 자격 증명을 제거할 수 없습니다.')
+            raise ValueError('无法移除原系统凭据')
         return
     command = 'add-generic-password -U -s {} -a {} -w {}\n'.format(
         shlex.quote(service), shlex.quote(user), shlex.quote(value.decode('utf-8')))
     if len(command.encode()) > 4096:
-        raise ValueError('기본 키체인 명령은 이 길이의 로그인 자격 증명을 지원하지 않습니다.')
+        raise ValueError('原生钥匙串命令不支持此长度的登录凭据')
     result = subprocess.run(['/usr/bin/security', '-i'], input=command.encode(),
                             capture_output=True, timeout=30)
     # Interactive security can return success after an inner command fails.
     if result.returncode or read(service, user) != value:
-        raise ValueError('시스템 키체인 쓰기가 확인되지 않았습니다. 컴퓨터에서 인증을 확인하세요.')
+        raise ValueError('系统钥匙串写入未确认，请在电脑端检查授权')

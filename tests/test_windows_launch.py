@@ -93,7 +93,7 @@ class WindowsDesktopLaunchTests(unittest.TestCase):
                 patch('bridge.clients.codex.desktop_runtime.wait_stopped'), \
                 patch('bridge.platforms.windows.discovery_ext.application_execution_alias', return_value=None), \
                 patch('subprocess.Popen') as spawn:
-            with self.assertRaisesRegex(ValueError, "애플리케이션\\ 시작\\ 별명을\\ 확인할\\ 수\\ 없으며\\ 아직\\ 시작되지\\ 않았습니다\\.\\ 애플리케이션\\ 설치\\ 및\\ 실행\\ 별칭\\ 설정을\\ 확인하세요\\."):
+            with self.assertRaisesRegex(ValueError, '启动别名'):
                 DesktopApp(self.executable, self.root).start()
         spawn.assert_not_called()
 
@@ -150,7 +150,7 @@ class WindowsDesktopLaunchTests(unittest.TestCase):
             return self.inventory
         self.snapshot.side_effect = inventory
         with patch('subprocess.Popen', side_effect=self.denied) as spawn:
-            with self.assertRaisesRegex(ValueError, '취소'):
+            with self.assertRaisesRegex(ValueError, '已取消'):
                 DesktopApp(self.executable, self.root).launch(cancelled=cancelled)
         self.assertEqual(spawn.call_count, 1)
 

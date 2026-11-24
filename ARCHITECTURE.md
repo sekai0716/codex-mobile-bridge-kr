@@ -8,7 +8,9 @@
 
 기본적으로 기존 세션의 설정을 상속한다. 모델을 명시적으로 선택했을 때만 `model`, `effort`, 속도 단계를 갱신한다. 계정 전환은 별도의 전역 작업이다. 자격 증명은 데스크톱에서만 추가하고 두 화면에서는 저장된 연결을 선택한다. 공식 데스크톱 앱을 종료한 뒤 로컬 인증과 기본 provider를 교체하고 다시 실행해 확인한다. 기존 채팅의 provider와 승인 정책을 직접 이전하지는 않는다. 자세한 내용은 [계정과 연결](docs/account-switching.md)을 참고한다.
 
-## 네이티브 Goal 제어
+本机新版 Codex Desktop 若由 utility host 启动运行时，原生连接准备后使用 App 持有的透明 stdio 接入；旧版继续使用原 IPC。新路径按进程身份和实际运行记录选择，不依赖 App 版本号。状态读取不恢复线程，发送与审批仍使用同一原生执行连接，详见[宿主进程接入边界](.agents/notes/implemented/bug-fix/2026-11-21-hosted-codex-desktop.md)。
+
+## 原生 Goal 控制
 
 App에서 실행하는 로컬 채팅의 Goal 메타데이터는 제한된 공식 런타임 연결로 읽고 쓴다. 허용하는 호출은 `initialize`와 `thread/goal/get/set/clear`뿐이다. 이 연결은 채팅을 로드·재개하거나 `turn/start`를 호출하지 않으며 provider·인증·승인 설정도 바꾸지 않는다. 실제 실행과 승인은 원래 데스크톱 owner가 계속 담당한다. 연결된 네이티브 CLI의 로컬·SSH 채팅은 같은 daemon에서 Goal을 읽고 쓰며 지원 여부를 네이티브 인터페이스로 확인한다. 두 경로는 작업 ID와 결과 확인 규칙을 공유한다. 현재 follower IPC에는 Goal 쓰기 인터페이스가 없으므로 SSH에서 App owner가 실행하는 채팅은 Goal 제어를 지원하지 않는다. 이 연결을 임의의 App Server RPC를 전달하는 용도로 사용해서는 안 된다.
 

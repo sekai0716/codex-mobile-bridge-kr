@@ -59,11 +59,11 @@ class WslClaudeEntries:
         if self.path.exists():
             value = json.loads(self.path.read_text(encoding='utf-8'))
             if value.get('version') != 1 or not isinstance(value.get('entries'), list):
-                raise ValueError('WSL Claude Code 구성이 인식되지 않습니다.')
+                raise ValueError('WSL Claude Code 配置无法识别')
             self.entries = value['entries']
             for row in self.entries:
                 if row.get('id') != entry_id(row['distribution'], row['user'], row['configDir']):
-                    raise ValueError('WSL Claude Code 신원 불일치')
+                    raise ValueError('WSL Claude Code 身份不匹配')
 
     def scan(self):
         candidates, errors = {}, []
@@ -77,7 +77,7 @@ class WslClaudeEntries:
                         'user': info['user'], 'configDir': directory,
                         'label': 'WSL · '+distribution+' · '+info['user']+' · '+directory}
             except (OSError, ValueError, TimeoutError, KeyError):
-                errors.append({'distribution': distribution, 'error': '읽을 수 있는 항목이 없습니다. Claude Code 환경이나 Python'})
+                errors.append({'distribution': distribution, 'error': '未找到可读取的 Claude Code 环境或 Python'})
         with self.lock:
             self.candidates = candidates
         return {'errors': errors}
@@ -95,25 +95,25 @@ class WslClaudeEntries:
                  'distributionRunning': None if running is None else row['distribution'] in running,
                  'setupStatus': 'ready', 'accessManagement': 'external',
                  'canQuitDesktop': False, 'canForceQuit': False,
-                 'reason': "게이트웨이에서 이 WSL API 연결을 관리할 수 있습니다. 원래 Claude Code CLI에서 공식 로그인을 완료하세요."}
+                 'reason': '可在本网关管理此 WSL API 接入；官方登录仍在原 Claude Code CLI 完成。'}
                 for row in rows.values()]
 
     def save_wsl(self, distribution, user, home, label):
         if (not isinstance(label, str) or not 1 <= len(label.strip()) <= 80
                 or any(ord(c) < 32 or ord(c) == 127 for c in label)):
-            raise ValueError("제어 문자 없이 1~80자의 연결 이름을 입력합니다.")
+            raise ValueError('请输入 1–80 字的接入名称，不能包含控制字符')
         source = (wsl.configuration_source(user, home) + '\n__name__="wsl_claude_probe"\n'
                   + worker_source() + PROBE)
         info = wsl.read(distribution, source, user)
         if info.get('user') != user or len(info.get('profiles', [])) != 1:
-            raise ValueError("선택한 디렉터리에 대해 네이티브 WSL Claude Code 환경을 찾을 수 없습니다.")
+            raise ValueError('未找到所选目录的原生 WSL Claude Code 环境')
         directory = info['profiles'][0]['configDir']
         identifier = entry_id(distribution, user, directory)
         candidate = {'id': identifier, 'distribution': distribution, 'user': user,
                      'configDir': directory, 'label': label.strip()}
         with self.lock:
             if any(row['id'] == identifier for row in self.entries):
-                raise ValueError("이 WSL 구성 디렉터리는 이미 등록되어 있습니다. 기존 항목을 사용합니다.")
+                raise ValueError('此 WSL 配置目录已登记，请使用已有入口')
             previous = self.candidates.get(identifier)
             self.candidates[identifier] = candidate
             try:
@@ -128,16 +128,16 @@ class WslClaudeEntries:
 
     def configure(self, identifier, enabled, *, _manual=False):
         if type(enabled) is not bool or not isinstance(identifier, str) or not re.fullmatch(r'wsl-claude:[0-9a-f]{32}', identifier):
-            raise ValueError('WSL Claude Code 입구 스위치가 잘못되었습니다.')
+            raise ValueError('WSL Claude Code 入口开关无效')
         with self.lock:
             row = next((r for r in self.entries if r['id'] == identifier), None)
             if _manual and row is not None:
-                raise ValueError("이 WSL 구성 디렉터리는 이미 등록되어 있습니다. 기존 항목을 사용합니다.")
+                raise ValueError('此 WSL 配置目录已登记，请使用已有入口')
             if row is None:
                 if not enabled or identifier not in self.candidates:
-                    raise ValueError('기존 항목을 스캔하고 선택하세요. WSL Claude Code 입구')
+                    raise ValueError('请先扫描并选择已有 WSL Claude Code 入口')
                 if len(self.entries) >= 16:
-                    raise ValueError('가장 많이 등록된 16 개인 WSL Claude Code 입구')
+                    raise ValueError('最多登记 16 个 WSL Claude Code 入口')
                 row = dict(self.candidates[identifier])
                 if not _manual:
                     self.entries.append(row)
@@ -163,7 +163,7 @@ class WslClaudeEntries:
         with self.lock:
             row = next((dict(r) for r in self.entries if r['id'] == identifier and r.get('enabled', True)), None)
         if row is None:
-            raise ValueError('WSL Claude Code 입구가 폐쇄되거나 변경됨')
+            raise ValueError('WSL Claude Code 入口已关闭或变化')
         return row
 
     def hosts(self):
@@ -192,7 +192,7 @@ class WslClaudeCli(RemoteClaudeCli):
         if self.continuations_path and self.continuations_path.exists():
             value = json.loads(self.continuations_path.read_text(encoding='utf-8'))
             if value.get('version') != 1 or not isinstance(value.get('sessions'), dict) or not isinstance(value.get('pending'), dict):
-                raise ValueError("WSL Claude Code 연속성 레코드가 유효하지 않습니다.")
+                raise ValueError('WSL Claude Code 续接记录无效')
             self.continuations = value['sessions']
             self.continuation_pending = value['pending']
 
@@ -207,7 +207,7 @@ class WslClaudeCli(RemoteClaudeCli):
         result = self._remote(identifier, {'operation': 'account-continuation'})
         profile = result.get('profile') or {}
         if profile.get('directory') != row['configDir'] or result.get('identity') != identity:
-            raise ValueError("WSL Claude Code 계정 ID가 변경되었습니다. 계속하기 전에 새로고침하세요.")
+            raise ValueError('WSL Claude Code 账号身份已变化，请刷新')
         fresh = {item['nativeId']: item for item in result.get('sessions', [])}
         selected = {}
         for sid, saved in self.index.items():
@@ -218,7 +218,7 @@ class WslClaudeCli(RemoteClaudeCli):
             if (not current or any(current.get(key) != saved.get(key) for key in
                                    ('origin', 'cwd', 'model', 'permissionMode', 'permissionKnown', 'projectConfig')) or
                     (current.get('stamp') or [])[:2] != (saved.get('stamp') or [])[:2]):
-                raise ValueError("원래 WSL Claude Code 세션 ID가 변경되었습니다. 계정이 전환되지 않았습니다.")
+                raise ValueError('原 WSL Claude Code 会话身份已变化，账号尚未切换')
             selected[sid] = {key: current.get(key) for key in
                              ('nativeId', 'cwd', 'origin', 'model', 'permissionMode', 'permissionKnown',
                               'projectConfig', 'stamp', 'draftAccountIdentity')}
@@ -236,7 +236,7 @@ class WslClaudeCli(RemoteClaudeCli):
         result = self._remote(identifier, {'operation': 'account-continuation'})
         profile = result.get('profile') or {}
         if profile.get('directory') != row['configDir'] or result.get('identity') != identity:
-            raise ValueError("전환 후 WSL Claude Code ID가 확인되지 않았습니다.")
+            raise ValueError('WSL Claude Code 切换后身份尚未核验')
         fresh = {item['nativeId']: item for item in result.get('sessions', [])}
         aliases, updated, drafts = dict(self.continuations), {}, []
         host = {**row, 'alias': identifier}
@@ -246,7 +246,7 @@ class WslClaudeCli(RemoteClaudeCli):
                     any(current.get(key) != saved.get(key) for key in
                         ('cwd', 'model', 'permissionMode', 'permissionKnown', 'projectConfig')) or
                     (current.get('stamp') or [])[:2] != (saved.get('stamp') or [])[:2]):
-                raise ValueError("원래 WSL Claude Code 세션 ID가 확인되지 않았습니다.")
+                raise ValueError('原 WSL Claude Code 会话身份尚未核验')
             prior = (aliases.get(sid) or {}).get('previousAccountIdentities', [])
             lineage = list(dict.fromkeys([*prior, saved.get('draftAccountIdentity') or '']))
             lineage = [item for item in lineage if re.fullmatch(r'[0-9a-f]{64}', item) and
@@ -320,10 +320,10 @@ class WslClaudeCli(RemoteClaudeCli):
                 capture_output=True, text=True, encoding='utf-8', timeout=timeout, **wsl._options())
             value = json.loads(result.stdout.strip()) if result.returncode == 0 else {}
             if value.get('ok') is not True:
-                raise BridgeUnavailable(value.get('message') or 'WSL Claude Code 호스트를 사용할 수 없습니다. 릴리스 버전과 원래 구성을 확인하세요.')
+                raise BridgeUnavailable(value.get('message') or 'WSL Claude Code 主机不可用，请检查发行版和原配置')
             return value['value']
         except (OSError, subprocess.TimeoutExpired, ValueError, KeyError) as exc:
-            raise BridgeUnavailable('WSL Claude Code 호스트를 사용할 수 없습니다. 릴리스 버전과 원래 구성을 확인하세요.') from exc
+            raise BridgeUnavailable('WSL Claude Code 主机不可用，请检查发行版和原配置') from exc
 
 
 class _RemoteHosts:

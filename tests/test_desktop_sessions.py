@@ -16,6 +16,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Adapters(unittest.TestCase):
+    def test_dsh_empty_native_credentials_do_not_block_detail_model_identity(self):
+        from bridge.clients.deepseek.accounts import DeepSeekAccounts
+        home = self.root/'dsh'
+        home.mkdir()
+        path = home/'.credentials.yaml'
+        store = DeepSeekAccounts(self.root/'account-snapshots', home)
+        adapter = Mock(home=home)
+        adapter.call.return_value = {'session': {'id': 'chat', 'cwd': str(self.root)},
+                                     'messages': [{'id': 'reply', 'role': 'assistant', 'text': 'Native reply'}]}
+        self.manager.adapters['deepseek'] = adapter
+        with patch.object(self.manager, '_account_store', return_value=store):
+            for empty in ('{}', '{ }', 'null', '~'):
+                with self.subTest(empty=empty):
+                    raw = ('version: 1\r\nrefs: '+empty+'\r\nrecords: '+empty+'\r\n').encode()
+                    path.write_bytes(raw)
+                    path.chmod(0o600)
+                    self.assertNotIn('error', store.public().get('current', {}))
+                    detail = self.manager.call('deepseek', 'detail', 'chat')
+                    self.assertEqual(detail['messages'][0]['text'], 'Native reply')
+                    self.assertTrue(detail['modelCatalogIdentity'])
+                    self.assertEqual(path.read_bytes(), raw)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=ROOT/'.tmp')
         self.addCleanup(self.temp.cleanup)
@@ -57,7 +79,7 @@ class Adapters(unittest.TestCase):
 
     def test_host_references_are_resolved_once_and_left_to_native_adapters(self):
         from bridge.features.workspace.workspace import operate
-        file = self.root / '중국어.txt'; file.write_text('fixture')
+        file = self.root / '中文.txt'; file.write_text('fixture')
         for provider in ['claude', 'deepseek']:
             adapter = Mock(); adapter.receipts_path = None
             adapter.call.return_value = {'status': 'accepted'}
@@ -104,11 +126,11 @@ class Adapters(unittest.TestCase):
     def test_claude_preparation_is_available_without_starting_gateway(self):
         self.manager.gateway_running = False
         adapter = self.manager.adapters['claude']
-        with patch.object(adapter, 'prerequisites', return_value={'workspace': '/중국어', 'connected': False}) as read, \
+        with patch.object(adapter, 'prerequisites', return_value={'workspace': '/中文', 'connected': False}) as read, \
              patch.object(adapter, 'prepare') as prepare, patch.object(adapter, 'connect') as connect:
             value = self.manager.control({'action': 'claude-prerequisites'})
             self.assertFalse(value['gatewayRunning'])
-            self.assertEqual(value['workspace'], '/중국어')
+            self.assertEqual(value['workspace'], '/中文')
             read.assert_called_once_with(request_permission=False)
             self.manager.control({'action': 'claude-prerequisites', 'requestPermission': True})
             self.assertEqual(read.call_args.kwargs, {'request_permission': True})
@@ -166,7 +188,7 @@ class Adapters(unittest.TestCase):
         body = {'id': str(uuid.uuid4()), 'model': 'provider/manual', 'manualModel': True,
                 'modelCatalogIdentity': 'old-account'}
         with patch.object(self.manager, '_model_identity', return_value='new-account'):
-            with self.assertRaisesRegex(ValueError, "계정이\\ 변경되었습니다\\.\\ 모델\\ 설정을\\ 다시\\ 엽니다\\."):
+            with self.assertRaisesRegex(ValueError, '账号已切换'):
                 self.manager.call('deepseek', 'settings', 'session', body)
         adapter.call.assert_not_called()
         self.assertEqual(self.manager.db.execute('SELECT COUNT(*) FROM requests').fetchone()[0], 0)
@@ -203,12 +225,12 @@ class Adapters(unittest.TestCase):
             'models': [{'id': 'sonnet'}], 'capabilities': {'models': True, 'effort': False}})
         with patch.object(self.manager, '_model_identity', return_value='legacy'), \
              patch.object(self.manager, '_model_live', return_value=True), \
-             patch.object(self.manager, '_read', side_effect=BridgeUnavailable('현재 Claude Code 이 버전은 모델 디렉터리 새로 고침을 지원하지 않습니다.')):
+             patch.object(self.manager, '_read', side_effect=BridgeUnavailable('当前 Claude Code 版本不支持刷新模型目录')):
             result = self.manager._catalog_models('claude', 'session', {'section': 'models', 'refresh': True})
         self.assertEqual(result['models'], [{'id': 'sonnet'}])
         self.assertEqual(result['cache']['updatedAt'], updated_at)
         self.assertEqual(result['cache']['state'], 'stale')
-        self.assertEqual(result['notice'], '현재 Claude Code 버전은 모델 디렉터리 새로 고침을 지원하지 않으며 마지막 결과가 유지되었습니다.')
+        self.assertEqual(result['notice'], '当前 Claude Code 版本不支持刷新模型目录，已保留上次结果')
         self.assertEqual(result['modelError'], result['notice'])
         self.assertEqual(self.manager.model_store.read('legacy')[0], updated_at)
 
@@ -310,7 +332,7 @@ class Adapters(unittest.TestCase):
                 store._current.return_value = ('api', 'fingerprint-two', store._current.return_value[2])
                 return [{'id': 'old-model', 'name': 'Old', 'efforts': []}]
             upstream.side_effect = changed
-            with self.assertRaisesRegex(ValueError, "고객\\ 계정이나\\ 구성이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
+            with self.assertRaisesRegex(ValueError, '账号或配置已变化'):
                 self.manager.call('claude', 'account')
             self.assertIsNone(self.manager.model_store.read(old_identity))
             self.assertIsNone(self.manager.model_store.read(self.manager._account_model_identity('claude')))
@@ -381,7 +403,7 @@ class Adapters(unittest.TestCase):
         manager = self.manager
         manager._account_model_identity = Mock(return_value='account-one')
         self.assertEqual(manager._accounts_public('claude', {'accounts': []})['modelCatalogIdentity'], 'account-one')
-        manager._account_model_identity.side_effect = BridgeUnavailable('알 수 없는 계정')
+        manager._account_model_identity.side_effect = BridgeUnavailable('账号未知')
         self.assertEqual(manager._accounts_public('claude', {'accounts': []})['modelCatalogIdentity'], '')
 
     def test_account_change_during_model_read_cannot_publish_old_catalog(self):
@@ -391,7 +413,7 @@ class Adapters(unittest.TestCase):
             manager._account_model_identity.return_value = 'new-account'
             return {'models':[{'id':'old-model'}]}
         manager._read = Mock(side_effect=changed)
-        with self.assertRaisesRegex(ValueError, "고객\\ 계정이나\\ 구성이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
+        with self.assertRaisesRegex(ValueError, '账号或配置已变化'):
             manager.call('deepseek', 'account')
         self.assertIsNone(manager.model_store.read('old-account'))
 
@@ -433,7 +455,7 @@ class Adapters(unittest.TestCase):
         manager._account_model_identity = Mock(side_effect=['old-account', 'old-account', 'new-account'])
         manager._account_model_live = Mock(return_value=False)
         manager._read = Mock(return_value={'models':[{'id':'old-model'}], 'capabilities':{'models':True}})
-        with self.assertRaisesRegex(ValueError, "고객\\ 계정이나\\ 구성이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
+        with self.assertRaisesRegex(ValueError, '账号或配置已变化'):
             manager.call('deepseek', 'catalog', 'session-one', {'section':'models'})
 
     def test_client_switch_requires_configuration_and_persists(self):

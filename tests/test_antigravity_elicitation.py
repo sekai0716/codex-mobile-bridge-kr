@@ -31,7 +31,7 @@ class ElicitationTests(unittest.TestCase):
         for value in ['maybe', '2', 'anything']:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 self.respond({'type': 'boolean'}, [value])
-        self.assertEqual(self.respond({'type': 'boolean'}, ['아니요 (false)']), {'answer': False})
+        self.assertEqual(self.respond({'type': 'boolean'}, ['否 (false)']), {'answer': False})
 
     def test_required_answers_cannot_be_missing_or_skipped(self):
         _, meta = request(self.schema({'type': 'string'}))

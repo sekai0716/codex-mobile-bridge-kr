@@ -33,14 +33,14 @@ class ModelResponseTests(unittest.TestCase):
             {'slug': '../invalid model'}, {'slug': 'gpt-5.5'}]}), ['gpt-5.5'])
 
     def test_empty_cc_switch_catalog_explains_no_available_models(self):
-        with self.assertRaisesRegex(ValueError, "공급자가\\ 사용\\ 가능한\\ 모델을\\ 반환하지\\ 않았습니다\\.\\ 모델\\ ID를\\ 수동으로\\ 입력하세요\\."):
+        with self.assertRaisesRegex(ValueError, '未返回可用模型'):
             self.read({'models': []})
 
     def test_existing_formats_keep_id_semantics(self):
         self.assertEqual(self.read([{'id': 'array-model'}]), ['array-model'])
         self.assertEqual(self.read({'data': [{'id': 'openai-model'}],
                                     'models': [{'slug': 'native-model'}]}), ['openai-model'])
-        with self.assertRaisesRegex(ValueError, "공급자가\\ 사용\\ 가능한\\ 모델을\\ 반환하지\\ 않았습니다\\.\\ 모델\\ ID를\\ 수동으로\\ 입력하세요\\."):
+        with self.assertRaisesRegex(ValueError, '未返回可用模型'):
             self.read({'data': [], 'models': [{'slug': 'native-model'}]})
 
 
@@ -182,10 +182,10 @@ class ApiCatalogTests(unittest.TestCase):
             if method=='account/read':return {'account':{'type':'apiKey'}}
             if method=='model/list':raise CatalogError('runtime has no catalog')
             raise AssertionError(method)
-        with patch('bridge.clients.codex.catalog.model_catalog',side_effect=ValueError("공급자에게 연결할 수 없습니다. API URL, 네트워크 및 인증서를 확인하세요.")):
+        with patch('bridge.clients.codex.catalog.model_catalog',side_effect=ValueError('无法连接上游，请检查 API 地址、网络和证书后重试')):
             result = self.reader.read_models(request,str(self.home),'bridge_api')
         self.assertEqual(result['models'],[])
-        self.assertEqual(result['modelSource'],'api');self.assertIn("공급자에게 연결할 수 없습니다. API URL, 네트워크 및 인증서를 확인하세요.",result['modelError'])
+        self.assertEqual(result['modelSource'],'api');self.assertIn('无法连接上游',result['modelError'])
         self.assertNotIn('model/list',[method for method,_ in self.calls])
 
     def test_official_account_retains_native_catalog(self):
@@ -249,7 +249,7 @@ class ApiCatalogTests(unittest.TestCase):
                 upstream.assert_not_called()
                 self.assertEqual(result['modelSource'],'api')
                 self.assertEqual(result['models'],[])
-                self.assertIn("이 API 연결은 추가 인증 설정을 사용합니다. 모델 ID를 수동으로 입력합니다.",result['modelError'])
+                self.assertIn('额外认证',result['modelError'])
 
     def test_missing_env_key_and_extra_auth_do_not_send_partial_credentials(self):
         for definition in ({'env_key':'CMB_ABSENT_FIXTURE_KEY'}, {'env_http_headers':{'private':'CMB_ABSENT_FIXTURE_HEADER'}}):
@@ -557,7 +557,7 @@ for line in sys.stdin:
             (self.home/'auth.json').write_text(json.dumps({'OPENAI_API_KEY': 'new-key'}))
             return {'models': [{'model': 'old-account'}]}
         with patch.object(self.reader, '_fetch', side_effect=switched):
-            with self.assertRaisesRegex(CatalogError, "모델\\ 액세스\\ 권한이\\ 변경되었습니다\\.\\ 다시\\ 시도해\\ 주세요\\."):
+            with self.assertRaisesRegex(CatalogError, '接入已变化'):
                 self.reader.get_kind('models', str(self.home), provider='openai')
         self.assertIsNone(self.reader.model_store.read(old_identity))
 
@@ -588,6 +588,83 @@ for line in sys.stdin:
                 time.sleep(.01)
             self.assertEqual(fetch.call_count, 1)
         self.assertEqual(self.reader.get_kind('models', str(self.home), provider='openai')['models'][0]['id'], 'new')
+
+    def test_unknown_config_preserves_default_provider_identity_and_cache(self):
+        self.reader.allow_background_refresh = False
+        with patch.object(self.reader, '_fetch', return_value={
+                'models': [{'model': 'kept-custom-model'}], 'skillEntries': [], '_defaultProvider': 'custom'}):
+            self.reader.get(str(self.home))
+        identity = self.reader.model_identity(str(self.home), None)
+        saved = self.reader.model_store.read(identity)
+        for invalid in (None, [], {}, {'config': None}, {'config': []},
+                        {'config': {'profiles': []}},
+                        {'config': {'profile': 'selected', 'profiles': {'selected': 'invalid'}}}):
+            with self.subTest(invalid=invalid):
+                calls = []
+                def request(method, params):
+                    calls.append(method)
+                    return invalid
+                with patch.object(self.reader, '_fetch', side_effect=lambda *args:
+                        self.reader.read_models(request, str(self.home))):
+                    with self.assertRaisesRegex(CatalogError, '无法确认模型接入配置'):
+                        self.reader.get(str(self.home), refresh=True)
+                self.assertEqual(calls, ['config/read'])
+                self.assertEqual(self.reader.model_identity(str(self.home), None), identity)
+                self.assertEqual(self.reader.model_store.read(identity), saved)
+
+    def test_invalid_native_model_pages_preserve_successful_cache(self):
+        self.reader.allow_background_refresh = False
+        initial = {'models': [{'model': 'kept-model'}], 'skillEntries': [], '_defaultProvider': 'openai'}
+        with patch.object(self.reader, '_fetch', return_value=initial):
+            self.reader.get(str(self.home), provider='openai')
+        identity = self.reader.model_identity(str(self.home), 'openai')
+        saved = self.reader.model_store.read(identity)
+        for invalid in (None, {}, {'data': None}, {'data': {}}, {'data': 'invalid'}):
+            for second_page in (False, True):
+                with self.subTest(invalid=invalid, second_page=second_page):
+                    def request(method, params):
+                        if method == 'config/read':
+                            return {'config': {'model_catalog_json': 'fixture.json'}}
+                        self.assertEqual(method, 'model/list')
+                        if second_page and params['cursor'] is None:
+                            return {'data': [{'model': 'partial'}], 'nextCursor': 'second'}
+                        return invalid
+                    def fetch(*args):
+                        return {**self.reader.read_models(request, str(self.home)), 'skillEntries': []}
+                    with patch.object(self.reader, '_fetch', side_effect=fetch):
+                        with self.assertRaisesRegex(CatalogError, '模型目录响应无效'):
+                            self.reader.get(str(self.home), refresh=True, provider='openai')
+                        stale = self.reader.get_kind('models', str(self.home), refresh=True, provider='openai')
+                    self.assertEqual([row['id'] for row in stale['models']], ['kept-model'])
+                    self.assertEqual(stale['cache']['state'], 'stale')
+                    self.assertEqual(stale['cache']['updatedAt'], saved[0])
+                    self.assertEqual(self.reader.model_store.read(identity), saved)
+        def empty(method, params):
+            return {'config': {'model_catalog_json': 'fixture.json'}} if method == 'config/read' else {'data': []}
+        self.assertEqual(self.reader.read_models(empty, str(self.home))['models'], [])
+
+    def test_null_catalog_lists_fail_but_optional_metadata_remains_compatible(self):
+        # 运行时返回 data=null 或 supportedReasoningEfforts=null 时不应抛出 TypeError。
+        def null_codex(method, params):
+            if method == 'config/read':
+                return {'config': {'profile': 'empty', 'profiles': {'empty': None}}}
+            if method == 'account/read':
+                return {'account': None}
+            if method == 'model/list':
+                return {'data': None, 'nextCursor': None}
+            raise AssertionError(method)
+
+        with self.assertRaisesRegex(CatalogError, '模型目录响应无效'):
+            self.reader.read_models(null_codex, str(self.home))
+
+        def null_metadata(method, params):
+            return {'data': [None, {'model': None, 'id': 'provider-fixture', 'supportedReasoningEfforts': None}]}
+
+        with patch('bridge.clients.codex.catalog.model_catalog',
+                   return_value=[{'id': 'provider-fixture', 'name': 'provider-fixture', 'efforts': []}]):
+            api_result = self.reader.read_models(self.request, str(self.home), 'bridge_api', metadata_request=null_metadata)
+        self.assertEqual([m['model'] for m in api_result['models']], ['provider-fixture'])
+        self.assertEqual(api_result['models'][0]['supportedReasoningEfforts'], [])
 
 
 class RemoteCatalogTests(unittest.TestCase):

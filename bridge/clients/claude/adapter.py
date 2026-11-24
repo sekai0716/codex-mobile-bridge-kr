@@ -12,7 +12,7 @@ from pathlib import Path
 import bridge.clients.claude.model as model
 from bridge.clients.claude.context import context_fields
 from bridge.clients.claude.setup import inspect_installation, console_source, developer_mode_enabled, native_action, running_app, claude_data_home, background_running_app
-from bridge.clients.errors import BridgeUnavailable
+from bridge.clients.errors import BridgeUnavailable, ResumePreflightBlocked
 from bridge.clients.file_mentions import file_mentions
 from bridge.features.sessions.create import ArchiveNotSent
 from bridge.clients.claude.mailbox import FileDesktop, MAX_REQUEST, CONNECTOR_REVISION, workspace_trust_rejection
@@ -184,7 +184,7 @@ class Claude:
             old_monitor.join(timeout=5)
         with self.setup_lock:
             if self.setup_thread and self.setup_thread.is_alive():
-                raise ValueError("현재 Claude 연결 시도를 먼저 취소하세요.")
+                raise ValueError('请先取消正在进行的 Claude 连接')
             if not self.discovery.get('installed') or self.discovery.get('automaticConnection') != 'native-console':
                 return self.status()
             reset = self.setup_cancel.is_set()
@@ -195,14 +195,14 @@ class Claude:
             if self.status()['connected']:
                 return self.status()
             if launch and sys.platform == 'win32':
-                self._setup_state('starting', "백그라운드에서 Claude 시작 중")
+                self._setup_state('starting', '正在后台启动 Claude')
                 self.setup_mode = 'background'
                 self.setup_thread = threading.Thread(target=self._connect_background,
                     args=(self.setup_cancel, self.discovery['executable'], self.discovery.get('dataHome')), daemon=True)
                 self.setup_thread.start()
             else:
                 self._setup_state('needs-initialization',
-                    "완전히 종료하거나 다시 로드한 후에는 Claude에 연결 초기화가 필요합니다. 휴대폰에서 시작할 수 있습니다. 컴퓨터의 전경 창을 사용합니다.")
+                    'Claude 完全退出或重新加载后需要初始化连接；可从手机发起，过程会使用电脑前台。')
             private_json(self.directory/'discovery.json', self.discovery)
             return self.status()
 
@@ -232,7 +232,7 @@ class Claude:
             if not current():
                 return
             if submission not in ('submitted', 'uncertain'):
-                self._background_state(cancel, 'connected', '데스크톱 연결 가능')
+                self._background_state(cancel, 'connected', '桌面连接可用')
                 return
             try:
                 cleanup = native_action('close-background-devtools', pid=pid, executable=executable,
@@ -241,30 +241,30 @@ class Claude:
             except Exception:
                 pending = True
             self._attempt_state(cancel, 'connected',
-                "Claude가 연결되었습니다. 개발자 도구 창을 수동으로 닫아주세요." if pending else '데스크톱 연결 가능',
+                'Claude 已连接；开发者工具未自动关闭，请手动关闭' if pending else '桌面连接可用',
                 consoleCleanupPending=pending)
         native_started = False
         try:
             if not current():
                 return
             if self.desktop and self.desktop.connected:
-                self._background_state(cancel, 'connected', '데스크톱 연결 가능')
+                self._background_state(cancel, 'connected', '桌面连接可用')
                 return
             if not data_home:
-                raise ValueError("Claude의 데이터 디렉터리를 찾을 수 없습니다. 다시 스캔하세요.")
+                raise ValueError('未找到 Claude 数据目录，请重新扫描')
             runner = background_running_app
             if self.native_descriptor is not None and self.native_descriptor().get('nativeProfile'):
-                raise ValueError('현재 시스템에서는 이러한 독립성을 검증하지 않았습니다. Claude 구성된 백그라운드 초기화')
+                raise ValueError('当前系统尚未验证此独立 Claude 配置的后台初始化')
             app = runner(executable, data_home, cancelled=cancel,
                                          launch_gate=self.setup_lock, initialize_console=True,
                                          explicit_home=bool(self.discovery.get('dataHomeExplicit')))
-            if not self._background_state(cancel, 'connecting', "Claude가 시작되었습니다. 기존 데스크톱 연결이 복구되기를 기다리는 중입니다."):
+            if not self._background_state(cancel, 'connecting', 'Claude 已启动，正在等待已有桌面连接恢复'):
                 return
             for _ in range(5):
                 if not current():
                     return
                 if self.desktop and self.desktop.connected:
-                    self._background_state(cancel, 'connected', '데스크톱 연결 가능')
+                    self._background_state(cancel, 'connected', '桌面连接可用')
                     return
                 if cancel.wait(.2):
                     return
@@ -280,7 +280,7 @@ class Claude:
                         private_json(self.directory/'discovery.json', self.discovery)
                     data_home = active_home
             if not developer_mode_enabled(data_home):
-                unavailable('needs-developer-mode', '제발 Claude 개발자 모드 확인 후 연결 초기화를 다시 시도해보세요.')
+                unavailable('needs-developer-mode', '请在 Claude 中确认开发者模式后重试初始化连接')
                 return
             with self.setup_lock:
                 if not current():
@@ -288,7 +288,7 @@ class Claude:
                 prepared = self.prepare()
                 cancel_path = cancel_path or self.directory/'cancel-native-connection'
                 cancel_path.unlink(missing_ok=True)
-            if not self._background_state(cancel, 'connecting', "백그라운드에서 Claude 연결 초기화"):
+            if not self._background_state(cancel, 'connecting', '正在后台初始化 Claude 连接'):
                 return
             native_started = True
             result = native_action('connect-background', pid=app['pid'], executable=executable,
@@ -300,7 +300,7 @@ class Claude:
                 return
             if result.get('submission') == 'none':
                 unavailable(result.get('setupState', 'needs-initialization'),
-                            result.get('reason', '현재 Claude 사용 가능한 백그라운드 연결 창이 제공되지 않습니다. 연결을 명시적으로 초기화하십시오.'))
+                            result.get('reason', '当前 Claude 未提供可用的后台连接窗口，请显式初始化连接'))
                 return
             # Submission (including an interrupted receipt) is not readiness.
             # Never invoke the foreground injector after input may have arrived.
@@ -313,9 +313,9 @@ class Claude:
                 if cancel.wait(.25):
                     return
             self._background_state(cancel, 'needs-retry',
-                "백그라운드 초기화가 제출되었지만 Claude가 연결을 확인하지 않았습니다. 다시 시도하기 전에 작업 공간 신뢰를 확인하거나 상태를 새로 고치세요.")
+                '后台初始化已提交，但尚未收到 Claude 连接回执，请检查目录信任或刷新状态后重试')
         except Exception as exc:
-            reason = str(exc) if isinstance(exc, (ValueError, OSError)) else 'Claude 백그라운드 시작 또는 초기화가 완료되지 않았습니다. 다시 시도해 주세요.'
+            reason = str(exc) if isinstance(exc, (ValueError, OSError)) else 'Claude 后台启动或初始化未完成，请重试'
             if native_started:
                 self._background_state(cancel, 'needs-retry', reason)
             else:
@@ -335,7 +335,7 @@ class Claude:
                     return self.status()
                 if any(row.get('status') in ('active', 'running', 'waiting') or row.get('requests')
                        for row in self.call('list').get('sessions', [])):
-                    raise ValueError("Claude에는 실행 중인 작업이 있거나 승인이 보류 중입니다. 다시 시작하기 전에 완료하세요.")
+                    raise ValueError('Claude 有任务运行或等待确认，请先结束任务再重启')
                 if self.setup_thread and self.setup_thread.is_alive():
                     self.setup_cancel.set()
                     old_monitor = self.setup_thread
@@ -351,7 +351,7 @@ class Claude:
             if self.setup_thread and self.setup_thread.is_alive():
                 if not restart and not self.setup_cancel.is_set():
                     return self.status()
-                raise ValueError("현재 Claude 연결 시도를 먼저 취소하세요.")
+                raise ValueError('请先取消正在进行的 Claude 连接')
             if not self.discovery.get('installed'):
                 return self.status()
             if self.discovery.get('automaticConnection') != 'native-console':
@@ -362,7 +362,7 @@ class Claude:
             private_json(self.directory/'discovery.json', self.discovery)
             cancel_path = self.directory/'cancel-native-connection'
             cancel_path.unlink(missing_ok=True)
-            self._setup_state('connecting', "Claude에 연결 중", consoleCleanupPending=False)
+            self._setup_state('connecting', '正在连接 Claude', consoleCleanupPending=False)
             if self.desktop is None and ((self.directory/'connection.json').exists()
                                          or sys.platform == 'darwin' and not foreground):
                 self.prepare()
@@ -379,14 +379,14 @@ class Claude:
             return self.status()
 
     def _await_desktop(self, state, cancel):
-        self._setup_state(state['setupState'], state.get('reason', 'Claude 연결이 준비되지 않았습니다.'),
+        self._setup_state(state['setupState'], state.get('reason', 'Claude 连接未就绪'),
                           **{k: state[k] for k in ('helperPath',) if k in state})
         result = native_action('wait-desktop', cancelled=cancel,
                                recovered=lambda: bool(self.desktop and self.desktop.connected
                                                       and not self.connection_probe_failed))
         if result.get('setupState') in ('ready', 'connected'):
             return True
-        self._setup_state(result.get('setupState', 'failed'), result.get('reason', 'Claude 연결이 준비되지 않았습니다.'))
+        self._setup_state(result.get('setupState', 'failed'), result.get('reason', 'Claude 连接未就绪'))
         return False
 
     def _assert_reconnect_idle(self):
@@ -395,7 +395,7 @@ class Claude:
             self.desktop.read()  # A late signed success may settle an earlier write.
         if (self.pending_calls or self.desktop and
                 (self.desktop.lock.locked() or self.desktop.unconfirmed_mutations)):
-            raise ValueError("Claude에는 아직 확인되지 않은 결과가 있는 요청이 있습니다. 컴퓨터에서 결과를 확인하고 새 연결이 필요한 경우 데스크탑 컨트롤을 사용하십시오.")
+            raise ValueError('Claude 仍有未确认的请求，请先在电脑端检查结果；如需重新建立连接，请在电脑端操作')
 
     def _connect_native(self, restart, cancel_path, cancel=None, *, existing_only=False, foreground=True):
         cancel = cancel if cancel is not None else self.setup_cancel
@@ -429,17 +429,17 @@ class Claude:
                         except BridgeUnavailable:
                             pass
                     if not self.connection_probe_failed:
-                        self._attempt_state(cancel, 'connected', '데스크톱 연결 가능')
+                        self._attempt_state(cancel, 'connected', '桌面连接可用')
                         return
                 self._attempt_state(cancel, 'needs-initialization',
-                    "Claude가 기존 연결을 복원할 수 없습니다. 연결 초기화를 선택합니다. 초기화에서는 전경 창을 사용합니다. 컴퓨터 바탕화면을 대화형으로 유지하세요.")
+                    'Claude 未恢复已有连接；请点击“初始化连接”。初始化会使用电脑前台，请保持桌面可交互。')
                 return
             while not cancel.is_set():
                 # Only the current renderer revision can recover without UI.
                 # Older injectors may follow the generation, but connected
                 # stays false until native setup loads this runtime's source.
                 if self.desktop and self.desktop.connected and not restart and not force_console:
-                    self._attempt_state(cancel, 'connected', '데스크톱 연결 가능')
+                    self._attempt_state(cancel, 'connected', '桌面连接可用')
                     return
                 if existing_only:
                     with self.setup_lock:
@@ -450,11 +450,11 @@ class Claude:
                 if permission.get('setupState') != 'ready':
                     if permission.get('setupState') in DESKTOP_WAIT_STATES:
                         if sys.platform == 'win32':
-                            self._attempt_state(cancel, permission['setupState'], permission.get('reason', 'Claude 연결이 준비되지 않았습니다.'))
+                            self._attempt_state(cancel, permission['setupState'], permission.get('reason', 'Claude 连接未就绪'))
                             return
                         if self._await_desktop(permission, cancel): continue
                         return
-                    self._setup_state(permission.get('setupState', 'failed'), permission.get('reason', 'Claude 연결이 준비되지 않았습니다.'),
+                    self._setup_state(permission.get('setupState', 'failed'), permission.get('reason', 'Claude 连接未就绪'),
                                       **{k: permission[k] for k in ('helperPath',) if k in permission})
                     if permission.get('setupState') != 'needs-permission':
                         return
@@ -466,7 +466,7 @@ class Claude:
                 executable = self.discovery['executable']
                 data_home = self.discovery.get('dataHome')
                 if not data_home:
-                    raise ValueError("Claude의 데이터 디렉터리를 찾을 수 없습니다. 다시 스캔하세요.")
+                    raise ValueError('未找到 Claude 数据目录，请重新扫描')
                 descriptor = self.native_descriptor() if self.native_descriptor is not None else None
                 if descriptor and (descriptor.get('nativeProfile') or descriptor.get('excludeProfiles')):
                     from bridge.clients.lifecycle import profile_running_app
@@ -491,22 +491,22 @@ class Claude:
                         result = native_action('enable-devtools', pid=pid, executable=executable, cancelled=cancel)
                         if result.get('setupState') in DESKTOP_WAIT_STATES:
                             if sys.platform == 'win32':
-                                self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 연결이 준비되지 않았습니다.'))
+                                self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 连接未就绪'))
                                 return
                             if self._await_desktop(result, cancel): continue
                             return
                         developer_prompt_pid = pid
                         if result.get('setupState') not in ('needs-developer-mode', 'submitted'):
-                            self._attempt_state(cancel, result.get('setupState', 'failed'), result.get('reason', "Claude에서 개발자 모드 확인"))
+                            self._attempt_state(cancel, result.get('setupState', 'failed'), result.get('reason', '请在 Claude 中确认开发者模式'))
                             return
                     self._attempt_state(cancel, 'needs-developer-mode',
-                        "Claude의 개발자 모드 프롬프트를 확인한 다음 연결 초기화를 다시 선택합니다." if sys.platform == 'win32'
-                        else "계속 연결하려면 Claude의 개발자 모드 프롬프트를 확인하세요.")
+                        '请确认 Claude 的开发者模式提示，完成后重新点击初始化连接' if sys.platform == 'win32'
+                        else '请确认 Claude 的开发者模式提示，完成后会继续连接')
                     if sys.platform == 'win32':
                         return
                     cancel.wait(3)
                     continue
-                if not self._attempt_state(cancel, 'connecting', "Claude에 연결 중입니다. 지금은 콘솔에 집중하세요. 취소하려면 Esc를 누르세요."):
+                if not self._attempt_state(cancel, 'connecting', '正在连接 Claude，请暂时保持 Console 焦点，按 Esc 可取消'):
                     return
                 with self.setup_lock:
                     if cancel.is_set(): return
@@ -541,11 +541,11 @@ class Claude:
                 if result.get('setupState') != 'submitted':
                     if result.get('setupState') in DESKTOP_WAIT_STATES:
                         if sys.platform == 'win32':
-                            self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 연결이 준비되지 않았습니다.'))
+                            self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 连接未就绪'))
                             return
                         if self._await_desktop(result, cancel): continue
                         return
-                    self._setup_state('needs-retry', result.get('reason', "Claude가 연결을 완료할 수 없습니다. 다시 시도하려면 연결을 선택하세요."))
+                    self._setup_state('needs-retry', result.get('reason', 'Claude 自动连接未完成，请点击连接重试'))
                     return
                 deadline = time.monotonic() + (8 if sys.platform == 'win32' else 18)
                 inspect_at = time.monotonic() + 2
@@ -556,14 +556,14 @@ class Claude:
                                 self.check_connection(_reconnect_probe=True)
                             except BridgeUnavailable:
                                 self._attempt_state(cancel, 'needs-retry',
-                                    "Claude 데스크톱 연결이 응답하지 않습니다. 컴퓨터에서 상태를 확인하고 다시 시도하세요. 클라이언트가 다시 시작되지 않았습니다.")
+                                    'Claude 桌面连接暂未响应，请检查电脑端状态后重试；未重启客户端')
                                 return
                         self.connection_probe_failed = False
                         # The signed renderer receipt (and required read probe)
                         # makes the mailbox usable. Closing DevTools is separate
                         # UI cleanup and must not keep normal calls blocked.
                         with self.setup_lock:
-                            if not self._attempt_state(cancel, 'connected', '데스크톱 연결 가능',
+                            if not self._attempt_state(cancel, 'connected', '桌面连接可用',
                                                        consoleCleanupPending=True):
                                 return
                             self.reconnecting = False
@@ -572,7 +572,7 @@ class Claude:
                             pending = cleanup.get('setupState') not in ('connected', 'submitted')
                         except Exception:
                             pending = True
-                        self._attempt_state(cancel, 'connected', "Claude가 연결되었습니다. 개발자 도구 창을 수동으로 닫아주세요." if pending else '데스크톱 연결 가능',
+                        self._attempt_state(cancel, 'connected', 'Claude 已连接；开发者工具未自动关闭，请手动关闭' if pending else '桌面连接可用',
                                           consoleCleanupPending=pending)
                         return
                     if time.monotonic() >= inspect_at:
@@ -589,23 +589,23 @@ class Claude:
                                                script=prepared.get('inspectionMarker'), cancelled=cancel)
                         if result.get('setupState') in DESKTOP_WAIT_STATES:
                             if sys.platform == 'win32':
-                                self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 연결이 준비되지 않았습니다.'))
+                                self._attempt_state(cancel, result['setupState'], result.get('reason', 'Claude 连接未就绪'))
                                 return
                             if self._await_desktop(result, cancel): continue
                             return
                         self._setup_state(result.get('setupState') if result.get('setupState') in ('needs-trust', 'owner-conflict') else 'failed',
                                           result.get('reason') if result.get('setupState') in ('needs-trust', 'owner-conflict')
-                                          else "Claude에서 연결 확인이 없습니다. 로그인 및 디렉터리 신뢰를 확인한 후 다시 시도하세요.")
+                                          else '未收到 Claude 连接确认，请检查登录和目录信任后重试')
                     return
         except Exception as exc:
             if not cancel.is_set():
                 self._attempt_state(cancel, exc.setup_state if isinstance(exc, DesktopUnavailable) else 'failed',
-                                    str(exc) if isinstance(exc, ValueError) else "자동 Claude 연결이 완료되지 않았습니다. 다시 시도해 보세요.")
+                                    str(exc) if isinstance(exc, ValueError) else 'Claude 自动连接未完成，请重试')
         finally:
             with self.setup_lock:
                 self.reconnecting = False
             if cancel.is_set():
-                self._attempt_state(cancel, 'cancelled', "Claude 연결이 취소되었습니다.", allow_cancelled=True)
+                self._attempt_state(cancel, 'cancelled', '已取消 Claude 连接', allow_cancelled=True)
 
     def cancel(self, persist=True):
         with self.setup_lock:
@@ -614,7 +614,7 @@ class Claude:
                 (self.directory/'cancel-native-connection').touch(mode=0o600)
             if self.desktop:
                 self.desktop.close()
-            self._setup_state('cancelled', "Claude 연결이 취소되었습니다.")
+            self._setup_state('cancelled', '已取消 Claude 连接')
             if persist and self.discovery:
                 self.discovery['autoConnect'] = False
                 private_json(self.directory/'discovery.json', self.discovery)
@@ -626,11 +626,11 @@ class Claude:
         result = {**self.discovery, 'connected': connected, 'configured': connected,
                   'capabilities': self.desktop.capabilities if self.desktop else {}}
         if connected:
-            result.update(setupState='connected', reason=self.discovery.get('reason') if result.get('consoleCleanupPending') else '데스크톱 연결 가능')
+            result.update(setupState='connected', reason=self.discovery.get('reason') if result.get('consoleCleanupPending') else '桌面连接可用')
         elif self.discovery.get('setupState') == 'connected':
-            result.update(setupState='needs-retry', reason="Claude 연결이 끊어졌습니다. 다시 시도하려면 연결을 선택하세요.")
+            result.update(setupState='needs-retry', reason='Claude 连接已中断，请点击连接重试')
         elif not self.discovery:
-            result.update(setupState='not-scanned', reason="로컬 클라이언트 스캔")
+            result.update(setupState='not-scanned', reason='请扫描本机客户端')
         result.update(self.cli.status())
         result['cliAvailable'] = result['cliAvailable'] or self.remote_cli.available()
         return result
@@ -650,7 +650,7 @@ class Claude:
     def desktop_listing(self):
         """Read Desktop sessions without scanning Claude Code CLI history."""
         if self.loop is None or self.desktop is None or not self.desktop.connected or self.setup_cancel.is_set():
-            raise BridgeUnavailable('Claude Desktop 연결되지 않음')
+            raise BridgeUnavailable('Claude Desktop 未连接')
         future = self._submit_call(lambda: self.listing())
         try:
             return future.result(timeout=100)
@@ -697,15 +697,15 @@ class Claude:
         if host_id in (None, 'local') and self.status()['connected'] and self.desktop:
             for kind in ('code', 'cowork'):
                 if 'start' in self.desktop.capabilities.get(kind, []):
-                    rows.append({'surface': kind, 'host': 'local', 'hostLabel': '이 컴퓨터',
+                    rows.append({'surface': kind, 'host': 'local', 'hostLabel': '此电脑',
                         'name': 'Claude Desktop · '+kind,
                         'scope': self.discovery.get('dataHome') or str(self.directory),
                         'createRequiresMessage': True})
         profile = self.cli.profile_resolver() if host_id in (None, 'local') else None
         if profile and self.cli._ready(profile):
             account_identity = project_account_identity(profile)
-            rows.append({'surface': 'cli', 'host': 'local', 'hostLabel': '이 컴퓨터',
-                'name': 'Claude Code · 이 컴퓨터', 'scope': profile['origin']+'|'+account_identity,
+            rows.append({'surface': 'cli', 'host': 'local', 'hostLabel': '此电脑',
+                'name': 'Claude Code · 此电脑', 'scope': profile['origin']+'|'+account_identity,
                 'origin': profile['origin'], 'accountFingerprint': account_identity,
                 'createRequiresMessage': True})
         if host_id != 'local':
@@ -715,7 +715,7 @@ class Claude:
     def create_cli(self, project, body):
         message = body.get('firstMessage', body.get('text', ''))
         if not isinstance(message, str) or not message.strip() or len(message) > 100000:
-            raise ValueError("첫 번째 메시지를 입력하세요. Claude가 대화를 생성하여 보냅니다.")
+            raise ValueError('请输入首条消息，Claude 将创建会话并发送此消息')
         selection = {key: body[key] for key in ('model', 'effort', 'manualModel', 'manualEffort') if key in body}
         options = {'selection': selection} if selection else {}
         if project['host'] == 'local':
@@ -737,7 +737,7 @@ class Claude:
             return {'status': 'blocked', 'code': 'workspace-trust-required',
                     'workspace': project['cwd'],
                     'canConfirmTrust': 'mobileProjectTrust' in self.desktop.capabilities.get('code', []),
-                    'message': "Claude Desktop Code에서 이 폴더를 열고 작업 공간 신뢰를 승인한 다음 돌아가서 다시 시도하세요. 첫 번째 메시지는 보존되었습니다."}
+                    'message': '请先在 Claude Desktop 的 Code 页面打开此目录并确认“信任工作区”，再返回重试。首条消息已保留。'}
         return {'status': 'ready', 'result': {'id': model.gateway_id(project['surface'], value['sessionId'])}}
 
     async def dispatch(self, action, sid, body):
@@ -746,17 +746,17 @@ class Claude:
             if (project['surface'] != 'code' or project['host'] != 'local' or
                     not self.status()['connected'] or
                     'mobileProjectTrust' not in self.desktop.capabilities.get('code', [])):
-                raise BridgeUnavailable("이 클라이언트는 원격 작업 공간 확인을 지원하지 않습니다. 원래 클라이언트에서 확인하세요.")
+                raise BridgeUnavailable('当前客户端不支持远程确认工作区，请在原客户端确认')
             return await self.desktop.call('code', 'mobileProjectTrust', project['cwd'], body['confirmed'])
         if action == 'create' and body.get('directoryProject'):
             project = body['directoryProject']
             if project['surface'] == 'cli':
                 return await asyncio.to_thread(self.create_cli, project, body)
             if not self.status()['connected'] or 'start' not in self.desktop.capabilities.get(project['surface'], []):
-                raise BridgeUnavailable('Claude 데스크톱 액세스가 변경되었습니다. 프로젝트를 다시 선택하세요.')
+                raise BridgeUnavailable('Claude 桌面接入已变化，请重新选择项目')
             message = body.get('firstMessage', '')
             if not isinstance(message, str) or not message.strip() or len(message) > 100000:
-                raise ValueError("첫 번째 메시지를 입력하세요. Claude가 대화를 생성하여 보냅니다.")
+                raise ValueError('请输入首条消息，Claude 将创建会话并发送此消息')
             options = {'message': message, **({'title': body['title'].strip()} if body.get('title', '').strip() else {}),
                        **{key: body[key] for key in ('model', 'effort') if key in body}}
             if project['surface'] == 'code':
@@ -819,10 +819,10 @@ class Claude:
                 return {'projects': list(projects.values()) + public_cli, 'createRequiresMessage': True}
             project = projects.get(body.get('projectKey'))
             if not project:
-                raise ValueError("기존 데스크톱 프로젝트 선택")
+                raise ValueError('请选择桌面已有项目')
             message = body.get('firstMessage', body.get('text', ''))
             if not isinstance(message, str) or not message.strip() or len(message) > 100000:
-                raise ValueError("첫 번째 메시지를 입력하세요. Claude가 대화를 생성하여 보냅니다.")
+                raise ValueError('请输入首条消息，Claude 将创建会话并发送此消息')
             options = {'message': message, **({'title': body['title'].strip()} if body.get('title', '').strip() else {}),
                        **{key: body[key] for key in ('model', 'effort') if key in body}}
             if project['surface'] == 'code':
@@ -836,40 +836,40 @@ class Claude:
             await self.listing()
         saved = self.index.get(sid)
         if not saved:
-            raise ValueError("Claude 대화를 찾을 수 없습니다.")
+            raise ValueError('找不到 Claude 会话')
         kind, native = saved['backend'], saved['nativeId']
         if action == 'record-location':
             fresh = model.session(kind, await self.desktop.call(kind, 'getSession', native))
             if fresh['id'] != sid:
-                raise BridgeUnavailable('Claude 세션 ID가 변경되었습니다. 새로고침한 후 다시 시도해 주세요.')
+                raise BridgeUnavailable('Claude 会话身份已变化，请刷新后重试')
             return {'path': await asyncio.to_thread(metadata_record_path, self.discovery.get('dataHome'), kind, native)}
         if action == 'image':
             if 'mobileImage' not in self.desktop.capabilities.get(kind, []):
-                raise ValueError('업데이트해주세요 Claude 접속 후 역사적 사진 미리보기')
+                raise ValueError('请更新 Claude 接入后预览历史图片')
             return await self.desktop.call(kind, 'mobileImage', native, body.get('source'))
         if action == 'rename':
             if not self.session_capabilities(kind)['rename']:
-                raise ValueError('현재 Claude 확인되지 않은 기본 이름 바꾸기 인터페이스에 액세스')
+                raise ValueError('当前 Claude 接入未提供已确认的原生改名接口')
             title = body.get('title')
             if not isinstance(title, str) or not 1 <= len(title.strip()) <= 120 or re.search(r'[\x00-\x1f\x7f]', title):
-                raise ValueError('제목 1–120 단어, 제어 문자를 포함할 수 없습니다.')
+                raise ValueError('标题为 1–120 字，不能包含控制字符')
             reply = await self.desktop.call(kind, 'mobileRename', native, {'title': title.strip()})
             if reply.get('status') != 'confirmed' or reply.get('result') != {'id': native, 'title': title.strip()}:
-                raise BridgeUnavailable('이름 변경 결과를 확인해야 합니다. 원래 클라이언트를 확인하세요. 중복 제출은 되지 않습니다')
+                raise BridgeUnavailable('改名结果待核对，请检查原客户端；不会重复提交')
             return {**reply, 'result': {'id': sid, 'title': title.strip()}}
         if action in ('archive-state', 'archive'):
             if kind != 'code' or not self.session_capabilities(kind)['archive']:
-                raise ValueError("네이티브 아카이브 및 복원 지원은 이 연결에 대해 확인되지 않았습니다.")
+                raise ValueError('当前接入尚未确认原生归档和恢复能力')
             state = await self.desktop.call(kind, 'mobileArchiveState', native)
             session = model.session(kind, state['session'])
             if session['id'] != sid:
-                raise BridgeUnavailable('데스크탑에서 반환된 아카이브 대상 ID가 일치하지 않습니다.')
+                raise BridgeUnavailable('桌面返回的归档目标标识不一致')
             result = {**session, '_archiveFlags': state['archiveFlags'], 'archiveSafe': state.get('archiveSafe') is True,
                       'capabilities': self.session_capabilities(kind)}
             if action == 'archive-state':
                 return result
             if getattr(self.desktop, 'unconfirmed_mutations', None):
-                raise ArchiveNotSent("Claude에 확인되지 않은 네이티브 작업이 있습니다. 원래 클라이언트를 먼저 확인하세요.")
+                raise ArchiveNotSent('Claude 有待核对的原生写入，请先在原客户端处理')
             options = {'archived': body['archived']}
             if body.get('disconnect') is True:
                 options['disconnect'] = True
@@ -879,7 +879,7 @@ class Claude:
             return {'status': 'accepted'}
         history_limit = body.get('historyLimit', 40)
         if action == 'detail' and (type(history_limit) is not int or not 1 <= history_limit <= 100):
-            raise ValueError('잘못된 기록 페이지 크기')
+            raise ValueError('历史页大小无效')
         history_before = body.get('historyBefore')
         native_before = None
         if action == 'detail' and history_before is not None:
@@ -892,15 +892,15 @@ class Claude:
                 if not isinstance(native_before, str) or not native_before:
                     raise ValueError()
             except (AttributeError, KeyError, ValueError, TypeError):
-                raise ValueError('기록 커서가 잘못되었습니다.') from None
+                raise ValueError('历史游标无效') from None
         paged = kind == 'code' and 'mobileHistory' in self.desktop.capabilities.get(kind, [])
         if action == 'detail' and native_before is not None and not paged:
-            raise ValueError('현재 Claude 액세스는 기록 페이징을 지원하지 않습니다.')
+            raise ValueError('当前 Claude 接入不支持历史分页')
         detail = (await self.desktop.call(kind, 'mobileDetail', native, *([{'historyLimit': history_limit, 'historyBefore': native_before}] if paged else []))
                   if action == 'detail' and 'mobileDetail' in self.desktop.capabilities.get(kind, []) else None)
         row = model.session(kind, detail['session'] if detail is not None else await self.desktop.call(kind, 'getSession', native))
         if row['id'] != sid:
-            raise BridgeUnavailable("데스크톱 앱이 다른 대화를 반환했습니다. ID")
+            raise BridgeUnavailable('桌面返回的会话标识不一致')
         if action == 'detail':
             raw = detail['transcript'] if detail is not None else await self.desktop.call(kind, 'getTranscript', native)
             row['contextUsage'] = detail.get('contextUsage') if detail is not None else None
@@ -911,7 +911,10 @@ class Claude:
             # Transcript request counters describe the last prompt, not the
             # current context after compaction/replacement. Keep them separate
             # when Desktop cannot provide its current context summary.
-            row['lastPromptContextUsage'] = context_fields(raw)['contextUsage']
+            # 与下文 model.transcript(raw) 一致，先经 model.rows(raw) 拆包响应：
+            # 若跳过拆包，{'messages': [...]} 等容器字典会被当成键名遍历导致读数静默丢失，
+            # 而 None 会直接抛出 TypeError（HTTP 500），而非适配器统一的“不支持的数据结构”错误。
+            row['lastPromptContextUsage'] = context_fields(model.rows(raw))['contextUsage']
             capabilities = self.session_capabilities(kind)
             capabilities['compact'] = (capabilities['compact'] and row['runtimeKnown'] and
                                        row['status'] == 'idle' and not row['requests'] and not row['archived'])
@@ -935,12 +938,12 @@ class Claude:
                     'capabilities': capabilities, 'maxRequestBytes': MAX_REQUEST}
         if action == 'fork':
             if not self.session_capabilities(kind)['fork']:
-                raise ValueError("이 Claude 연결은 네이티브 분기를 제공하지 않습니다.")
+                raise ValueError('当前 Claude 接入未提供原生分支接口')
             value = await self.desktop.call(kind, 'mobileFork', native,
                                             {'id': body['id'], 'messageId': body['messageId']})
             child = value.get('sessionId') if isinstance(value, dict) else None
             if not isinstance(child, str) or not child or child == native:
-                raise BridgeUnavailable('Claude 아직 브랜치 결과가 확인되지 않았습니다. 바탕화면에서 확인해주세요')
+                raise BridgeUnavailable('Claude 尚未确认分支结果，请在桌面核对')
             return {'status': 'ready', 'result': {'id': model.gateway_id(kind, child)}}
         if action == 'catalog':
             if body.get('section') == 'selection':
@@ -959,13 +962,13 @@ class Claude:
                 catalog = await self.desktop.call(kind, 'mobileCatalog', native)
                 offered = {skill['id'] for skill in catalog.get('skills', []) if skill.get('selectable') is not False}
                 if not isinstance(body['plugins'], list) or any(skill not in offered for skill in body['plugins']):
-                    raise ValueError("해당 스킬을 더 이상 사용할 수 없습니다. 새로고침하고 다시 선택하세요.")
-                text = '아래 설치된 스킬을 사용해 주세요：'+', '.join(body['plugins'])+'\n\n'+text
+                    raise ValueError('技能已不可用，请刷新后选择')
+                text = '请使用以下已安装技能：'+', '.join(body['plugins'])+'\n\n'+text
             images = []
             for image in body.get('resolvedImages', []):
                 match = re.fullmatch(r'data:(image/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=]+)', image.get('url', ''))
                 if not match:
-                    raise ValueError("잘못된 이미지 첨부 형식")
+                    raise ValueError('图片附件格式无效')
                 images.append({'mimeType': match[1], 'base64': match[2], **({'filename': image['name']} if isinstance(image.get('name'), str) else {})})
             args = [native, text, images or None]
             if kind == 'code':
@@ -973,19 +976,19 @@ class Claude:
                          None, body.get('id')]
             else:
                 if body.get('mode') == 'steer':
-                    raise ValueError("Cowork는 현재 작업 조정을 지원하지 않습니다. 대신 새 메시지를 보내세요.")
+                    raise ValueError('Cowork 未提供补充当前任务接口，请使用普通发送')
                 args += [None, body.get('id')]
             result = await self.desktop.call(kind, 'sendMessage', *args, timeout=90)
         elif action == 'compact':
             if not self.session_capabilities(kind)['compact'] or row['status'] != 'idle' or not row['runtimeKnown'] or row['requests']:
-                raise BridgeUnavailable('컨텍스트를 압축하기 전에 기본 세션이 유휴 상태가 될 때까지 기다리십시오.')
+                raise BridgeUnavailable('请等待原生会话空闲后再压缩上下文')
             commands = await self.desktop.call(kind, 'getSupportedCommands', {'sessionId': native})
             if not isinstance(commands, list) or not _supports_compact({'commands': commands}, desktop_projection=True):
-                raise BridgeUnavailable('현재 Claude 세션이 기본 컨텍스트 압축 명령을 제공하지 않습니다.')
+                raise BridgeUnavailable('当前 Claude 会话未提供原生上下文压缩命令')
             fresh = model.session(kind, await self.desktop.call(kind, 'getSession', native))
             if (fresh['id'] != sid or fresh['cwd'] != row['cwd'] or fresh['archived'] or
                     fresh['status'] != 'idle' or not fresh['runtimeKnown'] or fresh['requests']):
-                raise BridgeUnavailable('기본 세션이 변경되었으며 압축이 아직 커밋되지 않았습니다.')
+                raise BridgeUnavailable('原生会话已变化，尚未提交压缩')
             args = [native, '/compact', None]
             args += [None, None, None, None, body['id']] if kind == 'code' else [None, body['id']]
             result = await self.desktop.call(kind, 'sendMessage', *args, timeout=30)
@@ -1001,66 +1004,59 @@ class Claude:
             selected = next((m for m in catalog['models'] if m['id'] == body.get('model', row.get('model'))), None)
             identifier = body.get('model', row.get('model'))
             if not isinstance(identifier, str) or not re.fullmatch(r'[^\s\x00-\x1f\x7f]{1,256}', identifier):
-                raise ValueError('올바른 모델 이름을 입력하세요.')
+                raise ValueError('请输入有效的模型名称')
             if not self.session_capabilities(kind)['models']:
-                raise ValueError('현재 클라이언트는 모델 설정 인터페이스를 제공하지 않습니다.')
+                raise ValueError('当前客户端未提供模型设置接口')
             known = selected is not None
             if selected is None:
                 selected = {'id': identifier, 'efforts': []}
             if 'effort' in body and (not isinstance(body.get('effort'), str) or
                     (body['effort'] or body.get('manualEffort') is True) and not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', body['effort'])):
-                raise ValueError('올바른 사고 강도를 입력하세요.')
+                raise ValueError('请输入有效的思考强度')
             if known and body.get('effort') and body.get('manualEffort') is not True and body['effort'] not in selected.get('efforts', []):
-                raise ValueError("이 모델은 추론 강도를 지원하지 않습니다.")
+                raise ValueError('该模型不支持此思考强度')
             effort = body.get('effort') or (selected.get('defaultEffort') if kind == 'cowork' else None)
             if 'effort' in body and (not self.session_capabilities(kind)['effort'] or kind == 'cowork' and not effort):
-                raise ValueError("이 클라이언트는 해당 추론 강도 설정을 제공하지 않습니다.")
+                raise ValueError('当前客户端未提供此思考强度设置')
             if selected['id'] != row.get('model'):
                 await self.desktop.call(kind, 'setModel', native, selected['id'])
             if 'effort' in body:
                 await self.desktop.call(kind, 'setEffort', native, effort)
             observed = model.session(kind, await self.desktop.call(kind, 'getSession', native))
             if observed.get('model') != selected['id'] or ('effort' in body and observed.get('effort') != effort):
-                raise BridgeUnavailable("데스크톱 앱이 모델 설정을 확인하지 않았습니다. 확인하려면 새로고침하세요.")
+                raise BridgeUnavailable('桌面未确认模型设置，请刷新后检查')
             result = True
         elif action == 'access':
             options = [{'value': mode, 'label': label, 'description': description} for mode, label, description in (
-                ('default', '기본 권한', "Claude는 필요할 때 승인을 요청합니다."),
-                ('acceptEdits', '파일 편집 허용', "파일 편집을 허용합니다. 다른 작업은 Claude 승인 규칙을 따릅니다."),
-                ('plan', '계획 모드', "먼저 계획을 세우십시오. Claude는 작업 권한을 결정합니다."))] if self.session_capabilities(kind)['permissions'] else []
+                ('default', '默认权限', '由 Claude 在需要时请求确认'),
+                ('acceptEdits', '允许文件编辑', '允许编辑文件，其他操作沿用 Claude 的确认规则'),
+                ('plan', '计划模式', '先制定计划，操作权限由 Claude 决定'))] if self.session_capabilities(kind)['permissions'] else []
             if 'mode' in body:
                 if body['mode'] not in {option['value'] for option in options}:
-                    raise ValueError("이 클라이언트가 제공한 권한 옵션을 선택하세요.")
+                    raise ValueError('请选择当前客户端提供的权限选项')
                 accepted = await self.desktop.call(kind, 'setPermissionMode', native, body['mode'])
                 observed = model.session(kind, await self.desktop.call(kind, 'getSession', native))
                 if accepted is False or observed.get('permissionMode') != body['mode']:
-                    raise BridgeUnavailable("Claude가 권한 설정을 확인하지 않았습니다. 데스크톱 앱에서 조직 정책을 확인하세요.")
+                    raise BridgeUnavailable('Claude 未确认权限设置，请在桌面检查组织策略')
                 row = observed
             return {'status': 'accepted', 'mode': row['permissionMode'], 'modes': [option['value'] for option in options], 'options': options}
         elif action == 'respond':
             pending = next((p for p in row['requests'] if p['id'] == body.get('requestId')), None)
             if not pending:
-                raise ValueError("요청이 이미 처리되었거나 만료되었습니다.")
+                # 尚未发出任何桌面写入 IPC；使用 ResumePreflightBlocked 避免账本残留 unknown 阻塞归档。
+                raise ResumePreflightBlocked('请求已处理或过期')
             decision = {'accept': 'once', 'decline': 'deny'}.get(body.get('decision'))
             if decision is None:
-                raise ValueError("한 번 허용 또는 거부를 선택하세요.")
+                raise ResumePreflightBlocked('请选择本次允许或拒绝')
             args = [pending['id'], decision]
             if pending['needsInput'] and decision == 'once':
-                answers = body.get('answers', {})
-                questions = pending['input'].get('questions', [])
-                mapped = {}
-                for i, question in enumerate(questions):
-                    key = str(question.get('id') or question.get('question') or i)
-                    value = answers.get(key, {}).get('answers')
-                    if not isinstance(value, list) or not value or any(not isinstance(v, str) or not v.strip() for v in value):
-                        raise ValueError("모든 질문에 답변하세요")
-                    mapped[question.get('question') or key] = ', '.join(value)
-                args.append({**pending['input'], 'answers': mapped})
+                args.append(model.respond_answers(pending.get('input'), body.get('answers'),
+                                                  error_cls=ResumePreflightBlocked))
             result = await self.desktop.call(kind, 'respondToToolPermission', *args)
         else:
-            raise ValueError("지원되지 않는 Claude 작업")
+            raise ValueError('不支持的 Claude 操作')
         if result is False or isinstance(result, dict) and any(result.get(k) is False for k in ('ok', 'delivered', 'dispatched', 'applied')):
-            raise BridgeUnavailable("데스크톱 앱이 작업을 수락하지 않았습니다. 원래 대화를 확인해보세요.")
+            raise BridgeUnavailable('桌面未接受操作，请检查原会话')
         return {'status': 'accepted'}
 
     def record_path(self, sid):
@@ -1072,15 +1068,15 @@ class Claude:
         if action == 'work-mode':
             mode = (body or {}).get('mode')
             if mode not in ('default', 'plan'):
-                raise ValueError('잘못된 작업 모드')
+                raise ValueError('工作模式无效')
             current = self._call('detail', sid, timeout=timeout)
             row = current['session']
             if current.get('capabilities', {}).get('permissions') is not True:
-                raise ValueError('현재 Claude Access는 기본 계획 모드를 제공하지 않습니다.')
+                raise ValueError('当前 Claude 接入未提供原生计划模式')
             if (row.get('permissionMode') == 'plan') == (mode == 'plan'):
                 return {'status': 'accepted'}
             if row.get('status') != 'idle' or row.get('requests'):
-                raise ValueError('모드를 전환하기 전에 현재 작업이 끝날 때까지 기다리십시오.')
+                raise ValueError('请等待当前任务结束后再切换模式')
             return self._call('access', sid, {**(body or {}), 'mode': 'plan' if mode == 'plan' else 'default'}, timeout=timeout)
         result = self._call(action, sid, body, timeout=timeout)
         if action == 'detail':
@@ -1132,7 +1128,7 @@ class Claude:
     def _submit_call(self, operation, *, _reconnect_probe=False):
         with self.setup_lock:
             if self.reconnecting and not _reconnect_probe:
-                raise BridgeUnavailable("Claude가 다시 연결 중입니다. 잠시 후 다시 시도해 주세요.")
+                raise BridgeUnavailable('Claude 正在重新连接，请稍后再试')
             # Prune on caller threads. A loop-thread done callback taking this
             # lock could deadlock prepare(), which waits for loop.initialize.
             self.pending_calls = {call for call in self.pending_calls if not call.done()}
@@ -1147,16 +1143,16 @@ class Claude:
         desktop = self.desktop
         async def probe():
             if self.desktop is not desktop or self.setup_cancel.is_set():
-                raise BridgeUnavailable("Claude 데스크탑 파일 커넥터가 연결 해제되었습니다. 수술 결과가 불확실할 수 있습니다.")
+                raise BridgeUnavailable('Claude Desktop 文件桥接已断开；操作结果可能不确定')
             capabilities = desktop.capabilities
             for surface in ('code', 'cowork'):
                 for method in ('mobileList', 'getAll'):
                     if method in capabilities.get(surface, []):
                         await desktop.call(surface, method, timeout=3)
                         if self.desktop is not desktop or self.setup_cancel.is_set():
-                            raise BridgeUnavailable("Claude 데스크탑 파일 커넥터가 연결 해제되었습니다. 수술 결과가 불확실할 수 있습니다.")
+                            raise BridgeUnavailable('Claude Desktop 文件桥接已断开；操作结果可能不确定')
                         return
-            raise BridgeUnavailable("Claude 데스크탑 파일 커넥터가 연결 해제되었거나 이 작업을 지원하지 않습니다.")
+            raise BridgeUnavailable('Claude Desktop 文件桥接未连接或不支持此操作')
         # Only this fixed read probe may run while native reconnection owns the
         # mailbox. Normal dispatch remains blocked until recovery is verified.
         future = self._submit_call(probe, _reconnect_probe=_reconnect_probe)
@@ -1168,7 +1164,7 @@ class Claude:
             # future and mailbox lock until that writer and its bounded RPC
             # finish, so a late read cannot overwrite the next request.
             self.connection_probe_failed = True
-            raise BridgeUnavailable("Claude 데스크톱 연결이 응답하지 않습니다. 컴퓨터에서 상태를 확인하고 다시 시도하세요. 클라이언트가 다시 시작되지 않았습니다.") from exc
+            raise BridgeUnavailable('Claude 桌面连接暂未响应，请检查电脑端状态后重试；未重启客户端') from exc
         finally:
             if future.done():
                 with self.setup_lock:

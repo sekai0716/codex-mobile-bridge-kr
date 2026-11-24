@@ -29,7 +29,7 @@ def starter_path():
 def launch(application, signature):
     starter = starter_path()
     if starter is None:
-        raise ValueError("ZCode 비공개 시작 구성요소를 사용할 수 없습니다.")
+        raise ValueError("ZCode 私有启动组件不可用")
     signature.verify_starter(starter)
     # macOS per-user temp directory is the location independently checked by the starter.
     root = subprocess.check_output(

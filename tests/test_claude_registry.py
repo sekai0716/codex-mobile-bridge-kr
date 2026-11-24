@@ -39,7 +39,7 @@ class ClaudeRegistryTests(unittest.TestCase):
              patch('bridge.clients.claude.session_registry.os.kill'), \
              patch('bridge.clients.claude.session_registry.subprocess.run',
                    return_value=SimpleNamespace(returncode=0, stdout=' '+self.start+'\n', stderr='')):
-            with self.assertRaisesRegex(BridgeUnavailable, "이\\ Claude\\ Code\\ 채팅이\\ 다른\\ 터미널에\\ 아직\\ 열려\\ 있는지\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '仍在其他终端运行'):
                 assert_session_closed(self.config, self.session_id)
 
     def test_closed_or_reused_pid_allows_resume(self):
@@ -60,7 +60,7 @@ class ClaudeRegistryTests(unittest.TestCase):
              patch('bridge.clients.claude.session_registry.os.kill'), \
              patch('bridge.clients.claude.session_registry.subprocess.run',
                    return_value=SimpleNamespace(returncode=0, stdout=' '+self.start+'\n', stderr='')):
-            with self.assertRaisesRegex(BridgeUnavailable, "이\\ Claude\\ Code\\ 채팅이\\ 다른\\ 터미널에\\ 아직\\ 열려\\ 있는지\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '仍在其他终端运行'):
                 assert_profile_idle(self.config)
         with patch('bridge.clients.claude.session_registry.sys.platform', 'darwin'), \
              patch('bridge.clients.claude.session_registry.os.kill', side_effect=ProcessLookupError):
@@ -77,7 +77,7 @@ class ClaudeRegistryTests(unittest.TestCase):
         with patch.object(session_registry.sys, 'platform', 'linux'), \
              patch.object(session_registry, '_pid_domain', return_value=domain):
             with patch.object(linux_process, 'process_start_ticks', return_value='123456'):
-                with self.assertRaisesRegex(BridgeUnavailable, "이\\ Claude\\ Code\\ 채팅이\\ 다른\\ 터미널에\\ 아직\\ 열려\\ 있는지\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
+                with self.assertRaisesRegex(BridgeUnavailable, '仍在其他终端运行'):
                     assert_session_closed(self.config, self.session_id)
             for token in (None, '123457'):
                 with patch.object(linux_process, 'process_start_ticks', return_value=token):
@@ -118,7 +118,7 @@ class ClaudeRegistryTests(unittest.TestCase):
         with patch.object(session_registry.sys, 'platform', 'win32'), \
              patch.object(session_registry.os, 'kill', side_effect=AssertionError('Windows must not signal PID')) as kill, \
              patch.object(claude_process, 'process_start_ticks', return_value=start) as lookup:
-            with self.assertRaisesRegex(BridgeUnavailable, "이\\ Claude\\ Code\\ 채팅이\\ 다른\\ 터미널에\\ 아직\\ 열려\\ 있는지\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
+            with self.assertRaisesRegex(BridgeUnavailable, '仍在其他终端运行'):
                 assert_session_closed(self.config, self.session_id)
         kill.assert_not_called()
         lookup.assert_called_once_with(1234)
@@ -134,7 +134,7 @@ class ClaudeRegistryTests(unittest.TestCase):
             with self.subTest(version=version), \
                  patch.object(session_registry.sys, 'platform', 'win32'), \
                  patch.object(claude_process, 'process_start_ticks', return_value=start) as lookup:
-                with self.assertRaisesRegex(BridgeUnavailable, "이\\ Claude\\ Code\\ 채팅이\\ 다른\\ 터미널에\\ 아직\\ 열려\\ 있는지\\ 확인할\\ 수\\ 없습니다\\.\\ 컴퓨터를\\ 확인하고\\ 다시\\ 시도하세요\\."):
+                with self.assertRaisesRegex(BridgeUnavailable, '仍在其他终端运行'):
                     assert_session_closed(self.config, self.session_id)
                 lookup.assert_called_once_with(1234)
                 lookup.return_value = None
@@ -155,17 +155,17 @@ class ClaudeRegistryTests(unittest.TestCase):
         lookup.assert_called_once_with(1234)
         with patch.object(session_registry.sys, 'platform', 'win32'), \
              patch.object(claude_process, 'process_start_ticks', return_value='638960923680000000'):
-            with self.assertRaisesRegex(BridgeUnavailable, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(BridgeUnavailable, '无法确认'):
                 assert_profile_idle(self.config)
         with patch.object(session_registry.sys, 'platform', 'win32'), \
              patch.object(claude_process, 'process_start_ticks', side_effect=PermissionError):
-            with self.assertRaisesRegex(BridgeUnavailable, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(BridgeUnavailable, '无法确认'):
                 assert_profile_idle(self.config)
         entry['procStart'] = 638960923680000000
         (self.registry/'1234.json').write_text(json.dumps(entry))
         with patch.object(session_registry.sys, 'platform', 'win32'), \
              patch.object(claude_process, 'process_start_ticks') as lookup:
-            with self.assertRaisesRegex(BridgeUnavailable, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(BridgeUnavailable, '无法确认'):
                 assert_profile_idle(self.config)
         lookup.assert_not_called()
 
@@ -175,7 +175,7 @@ class ClaudeRegistryTests(unittest.TestCase):
         (self.registry/'1234.json').write_text(json.dumps(entry))
         with patch.object(session_registry.sys, 'platform', 'win32'), \
              patch.object(claude_process, 'process_start_ticks') as lookup:
-            with self.assertRaisesRegex(BridgeUnavailable, '확인할 수 없습니다'):
+            with self.assertRaisesRegex(BridgeUnavailable, '无法确认'):
                 assert_session_closed(self.config, self.session_id)
         lookup.assert_not_called()
 

@@ -41,14 +41,14 @@ class MissingConnector(unittest.TestCase):
         return self.recovery.confirm({}, self.adapter, {'token':preview['token'], 'confirmed':True, 'confirmConfigurationRepair':True})
 
     def test_confirmed_stopped_repair_preserves_other_text_and_private_full_backup(self):
-        with self.assertRaisesRegex(ValueError, '확인할 수 없습니다'):
+        with self.assertRaisesRegex(ValueError, '无法验证'):
             self.adapter.discover_existing()
         preview = self.preview()
         self.assertTrue(preview['canRecover'])
         self.assertTrue(preview['configurationRepair'])
         self.assertFalse(preview['requiresUnknownConfirmation'])
         self.assertEqual(self.patch.read_bytes(), self.raw)
-        with self.assertRaisesRegex(ValueError, "백업을\\ 명시적으로\\ 확인하고\\ 실패한\\ 백업을\\ 교체하십시오\\.\\ Harness\\ 액세스\\ 구성"):
+        with self.assertRaisesRegex(ValueError, '明确确认备份'):
             self.recovery.confirm({}, self.adapter, {'token':preview['token'], 'confirmed':True})
         self.assertTrue(self.confirm(preview))
         expected = (self.prefix+MARKER+'\r\n'+self.adapter._line()+'\r\n'+self.suffix).encode()
@@ -59,7 +59,7 @@ class MissingConnector(unittest.TestCase):
         if os.name != 'nt':self.assertEqual(backups[0].stat().st_mode & 0o777,0o600)
         self.assertEqual(verified_directory(json.loads(self.adapter._line()[2:]),self.home)[0],self.adapter.directory)
         self.assertFalse(self.old.directory.exists())
-        with self.assertRaisesRegex(ValueError, "Harness\\ 복구\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."):self.confirm(preview)
+        with self.assertRaisesRegex(ValueError, '已过期'):self.confirm(preview)
 
     def test_live_process_or_new_process_prevents_any_patch_write(self):
         self.state = snapshot();self.state['home']=str(self.home)
@@ -67,13 +67,13 @@ class MissingConnector(unittest.TestCase):
         self.state=snapshot(gui=False,hosts=());self.state['home']=str(self.home)
         preview=self.preview()
         self.state=snapshot();self.state['home']=str(self.home)
-        with self.assertRaisesRegex(ValueError,'프로세스가 변경되었습니다.'):self.confirm(preview)
+        with self.assertRaisesRegex(ValueError,'进程已变化'):self.confirm(preview)
         self.assertEqual(self.patch.read_bytes(),self.raw)
         self.assertFalse(self.adapter.directory.exists())
 
     def test_changed_patch_requires_new_preview(self):
         preview=self.preview();changed=self.raw+b'# new edit\n';self.patch.write_bytes(changed)
-        with self.assertRaisesRegex(ValueError,'구성이 변경되었습니다.'):self.confirm(preview)
+        with self.assertRaisesRegex(ValueError,'配置已变化'):self.confirm(preview)
         self.assertEqual(self.patch.read_bytes(),changed)
         self.assertFalse(self.adapter.directory.exists())
 
@@ -108,7 +108,7 @@ class MissingConnector(unittest.TestCase):
             with self.assertRaisesRegex(OSError,'fixture replace failed'):self.confirm(preview)
         self.assertEqual(self.patch.read_bytes(),self.raw)
         self.assertEqual(next(self.adapter.directory.glob('cordis.patch.before-repair-*.yml')).read_bytes(),self.raw)
-        with self.assertRaisesRegex(ValueError,"Harness\\ 복구\\ 확인이\\ 만료되었습니다\\.\\ 다시\\ 확인하세요\\."):self.confirm(preview)
+        with self.assertRaisesRegex(ValueError,'已过期'):self.confirm(preview)
         credentials=(self.adapter.directory/'connection.json').read_bytes()
         self.assertTrue(self.confirm(self.preview()))
         self.assertEqual((self.adapter.directory/'connection.json').read_bytes(),credentials)
@@ -119,7 +119,7 @@ class MissingConnector(unittest.TestCase):
         def check():
             calls.append(1)
             if len(calls)==2:self.patch.write_bytes(changed)
-        with self.assertRaisesRegex(ValueError,"Harness\\ 복구\\ 중에\\ 구성이\\ 변경되었습니다\\.\\ 원래\\ 구성\\ 백업이\\ 유지되었으며\\ 교체되지\\ 않았습니다\\."):
+        with self.assertRaisesRegex(ValueError,'恢复期间变化'):
             self.adapter.repair_missing_connector(expected,check)
         self.assertEqual(self.patch.read_bytes(),changed)
         self.assertEqual(next(self.adapter.directory.glob('cordis.patch.before-repair-*.yml')).read_bytes(),self.raw)
@@ -135,6 +135,6 @@ class MissingConnector(unittest.TestCase):
         preview=self.preview()
         config=self.adapter.directory/'connection.json';value=json.loads(config.read_text())
         value['token']='a-new-owner-token';config.write_text(json.dumps(value))
-        with self.assertRaisesRegex(ValueError,'구성이 변경되었습니다.'):self.confirm(preview)
+        with self.assertRaisesRegex(ValueError,'配置已变化'):self.confirm(preview)
         self.assertEqual(self.patch.read_bytes(),self.raw)
         self.assertEqual(json.loads(config.read_text())['token'],'a-new-owner-token')

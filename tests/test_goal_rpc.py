@@ -70,7 +70,7 @@ def goal_row(thread_id='tid'):
 
 
 def create_database(root, thread_id='tid', status='active'):
-    path = Path(root) / 'goals # 중국어' / 'goals_1.sqlite'
+    path = Path(root) / 'goals # 中文' / 'goals_1.sqlite'
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     try:
@@ -85,7 +85,7 @@ def create_database(root, thread_id='tid', status='active'):
 
 class SQLiteURITests(unittest.TestCase):
     def test_read_uri_escapes_platform_and_unicode_paths(self):
-        path = Path(tempfile.gettempdir()) / 'codex space 중국어 #x' / 'goals_1.sqlite'
+        path = Path(tempfile.gettempdir()) / 'codex space 中文 #x' / 'goals_1.sqlite'
         uri = sqlite_read_uri(path)
         self.assertTrue(uri.startswith('file://'))
         self.assertIn('%23', uri)
@@ -93,7 +93,7 @@ class SQLiteURITests(unittest.TestCase):
 
     def test_read_and_absent_use_special_paths(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / 'codex space 중국어 #x'
+            root = Path(directory) / 'codex space 中文 #x'
             path = create_database(root)
             row = read_native_goal(path.parent, 'tid')
             self.assertEqual(row['objective'], 'Work')
@@ -101,7 +101,7 @@ class SQLiteURITests(unittest.TestCase):
 
     def test_windows_uri_is_percent_encoded(self):
         from pathlib import PureWindowsPath
-        uri = PureWindowsPath(r'C:\Users\Luoran 중국어\goals_1.sqlite').as_uri() + '?mode=ro'
+        uri = PureWindowsPath(r'C:\Users\Luoran 中文\goals_1.sqlite').as_uri() + '?mode=ro'
         self.assertTrue(uri.startswith('file:///C:/'))
         self.assertIn('?mode=ro', uri)
 

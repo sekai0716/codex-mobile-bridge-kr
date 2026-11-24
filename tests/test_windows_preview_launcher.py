@@ -47,7 +47,7 @@ class PreviewLauncherTest(unittest.TestCase):
   framework=Path(os.environ['WINDIR'])/'Microsoft.NET/Framework64/v4.0.30319'
   if not (framework/'csc.exe').is_file():self.skipTest('Windows .NET compiler required')
   # Keep the result for diagnosing an independent broker; do not delete an app while it is alive.
-  folder=Path(tempfile.mkdtemp(prefix='preview launch 중국어 % ! ',dir=ROOT/'.tmp'))
+  folder=Path(tempfile.mkdtemp(prefix='preview launch 中文 % ! ',dir=ROOT/'.tmp'))
   (folder/'scripts').mkdir()
   shutil.copy2(SOURCE/'start-preview3-windows.cmd',folder/'start-preview3-windows.cmd')
   shutil.copy2(SOURCE/'scripts/start-preview3-windows.ps1',folder/'scripts/start-preview3-windows.ps1')

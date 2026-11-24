@@ -94,9 +94,9 @@ class Session:
         self.sequence += 1
         self.condition.notify_all()
 
-    def view(self):
+    def view(self, process_bodies=True):
         with self.condition:
-            return {**normalize_state(self.state, self.connected), 'permissionMode': linux_permissions.current_mode(self.state), 'sequence': self.sequence,
+            return {**normalize_state(self.state, self.connected, process_bodies=process_bodies), 'permissionMode': linux_permissions.current_mode(self.state), 'sequence': self.sequence,
                     'loadingHistory': self.loading, 'activating': self.activating, 'error': self.error}
 
 
@@ -392,7 +392,7 @@ class WslEntry(WslFeatures):
             cwd = row.get('cwd') or ''
             row.update(host=self.host, endpointId=self.host, hostLabel=self.row['label'],
                        title=row.get('name') or row.get('display_title') or row.get('title') or '이름없는 채팅',
-                       projectKey=self.host + '|' + cwd, projectName=cwd.rstrip('/').rsplit('/', 1)[-1] or '분류되지 않음',
+                       projectKey=self.host + '|' + cwd, projectName=cwd.rstrip('/').rsplit('/', 1)[-1] or '未归类',
                        recency=row.get('recency_at_ms') or (row.get('recency_at') or 0) * 1000 or row.get('updated_at_ms') or (row.get('updated_at') or 0) * 1000)
             with self.lock:
                 session = self.live.get(row['id'])
@@ -541,8 +541,9 @@ class WslEntry(WslFeatures):
             return None
 
     def view(self, identifier, **options):
+        process_bodies = options.pop('process_bodies', True)
         session = self.session(identifier, **options)
-        result = session.view()
+        result = session.view(process_bodies=process_bodies)
         result['draftAccountIdentity'] = self._management_identity(identifier, refresh=True)
         continuation = self._account_draft_continuation(identifier)
         if continuation is not None:
@@ -563,16 +564,21 @@ class WslEntry(WslFeatures):
 
     def timeline_read(self, identifier, mode='page', **options):
         session = self.session(identifier, background=True)
+        conversation = options.get('projection') == 'conversation' or mode == 'process'
+        if mode == 'detail':
+            options.pop('projection', None)
         if options.get('before') and not session.view()['historyComplete']:
             with session.action_lock:
                 session.history_limit += 50
             self._refresh(session)
         # view() reads write receipts; do not take the entry write gate while
         # holding the session condition (writers acquire them in reverse order).
-        snapshot = self.view(identifier, attach=False)
+        snapshot = self.view(identifier, attach=False, process_bodies=not conversation)
         with session.condition:
             if snapshot['sequence'] >= session.timeline.sequence:
-                session.timeline.update(snapshot)
+                session.timeline.update(snapshot, conversation=conversation)
+            if mode == 'process':
+                return {**session.timeline.process(**options), 'files': []}
             if mode == 'detail':
                 result = session.timeline.detail(**options)
                 if 'fileIndex' in result:
@@ -633,12 +639,12 @@ class WslEntry(WslFeatures):
                 raise IPCError("WSL 계정 상태가 변경되었습니다. 원래 WSL 서비스를 종료한 후 다시 연결하세요.")
             return None
         if not route.get('valid'):
-            raise IPCError("WSL 계정 구성이 변경되었습니다. 계정에서 확인한 후 다시 연결하세요.")
+            raise IPCError('WSL 账号配置已变化，请在账号页面核验后重新连接')
         config = runtime.request('config/read', {'includeLayers': False, 'cwd': thread.get('cwd')}).get('config') or {}
         provider = config.get('model_provider') or 'openai'
         definition = (config.get('model_providers') or {}).get(provider) or {}
         if ((thread.get('modelProvider') and thread['modelProvider'] != provider) or provider != route['provider']):
-            raise IPCError("이 채팅은 다른 제공업체를 사용합니다. 먼저 원래 액세스 프로필을 선택하세요.")
+            raise IPCError('此历史会话的提供商与当前接入不同；请先选择原接入')
         if (definition.get('base_url') != route['baseUrl']
                 or definition.get('wire_api', 'responses') != 'responses'
                 or definition.get('requires_openai_auth') is not True
@@ -648,7 +654,7 @@ class WslEntry(WslFeatures):
                 or any(config.get(key) for key in ('profile', 'profiles', 'api_key_helper', 'credential_store'))
                 or any(definition.get(key) for key in ('env_key', 'experimental_bearer_token', 'http_headers',
                     'env_http_headers', 'auth', 'aws', 'query_params', 'gateway_oauth'))):
-            raise IPCError("이 프로젝트는 선택한 WSL API 엔드포인트 또는 인증을 재정의합니다. 원래 CLI의 프로젝트 구성을 수정한 후 다시 연결하세요.")
+            raise IPCError('此项目覆盖了已选择的 WSL API 地址或认证，请在原 CLI 修正项目配置后重新连接')
         proof = (self.generation, route['appliedIdentity'], route['accountIdentity'],
                  thread.get('cwd'), provider, thread.get('model'))
         previous = self._managed_routes.get(thread.get('id'))
@@ -656,12 +662,12 @@ class WslEntry(WslFeatures):
         # latest observed model while retaining the original route provenance.
         if (not new and thread.get('status', {}).get('type') != 'notLoaded'
                 and (previous is None or previous[:-1] != proof[:-1])):
-            raise IPCError("이 WSL 채팅은 다른 연결에 의해 로드되었으며 해당 API 경로를 확인할 수 없습니다. 원래 WSL 서비스를 종료한 후 다시 연결하세요.")
+            raise IPCError('此 WSL 会话已由其他连接加载，无法核验原 API 路由；请退出原 WSL 服务后重新连接')
         return proof
 
     def _target(self, identifier, activate=False, managed_control=False):
         if not activate and self.released_cli.contains(identifier):
-            raise IPCError('CLI 연결이 해제되었습니다. 다시 연결하려면 ’세션 계속’을 클릭하세요.')
+            raise IPCError('CLI 连接已释放，请点击继续会话重新连接')
         metadata = self.store.get(identifier)
         self.cli_origins[identifier] = metadata.get('origin')
         runtime = self.runtime(allow_start=activate)
@@ -823,7 +829,7 @@ class WslEntry(WslFeatures):
             def request(method, params):
                 if (runtime is None or runtime.closed or self.server is not runtime or self.generation != generation
                         or self.subscriptions.get(identifier) != generation or self.subscription_tokens.get(identifier) != token):
-                    raise IPCError('기존 WSL CLI 연결이 변경되었습니다. 새로운 연결이 작동되지 않음')
+                    raise IPCError('原 WSL CLI 连接已变化；未操作新的连接')
                 return runtime.request(method, params)
             queued = [entry for key, entry in self.receipts.items() if key.startswith(identifier + ':send:')
                       and entry.get('result', {}).get('status') in ('queued', 'unknown')]
@@ -1364,9 +1370,9 @@ class WslEntry(WslFeatures):
         if preset not in ('ask', 'auto-review', 'full-access'):
             raise ValueError('잘못된 권한 설정')
         if expected_runtime not in (None, 'cli', 'wsl'):
-            raise ValueError("채팅 런타임이 변경되었습니다. 권한 패널을 다시 엽니다.")
+            raise ValueError('会话运行时已变化，请重新打开权限面板')
         if preset == 'full-access' and confirmed is not True:
-            raise ValueError("전체 액세스 확인")
+            raise ValueError('请确认完全访问权限')
         session = self.session(identifier, attach=False)
         with session.action_lock:
             facts, options = self._permission_options(identifier)
@@ -1526,7 +1532,7 @@ class WslEntry(WslFeatures):
             identifiers = [row['id'] for row in self.store.lifecycle_threads(root_id=identifier)]
             if any(key.split(':')[0] in identifiers and row['result'].get('status') in ('queued', 'unknown')
                    for key, row in self.receipts.items()):
-                raise ValueError("이 채팅에는 대기 중이거나 확인되지 않은 작업이 있습니다. 먼저 원본 WSL 세션을 확인하세요.")
+                raise ValueError('聊天有排队或待核对操作，请先在原 WSL 处理')
             runtime = self.runtime(allow_start=True)
             if not disconnect:
                 check_archive_runtime(runtime.request, identifiers)

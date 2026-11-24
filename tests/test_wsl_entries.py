@@ -94,7 +94,7 @@ class RegistryTests(unittest.TestCase):
         identifier = entry_id('Ubuntu', 'fixture', '/mnt/c/shared')
         self.entries.candidates[identifier] = {'id': identifier, 'distribution': 'Ubuntu', 'user': 'fixture',
             'home': '/mnt/c/shared', 'windowsHome': str(self.entries.desktop_home), 'label': 'shared'}
-        with self.assertRaisesRegex(ValueError, "이\\ WSL\\ 입구와\\ 데스크탑이\\ 동일하게\\ 공유됩니다\\.\\ Codex\\ 디렉터리,\\ 반복적으로\\ 액세스할\\ 수\\ 없음"):
+        with self.assertRaisesRegex(ValueError, '共用同一'):
             self.entries.configure(identifier, True)
         self.assertFalse(self.entries.path.exists())
 

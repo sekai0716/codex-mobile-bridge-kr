@@ -89,7 +89,7 @@ class ManualPluginTests(unittest.TestCase):
         adapter = ManualDeepSeek(self.directory/'binding.json')
         before = (self.directory/'binding.json').read_bytes()
         (self.directory/'endpoint.json').unlink()
-        with self.assertRaisesRegex(Exception, '프로필.*fixture.*플러그인을 다시 로드.*다시 설치할 필요가 없습니다'):
+        with self.assertRaisesRegex(Exception, '档案“fixture”.*重新加载.*无需重复安装'):
             adapter.call('list')
         self.assertEqual((self.directory/'binding.json').read_bytes(), before)
         self.assertEqual(self.calls, [])
@@ -104,7 +104,7 @@ class ManualPluginTests(unittest.TestCase):
         with tarfile.open(result['tarPath']) as archive:
             self.assertEqual(set(archive.getnames()), {'package/'+name for name in package_files()})
             manifest = json.load(archive.extractfile('package/package.json'))
-            self.assertEqual(manifest['engines']['dsh'], '0.2.1-rc.2')
+            self.assertEqual(manifest['engines']['dsh'], '*')
         with self.assertRaises(FileExistsError): export_package(str(self.root))
 
     def modern(self, version='0.2.0', revision=11):
@@ -126,13 +126,18 @@ class ManualPluginTests(unittest.TestCase):
         self.assertTrue(adapter.call('status')['connected'])
         self.running_plugin['revision'] = 12
         before = self.calls.count('send')
-        with self.assertRaisesRegex(Exception, "DSH\\ 실행\\ 중인\\ 플러그인\\ 버전이\\ 설치된\\ 버전과\\ 일치하지\\ 않습니다\\.\\ 원래\\ 클라이언트에서\\ 플러그인을\\ 다시\\ 로드하세요\\."): adapter.call('send')
+        with self.assertRaisesRegex(Exception, '运行版本'): adapter.call('send')
         self.assertEqual(self.calls.count('send'), before)
 
-    def test_unknown_protocol_and_release_family_rejected_before_traffic(self):
-        for version, revision in [('0.3.0', 11), ('0.2.0', 10), ('0.2.0', 12)]:
+    def test_new_release_with_same_wire_contract_remains_compatible(self):
+        for version in ('0.3.0', '1.0.0', '1.1.0-rc.1+fixture'):
+            self.modern(version)
+            self.assertTrue(ManualDeepSeek(self.directory/'binding.json').call('status')['connected'])
+
+    def test_unknown_protocol_and_malformed_release_rejected_before_traffic(self):
+        for version, revision in [('invalid', 11), ('0.2.0', 10), ('0.2.0', 12)]:
             self.modern(version, revision)
-            with self.assertRaisesRegex(ValueError, "DSH\\ 플러그인\\ 프로토콜\\ 또는\\ 버전이\\ 호환되지\\ 않습니다\\.\\ 지원되는\\ 범용\\ 플러그인을\\ 설치하세요\\."): ManualDeepSeek(self.directory/'binding.json')
+            with self.assertRaisesRegex(ValueError, '不兼容'): ManualDeepSeek(self.directory/'binding.json')
         self.assertEqual(self.calls, [])
 
     def test_preview_is_read_only_and_confirmed_instance_is_rechecked(self):
@@ -142,7 +147,7 @@ class ManualPluginTests(unittest.TestCase):
         self.assertEqual(preview['profile'], 'fixture')
         self.assertNotIn('deepseekManualBinding', manager.config)
         self.assertEqual(self.calls, ['status'])
-        with self.assertRaisesRegex(ValueError, "DSH\\ 플러그인\\ 인스턴스가\\ 변경되었습니다\\.\\ 다시\\ 바인딩하세요\\."):
+        with self.assertRaisesRegex(ValueError, '实例已改变'):
             manager.control({'action': 'bind-deepseek-plugin', 'file': preview['file'], 'instanceId': str(uuid.uuid4())})
         self.assertNotIn('deepseekManualBinding', manager.config)
 
@@ -153,23 +158,23 @@ class ManualPluginTests(unittest.TestCase):
         self.save('connection.json', {'token': 'b'*64, 'endpoint': str(self.directory/'endpoint.json'),
                                       'instanceId': self.binding['instanceId']})
         before = len(self.calls)
-        with self.assertRaisesRegex(ValueError, '자격 증명이 변경되었습니다.'): adapter.call('send')
+        with self.assertRaisesRegex(ValueError, '凭据已改变'): adapter.call('send')
         self.assertEqual(len(self.calls), before)
         (self.package/'host.mjs').write_text('different plugin')
-        with self.assertRaisesRegex(ValueError, "DSH\\ 플러그인\\ 버전이\\ 일치하지\\ 않습니다\\.\\ 범용\\ 플러그인을\\ 다시\\ 설치하세요\\."): ManualDeepSeek(self.directory/'binding.json')
+        with self.assertRaisesRegex(ValueError, '版本不匹配'): ManualDeepSeek(self.directory/'binding.json')
 
     def test_changed_instance_and_symlink_are_rejected(self):
-        with self.assertRaisesRegex(ValueError, "DSH\\ 플러그인\\ 인스턴스가\\ 변경되었습니다\\.\\ 다시\\ 바인딩하세요\\."):
+        with self.assertRaisesRegex(ValueError, '实例已改变'):
             ManualDeepSeek(self.directory/'binding.json', str(uuid.uuid4()))
         path = self.directory/'binding.json'; path.rename(path.with_suffix('.saved'))
         path.symlink_to(path.with_suffix('.saved'))
-        with self.assertRaisesRegex(ValueError, "DSH\\ 파일\\ 권한\\ 바인딩이\\ 안전하지\\ 않습니다"): ManualDeepSeek(path)
+        with self.assertRaisesRegex(ValueError, '权限不安全'): ManualDeepSeek(path)
 
     def test_bind_requires_disabled_access_and_preserves_official_settings(self):
         manager = self.manager()
         manager.config.update(deepseekHome='/official-home', deepseekAdapterDirectory='/official-connector')
         manager.config['enabled']['deepseek'] = True
-        with self.assertRaisesRegex(ValueError, "먼저만\\ 비활성화하세요\\.\\ DSH\\ 휴대폰을\\ 연결한\\ 다음\\ 전환하거나\\ 바인딩을\\ 해제하세요\\."): self.bind(manager)
+        with self.assertRaisesRegex(ValueError, '先仅停用'): self.bind(manager)
         self.assertEqual(self.calls, [])
         manager.config['enabled']['deepseek'] = False
         self.assertTrue(self.bind(manager)['bound'])
@@ -207,9 +212,9 @@ class ManualPluginTests(unittest.TestCase):
             self.assertTrue(row['connected']); self.assertFalse(row['canForceQuit'])
             manager.start_enabled()
             launch.assert_not_called()
-            with self.assertRaisesRegex(ValueError, '비활성화만 지원'):
+            with self.assertRaisesRegex(ValueError, '仅支持停用'):
                 manager.toggle_client({'provider': 'deepseek', 'enabled': False, 'quitDesktop': True})
-            with self.assertRaisesRegex(ValueError, "수동\\ 바인딩은\\ 타사\\ 클라이언트\\ 프로세스를\\ 관리하지\\ 않습니다\\.\\ 클라이언트\\ 내에서\\ 다시\\ 시작하거나\\ 종료하세요\\."):
+            with self.assertRaisesRegex(ValueError, '不管理第三方'):
                 manager.recover_deepseek({'action': 'deepseek-recovery-preview'})
         self.assertNotIn('quit', self.calls)
 
@@ -217,7 +222,7 @@ class ManualPluginTests(unittest.TestCase):
         manager = self.manager(); self.bind(manager)
         self.assertTrue(manager.client_accounts('deepseek', {})['readOnly'])
         for operation in ('save-api', 'switch', 'import'):
-            with self.assertRaisesRegex(ValueError, "수동으로\\ 바인딩된\\ 계정\\ 및\\ API\\ 타사\\ 클라이언트에서\\ 관리해\\ 주세요"):
+            with self.assertRaisesRegex(ValueError, '第三方客户端'):
                 manager.client_accounts('deepseek', {'operation': operation})
         manager.config['enabled']['deepseek'] = True
         manager.notification_rows()
@@ -230,9 +235,9 @@ class ManualPluginTests(unittest.TestCase):
         restored = DesktopSessions(self.root/'gateway', gateway_running=True)
         self.addCleanup(restored.close)
         self.assertIsNone(restored.adapters.get('deepseek'))
-        with self.assertRaisesRegex(Exception, '확인할 수 없습니다'): restored.call('deepseek', 'list')
-        self.assertIn('다른 인스턴스로 전환되지 않습니다.', restored.deepseek_restore_error)
-        with self.assertRaisesRegex(Exception, '확인할 수 없습니다'): restored.client_accounts('deepseek', {})
+        with self.assertRaisesRegex(Exception, '无法验证'): restored.call('deepseek', 'list')
+        self.assertIn('不会切换到其他实例', restored.deepseek_restore_error)
+        with self.assertRaisesRegex(Exception, '无法验证'): restored.client_accounts('deepseek', {})
 
 
 if __name__ == '__main__': unittest.main()

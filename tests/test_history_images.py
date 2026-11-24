@@ -79,5 +79,5 @@ class HistoryImageTests(unittest.TestCase):
         result = messages(records)
         self.assertEqual([row['role'] for row in result], ['user','user','activity','activity'])
         self.assertEqual(result[2]['kind'],'context')
-        self.assertEqual(result[2]['title'],'문맥')
+        self.assertEqual(result[2]['title'],'上下文')
         self.assertEqual(result[0]['text'],result[2]['text'])

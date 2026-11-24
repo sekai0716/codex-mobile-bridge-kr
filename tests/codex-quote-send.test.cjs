@@ -2,7 +2,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {ComposerDrafts}=require('../web/features/chat/composer-drafts.js');
 const {ComposerQuotes}=require('../web/features/chat/composer-quotes.js');
-const {resolveComposerSendMode}=require('../web/features/chat/modes.js');
 
 for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preserves newer quote-only edits when durable storage fails`,async()=>{
  const nodes=new Map(['composer','message','send-mode','send-error','send'].map(id=>[id,{value:id==='send-mode'?'send':'',textContent:''}]));
@@ -10,19 +9,19 @@ for(const status of ['accepted','unknown'])test(`Codex fallback ${status} preser
  const scope={gateway:'gateway',provider:'codex',account:'account',host:'local',session:'chat'};
  const drafts=new ComposerDrafts(failedStorage),quotes={quotes:[{text:'first',source:'reply',provider:'codex'}],serialize(text){return ComposerQuotes.serialize(text,this.quotes);},reset(){this.quotes=[];}};
  const temporary=new Map(),provisionals=new Map();let resolve,submitted,entered;const requestStarted=new Promise(done=>entered=done);
- const context={
+ const context={composerToolbar:{actionMode:()=>'send'},
   $:id=>nodes.get(id),t:text=>text,sending:false,currentId:'chat',currentHost:'local',state:{},currentAccess:()=>({canSend:true}),
   codexQuotes:quotes,codexDraftScope:scope,composerDrafts:drafts,draftGateway:'gateway',codexProvisionalDrafts:provisionals,messageManagement:null,
-  attachments:{ready:()=>true,ids:()=>[],references:()=>[],rows:[],setLocked(){},clear(){}},workModes:{value:()=> 'default',render(){},submitted(){}},
-  sendModes:{value:view=>resolveComposerSendMode(nodes.get('send-mode').value,view),render(){}},
-  invalidSkills:new Set(),selectedSkills:new Set(),BridgeI18n:{locale:()=> 'ko'},chatKey:()=> 'local|chat',uuid:()=> 'send-id',
+  attachments:{ready:()=>true,ids:()=>[],references:()=>[],rows:[],setLocked(){},clear(){}},renderCodexWorkModes(){},workModes:{value:()=> 'default',render(){},submitted(){}},
+  invalidSkills:new Set(),selectedSkills:new Set(),BridgeI18n:{locale:()=> 'zh'},chatKey:()=> 'local|chat',uuid:()=> 'send-id',
   saveDraft(){const fields={text:nodes.get('message').value,quotes:quotes.quotes};const saved=drafts.save(scope,fields);if(!saved)provisionals.set('local|chat',JSON.parse(JSON.stringify(fields)));return saved;},
   sessionStorage:{getItem:key=>temporary.get(key)||null,setItem:(key,value)=>temporary.set(key,value),removeItem:key=>temporary.delete(key)},
   sessionUrl:()=>'/send',api:async(url,body)=>{submitted=body;entered();return new Promise(done=>resolve=done);},bumpRecency(){},toast(){},
   renderSkillPills(){},restoringComposer:false,window:{BridgePresentation:{resizeMessage(){},showError(){}}}
  };
  const source=fs.readFileSync(require.resolve('../web/shell/app.js'),'utf8'),start=source.indexOf("$('composer').onsubmit="),end=source.indexOf("$('message').onkeydown=",start);
- const controls=source.slice(source.indexOf('function connectOnFirstSend('),source.indexOf('function renderModelSummary('));
+ const controlStart=source.indexOf('function composerCanSend(');
+ const controls=source.slice(controlStart,source.indexOf('function uuid(',controlStart));
  vm.runInNewContext(controls+source.slice(start,end),context);
  const sending=nodes.get('composer').onsubmit({preventDefault(){}});await requestStarted;assert.equal(submitted.text,'> first');assert.equal(drafts.pending(scope),null);
  quotes.quotes.push({text:'later',source:'reply-2',provider:'codex'});context.saveDraft();assert.equal(nodes.get('message').value,'');resolve({status});await sending;

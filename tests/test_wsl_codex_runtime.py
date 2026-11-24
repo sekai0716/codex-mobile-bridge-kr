@@ -32,7 +32,7 @@ class NativeStopProtocolTests(unittest.TestCase):
         before = {'daemons': [{'pid': 900001, 'startTicks': '123'}], 'blockers': []}
         changed = {'daemons': [{'pid': 900001, 'startTicks': '456'}], 'blockers': []}
         namespace, body, system, signals = self.execute_stop([before, changed])
-        with self.assertRaisesRegex(ValueError, 'WSL 공유 서비스 ID가 변경'):
+        with self.assertRaisesRegex(ValueError, '身份已变化'):
             exec(body, namespace)
         signals.pidfd_send_signal.assert_not_called()
         system.close.assert_called_once_with(55)
@@ -40,7 +40,7 @@ class NativeStopProtocolTests(unittest.TestCase):
     def test_one_sigterm_timeout_has_no_force_fallback(self):
         before = {'daemons': [{'pid': 900001, 'startTicks': '123'}], 'blockers': []}
         namespace, body, system, signals = self.execute_stop([before, before], ready=False)
-        with self.assertRaisesRegex(ValueError, '정상적으로 종료되지 않았습니다'):
+        with self.assertRaisesRegex(ValueError, '未正常退出'):
             exec(body, namespace)
         signals.pidfd_send_signal.assert_called_once_with(55, 15, None, 0)
         self.assertTrue(namespace['signal_sent'])
@@ -64,7 +64,7 @@ class NativeStopProtocolTests(unittest.TestCase):
         changed = {'daemons': [{'pid': 900001, 'startTicks': '123', 'bootId': 'new-boot'}], 'blockers': []}
         namespace, body, _, signals = self.execute_stop([changed])
         namespace['request']['daemon'] = before['daemons'][0]
-        with self.assertRaisesRegex(ValueError, 'ID 또는 작업 항목이 변경'):
+        with self.assertRaisesRegex(ValueError, '身份或任务入口'):
             exec(body, namespace)
         signals.pidfd_send_signal.assert_not_called()
 

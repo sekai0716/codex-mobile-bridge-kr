@@ -2,8 +2,7 @@
 
 class GitPanel {
   constructor(workbench, session, tab) {
-    this.workbench = workbench; this.session = session; this.tab = tab; this.mode = 'changes'; this.historyLimit = 40; this.windowStates = {};
-    this.repository = null;
+    this.workbench = workbench; this.session = session; this.tab = tab; this.mode = 'history'; this.historyLimit = 40; this.windowStates = {};
     this.node = (...args) => workbench.node(...args);
     this.button = (...args) => workbench.button(...args);
   }
@@ -14,33 +13,19 @@ class GitPanel {
   async load({rediscover = true} = {}) {
     this.dispose(); const controller = this.tab.controller = new AbortController();
     const head = this.node('div', 'wb-git-head'), title = this.node('div', 'wb-git-heading');
-    title.append(this.node('strong', '', 'Git'), this.node('span', '', BridgeI18n.t('프로젝트 변경')));
-    const refresh = this.button(BridgeI18n.t('새로고침'), () => this.load(), BridgeI18n.t('Git 상태 새로 고침'));
+    title.append(this.node('strong', '', 'Git'), this.node('span', '', BridgeI18n.t(this.mode === 'history' ? '提交历史' : '当前项目的变更')));
+    const refresh = this.button(BridgeI18n.t('刷新'), () => this.load(), BridgeI18n.t('刷新 Git 状态'));
     head.append(title, refresh);
-    const status = this.node('p', 'wb-status', BridgeI18n.t('Git 상태 로드 중…')); status.setAttribute('role', 'status');
-    this.tab.body.replaceChildren(head, status);
+    const modes = this.node('div', 'wb-git-modes');
+    for (const [key, label] of [['changes', BridgeI18n.t('变更')], ['history', BridgeI18n.t('历史')], ['branches', BridgeI18n.t('分支')]]) {
+      const button = this.button(label, () => { this.mode = key; this.load(); }); button.setAttribute('aria-pressed', String(this.mode === key)); modes.append(button);
+    }
+    const status = this.node('p', 'wb-status', BridgeI18n.t('正在读取 Git 状态…')); status.setAttribute('role', 'status');
+    status.hidden = this.mode === 'history';
+    this.tab.body.replaceChildren(head, modes, status);
     try {
-      // 후보 목록은 같은 작업 폴더의 보기 전환에서만 재사용한다.
-      // 상태 조회와 명시적 새로고침은 최신 결과를 읽는다.
-      const cwd = this.session.cwd;
-      if (rediscover || !this.repositories || this.repositoriesCwd !== cwd) {
-        const discovered = await this.workbench.request(this.workbench.url(this.session, 'git-repositories'), undefined, controller.signal);
-        if (controller.signal.aborted) return;
-        this.repositories = discovered.repositories;
-        this.repositoriesCwd = cwd;
-      }
-      const repositories = this.repositories;
-      if (!repositories.length) { status.textContent = BridgeI18n.t('No Git repository was found in this project.'); return; }
-      if (!repositories.some(row => row.path === this.repository)) { this.repository = repositories[0].path; this.selected = this.selectedCommit = null; this.windowStates = {}; }
-      const picker = this.node('select', 'wb-git-repository'); picker.setAttribute('aria-label', BridgeI18n.t('Git repository'));
-      for (const row of repositories) {
-        const label = repositories.some(other => other !== row && other.name === row.name) ? row.root : row.name;
-        const option = this.workbench.raw(this.node('option', '', label)); option.value = row.path; option.title = row.root; picker.append(option);
-      }
-      picker.value = this.repository; this.repositoryRoot = picker.title = repositories.find(row => row.path === this.repository).root;
-      picker.onchange = () => { this.repository = picker.value; this.selected = this.selectedCommit = null; this.windowStates = {}; this.load({rediscover:false}); };
-      this.tab.body.append(picker);
-      const result = await this.workbench.request(this.url('git-status'), undefined, controller.signal);
+      if (this.mode === 'history') { await this.history(controller); return; }
+      const result = await this.workbench.request(this.workbench.url(this.session, 'git-status'), undefined, controller.signal);
       if (controller.signal.aborted) return;
       if (!result.available) { status.textContent = result.message; return; }
       this.state = result;
@@ -53,13 +38,7 @@ class GitPanel {
       if (result.scope !== '.') notes.push(BridgeI18n.t('차이점은 현재 프로젝트 디렉토리로 제한됩니다.'));
       if (result.upstream) notes.push(result.upstream + (result.ahead === null ? '' : BridgeI18n.t('· 앞으로') + result.ahead + BridgeI18n.t('/ 뒤에') + result.behind) + BridgeI18n.t('(현지 기록)'));
       status.textContent = notes.join(' · '); status.hidden = !notes.length;
-      const modes = this.node('div', 'wb-git-modes');
-      for (const [key, label] of [['changes', BridgeI18n.t('변경 사항')], ['history', BridgeI18n.t('기록')], ['branches', BridgeI18n.t('지점')]]) {
-        const button = this.button(label, () => { this.mode = key; this.load({rediscover:false}); }); button.dataset.gitMode=key; button.setAttribute('aria-pressed', String(this.mode === key)); modes.append(button);
-      }
-      this.tab.body.append(modes);
       if (this.actionError) this.tab.body.append(this.node('p', 'wb-status error', this.actionError));
-      if (this.mode === 'history') { await this.history(controller); return; }
       if (this.mode === 'branches') { await this.branches(controller); return; }
       const actions = this.node('div', 'wb-git-actions');
       const stage = this.button(BridgeI18n.t('모두 스테이지'), () => this.execute({action:'stage-all'}).catch(()=>{}));

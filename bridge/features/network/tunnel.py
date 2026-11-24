@@ -140,7 +140,7 @@ class QuickTunnel:
 
     def start(self):
         if self.closed.is_set():
-            raise RuntimeError("터널이 멈췄다")
+            raise RuntimeError("隧道已停止")
         if not self.executable.is_file():
             raise RuntimeError("부족 cloudflared，확인해주세요 README 외부 네트워크 접속 구성")
 
@@ -155,7 +155,7 @@ class QuickTunnel:
         while not self.closed.wait(self.START_POLL):
             if self.ready.is_set():
                 return self.url
-        raise RuntimeError("터널이 멈췄다")
+        raise RuntimeError("隧道已停止")
 
     def _supervise(self):
         delay = 0
