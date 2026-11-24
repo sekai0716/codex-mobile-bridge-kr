@@ -6,6 +6,7 @@ import os
 import shutil
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -19,8 +20,9 @@ import test_bridge as support
 
 class GitWorkspaceTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir=support.ROOT / '.tmp')
-        self.root = Path(self.temp.name) / 'project'; self.root.mkdir()
+        # The parent must not inherit Git metadata from the source checkout.
+        self.temp = tempfile.TemporaryDirectory(prefix='bridge-git-')
+        self.root = Path(self.temp.name).resolve() / 'project'; self.root.mkdir()
         self.git('init', '-q', '-b', 'main')
         self.git('config', 'user.name', 'Fixture'); self.git('config', 'user.email', 'fixture@example.invalid')
         self.git('config', 'commit.gpgsign', 'false'); self.git('config', 'core.hooksPath', '.git/hooks')
@@ -154,6 +156,13 @@ class GitWorkspaceTests(unittest.TestCase):
             try:
                 self.assertEqual(selected.run(['show', 'HEAD:hello.txt'])[1], b'first\nsecond\n')
                 self.assertEqual(selected.working('hello.txt'), b'first\nsecond\n')
+                # The packaged gateway uses this same inherited-directory entry point.
+                child = subprocess.run(
+                    [sys.executable, str(support.ROOT / 'desktop.py'), '--git-directory-child',
+                     str(selected.directory_fd), 'show', 'HEAD:hello.txt'],
+                    pass_fds=(selected.directory_fd,), env=selected.environment, capture_output=True, check=True,
+                )
+                self.assertEqual(child.stdout, b'first\nsecond\n')
             finally:
                 self.root.unlink(); held.rename(self.root)
 

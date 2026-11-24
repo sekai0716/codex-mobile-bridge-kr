@@ -17,7 +17,9 @@ class HistoryLookupTests(unittest.TestCase):
     def setUp(self):
         support.IntegrationTests.setUp(self)
         self.addCleanup(support.IntegrationTests.tearDown, self)
-        self.enterContext(patch.object(self.bridge, '_management_identity', return_value='fixture-account'))
+        self.patches = contextlib.ExitStack()
+        self.addCleanup(self.patches.close)
+        self.patches.enter_context(patch.object(self.bridge, '_management_identity', return_value='fixture-account'))
         self.fixture.state['threadRuntimeStatus'] = {'type':'active'}
         self.assertTrue(self.bridge.view(support.THREAD)['connected'])
 
@@ -26,7 +28,7 @@ class HistoryLookupTests(unittest.TestCase):
         def connection(session, *, write=False):
             self.assertEqual(session.id, support.THREAD)
             yield handler, 'fixture-generation'
-        self.enterContext(patch.object(self.bridge, '_thread_source', connection))
+        self.patches.enter_context(patch.object(self.bridge, '_thread_source', connection))
 
     def test_native_search_cursor_and_one_target_turn(self):
         calls = []
@@ -56,8 +58,8 @@ class HistoryLookupTests(unittest.TestCase):
         self.source(unavailable)
         messages = [{'id':str(i),'role':'user','text':'한글 검색'} for i in range(22)]
         session = self.bridge.live[support.THREAD]
-        self.enterContext(patch.object(session,'timeline_view',return_value={'turns':[{'id':'turn','messages':messages}]}))
-        self.enterContext(patch.object(self.bridge,'store',SimpleNamespace()))
+        self.patches.enter_context(patch.object(session,'timeline_view',return_value={'turns':[{'id':'turn','messages':messages}]}))
+        self.patches.enter_context(patch.object(self.bridge,'store',SimpleNamespace()))
         params = {'account':'fixture-account','term':'한글'}
         first = self.bridge.thread_history_search(support.THREAD,params)
         self.assertEqual(first['source'],'loaded')
@@ -136,7 +138,7 @@ class HistoryLookupTests(unittest.TestCase):
 class IndexLookupTests(unittest.TestCase):
     def test_saved_index_finds_older_message_and_reads_only_selected_item(self):
         with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp); rollout = home / 'rollout'; rollout.write_text('x')
+            home = Path(tmp).resolve(); rollout = home / 'rollout'; rollout.write_text('x')
             store = SimpleNamespace(home=home, _rollout_in_home=lambda path: path==rollout,
                                     get=lambda thread:{'rollout_path':str(rollout)})
             with contextlib.closing(sqlite3.connect(home / 'thread_history_1.sqlite')) as db:

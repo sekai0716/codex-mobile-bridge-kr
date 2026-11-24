@@ -25,7 +25,9 @@ class UploadPartTests(unittest.TestCase):
         self.project = Path(self.tmp.name) / 'project'
         self.project.mkdir()
         cache = str(Path(self.tmp.name) / 'cache')
-        self.enterContext(patch.dict(os.environ, {'XDG_CACHE_HOME': cache, 'LOCALAPPDATA': cache}))
+        cache_env = patch.dict(os.environ, {'XDG_CACHE_HOME': cache, 'LOCALAPPDATA': cache})
+        cache_env.start()
+        self.addCleanup(cache_env.stop)
         self.params = dict(owner='a' * 64, identifier=str(uuid.uuid4()), path='new.bin', total=4)
 
     def send(self, phase, **fields):

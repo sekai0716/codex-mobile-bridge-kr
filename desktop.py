@@ -23,6 +23,18 @@ if len(sys.argv) == 3 and sys.argv[1] == '--terminal-child':
         from bridge.platforms.posix.terminal import child_main
     child_main(sys.argv[2])
 
+if os.name == 'posix' and sys.argv[1:2] == ['--git-directory-child']:
+    fd = int(sys.argv[2])
+    try:
+        os.fchdir(fd)
+        os.close(fd)
+    except OSError:
+        raise SystemExit(126)
+    try:
+        os.execvp('git', ['git', *sys.argv[3:]])
+    except FileNotFoundError:
+        raise SystemExit(127)
+
 if sys.argv[1:2] == ['zcode-pipe-host']:
     if sys.platform == 'darwin' and not getattr(sys, 'frozen', False):
         raise SystemExit('The private ZCode host requires the installed macOS gateway')

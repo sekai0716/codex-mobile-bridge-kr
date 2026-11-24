@@ -146,7 +146,9 @@ class ToolImageTests(unittest.TestCase):
                 timeline = Timeline()
                 timeline.update({**view, 'sequence': 1})
                 rows = timeline.page()['rows']
-                for row, (key, args, text, failed) in zip(rows[:3], calls, strict=True):
+                call_rows = rows[:len(calls)]
+                self.assertEqual(len(call_rows), len(calls))
+                for row, (key, args, text, failed) in zip(call_rows, calls):
                     self.assertEqual(row['computerUse'], {'title': args['title'].strip() or args['completion_summary']})
                     self.assertNotIn('attachments', row)
                     self.assertEqual(row.get('success') is False, failed)
@@ -154,8 +156,9 @@ class ToolImageTests(unittest.TestCase):
                     detail = timeline.detail(timeline.cursor(row['key']))['text']
                     for value in (args.get('code') or args['completion_summary'], text, 'Approved ' + key):
                         self.assertIn(value, detail)
-                self.assertEqual(len(rows[3:]), 3)
-                self.assertTrue(all(row['reviewLinked'] for row in rows[3:]))
+                review_rows = rows[len(calls):]
+                self.assertEqual(len(review_rows), len(reviews))
+                self.assertTrue(all(row['reviewLinked'] for row in review_rows))
 
     def test_failed_tool_keeps_native_error_body_and_uses_structured_failure_signals(self):
         call = {'type': 'mcpToolCall', 'server': 'cua_repl', 'tool': 'js', 'arguments': {'title': 'Check window'}}

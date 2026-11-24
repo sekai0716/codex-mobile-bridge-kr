@@ -11,6 +11,7 @@ import re
 import sqlite3
 import stat
 import subprocess
+import sys
 import tempfile
 import threading
 import uuid
@@ -608,6 +609,24 @@ class WorkspaceUpload:
                 return position, 'done', False
 
 
+# A remote workspace payload has no installed Bridge modules to import.
+_GIT_DIRECTORY_CHILD = """
+import os
+import sys
+
+fd = int(sys.argv[1])
+try:
+    os.fchdir(fd)
+    os.close(fd)
+except OSError:
+    sys.exit(126)
+try:
+    os.execvp('git', ['git', *sys.argv[2:]])
+except FileNotFoundError:
+    sys.exit(127)
+"""
+
+
 class GitWorkspace:
     """Project Git inspection and explicitly requested local Git operations."""
     def __init__(self, workspace, *, directory_fd=None):
@@ -628,13 +647,23 @@ class GitWorkspace:
     def run(self, args, limit=2 * 1024 * 1024, write=False, message=None):
         source = tempfile.TemporaryFile(dir=self.gitdir) if message is not None else None
         if source: source.write(message.encode('utf-8')); source.seek(0)
+        command = (self.write_command if write else self.command) + args
+        needs_child = self.directory_fd is not None and sys.platform == 'darwin'
         try:
             # 선택한 하위 폴더는 검증한 핸들을 작업 위치로 사용한다.
             # 검증 뒤 링크가 바뀌어도 다른 저장소에서 명령을 실행하지 않는다.
             options = {'cwd': self.workspace.root}
             if self.directory_fd is not None:
-                options = {'cwd': '/dev/fd/' + str(self.directory_fd), 'pass_fds': (self.directory_fd,)}
-            process = subprocess.Popen((self.write_command if write else self.command) + args, **options, env=self.environment,
+                options = {'pass_fds': (self.directory_fd,)}
+                if needs_child:
+                    # macOS does not allow chdir through /dev/fd. Change the
+                    # directory in a fresh process before replacing it with Git.
+                    launcher = ([sys.executable, '--git-directory-child'] if getattr(sys, 'frozen', False) else
+                                [sys.executable, '-I', '-S', '-c', _GIT_DIRECTORY_CHILD])
+                    command = [*launcher, str(self.directory_fd), *command[1:]]
+                else:
+                    options['cwd'] = '/dev/fd/' + str(self.directory_fd)
+            process = subprocess.Popen(command, **options, env=self.environment,
                                        stdin=source if source else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
             raise ValueError('이 컴퓨터나 SSH 서버가 설치되지 않았습니다 Git') from None
@@ -652,6 +681,10 @@ class GitWorkspace:
             if truncated: process.kill()
             code = process.wait()
             if expired.is_set(): raise ValueError('Git 작업 결과가 확인되지 않았습니다. 다시 시도할지 결정하기 전에 상태와 기록을 새로 고치세요.' if write else 'Git 읽기 시간이 초과되었습니다. 컴퓨터에서 창고를 확인한 후 다시 시도해 주세요.')
+            if needs_child and code == 126:
+                raise ValueError('프로젝트 디렉터리에 접근할 수 없습니다. 다시 선택하세요.')
+            if needs_child and code == 127:
+                raise ValueError('이 컴퓨터나 SSH 서버가 설치되지 않았습니다 Git')
             return code, data[:limit], truncated
         finally:
             timer.cancel(); process.stdout.close()

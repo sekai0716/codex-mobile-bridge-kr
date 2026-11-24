@@ -538,7 +538,7 @@ class QuitFixture {
                     code = wait(helper, 15)
                     if mode == 'initialize':
                         self.assertEqual(code, 1, output.read_text(encoding='utf-8-sig'))
-                        self.assertIn('桌面不可用', output.read_text(encoding='utf-8-sig'))
+                        self.assertIn('Windows 입력 데스크톱을 사용할 수 없습니다', output.read_text(encoding='utf-8-sig'))
                         self.assertLess(time.monotonic()-started, 3, 'initialization must fail before window restore')
                         self.assertFalse(marker.exists())
                         self.assertFalse(exited(app))
@@ -574,8 +574,8 @@ class QuitFixture {
                         # restore a hidden window or expand a menu to find it.
                         self.assertEqual(code, 1, result)
                         self.assertEqual(result['quitState'], 'failed', result)
-                        self.assertIn('尚未提交退出', result['reason'])
-                        self.assertIn('电脑端正常退出', result['reason'])
+                        self.assertIn('아직 제출되지 않았습니다', result['reason'])
+                        self.assertIn('컴퓨터에서 정상적으로 종료', result['reason'])
                         self.assertLess(time.monotonic()-started, 12)
                         self.assertFalse(marker.exists())
                         self.assertEqual(len(replies), 1, 'unsubmitted failure must not report dispatch')
