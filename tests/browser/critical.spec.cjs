@@ -726,7 +726,7 @@ test('message management keeps native Codex items visible and read only as the q
   await expect(dialog.getByRole('button',{name:'Edit',exact:true})).toHaveCount(1);
   await page.evaluate(()=>{__nativeQueueFixture.rows=[];});
   await expect(native).toHaveCount(0,{timeout:7000});
-  await dialog.getByRole('button',{name:/^(Close|关闭)$/}).click();
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();
   await expect(dialog).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>messageManagement.panel.nativeTimer)).toBe(null);
   expect(await page.evaluate(()=>({writes:__nativeQueueFixture.writes,timer:messageManagement.panel.nativeTimer}))).toEqual({writes:0,timer:null});

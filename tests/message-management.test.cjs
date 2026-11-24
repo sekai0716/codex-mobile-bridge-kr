@@ -4,7 +4,7 @@ const {MessageManagement}=require('../web/features/chat/message-management.js');
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(){
  const m=Object.create(MessageManagement.prototype),saved=[],sent=[];
- Object.assign(m,{target:{id:'chat',host:'ssh'},t:x=>x,uuid:()=> 'fresh-id',busy:false,drag:null,generation:1,dialog:{open:true},content:{inert:false,replaceChildren(){}},status:{textContent:''},closeButton:{},refreshButton:{},data:{version:'v1',draftAccountIdentity:'account',queue:[{id:'a'},{id:'b'},{id:'c'}]},queue:[{id:'a'},{id:'b'},{id:'c'}],render(){this.renders=(this.renders||0)+1;},refresh:async()=>{m.refreshes=(m.refreshes||0)+1;},onChanged(){},saveEditor:async(scope,editor)=>saved.push({scope,editor}),edit:async(scope,body)=>{sent.push({scope,body});return {queue:[{id:body.id,editId:body.editId,text:body.text}]};}});
+ Object.assign(m,{target:{id:'chat',host:'ssh'},t:x=>x,uuid:()=> 'fresh-id',busy:false,drag:null,generation:1,dialog:{open:true},content:{inert:false,replaceChildren(){}},title:{},status:{textContent:''},closeButton:{},refreshButton:{},data:{version:'v1',draftAccountIdentity:'account',queue:[{id:'a'},{id:'b'},{id:'c'}]},queue:[{id:'a'},{id:'b'},{id:'c'}],render(){this.renders=(this.renders||0)+1;},refresh:async()=>{m.refreshes=(m.refreshes||0)+1;},onChanged(){},saveEditor:async(scope,editor)=>saved.push({scope,editor}),edit:async(scope,body)=>{sent.push({scope,body});return {queue:[{id:body.id,editId:body.editId,text:body.text}]};}});
  return {m,saved,sent};
 }
 test('up/down order is persisted with exact version and all queue IDs',async()=>{
