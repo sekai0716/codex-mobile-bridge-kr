@@ -2732,6 +2732,21 @@
       "en": "Connected",
       "ko": "연결됨",
       "zh": "已连接"
+    },
+    "Bridge · 컴퓨터 작업": {
+      "en": "Bridge · Computer task",
+      "ko": "Bridge · 컴퓨터 작업",
+      "zh": "Bridge · 电脑任务"
+    },
+    "마지막 상태": {
+      "en": "Last status",
+      "ko": "마지막 상태",
+      "zh": "最后状态"
+    },
+    "채팅으로 돌아가려면 탭하세요": {
+      "en": "Tap to continue chatting",
+      "ko": "채팅으로 돌아가려면 탭하세요",
+      "zh": "轻点返回聊天"
     }
   }
 }

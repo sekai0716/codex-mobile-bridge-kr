@@ -16,6 +16,13 @@ test('native language sources preserve three complete packs and generated output
   const project=fs.readFileSync(path.join(root,'mobile/ios/BridgePreview.xcodeproj/project.pbxproj'),'utf8');
   assert.match(project,/MobileLocaleData.swift in Sources/);assert.match(project,/MobileLocaleData.swift in Widget Sources/);
 });
+test('Live Activity widget strings are translated by the iOS language catalog',()=>{
+  const widget=fs.readFileSync(path.join(root,'mobile/ios/BridgeActivity/BridgeActivityWidget.swift'),'utf8');
+  const keys=[...widget.matchAll(/context\.state\.text\(([^)]+)\)/g)]
+    .flatMap(call=>Array.from(call[1].matchAll(/"([^"]+)"/g),match=>match[1]));
+  assert.ok(keys.length>0);
+  for(const key of keys) assert.ok(Object.hasOwn(catalog.ios,key),key);
+});
 test('Android locale table executes saved and OS languages without changing unknown user text',t=>{
   const java=process.env.JAVA_HOME?path.join(process.env.JAVA_HOME,'bin','java'):'java',javac=process.env.JAVA_HOME?path.join(process.env.JAVA_HOME,'bin','javac'):'javac';
   if(spawnSync(javac,['-version']).status!==0){t.skip('JDK required; covered by Android APK build');return;}

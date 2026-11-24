@@ -9,8 +9,8 @@ struct BridgeActivityWidget: Widget {
             HStack(spacing: 14) {
                 Image(systemName: context.state.symbol).font(.title2).foregroundStyle(.blue)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(context.attributes.demo ? context.state.text("스마트 아일랜드 시연", "Live Activity preview") : context.state.text("Bridge · 컴퓨터 작업", "Bridge · Computer task")).font(.headline)
-                    Text(context.isStale ? context.state.text("마지막 상태 · ", "Last status · ") + context.state.label : context.state.label).font(.subheadline)
+                    Text(context.state.text(context.attributes.demo ? "실시간 현황 미리보기" : "Bridge · 컴퓨터 작업")).font(.headline)
+                    Text(context.isStale ? context.state.text("마지막 상태") + " · " + context.state.label : context.state.label).font(.subheadline)
                     if context.isStale { Text(context.state.updatedAt, style: .time).font(.caption).foregroundStyle(.secondary) }
                 }
                 Spacer()
@@ -25,10 +25,10 @@ struct BridgeActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.trailing) { Image(systemName: context.isStale ? "arrow.clockwise" : context.state.symbol) }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(context.attributes.demo ? context.state.text("스마트 아일랜드 시연", "Live Activity preview") : context.state.text("Bridge · 컴퓨터 작업", "Bridge · Computer task")).font(.headline)
-                        Text(context.isStale ? context.state.text("마지막 상태 · ", "Last status · ") + context.state.label : context.state.label).font(.subheadline)
-                    if context.isStale { Text(context.state.updatedAt, style: .time).font(.caption).foregroundStyle(.secondary) }
-                        Text(context.state.text("채팅을 계속하려면 클릭하세요.", "Tap to continue chatting")).font(.caption).foregroundStyle(.secondary)
+                        Text(context.state.text(context.attributes.demo ? "실시간 현황 미리보기" : "Bridge · 컴퓨터 작업")).font(.headline)
+                        Text(context.isStale ? context.state.text("마지막 상태") + " · " + context.state.label : context.state.label).font(.subheadline)
+                        if context.isStale { Text(context.state.updatedAt, style: .time).font(.caption).foregroundStyle(.secondary) }
+                        Text(context.state.text("채팅으로 돌아가려면 탭하세요")).font(.caption).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             } compactLeading: {
