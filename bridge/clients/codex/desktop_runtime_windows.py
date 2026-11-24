@@ -79,13 +79,15 @@ def run(configuration, arguments):
     if (config.get('version') != VERSION or path != directory(home) / 'settings.json'
             or Path(config['launcher']).resolve() != Path(sys.executable).resolve()):
         raise ValueError('原生共享连接配置不匹配')
-    env = dict(os.environ)
+    cli = config['cli']
+    # Only the desktop uses the adapter path. Native children such as sandbox
+    # must resolve the official CLI once the adapter marker is removed.
+    env = {**os.environ, 'CODEX_CLI_PATH': cli}
     env.pop('CMB_CODEX_DESKTOP_CONFIGURATION', None)
     # Desktop's override bootstrap removes this variable. Preserve the exact
     # registered package identity instead of weakening its native sandbox.
     if config.get('sandboxFamily'):
         env['CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY'] = config['sandboxFamily']
-    cli = config['cli']
     if server_arguments(arguments, Path('unused.sock')) is None:
         # Windows CRT process overlay can crash before forwarding startup output.
         return subprocess.call([cli, *arguments], env=env, stdin=sys.stdin, stdout=sys.stdout,

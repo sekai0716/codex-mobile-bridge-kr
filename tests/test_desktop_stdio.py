@@ -6,6 +6,7 @@ import sys
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -18,31 +19,62 @@ from bridge.clients.local_rpc import LocalRequestNotSent
 from bridge.features.sessions.create import DeleteRejected
 
 
-class WindowsAuxiliaryCommandTests(unittest.TestCase):
-    def test_auxiliary_commands_wait_and_preserve_native_exit_status_and_streams(self):
+class WindowsRuntimeLaunchTests(unittest.TestCase):
+    def setUp(self):
         home = Path('.tmp/desktop-auxiliary-home').resolve()
-        config = {'version': 1, 'home': str(home), 'launcher': sys.executable,
-                  'cli': 'native.exe', 'sandboxFamily': 'OpenAI.Codex_fixture'}
-        configuration = windows_runtime.directory(home) / 'settings.json'
-        env = {'CMB_CODEX_DESKTOP_CONFIGURATION': str(configuration), 'CODEX_HOME': str(home)}
-        with patch.dict(sys.modules, {'msvcrt': SimpleNamespace(setmode=Mock())}), \
-             patch.object(windows_runtime, '_read', return_value=config), \
-             patch.object(windows_runtime.os, 'O_BINARY', 0, create=True), \
-             patch.object(windows_runtime.sys, 'stdin', Mock()), \
-             patch.object(windows_runtime.sys, 'stdout', Mock()), \
-             patch.dict(os.environ, env, clear=True), \
-             patch.object(windows_runtime.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), \
-             patch.object(windows_runtime.subprocess, 'call', return_value=23) as call, \
+        self.cli = str(home/'Codex Package/resources/codex.exe')
+        self.config = {'version': 1, 'home': str(home), 'launcher': sys.executable, 'cli': self.cli,
+                       'application': str(home/'Codex Package/Codex.exe'), 'sandboxFamily': 'OpenAI.Codex_fixture'}
+        self.configuration = str(windows_runtime.directory(home) / 'settings.json')
+        self.desktop_env = {'CMB_CODEX_DESKTOP_CONFIGURATION': self.configuration, 'CODEX_HOME': str(home),
+                            'CODEX_CLI_PATH': self.config['launcher']}
+        self.child_env = {'CODEX_HOME': str(home), 'CODEX_CLI_PATH': self.cli,
+                          'CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY': self.config['sandboxFamily']}
+        for context in (
+                patch.dict(sys.modules, {'msvcrt': SimpleNamespace(setmode=Mock())}),
+                patch.object(windows_runtime, '_read', return_value=self.config),
+                patch.object(windows_runtime.os, 'O_BINARY', 0, create=True),
+                patch.object(windows_runtime.sys, 'stdin', Mock()),
+                patch.object(windows_runtime.sys, 'stdout', Mock()),
+                patch.dict(os.environ, self.desktop_env, clear=True),
+                patch.object(windows_runtime.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True)):
+            context.start()
+            self.addCleanup(context.stop)
+
+    def test_auxiliary_commands_wait_and_preserve_native_exit_status_and_streams(self):
+        with patch.object(windows_runtime.subprocess, 'call', return_value=23) as call, \
              patch.object(windows_runtime.os, 'execve', side_effect=AssertionError('Windows CRT overlay')), \
              patch.object(windows_runtime, 'process_identity', side_effect=AssertionError('not a writer')):
-            for args in (['--version'], ['app-server', '--print-startup-config']):
+            for args in (['--version'], ['app-server', '--print-startup-config'], ['sandbox']):
                 with self.subTest(arguments=args):
-                    self.assertEqual(windows_runtime.run(str(configuration), args), 23)
-                    call.assert_called_with(['native.exe', *args],
-                        env={'CODEX_HOME': str(home), 'CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY': 'OpenAI.Codex_fixture'},
+                    self.assertEqual(windows_runtime.run(self.configuration, args), 23)
+                    call.assert_called_with([self.cli, *args], env=self.child_env,
                         stdin=windows_runtime.sys.stdin, stdout=windows_runtime.sys.stdout,
                         stderr=windows_runtime.sys.stderr,
                         creationflags=0x08000000)
+        self.assertEqual(dict(os.environ), self.desktop_env)
+
+    def test_app_server_children_use_native_cli_and_keep_package_identity(self):
+        initialize = {'id': 1, 'method': 'initialize', 'params': {'clientInfo': {'name': 'Codex Desktop'}}}
+        app = {'pid': 42, 'image': self.config['application']}
+        host = {'pid': 43, 'parent': app['pid']}
+        arguments = ['app-server']
+        for owner in (host, None):
+            with self.subTest(host=owner):
+                windows_runtime.sys.stdin.buffer = io.BytesIO(json.dumps(initialize).encode() + b'\n')
+                with patch('bridge.clients.codex.desktop_runtime.desktop_owner', return_value=(app, owner)), \
+                     patch.object(windows_runtime, 'process_identity', return_value=owner or app), \
+                     patch.object(windows_runtime, 'exclusive_lock', return_value=nullcontext()), \
+                     patch('bridge.clients.codex.desktop_host.serve', return_value=0) as shared, \
+                     patch.object(windows_runtime, '_serve', return_value=0) as legacy:
+                    self.assertEqual(windows_runtime.run(self.configuration, arguments), 0)
+                    if owner:
+                        shared.assert_called_once_with(self.config, app, host, arguments, initialize, self.child_env)
+                        legacy.assert_not_called()
+                    else:
+                        self.assertEqual(legacy.call_args.args[:5], (self.config, app, arguments, initialize, self.child_env))
+                        shared.assert_not_called()
+        self.assertEqual(dict(os.environ), self.desktop_env)
 
 
 class DesktopStdioTests(unittest.TestCase):
