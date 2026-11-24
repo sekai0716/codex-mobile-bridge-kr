@@ -424,7 +424,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['launcher_settings'].assert_called_once_with(self.app.executable)
 
     def test_linux_initialization_checks_boot_and_process_identity_before_normal_stop(self):
-        identity = {'pid': 41, 'image': str(self.app.executable), 'bootId': 'fixture-boot',
+        identity = {'pid': 41, 'image': os.path.normcase(str(self.app.executable)), 'bootId': 'fixture-boot',
                     'startTicks': 12345, 'parent': 10}
         self.mocks['identity'].return_value = identity
         with patch.object(accounts_module, 'sys', SimpleNamespace(platform='linux')), \
@@ -432,7 +432,7 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
                    return_value=({'CODEX_HOME': str(self.home)}, None)) as environment, \
              patch('bridge.platforms.linux.desktop.commands', return_value={41: str(self.app.executable)}):
             self.run_initialization()
-            self.assertEqual(self.manager.state['phase'], 'complete')
+            self.assertEqual(self.manager.state['phase'], 'complete', self.manager.state)
             self.assertTrue(self.manager.desktop_runtime_status()['supported'])
         self.assertEqual(environment.call_args.args[1],
                          {'processIdentity': {'bootId': 'fixture-boot', 'startTicks': 12345}})

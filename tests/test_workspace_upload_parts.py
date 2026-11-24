@@ -3,12 +3,14 @@ import errno
 import hashlib
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -112,6 +114,24 @@ class UploadPartTests(unittest.TestCase):
             self.send('cancel')
             self.assertEqual(dest.read_bytes(), b'1234')
 
+    def test_publication_cleanup_is_serialized_after_receipt_commit(self):
+        self.send('start')
+        self.send('chunk', offset=0, encoded='YWJjZA==')
+        remove_stage = WorkspaceUpload.remove_stage
+
+        def verify_cleanup(row):
+            with closing(WorkspaceUpload.registry()) as reader:
+                reader.execute('PRAGMA busy_timeout=0')
+                receipt = reader.execute('SELECT state FROM uploads WHERE id=?', (row['id'],)).fetchone()
+                self.assertEqual(receipt['state'], 'done')
+                with self.assertRaisesRegex(sqlite3.OperationalError, 'locked'):
+                    reader.execute('BEGIN IMMEDIATE')
+            remove_stage(row)
+
+        with patch.object(WorkspaceUpload, 'remove_stage', side_effect=verify_cleanup) as cleanup:
+            self.assertEqual(self.send('finish')['state'], 'done')
+            cleanup.assert_called_once()
+
     def test_concurrent_publish_preserves_destination(self):
         identifiers = [str(uuid.uuid4()), str(uuid.uuid4())]
         for identifier in identifiers:
@@ -134,8 +154,8 @@ class UploadPartTests(unittest.TestCase):
 
         def ssh(alias, source, timeout):
             self.assertEqual(alias, 'upload-fixture')
-            result = subprocess.run([sys.executable, '-B', '-'], input=source, text=True,
-                                    capture_output=True, check=True, timeout=timeout)
+            result = subprocess.run([sys.executable, '-B', '-X', 'utf8', '-'], input=source,
+                                    encoding='utf-8', capture_output=True, check=True, timeout=timeout)
             return json.loads(result.stdout)
 
         thread = str(uuid.uuid4())

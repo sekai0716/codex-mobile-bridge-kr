@@ -33,8 +33,8 @@ class LinuxControlTransportTests(unittest.TestCase):
         source = 'import importlib.util\nassert importlib.util.find_spec("bridge") is None\n'
         source += worker_source({'action':'unsupported'})
         with tempfile.TemporaryDirectory() as directory:
-            result = subprocess.run([sys.executable,'-I','-S','-c',source], cwd=directory,
-                                    capture_output=True, text=True, check=True)
+            result = subprocess.run([sys.executable, '-I', '-S', '-X', 'utf8', '-'], cwd=directory,
+                                    input=source, capture_output=True, encoding='utf-8', check=True)
         reply = json.loads(result.stdout)
         self.assertFalse(reply['ok'])
         self.assertEqual(reply['errorType'], 'ControlError')

@@ -27,6 +27,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.git('config', 'user.name', 'Fixture'); self.git('config', 'user.email', 'fixture@example.invalid')
         self.git('config', 'commit.gpgsign', 'false'); self.git('config', 'core.hooksPath', '.git/hooks')
         self.git('config', 'maintenance.auto', 'false')  # Tests copy the repository immediately after commit.
+        self.git('config', 'core.autocrlf', 'false')
         self.work = Workspace(self.root)
 
     def tearDown(self): self.temp.cleanup()
@@ -67,11 +68,11 @@ class GitWorkspaceTests(unittest.TestCase):
         folder = self.root / 'nested'; folder.mkdir()
         name = '변경 파일.txt'; target = folder / name
         lines = ['line %d\n' % i for i in range(70)]
-        target.write_text(''.join(lines)); other = self.root / 'other.txt'; other.write_text('original\n')
+        target.write_bytes(''.join(lines).encode()); other = self.root / 'other.txt'; other.write_bytes(b'original\n')
         self.git('add', '.'); self.git('commit', '-qm', 'initial files')
-        lines[55] = 'already staged\n'; target.write_text(''.join(lines)); self.git('add', '.')
+        lines[55] = 'already staged\n'; target.write_bytes(''.join(lines).encode()); self.git('add', '.')
         staged = lines.copy()
-        lines[8] = 'first edit\n'; lines[35] = 'second edit\n'; target.write_text(''.join(lines)); other.write_text('unrelated edit\n')
+        lines[8] = 'first edit\n'; lines[35] = 'second edit\n'; target.write_bytes(''.join(lines).encode()); other.write_bytes(b'unrelated edit\n')
         def preview(section): return operate(folder, 'git-diff', {'path': name, 'section': section})
         def apply(action, diff, which):
             return operate(folder, 'git-action', {'action': action, 'path': name, 'version': diff['version'], 'hunk': diff['hunks'][which]})
@@ -83,7 +84,7 @@ class GitWorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError): apply('stage-hunk', first, 0)
         apply('unstage-hunk', preview('staged'), 0); staged[35] = 'line 35\n'
         self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
-        before = preview('unstaged'); lines[35] = 'external edit\n'; target.write_text(''.join(lines))
+        before = preview('unstaged'); lines[35] = 'external edit\n'; target.write_bytes(''.join(lines).encode())
         with self.assertRaises(ValueError): apply('discard-hunk', before, 1)
         self.assertEqual(index_text(), ''.join(staged)); self.assertEqual(target.read_text(), ''.join(lines))
         apply('discard-hunk', preview('unstaged'), 0); lines[8] = 'line 8\n'
@@ -92,12 +93,12 @@ class GitWorkspaceTests(unittest.TestCase):
 
     def test_partial_changes_reject_ambiguous_stale_and_unapplicable_patches(self):
         target = self.root / 'repeat.txt'; section = ['same %d\n' % i for i in range(15)]
-        initial = section * 3; target.write_text(''.join(initial))
+        initial = section * 3; target.write_bytes(''.join(initial).encode())
         self.git('add', '.'); self.git('commit', '-qm', 'repeated contexts')
         modified = initial[:]; modified[7] = modified[22] = 'edit\n'
-        target.write_text(''.join(modified))
+        target.write_bytes(''.join(modified).encode())
         self.assertEqual(self.diff(target.name, 'unstaged')['hunks'], [None, None])
-        modified[22] = 'distinct edit\n'; target.write_text(''.join(modified))
+        modified[22] = 'distinct edit\n'; target.write_bytes(''.join(modified).encode())
         diff = self.diff(target.name, 'unstaged')
         params = {'action':'stage-hunk','path':target.name,'version':diff['version'],'hunk':diff['hunks'][0]}
         with self.assertRaises(ValueError): operate(self.root,'git-action',{**params,'hunk':'f'*64})

@@ -65,13 +65,14 @@ class NativeActivityProjection(unittest.TestCase):
 
     def test_citations_plans_review_history_child_links_and_images(self):
         child = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        image_path = Path(tempfile.gettempdir()) / 'generated' / 'sample.png'
         items = [
             {'type': 'agentMessage', 'id': 'm', 'text': 'reply', 'memoryCitation': {'entries': [{'path': 'memory.md', 'lineStart': 1, 'lineEnd': 2, 'note': 'note'}]}},
             {'type': 'plan', 'id': 'p', 'text': 'first'},
             {'type': 'todo-list', 'id': 'todo', 'plan': [{'step': 'one', 'status': 'completed'}, {'step': 'two', 'status': 'inProgress'}]},
             {'type': 'userInputResponse', 'id': 'q', 'questions': [{'question': 'choose', 'id': 'a'}], 'answers': {'a': ['yes']}, 'completed': True},
             {'type': 'subAgentActivity', 'id': 'a', 'agentThreadId': child, 'agentPath': '/root/test', 'kind': 'interrupted'},
-            {'type': 'imageGeneration', 'id': 'i', 'status': 'completed', 'savedPath': '/generated/sample.png'},
+            {'type': 'imageGeneration', 'id': 'i', 'status': 'completed', 'savedPath': str(image_path)},
             {'type': 'imageGeneration', 'id': 'u', 'src': 'https://other.test/private'},
             {'type': 'mcpToolCall', 'id': 'tool', 'mcpAppUi': {'resourceUri': 'ui://app/view'}, 'status': 'completed', 'result': {'content': [{'type': 'text', 'text': 'answer'}]}},
             {'type': 'dynamicToolCall', 'id': 'auto', 'tool': 'automation_update', 'arguments': {'mode': 'delete', 'id': 'known'}, 'status': 'completed', 'success': True,
@@ -91,7 +92,7 @@ class NativeActivityProjection(unittest.TestCase):
         self.assertTrue(t.rows[9]['activityCard'])
         self.assertIn('example', t.rows[9]['text'])
         state = {'turns': [{'items': items}]}
-        self.assertEqual(referenced_model_images(state, image_views_only=True), {Path('/generated/sample.png').resolve()})
+        self.assertEqual(referenced_model_images(state, image_views_only=True), {image_path.resolve()})
 
     def test_native_hook_function_output_and_model_notice(self):
         note = {'type': 'functionCallOutput', 'namespace': 'codex_app', 'name': 'create_thread', 'output':

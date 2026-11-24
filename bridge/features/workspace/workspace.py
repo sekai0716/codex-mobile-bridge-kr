@@ -531,6 +531,9 @@ class WorkspaceUpload:
             db.commit()
             if state == 'done' and row['temp']:
                 # Commit the receipt before cleanup so a lost response is resolved by status.
+                # Unlinking the staging name can change the published file's metadata.
+                # Keep that unlink outside other uploads' comparison transactions.
+                db.execute('BEGIN IMMEDIATE')
                 self.remove_stage(row)
                 db.execute('DELETE FROM checks WHERE id=?', (self.key,))
                 db.execute("UPDATE uploads SET temp='' WHERE id=?", (self.key,))
@@ -547,6 +550,7 @@ class WorkspaceUpload:
 
     def update_file(self, db, row, phase, offset, encoded):
         position = row['offset']
+        name = self.parts[-1]
         with self.workspace.directory(self.parts[:-1]) as (directory, fd):
             handle = self.workspace.open_file(directory, fd, row['temp'], os.O_RDWR)
             with os.fdopen(handle, 'r+b') as stage:
@@ -574,11 +578,12 @@ class WorkspaceUpload:
                     raise ValueError('Upload is incomplete.')
                 try:
                     if fd is None:
-                        os.link(directory / row['temp'], directory / self.parts[-1])
+                        os.link(directory / row['temp'], directory / name)
                     else:
-                        os.link(row['temp'], self.parts[-1], src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
+                        os.link(row['temp'], name, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
                 except FileExistsError:
-                    destination = self.workspace.open_file(directory, fd, self.parts[-1], os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0))
+                    flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0)
+                    destination = self.workspace.open_file(directory, fd, name, flags)
                     with os.fdopen(destination, 'rb') as target:
                         other = os.fstat(destination)
                         if stat.S_ISREG(other.st_mode) and os.path.samestat(info, other):
@@ -596,9 +601,19 @@ class WorkspaceUpload:
                                 if len(block) != size or target.read(size) != block:
                                     raise ValueError('동일한 이름의 파일이 이미 존재합니다. 업로드한 파일의 이름을 변경하세요.')
                                 checked += size
-                            current = (os.stat(self.parts[-1], dir_fd=fd, follow_symlinks=False)
-                                       if fd is not None else (directory / self.parts[-1]).lstat())
-                            if (not os.path.samestat(other, current) or other.st_size != current.st_size
+                            # Reopen the name to verify that it still points to
+                            # the file we compared. Use the same stat API for
+                            # both handles, including on Windows.
+                            try:
+                                current_fd = self.workspace.open_file(directory, fd, name, flags)
+                            except OSError:
+                                raise ValueError('Upload destination changed.') from None
+                            try:
+                                current = os.fstat(current_fd)
+                            finally:
+                                os.close(current_fd)
+                            if (not stat.S_ISREG(current.st_mode) or not os.path.samestat(other, current)
+                                    or other.st_size != current.st_size
                                     or other.st_mtime_ns != current.st_mtime_ns or other.st_ctime_ns != current.st_ctime_ns):
                                 raise ValueError('Upload destination changed.')
                             if checked == position:
