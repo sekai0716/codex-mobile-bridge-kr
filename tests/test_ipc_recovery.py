@@ -1,6 +1,7 @@
 """A live but retired router must not trap the gateway after explicit recovery."""
 import os
 import socket
+import sys
 import time
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -413,6 +414,78 @@ class RecoveryTests(unittest.TestCase):
 
     def test_hosted_explicit_rebuild_keeps_other_chats_connected(self):
         self._hosted_cold_recovery_keeps_shared_transport(rebuild=True)
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux desktop preparation')
+    def test_linux_rebuild_prepares_a_stopped_runtime_then_follows_the_same_thread(self):
+        from bridge.clients.codex.transport import connect_stream
+
+        self.bridge.ipc.codex_home = self.root
+        directory = self.root / 'shared'
+        directory.mkdir()
+        generation = 'fixture-generation'
+        shared = DesktopFixture(directory, owner='desktop-runtime:' + generation)
+        self.addCleanup(shared.close)
+        shared.loaded = False
+        shared.state['title'] = 'Original chat through the shared owner'
+        saved_endpoint = {'path': shared.path, 'generation': generation, 'controlToken': 'a' * 64}
+        endpoint = None
+
+        def prepare():
+            nonlocal endpoint
+            endpoint = saved_endpoint
+
+        def dial(path):
+            if path == self.fixture.path:
+                raise ConnectionRefusedError('Desktop is stopped')
+            return connect_stream(path)
+
+        with patch('bridge.clients.codex.desktop_runtime.hosted_endpoint', side_effect=lambda _: endpoint), \
+                patch('bridge.clients.codex.ipc.connect_stream', side_effect=dial) as connect, \
+                patch.object(self.bridge.accounts, 'prepare_shared_desktop_reconnect', side_effect=prepare) as start:
+            session = self.bridge.session(THREAD)
+            self.assertFalse(session.connected)
+            self.assertTrue(session.view()['rebuildRecommended'])
+            self.opened_desktop.side_effect = lambda *_: setattr(shared, 'loaded', True)
+            self.assertIs(self.bridge.reconnect_session(THREAD, rebuild=True), session)
+            self.assertTrue(session.connected)
+            self.assertEqual(session.owner, shared.owner)
+            self.assertEqual(session.state['title'], shared.state['title'])
+            self.assertEqual(session.state['id'], THREAD)
+            self.assertEqual(session.state['modelProvider'], 'custom-api')
+            self.assertFalse(session.view()['rebuildRecommended'])
+            self.opened_desktop.assert_called_once_with(THREAD, 'local')
+            self.assertEqual(connect.call_args_list[-1].args, (shared.path,))
+            initial = [row for row in shared.requests if row['method'] == 'initialize']
+            self.assertEqual(len(initial), 1)
+            self.assertEqual(initial[0]['params']['generation'], generation)
+            self.assertEqual(initial[0]['params']['controlToken'], saved_endpoint['controlToken'])
+
+            # Rebuilding a second time reuses the living shared transport.
+            sibling = self.sibling()
+            sibling.connected = True
+            socket_before = self.bridge.ipc.socket
+            self.assertIs(self.bridge.reconnect_session(THREAD, rebuild=True), session)
+            self.assertIs(self.bridge.ipc.socket, socket_before)
+            self.assertTrue(sibling.connected)
+            start.assert_called_once_with()
+            self.assertFalse(any(row['method'].startswith('thread-follower-') for row in shared.requests))
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux desktop preparation')
+    def test_linux_rebuild_rejects_legacy_connection_when_shared_preparation_is_blocked(self):
+        session = self.bridge.session(THREAD)
+        self.assertTrue(session.connected)
+        legacy = self.bridge.ipc.socket
+        self.bridge.ipc.codex_home = self.root
+        self.bridge.accounts.desktop_preparation = {'state': 'waiting', 'reason': 'Native task still running'}
+        with patch('bridge.clients.codex.desktop_runtime.hosted_endpoint', return_value=None), \
+                patch.object(self.bridge.accounts, 'prepare_shared_desktop_reconnect') as start:
+            with self.assertRaisesRegex(IPCError, 'Native task still running'):
+                self.bridge.reconnect_session(THREAD, rebuild=True)
+        start.assert_called_once_with()
+        self.opened_desktop.assert_not_called()
+        self.assertIs(self.bridge.ipc.socket, legacy)
+        self.assertEqual(session.owner, 'owner')
+        self.assertFalse(session.activating)
 
     def test_reconnect_clears_old_transport_synchronously(self):
         ipc = self.bridge.ipc

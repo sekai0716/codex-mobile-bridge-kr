@@ -35,7 +35,7 @@ def state():
 
 
 class DesktopFixture:
-    def __init__(self, root):
+    def __init__(self, root, *, owner='owner'):
         self.root = root
         (root / "ipc").mkdir()
         # macOS limits Unix socket paths; test data is still under project .tmp.
@@ -52,6 +52,7 @@ class DesktopFixture:
         self.state = state()
         self.revision = 1
         self.host = "local"
+        self.owner = owner
         self.requests = []
         self.client = None
         self.write_lock = threading.Lock()
@@ -66,7 +67,7 @@ class DesktopFixture:
             self.client.sendall(struct.pack('<I', len(data)) + data)
 
     def publish(self, change):
-        self.send({"type": "broadcast", "sourceClientId": "owner", "method": "thread-stream-state-changed", "version": 11,
+        self.send({"type": "broadcast", "sourceClientId": self.owner, "method": "thread-stream-state-changed", "version": 11,
                    "params": {"hostId": self.host, "conversationId": THREAD, "change": change}})
 
     def snapshot(self):
@@ -91,6 +92,10 @@ class DesktopFixture:
                             self.snapshot()
                         continue
                     self.requests.append(message)
+                    if method == 'thread-owner-discovery' and self.owner.startswith('desktop-runtime:') and not self.loaded:
+                        self.send({'type': 'response', 'requestId': message['requestId'], 'method': method,
+                                   'resultType': 'error', 'error': 'no-client-found'})
+                        continue
                     if method == 'thread-follower-update-thread-settings':
                         settings = message['params']['threadSettings']
                         if 'model' in settings: self.state['latestModel'] = settings['model']
@@ -100,7 +105,7 @@ class DesktopFixture:
                         self.snapshot()
                     result = {"applied": True} if method == 'thread-follower-update-thread-settings' else {"clientId": "gateway"} if method == 'initialize' else {"ok": True}
                     self.send({"type": "response", "requestId": message['requestId'], "method": method,
-                               "resultType": "success", "handledByClientId": "gateway" if method == 'initialize' else "owner", "result": result})
+                               "resultType": "success", "handledByClientId": "gateway" if method == 'initialize' else self.owner, "result": result})
             except (OSError, EOFError):
                 pass
             finally:

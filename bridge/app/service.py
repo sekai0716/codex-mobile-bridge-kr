@@ -26,7 +26,8 @@ from bridge.features.terminals.manager import TerminalManager
 from bridge.features.sessions.side_chat import SideChats
 from bridge.features.sessions import linux_permissions
 from bridge.clients.codex.ipc import (DesktopIPC, IPCError, StreamCompatibilityError,
-                                     KNOWN_STREAM_VERSIONS, validate_stream_version, validate_stream_state)
+                                     KNOWN_STREAM_VERSIONS, SHARED_DESKTOP_UNAVAILABLE,
+                                     validate_stream_version, validate_stream_state)
 from bridge.clients.errors import TaskStateUnavailable, TaskAuditIncomplete
 from bridge.clients.codex.app_server import AppServerError, AppServerUnavailable
 from bridge.clients.codex.desktop_runtime import SUPPORTED_PLATFORMS
@@ -3745,7 +3746,7 @@ class Bridge:
                 pass
         return False
 
-    def _attach(self, session, timeout=1.5):
+    def _attach(self, session, timeout=1.5, *, shared_only=False):
         with session.condition:
             probe_sequence = session.owner_probe_sequence
             epoch = session.connection_epoch
@@ -3839,12 +3840,16 @@ class Bridge:
             try:
                 # Owners answer a follow with a fresh snapshot. This also works
                 # for remote/background owners absent from owner-discovery.
-                self.ipc.connect()
+                if not shared_only:
+                    self.ipc.connect()
                 if not self.observation_enabled():
                     self.suspend_observation()
                     return
-                owner = (self.ipc.owner(session.id, host=self.native_host, legacy_discovery=False)
-                         if self.ipc.hosted and self.native_host == 'local' else None)
+                owner = None
+                if shared_only:
+                    owner = self.ipc.owner(session.id, host=self.native_host, shared_only=True)
+                elif self.ipc.hosted and self.native_host == 'local':
+                    owner = self.ipc.owner(session.id, host=self.native_host, legacy_discovery=False)
                 with session.condition:
                     session.owner = owner
                     session.revision = None
@@ -3858,6 +3863,9 @@ class Bridge:
                 with session.condition:
                     session.discovering = False
                     session.connected = False
+                    if (self._uses_shared_desktop_rebuild(session) and not self.ipc.client_id and
+                            not session.desktop_stream_error):
+                        session.rebuild_recommended = True
                     session.error = None if session.origin in ('cli', 'ide') else str(exc)
                     session.access = self._access(session.origin, session)
                     session.changed()
@@ -3919,12 +3927,17 @@ class Bridge:
             if gate is not None:
                 gate.release()
 
+    def _uses_shared_desktop_rebuild(self, session):
+        return (sys.platform == 'linux' and self.host == 'local' and session.origin == 'desktop' and
+                self.ipc.codex_home is not None and self.accounts is not None)
+
     @operation
     def rebuild_connection(self, thread_id):
-        session = self.session(thread_id, background=True)
-        self._load_session_origin(session)
+        session = self.session(thread_id, attach=False, background=True)
         if session.origin != 'desktop' or self.host != 'local':
             raise IPCError('此会话不使用桌面连接，请使用继续会话。')
+        if self._uses_shared_desktop_rebuild(session):
+            return self._rebuild_shared_desktop(session)
         if self.ipc.hosted and self.ipc.socket and not self.ipc.endpoint_changed():
             # A cold thread does not invalidate the verified shared runtime.
             # Retry its owner and explicit activation without dropping siblings.
@@ -3952,6 +3965,40 @@ class Bridge:
                 session.changed()
                 raise IPCError(session.error) from exc
 
+    def _rebuild_shared_desktop(self, session):
+        """Prepare the shared owner if needed, then follow this exact thread."""
+        with session.condition:
+            session.activating = True
+            session.desktop_restart_recommended = False
+            session.changed()
+        try:
+            try:
+                self.ipc.connect(shared_only=True)
+            except IPCError:
+                self.accounts.prepare_shared_desktop_reconnect()
+                try:
+                    self.ipc.connect(shared_only=True)
+                except IPCError as exc:
+                    raise IPCError(self.accounts.desktop_preparation.get('reason') or str(exc)) from exc
+            with session.condition:
+                if session.connected and not self.ipc.is_shared_owner(session.owner):
+                    self._invalidate(session, None, runtime='desktop')
+                session.last_activation = None
+            self.activate(session.id, _transport_rebuilt=True, _shared_only=True)
+            with session.condition:
+                if session.connected and self.ipc.is_shared_owner(session.owner):
+                    return session
+            raise IPCError(SHARED_DESKTOP_UNAVAILABLE)
+        except (IPCError, OSError, ValueError) as exc:
+            with session.condition:
+                session.error = session.desktop_stream_error or str(exc)
+                session.rebuild_recommended = not session.desktop_stream_error
+                raise IPCError(session.error) from exc
+        finally:
+            with session.condition:
+                session.activating = False
+                session.changed()
+
     @staticmethod
     def _record_cli_follow_error(session, error):
         with session.condition:
@@ -3974,16 +4021,17 @@ class Bridge:
 
     @operation
     def activate(self, thread_id, *, allow_ide_resume=True, _transport_rebuilt=False, _cli_recovery=None, _expected_cli=None,
-                 _defer_cli_account=False):
+                 _defer_cli_account=False, _shared_only=False):
         """Explicit phone operation only; reads and notification watches never navigate."""
         from bridge.clients.codex.daemon_network import CliProviderMismatch
-        if _cli_recovery is None:
+        if _cli_recovery is None and not _shared_only:
             record = self._cli_recovery_record()
             plan = record.get('providerTarget')
             if (plan and plan['before']['id'] == thread_id and record.get('phase') == 'complete'
                     and record.get('providerPhase') == 'authorized'):
                 return self._activate_cli_recovery(thread_id, plan)
-        session = self.session(thread_id, background=True)
+        session = self.session(thread_id, attach=not _shared_only, background=True)
+        attach_options = {'shared_only': True} if _shared_only else {}
         with session.condition:
             if session.desktop_stream_error and not session.connected:
                 raise IPCError(session.desktop_stream_error)
@@ -4029,7 +4077,7 @@ class Bridge:
                         # Ask for a current snapshot before abandoning that route.
                         with session.condition:
                             session.connected = False
-                        self._attach(session)
+                        self._attach(session, **attach_options)
                         if session.connected:
                             return session
                     self._rebuild_desktop_transport()
@@ -4052,9 +4100,9 @@ class Bridge:
                     if _transport_rebuilt and not session.connected:
                         # A probe for the retired transport can finish without
                         # checking this new connection. Reprobe before navigating.
-                        self._attach(session)
+                        self._attach(session, **attach_options)
                 else:
-                    self._attach(session)
+                    self._attach(session, **attach_options)
                 if session.connected:
                     return session
                 if session.origin == 'ide' and not allow_ide_resume:
@@ -4098,6 +4146,10 @@ class Bridge:
                                 session.native_attaching = False
                 if session.last_activation is not None and time.monotonic() - session.last_activation < 20:
                     raise IPCError(session.error or '桌面仍在加载此聊天；操作未发送，请稍后重试。')
+                if _shared_only:
+                    # Do not open a deep link after losing the shared owner:
+                    # the desktop handler could otherwise launch an ordinary App.
+                    self.ipc.connect(shared_only=True)
                 session.last_activation = time.monotonic()
                 try:
                     open_in_desktop(session.id, self.host)
@@ -4105,7 +4157,7 @@ class Bridge:
                     raise IPCError('无法在电脑 Codex 中加载此聊天；操作未发送，请检查 Codex 是否已安装并运行。') from exc
                 deadline = time.monotonic() + 20
                 while not session.connected and not self.closed.is_set() and time.monotonic() < deadline:
-                    self._attach(session, timeout=.75)
+                    self._attach(session, timeout=.75, **attach_options)
                     if not session.connected:
                         self.closed.wait(.25)
                 if not session.connected:
@@ -4117,6 +4169,8 @@ class Bridge:
                     if session.desktop_stream_error:
                         session.error = session.desktop_stream_error
                         session.desktop_restart_recommended = False
+                    elif _shared_only:
+                        session.error = str(exc)
                     elif session.rebuild_recommended and _transport_rebuilt:
                         session.desktop_restart_recommended = True
                         session.error = '已重建网关连接，但原桌面会话仍未恢复。可在应用管理中核对任务后重启 Codex；操作未发送。'
@@ -4165,7 +4219,7 @@ class Bridge:
                 return
             if session.origin in ('cli', 'ide') and session.desktop_owner_probe != 'found':
                 return
-            if session.discovering and session.origin not in ('cli', 'ide') and isinstance(change, dict) and change.get("type") == "snapshot" and isinstance(change.get('conversationState'), dict) and change['conversationState'].get('id') == session.id:
+            if session.discovering and session.owner is None and session.origin not in ('cli', 'ide') and isinstance(change, dict) and change.get("type") == "snapshot" and isinstance(change.get('conversationState'), dict) and change['conversationState'].get('id') == session.id:
                 session.owner = message.get("sourceClientId")
                 session.discovering = False
             if not session.owner or message.get("sourceClientId") != session.owner:

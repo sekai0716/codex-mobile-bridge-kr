@@ -150,6 +150,16 @@ class DesktopRuntimeAccountsTests(unittest.TestCase):
         self.mocks['configure'].assert_not_called()
         self.app.start.assert_not_called()
 
+    def test_explicit_shared_recovery_never_launches_an_unprepared_app(self):
+        self.mocks['connect'].return_value = None
+        self.mocks['validate_runtime'].side_effect = ValueError('Shared transport unsupported')
+        self.mocks['inspect'].side_effect = [self.stopped] * 3
+        self.manager.prepare_shared_desktop_reconnect()
+        self.assertEqual(self.manager.desktop_preparation,
+                         {'state': 'failed', 'reason': 'Shared transport unsupported'})
+        self.mocks['stop'].assert_not_called()
+        self.app.start.assert_not_called()
+
     def test_recovery_monitor_prepares_a_running_replacement_after_task_audit(self):
         self.mocks['connect'].side_effect = [None, Mock()]
         self.assertFalse(self.manager.prepare_desktop_runtime(self.app, allow_cold_start=False))

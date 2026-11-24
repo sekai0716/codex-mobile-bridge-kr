@@ -406,7 +406,7 @@ class HostedSessionTests(unittest.TestCase):
             ipc.follow('t', owner, False)
             with patch.object(ipc, '_legacy_connection') as old:
                 with self.assertRaisesRegex(IPCError, 'no-client-found'):
-                    ipc.request('thread-owner-discovery', {'hostId': 'local', 'conversationId': 'cold'})
+                    ipc.owner('cold', shared_only=True)
                 old.assert_not_called()
             legacy = Mock()
             legacy.request.return_value = {'resultType': 'success', 'handledByClientId': 'original-ide-owner',

@@ -1061,10 +1061,7 @@ class Accounts:
                                      and self.desktop_preparation.get('taskStateUnavailable') is True):
                 raise ValueError('请先核验原生连接初始化的任务状态，再确认是否继续')
             self.idle(pending_only=True)
-            executable = self.index.get('desktopExecutable') or DesktopApp.discover(self.runtime)
-            if not executable:
-                executable = DesktopApp.scan(self.runtime, self.home)
-            app = DesktopApp(executable, self.home)
+            app = self._desktop_runtime_app()
             app.validate(self.runtime)
             from bridge.clients.codex.desktop_runtime import validate_runtime, launcher_settings
             validate_runtime(self.runtime)
@@ -1075,8 +1072,16 @@ class Accounts:
             self.thread.start()
             return self.public()
 
-    def prepare_desktop_runtime(self, app, *, cancelled=lambda: False, allow_cold_start=True):
-        """Startup preparation; return True only when a passive retry is safe.
+    def _desktop_runtime_app(self):
+        executable = self.index.get('desktopExecutable') or DesktopApp.discover(self.runtime)
+        return DesktopApp(executable or DesktopApp.scan(self.runtime, self.home), self.home)
+
+    def prepare_shared_desktop_reconnect(self):
+        """Reuse the guarded lifecycle to prepare the original desktop profile."""
+        self.prepare_desktop_runtime(self._desktop_runtime_app(), require_shared=True)
+
+    def prepare_desktop_runtime(self, app, *, cancelled=lambda: False, allow_cold_start=True, require_shared=False):
+        """Automatic preparation; return True only when a passive retry is safe.
 
         Waiting does not change account state or hold a gate between attempts.
         Once a lifecycle write starts, a failure requires explicit recovery.
@@ -1091,7 +1096,7 @@ class Accounts:
                 return False
             self.assert_editable()
             return self._initialize_desktop_runtime(app, automatic=True, cancelled=cancelled,
-                                                    allow_cold_start=allow_cold_start)
+                                                    allow_cold_start=allow_cold_start, require_shared=require_shared)
         except ValueError as exc:
             self.desktop_preparation = {'state': 'waiting', 'reason': str(exc)}
             return True
@@ -1156,7 +1161,7 @@ class Accounts:
             stop_client(descriptor, state=current, expected_identities=owners)
 
     def _initialize_desktop_runtime(self, app, acknowledged=False, *, automatic=False, cancelled=lambda: False,
-                                    allow_cold_start=True):
+                                    allow_cold_start=True, require_shared=False):
         from bridge.clients.codex.desktop_runtime import configure, connect, initialization_lock, DesktopRuntimeBusy
         from bridge.clients.codex.desktop_runtime import preparation, record_preparation, settings
         from bridge.clients.codex.app_server import AppServerUnavailable
@@ -1192,9 +1197,9 @@ class Accounts:
                         launcher_settings(app.executable)
                     except ValueError as exc:
                         # An unsupported shared transport must not prevent an
-                        # ordinary cold App launch. Existing shared settings or
-                        # an uncertain launch never use this fallback.
-                        if settings(self.home) is not None:
+                        # ordinary startup. Explicit shared recovery and existing
+                        # shared settings require the shared runtime.
+                        if require_shared or settings(self.home) is not None:
                             raise
                         preparation_error = exc
                 state, identities = self._desktop_runtime_snapshot(app, descriptor)

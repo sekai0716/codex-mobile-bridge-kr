@@ -12,6 +12,7 @@ from bridge.clients.codex.transport import connect_stream, endpoint_identity
 
 
 KNOWN_STREAM_VERSIONS = frozenset((11, 13))
+SHARED_DESKTOP_UNAVAILABLE = '未能确认 Codex 原生共享连接，请重新初始化连接'
 
 
 class StreamCompatibilityError(ValueError):
@@ -153,9 +154,10 @@ class DesktopIPC:
             return bool(self.socket and self.endpoint_identity is not None and
                         current is not None and current != self.endpoint_identity)
 
-    def connect(self, *, deadline=None):
+    def connect(self, *, deadline=None, shared_only=False):
         with self.connect_lock:
-            if self.client_id and self.socket:
+            connected = bool(self.client_id and self.socket)
+            if connected and not shared_only:
                 return
             with self.lock:
                 generation = self.generation
@@ -166,11 +168,22 @@ class DesktopIPC:
                     hosted = hosted_endpoint(self.codex_home)
                 except (OSError, ValueError, KeyError, TypeError) as exc:
                     raise IPCError('原生桌面连接身份无法核验，请在账号管理中检查连接状态。') from exc
-                self.path = hosted['path'] if hosted else self.original_path
+            path = hosted['path'] if hosted else self.original_path
+            if shared_only and hosted is None:
+                raise IPCError(SHARED_DESKTOP_UNAVAILABLE)
+            identity = endpoint_identity(path)
+            if shared_only:
+                if (connected and self.path == path and self.endpoint_identity == identity and
+                        self.hosted_generation == hosted['generation']):
+                    return
+                # Explicit recovery holds the host operation gate while retiring a legacy follower.
+                self.close()
+                with self.lock:
+                    generation = self.generation
+            self.path = path
             self.hosted = hosted is not None
             self.hosted_generation = hosted['generation'] if hosted else None
             try:
-                identity = endpoint_identity(self.path)
                 if deadline is None:
                     sock = connect_stream(self.path)
                 else:
@@ -192,8 +205,13 @@ class DesktopIPC:
                 if hosted:
                     params.update({key: hosted[key] for key in ('generation', 'controlToken')})
                 result = self.request("initialize", params, timeout=5, deadline=deadline)
-                if hosted and hosted_endpoint(self.codex_home) != hosted:
-                    raise IPCError('原生桌面连接在握手期间已变化。')
+                if hosted:
+                    try:
+                        current = hosted_endpoint(self.codex_home)
+                    except (OSError, ValueError, KeyError, TypeError) as exc:
+                        raise IPCError('原生桌面连接在握手期间已变化。') from exc
+                    if current != hosted:
+                        raise IPCError('原生桌面连接在握手期间已变化。')
                 with self.lock:
                     if (generation != self.generation or self.socket is not sock or
                             deadline is not None and time.monotonic() >= deadline):
@@ -277,11 +295,19 @@ class DesktopIPC:
             self.legacy_owners.add(response['handledByClientId'])
         return response
 
-    def owner(self, session_id, host="local", *, legacy_discovery=True):
-        self.connect()
+    def is_shared_owner(self, owner):
+        with self.lock:
+            return bool(self.client_id and self.socket and self.hosted_generation and
+                        owner == 'desktop-runtime:' + self.hosted_generation)
+
+    def owner(self, session_id, host="local", *, legacy_discovery=True, shared_only=False):
+        self.connect(shared_only=shared_only)
         response = self.request("thread-owner-discovery", {
-            "hostId": host, "conversationId": session_id}, timeout=6, legacy_discovery=legacy_discovery)
-        return response["handledByClientId"]
+            "hostId": host, "conversationId": session_id}, timeout=6, legacy_discovery=legacy_discovery and not shared_only)
+        owner = response["handledByClientId"]
+        if shared_only and not self.is_shared_owner(owner):
+            raise IPCError(SHARED_DESKTOP_UNAVAILABLE)
+        return owner
 
     def follow(self, session_id, owner, enabled=True, host="local"):
         if self.hosted and (owner in self.legacy_owners or host != 'local'):
