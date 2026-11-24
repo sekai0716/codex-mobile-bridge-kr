@@ -27,3 +27,28 @@ test('English and original Chinese inputs resolve through the Korean pack',()=>{
   ui.setLanguage('zh');assert.equal(ui.t('Message…'),'输入消息…');
   ui.setLanguage('en');assert.equal(ui.t('이 채팅 이어가기…'),'Message…');
 });
+
+test('desktop connection errors from the gateway use the selected language',()=>{
+  const ui=loadLanguagePacks();
+  const missingConnection='桌面 App 未连接，请打开 Codex App。';
+  const messages=[
+    "原生桌面连接身份无法核验，请在账号管理中检查连接状态。",
+    "桌面读取超时；尚未取得实时会话状态。",
+    "桌面 App 未连接，请打开 Codex App。",
+    "原生桌面连接在握手期间已变化。",
+    "消息过大",
+    "桌面连接已断开",
+    "桌面连接已断开；请检查会话后再决定是否重发。",
+    "桌面请求未完成",
+    "桌面响应超时；操作可能已提交，请查看会话后再决定是否重发。",
+    "桌面 IPC 帧长度不兼容",
+  ];
+  for(const source of messages){
+    assert.match(ui.translateTo(source,'ko'),/[가-힣]/u,source);
+    assert.doesNotMatch(ui.translateTo(source,'ko'),/\p{Unified_Ideograph}/u,source);
+    assert.match(ui.translateTo(source,'en'),/^[\x20-\x7e]+$/,source);
+    assert.equal(ui.translateTo(source,'zh'),source);
+  }
+  assert.equal(ui.translateTo(missingConnection,'ko'),'Codex 데스크톱 앱에 연결할 수 없습니다. PC에서 Codex를 열어 주세요.');
+  assert.equal(ui.translateTo(missingConnection,'en'),'Unable to connect to the Codex desktop app. Open Codex on your computer.');
+});
