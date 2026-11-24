@@ -14,6 +14,7 @@ test('merged controls send queue and steer through the real submit handler and s
   await expect(page.locator('#bootstrap-status')).toBeHidden();
   await page.waitForFunction(() => typeof DesktopSessionsView === 'function');
   await page.evaluate(async () => {
+    BridgeI18n.setLanguage('zh');
     const root = document.createElement('div');
     root.id = 'merged-live';
     root.className = 'app';
@@ -201,7 +202,7 @@ for(const [provider,backend] of [['claude','code'],['claude','cowork'],['deepsee
   await view.choose(provider);await view.open('feedback-test');clearTimeout(view.timer);
  },{provider,backend});
  const composer=page.locator('#send-feedback-root .ds-composer'),input=composer.locator('textarea'),send=composer.locator('button[type=submit]'),feedback=composer.locator('.ds-send-feedback');
- const message='이 메시지의 전송 상태를 확인하고 아직 어떤 작업도 수행하지 마세요.';
+ const message='이 메시지의 전송 상태를 확인하고 아직 어떤 작업도 수행하지 마세요.',nextDraft='다음 초안';
  await input.fill(message);await send.click();
  await expect(feedback).toBeVisible();await expect(feedback.getByRole('status')).toHaveText('전송 중…');await expect(feedback.locator('p')).toHaveText(message);await expect(send).toBeDisabled();
  expect(await page.evaluate(()=>sendFeedbackFixture.notices)).toEqual([]);
@@ -211,13 +212,13 @@ for(const [provider,backend] of [['claude','code'],['claude','cowork'],['deepsee
   expect(await feedback.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
   await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-${theme}-sending.png`)});
  }
- await input.fill('다음 초안');
+ await input.fill(nextDraft);
  await page.evaluate(()=>sendFeedbackFixture.finish({status:'accepted'}));
- await expect(feedback).toBeHidden();await expect(input).toHaveValue('다음 초안');
+ await expect(feedback).toBeHidden();await expect(input).toHaveValue(nextDraft);
  await expect.poll(()=>page.evaluate(()=>sendFeedbackFixture.notices)).toEqual(['채팅으로 보냈습니다']);
  await send.click();await expect(feedback).toBeVisible();
  await page.evaluate(()=>sendFeedbackFixture.finish({status:'unknown',message:'확인을 위해 결과 보내기'}));
- await expect(feedback).toBeHidden();await expect(input).toHaveValue('다음 초안');await expect(composer.locator('.error')).toContainText('확인을 위해 결과 보내기');
+ await expect(feedback).toBeHidden();await expect(input).toHaveValue(nextDraft);await expect(composer.locator('.error')).toContainText('확인을 위해 결과 보내기');
  expect(await page.evaluate(()=>sendFeedbackFixture.writes.length)).toBe(2);
  expect(await page.evaluate(()=>sendFeedbackFixture.notices.filter(value=>value==='채팅으로 보냈습니다').length)).toBe(1);
  // A successful submission is distinct from ongoing native work. The indicator
@@ -239,30 +240,32 @@ for(const [provider,backend] of [['claude','code'],['claude','cowork'],['deepsee
  await image.click();await expect(page.locator('#image-preview-dialog')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-history-image.png`)});
  await page.keyboard.press('Escape');await expect(page.locator('#image-preview-dialog')).toBeHidden();
- await page.evaluate(()=>{const v=sendFeedbackFixture.view;document.documentElement.dataset.showProcess='true';v.applyDetail({connected:true,session:v.state,messages:[{id:'context',role:'activity',kind:'context',title:'上下文',text:'项目说明与自动注入内容'}]});});
+ await page.evaluate(()=>{const f=sendFeedbackFixture;document.documentElement.dataset.showProcess='true';f.publish({connected:true,session:f.view.state,messages:[{id:'context',role:'activity',kind:'context',title:'上下文',text:'项目说明与自动注入内容'}]});});
  const context=page.locator('#send-feedback-root .activity');await expect(context.locator('pre')).toBeHidden();
  await expect(context.locator('summary')).toBeVisible();await context.locator('summary').click();await expect(context.locator('pre')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-context-expanded.png`)});
  await page.evaluate(()=>{const v=sendFeedbackFixture.view;v.workbench.request=async()=>({name:'photo.png',path:'images/photo.png',absolutePath:'/fixture/images/photo.png',size:4,kind:'file'});BridgeFileActions.menu(v.workbench,v.workbench.current,{name:'photo.png',path:'images/photo.png',kind:'file'});});
- await page.getByRole('button',{name:'引用到消息',exact:true}).click();await expect(input).toBeVisible();await expect(input).toHaveValue('下一条草稿');await expect(page.locator('#send-feedback-root .attachment-chip')).toContainText('photo.png');
+ await page.getByRole('button',{name:'메시지 내 참조',exact:true}).click();await expect(input).toBeVisible();await expect(input).toHaveValue(nextDraft);await expect(page.locator('#send-feedback-root .attachment-chip')).toContainText('photo.png');
  expect(await page.evaluate(()=>sendFeedbackFixture.writes.length)).toBe(2);
  await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-project-reference.png`)});
  if(provider==='claude'&&backend==='code'){
   await page.evaluate(()=>{
    window.BridgeUploadSource=()=>true;
-   const v=sendFeedbackFixture.view;v.state.cwd='/fixture';v.updateComposer();
+   const f=sendFeedbackFixture,v=f.view;
+   f.publish({...f.detail,session:{...v.state,cwd:'/fixture'},messages:v.historyMessages});
    v.workbench.request=async()=>({project:'/fixture',entries:Array.from({length:60},(_,i)=>({name:`file-${i}.txt`,path:`file-${i}.txt`,kind:'file',size:10})),nextOffset:null});
   });
   await composer.locator('.attach-button').click();
   await expect(page.locator('.attachment-menu button')).toHaveCount(4);
   await expect(page.locator('.attachment-menu').getByRole('button',{name:'Skill',exact:true})).toBeDisabled();
-  await expect(page.getByRole('button',{name:'拍照或录像',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'사진 또는 비디오 촬영',exact:true})).toHaveCount(0);
   // Opening the sheet by touch/pointer must not paint a keyboard focus ring
   // on Photos; keyboard navigation still reaches every action.
   expect(await page.locator('.attachment-menu').evaluate(node=>document.activeElement===node)).toBe(true);
   await page.keyboard.press(process.platform==='darwin'&&testInfo.project.name.startsWith('webkit')?'Alt+Tab':'Tab');
   await expect(page.getByRole('button',{name:'사진 라이브러리',exact:true})).toBeFocused();
   await page.keyboard.press('Escape');
+  await expect(page.locator('.attachment-menu')).toHaveCount(0);
   await composer.locator('.attach-button').click();
   await page.screenshot({path:testInfo.outputPath('attachment-menu-chat.png')});
   await page.getByRole('button',{name:'호스트 프로젝트 파일 참조',exact:true}).click();

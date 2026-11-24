@@ -314,6 +314,7 @@ class Workbench {
   async close(id) {
     const session = this.current, index = session.files.findIndex(t => t.id === id);
     if (index < 0) return;
+    const closingChat = !!session.files[index].chatId;
     if (session.files[index].chatId === session.chatId && session.chatId!==session.id) {
       const selected = session.chatId === session.files[index].chatId;
       session.files[index].childView?.dispose();
@@ -332,7 +333,7 @@ class Workbench {
     session.files[index].controller?.abort(); session.files[index].pdf?.dispose(); session.files[index].html?.dispose(); session.files[index].markdown?.dispose(); session.files[index].fileFont?.dispose(); session.files[index].git?.dispose(); session.files[index].terminal?.dispose(); session.files[index].agents?.dispose(); session.files[index].sideChat?.dispose(); session.files.splice(index, 1);
     if(session.splitTab===id){
       const primary=this.primaryChatTab(session);
-      const adjacent=[...session.files.slice(index),...session.files.slice(0,index).reverse()].find(tab=>tab.id!==primary);
+      const adjacent=[...session.files.slice(index),...session.files.slice(0,index).reverse()].find(tab=>tab.id!==primary&&(closingChat||!tab.chatId));
       session.splitTab=!this.canSplit()&&id.startsWith('child:')?null:adjacent?.id||null;
     }
     if(session.lastToolTab===id)session.lastToolTab=session.splitTab||session.files.find(t=>!t.chatId)?.id||null;

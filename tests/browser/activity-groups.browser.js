@@ -31,9 +31,10 @@ async function runActivityGroupBrowserChecks(){
         apply=(cached=false)=>view.applyDetail(detail(),cached);
       }
       const node=id=>container.querySelector('[data-key="'+id+'"]');apply();await frame();await frame();
-      check(!container.querySelector('.chat-activity-group,.chat-process-page'),provider+' has no turn or batch disclosure');
-      check(messages.every(message=>node(message.id)?.parentElement===container),provider+' records remain direct chronological siblings');
-      check([...container.children].filter(node=>node.dataset.key&&!node.classList.contains('chat-turn-completion')).map(node=>node.dataset.key).join('|')===messages.map(row=>row.id).join('|'),provider+' ordering retains progress and user supplement');
+      const rendered=messages.filter(message=>provider!=='codex'||message.role!=='reasoning');
+      check(!container.querySelector('.activity-group'),provider+' native turn does not introduce a second activity disclosure');
+      check(rendered.every(message=>node(message.id)?.parentElement===container),provider+' records remain direct chronological siblings');
+      check([...container.children].filter(node=>node.dataset.key&&!node.classList.contains('chat-turn-completion')).map(node=>node.dataset.key).join('|')===rendered.map(row=>row.id).join('|'),provider+' ordering retains progress and user supplement');
       check(node('progress').getBoundingClientRect().height>0&&node('final').getBoundingClientRect().height>0,provider+' progress and final reply stay visible');
       const command=node('command');command.open=true;await frame();await frame();
       const count=reads;messages=messages.map(message=>({...message,turnStatus:'completed'}));apply();await frame();await frame();
@@ -44,7 +45,7 @@ async function runActivityGroupBrowserChecks(){
       if(view){view.input.value='Unsent '+provider;apply();check(view.input.value==='Unsent '+provider,provider+' draft survives refresh');}
       document.documentElement.dataset.showReasoning='false';document.documentElement.dataset.showProcess='false';
       if(timeline)timeline.setVisibility({showReasoning:false,showProcess:false});else apply();await frame();await frame();
-      check(node('reason').hidden&&node('command').hidden&&node('progress').hidden,provider+' display preferences hide only matching rows');
+      check((provider==='codex'?!node('reason'):node('reason').hidden)&&node('command').hidden&&node('progress').hidden,provider+' display preferences hide only matching rows');
       check(!node('input').hidden&&!node('supplement').hidden&&!node('final').hidden,provider+' user and final answer stay visible');
       document.documentElement.dataset.showReasoning='true';document.documentElement.dataset.showProcess='true';
     }finally{view?.clear();timeline?.dispose();root.remove();}

@@ -78,7 +78,7 @@ test('Git history remains available after an oversized changes list and loads ol
     const latestVisibleByDefault = body.querySelector('.wb-history-row')?.textContent.includes('Latest commit') || false;
     const firstLimit = new URL(historyRequests[0], location.href).searchParams.get('limit');
     body.querySelector('.wb-history-list button:last-child').click(); await wait(() => historyRequests.length === 2);
-    await wait(() => body.querySelector('.wb-history-list')?.textContent.includes('加载更早的提交'));
+    await wait(() => body.querySelector('.wb-history-list')?.textContent.includes(BridgeI18n.t('이전 커밋 로드')));
     const nextLimit = new URL(historyRequests[1], location.href).searchParams.get('limit');
     body.querySelector('.wb-git-modes button:first-child').click(); await wait(() => statusRequests === 1);
     const navigationVisible = !!body.querySelector('.wb-git-modes') && body.querySelectorAll('.wb-git-modes button').length === 3;
@@ -448,13 +448,13 @@ for(const [name,file,invoke] of [
 }
 
 for (const [name, file, invoke] of [
-  ['shared native rows remain chronological without task groups', 'activity-groups', 'runActivityGroupBrowserChecks'],
+  ['shared native rows retain commentary, supplements and chronological order', 'activity-groups', 'runActivityGroupBrowserChecks'],
   ['shared history batches preserve reading and native row order', 'history-batches', 'runHistoryBatchBrowserChecks'],
   ['paperclip host reference and native attachment actions', 'host-file-reference', 'runHostFileReferenceChecks'],
   ['agent manual model and reasoning settings', 'agent-model-settings', 'runAgentModelSettingsChecks'],
   ['chat history, list entry and scroll position', 'desktop-history', 'runDesktopHistoryBrowserChecks'],
   ['shared chat reading state across refreshes', 'chat-reading-state', 'runChatReadingStateChecks'],
-  ['native turn process folding experiment', 'turn-fold', 'runTurnFoldBrowserChecks'],
+  ['native turn process folding preserves messages and reading state', 'turn-fold', 'runTurnFoldBrowserChecks'],
   ['account-scoped drafts and late send acknowledgement', 'persistent-drafts', 'runPersistentDraftTests'],
   ['API form labels, layout and upstream model selection', 'api-form', 'runApiFormBrowserChecks'],
   ['shared session menu on desktop and mobile', 'session-menu', 'runSessionMenuBrowserChecks'],
@@ -1116,7 +1116,7 @@ test('Antigravity shared chat preserves source identity and composer geometry wh
  expect(result.labels).toEqual(['APP','CLI','IDE']);expect(result.options).toEqual(['all','app','cli','ide']);
  await page.screenshot({path:path.join(__dirname,'../../.tmp/feedback-20261110/agy-'+info.project.name+'-list.png')});
  await page.locator('#agy-chat .ds-surface').selectOption('cli');await expect(page.locator('#agy-chat .ds-session-row')).toHaveCount(1);await page.locator('#agy-chat .ds-session-row').click();
- await expect(page.locator('#agy-chat .ds-title')).toHaveText('测试失败排查');
+ await expect(page.locator('#agy-chat .ds-title')).toHaveText('테스트 실패 문제 해결');
  const before=await page.evaluate(()=>{const v=__agyChat.view;clearTimeout(v.timer);v.input.value='请继续检查';v.input.oninput();const controls=[v.modelButton,v.skillsButton,v.permissionsButton,v.contextButton,v.toolbar.moreButton,v.attachButton,v.toolbar.submitControl.root,v.send];__agyChat.controls=controls;return controls.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,top:b.top,width:b.width,height:b.height,hidden:n.hidden,disabled:n.disabled,stored:n===v.skillsButton&&v.toolbar.layout.more.includes('skills')&&v.toolbar.sources.contains(n)};});});
  expect(before.every(row=>!row.hidden&&(row.stored||row.width>10))).toBe(true);expect(before[1].disabled).toBe(true);expect(before[7].disabled).toBe(false);
  await page.screenshot({path:path.join(__dirname,'../../.tmp/feedback-20261110/agy-'+info.project.name+'-connected.png')});
@@ -1179,7 +1179,7 @@ test('Antigravity desktop management configures existing models and approvals pe
 test('shared session menu retains working chat notification settings without a composer reminder',async({page})=>{
  let writes=[];await page.route('**/api/desktop-sessions/claude/detail?*',route=>route.fulfill({json:{session:{id:'claude-synthetic-0',title:'Claude · 페이지 대화형 검증',cwd:'/synthetic/project',status:'idle'},capabilities:{send:true},messages:[]}}));
  await page.route('**/api/desktop-sessions/claude/notifications?*',route=>{const body=route.request().postDataJSON();if(body)writes.push(body);return route.fulfill({json:{available:true,requests:body?.requests||'inherit',completion:body?.completion||'off'}});});
- await ready(page,'session-menu');await page.locator('#client-switch').getByRole('button',{name:'Claude',exact:true}).click();const row=page.locator('.ds-session-row:visible').filter({hasText:'Claude · 페이지 대화형 검증'}).first();await expect(row).toBeVisible();
+ await ready(page,'session-menu');await page.evaluate(()=>BridgeI18n.setLanguage('zh'));await page.locator('#client-switch').getByRole('button',{name:'Claude',exact:true}).click();const row=page.locator('.ds-session-row:visible').filter({hasText:'Claude · 페이지 대화형 검증'}).first();await expect(row).toBeVisible();
  if(page.viewportSize().width<=640){await row.dispatchEvent('pointerdown',{pointerType:'touch',button:0,clientX:80,clientY:150});await expect(page.locator('dialog.session-menu')).toBeVisible();await row.dispatchEvent('pointerup',{pointerType:'touch',button:0});}else await row.click({button:'right'});
  await page.locator('dialog.session-menu').getByRole('button',{name:'聊天通知设置',exact:true}).click();const dialog=page.locator('dialog.picker[open]').filter({hasText:'聊天通知设置'});await expect(dialog).toBeVisible();await dialog.getByLabel('请求处理通知',{exact:true}).selectOption('on');await dialog.getByLabel('运行完毕通知',{exact:true}).selectOption('inherit');await dialog.getByRole('button',{name:'保存配置',exact:true}).click();await expect(dialog).toHaveCount(0);expect(writes).toEqual([{requests:'on',completion:'inherit'}]);expect(await page.locator('.ds-composer .composer-tools').getByRole('button',{name:/提醒/}).count()).toBe(0);
 });
@@ -1327,7 +1327,7 @@ test('desktop update cache and official version controls keep download and insta
   try{return route.fulfill({body:readFileSync(file),contentType:filename.endsWith('.js')?'text/javascript':filename.endsWith('.css')?'text/css':'image/png'});}catch{return route.abort();}
  });
  await page.setViewportSize({width:1200,height:950});await page.goto('/desktop/index.html');
- await expect(page.locator('#sidebar-status')).toHaveText('未启动');
+ await expect(page.locator('#sidebar-status')).toHaveText('已停止');
  expect(await page.evaluate(()=>fixtureCacheCalls.length+fixtureVersionCalls.length)).toBe(0);
  await page.locator('[data-tab=advanced]').click();await page.locator('[data-maintenance-tab=updates]').click();
  await expect(page.locator('.update-cache-entry')).toHaveCount(2);

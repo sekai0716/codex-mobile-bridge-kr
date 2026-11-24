@@ -125,6 +125,8 @@ test('independent send mode defaults to More, moves to a toolbar and shares the 
 }) => {
   await page.evaluate(() => {
     const t = __toolbarTest.main;
+    // This fixture owns capability inputs that the real composer normally sets.
+    t.submitControl.send.disabled = false;
     t.controls.sendMode.disabled = false;
     for (const option of t.controls.sendMode.options) option.disabled = false;
     t.submitControl.getState = () => ({ running: true, hasDraft: true });

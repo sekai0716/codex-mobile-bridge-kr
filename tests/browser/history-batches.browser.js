@@ -63,10 +63,11 @@ async function runHistoryBatchBrowserChecks(){
       check((timeline?timeline.rows.size:view.historyMessages.length)===202,provider+' retains all 200 raw tools plus current reply and user supplement');
       check(getNode('current')===currentNode&&body.isConnected&&!mutations.some(record=>[...record.removedNodes].some(node=>node===currentNode||node===body||node.contains?.(body))),provider+' history never detaches or replaces the current reply body');
       check(Math.abs(currentNode.getBoundingClientRect().top-top)<3,provider+' combined history preserves the current reading anchor');
-      const user=getNode('supplement'),tools=[...container.children].filter(node=>node.dataset.key?.startsWith('tool-'));
+      const user=getNode('supplement'),tools=[...container.querySelectorAll('[data-key^="tool-"]')];
       check(user.parentElement===container&&user.getBoundingClientRect().height>0,provider+' user supplement stays in its chronological position');
-      check(!container.querySelector('.chat-activity-group')&&tools.length===200,provider+' all loaded activities remain direct native rows');
-      check(getNode('tool-1').isConnected&&getNode('tool-200').isConnected,provider+' loaded history is not hidden in a local group page');
+      check(tools.map(node=>node.dataset.key).join('|')===pages[1].rows.concat(pages[0].rows).map(row=>row.key).join('|'),provider+' all loaded activities remain attached in chronological order');
+      const group=container.querySelector('details.activity-group');
+      check(timeline?group&&!group.open&&tools.every(node=>node.closest('details.activity-group')===group):!group&&tools.every(node=>node.parentElement===container),provider+' code activity grouping preserves the complete history');
       check(timeline?timeline.meta.requests[0].id===pending.id:view.state.requests[0].id===pending.id&&view.requests.children.length>0,provider+' historical reads never replace current approvals');
       check(!notices.length,provider+' history completes without a retry or error notice');
       if(view){
@@ -77,7 +78,7 @@ async function runHistoryBatchBrowserChecks(){
         const newer=container.querySelector('.ds-history-newer');
         check(view.historyMessages.length===202&&getNode('current')===currentNode&&body.isConnected,provider+' 200 non-overlapping new replies do not replace an upward reader history window');
         check(!mutations.slice(beforeDeferred).some(record=>[...record.removedNodes].some(node=>node===currentNode||node===body||node.contains?.(body)))&&Math.abs(currentNode.getBoundingClientRect().top-readingTop)<3,provider+' deferred recent page preserves the old reply node and reading pixel anchor');
-        check(newer&&newer.parentElement===container&&!newer.closest('.chat-activity-group')&&newer.getBoundingClientRect().height>0&&newer.getBoundingClientRect().bottom>viewport.getBoundingClientRect().top&&newer.getBoundingClientRect().top<viewport.getBoundingClientRect().bottom,provider+' non-overlapping recent history exposes an independent newer-content control inside the reading viewport');
+        check(newer&&newer.parentElement===container&&!newer.closest('.activity-group')&&newer.getBoundingClientRect().height>0&&newer.getBoundingClientRect().bottom>viewport.getBoundingClientRect().top&&newer.getBoundingClientRect().top<viewport.getBoundingClientRect().bottom,provider+' non-overlapping recent history exposes an independent newer-content control inside the reading viewport');
         check(view.input.value===draft&&requests.length===3,provider+' deferred history preserves the unsent draft and makes no history request');
         newer.click();await frame();await frame();
         check(view.historyMessages.length===200&&view.historyMessages[0].id==='new-0'&&view.historyMessages.at(-1).id==='new-199'&&!getNode('current'),provider+' only explicit newer-content selection switches to the actual latest page');

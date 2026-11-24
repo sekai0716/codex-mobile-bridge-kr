@@ -749,7 +749,7 @@ test('reasoning uses the last nonempty line beside Thinking and never renders ti
 test('compaction states and locale selections work in Korean, English and Chinese',async({page})=>{
   await prepare(page);
   await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'compact',order:3,role:'activity',kind:'contextCompaction',title:'contextCompaction',status:'completed',text:'',version:1},{key:'autocompact',order:4,role:'activity',kind:'autoContextCompaction',title:'autoContextCompaction',status:'inProgress',text:'',version:1}];chatTimeline.apply({...f.page(),sequence:2});});
-  const languages=[['ko','컨텍스트 압축됨','컨텍스트 자동 압축 중','메시지를 입력하세요'],['en','Context compacted','Automatically compacting context','Message…'],['zh','上下文已压缩','正在自动压缩上下文','输入消息…']];
+  const languages=[['ko','컨텍스트 압축됨','컨텍스트 자동 압축 중','이 채팅 이어가기…'],['en','Context compacted','Automatically compacting context','Continue this chat…'],['zh','上下文已压缩','正在自动压缩上下文','继续这条聊天…']];
   for(const [language,compact,auto,placeholder]of languages){
     await page.evaluate(language=>{BridgeI18n.setLanguage(language);BridgeI18n.apply();chatTimeline.relabel();},language);
     await expect(page.locator('#messages [data-key=compact] summary')).toHaveText(compact);

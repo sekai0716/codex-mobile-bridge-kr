@@ -6,11 +6,11 @@ class MessageManagement {
     Object.assign(this,{t:text=>text,uuid:()=>crypto.randomUUID(),localRecords:()=>[],loadEditor:()=>null,saveEditor:()=>{},beforeOpen:()=>{},onChanged:()=>{},confirm:message=>window.confirm(message),...options});
     this.doc=options.document||document;this.generation=0;this.busy=false;this.drag=null;this.editor=null;
     this.dialog=this.node('dialog','message-management picker');this.dialog.setAttribute('aria-labelledby','message-management-title');
-    const head=this.node('div','picker-head'),title=this.node('h2');title.id='message-management-title';title.textContent=this.t('메시지 관리');
-    this.closeButton=this.button('닫기',()=>this.dialog.close());head.append(title,this.closeButton);
+    const head=this.node('div','picker-head');this.title=this.node('h2');this.title.id='message-management-title';
+    this.closeButton=this.button('关闭',()=>this.dialog.close());head.append(this.title);
     this.status=this.node('p','message-management-status');this.status.setAttribute('role','status');
     this.content=this.node('div','message-management-content');this.content.tabIndex=-1;this.content.addEventListener('scroll',()=>{this.scrollEpoch=(this.scrollEpoch||0)+1;this.scrollingUntil=Date.now()+500;},{passive:true});
-    this.refreshButton=this.button('새로고침',()=>this.refresh());
+    this.refreshButton=this.button('刷新',()=>this.refresh());
     const headerActions=this.node('div','message-management-header-actions');headerActions.append(this.refreshButton,this.closeButton);head.append(headerActions);
     this.dialog.append(head,this.status,this.content);this.doc.body.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{if(this.busy||this.drag)event.preventDefault();});
@@ -25,6 +25,9 @@ class MessageManagement {
     const token=++this.generation;
     this.data=null;this.local=[];this.content.replaceChildren();
     this.opener=this.doc.activeElement;this.beforeOpen();await Promise.resolve(this.editorSave).catch(()=>{});this.editor=await this.loadEditor(this.target);this.persistedEditor=this.cloneValue(this.editor);if(token!==this.generation)return;
+    this.title.textContent=this.t('消息管理');
+    this.closeButton.textContent=this.t('关闭');
+    this.refreshButton.textContent=this.t('刷新');
     this.dialog.showModal();const visible=++this.generation;
     const loaded=await this.refresh();
     if(typeof editId!=='string'||!loaded||!this.current(visible))return;
