@@ -15,6 +15,9 @@ test('native language sources preserve three complete packs and generated output
   assert.equal(result.status,0,result.stdout+result.stderr);
   const project=fs.readFileSync(path.join(root,'mobile/ios/BridgePreview.xcodeproj/project.pbxproj'),'utf8');
   assert.match(project,/MobileLocaleData.swift in Sources/);assert.match(project,/MobileLocaleData.swift in Widget Sources/);
+  const objectIds=Array.from(project.matchAll(/^\s*([A-F0-9]{24})(?: \/\*[^\n]*\*\/)? = \{\s*isa = /gm),match=>match[1]);
+  assert.ok(objectIds.length>0);
+  assert.equal(new Set(objectIds).size,objectIds.length,'Xcode object IDs must be unique');
 });
 test('Live Activity widget strings are translated by the iOS language catalog',()=>{
   const widget=fs.readFileSync(path.join(root,'mobile/ios/BridgeActivity/BridgeActivityWidget.swift'),'utf8');
