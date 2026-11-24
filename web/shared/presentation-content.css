@@ -74,8 +74,9 @@
 .compose-actions .primary,.stop{min-height:36px;padding:8px 12px;font-size:12px;border-radius:10px}
 .stop{background:var(--surface);color:var(--text)}
 #composer .compose-bottom>.compose-actions{align-items:center}
-#composer #send,#composer #stop{display:grid;place-items:center;flex:none;width:40px;height:40px;min-height:40px;padding:8px;border-radius:50%}
-#composer #send svg,#composer #stop svg{width:22px;height:22px}
+/* 기본 입력창에만 적용한다. 사용자 지정 도구줄은 아이콘과 텍스트를 함께 배치한다. */
+#composer:not(.custom-composer) :is(#send,#stop){display:grid;place-items:center;flex:none;width:40px;height:40px;min-height:40px;padding:8px;border-radius:50%}
+#composer:not(.custom-composer) :is(#send,#stop) svg{width:22px;height:22px}
 .skill-pill{background:var(--soft);color:var(--green)}
 .newer{bottom:calc(var(--composer-height,190px) + 10px);background:var(--raised);color:var(--green);border-color:var(--line);font-size:12px;padding:9px 14px}
 .toast{background:var(--text);color:var(--page)}

@@ -338,12 +338,13 @@ function renderList(){
   const hasPins=!grouped&&ordered.some(chat=>chat.bridgePinned);
   for(const chat of ordered){
     let parent=$('sessions');
+    const projectLabel=(unassigned(chat)?t('Uncategorized'):chat.projectName)+' · '+(chat.host==='local'?t('이 컴퓨터'):chat.hostLabel);
     if(hasPins&&pinSection!==!!chat.bridgePinned){pinSection=!!chat.bridgePinned;const label=el('h3','muted',t(pinSection?'고정된 채팅':'최근 채팅'));$('sessions').append(label);}
     if(grouped){
       if(!groups.has(chat.projectKey)){
         const details=el('details','project-group');
         details.open=localStorage.getItem('group:'+chat.projectKey)!=='closed';
-        details.append(el('summary','',chat.projectName+' · '+(chat.host==='local'?t('이 컴퓨터'):chat.hostLabel)));
+        details.append(el('summary','',projectLabel));
         details.ontoggle=()=>localStorage.setItem('group:'+chat.projectKey,details.open?'open':'closed');
         groups.set(chat.projectKey,details);$('sessions').append(details);
       }
@@ -353,7 +354,7 @@ function renderList(){
     button.dataset.id=chat.id;button.dataset.host=chat.host;
     button.append(el('strong','',chat.title));
     button.append(el('span','session-source',sourceLabel(sessionAccess(chat.access))||t('기타 소스')));
-    const meta=el('small');meta.append(el('span','',(chat.orphanedSideChat?t('보조 채팅(기본 채팅 사용 불가)')+' · ':'')+chat.projectName+' · '+(chat.host==='local'?t('이 컴퓨터'):chat.hostLabel)),el('time','',dateText(chat.recency/1000)));
+    const meta=el('small');meta.append(el('span','',(chat.orphanedSideChat?t('보조 채팅(기본 채팅 사용 불가)')+' · ':'')+projectLabel),el('time','',dateText(chat.recency/1000)));
     if(chat.pinPending)button.append(el('span','session-source',t('동기화 보류 중인 고정 환경설정')));
     button.append(meta);button.onclick=()=>openChat(chat.id,chat.host).catch(e=>toast(e.message));bindSessionMenu(button,chat);parent.append(button);
   }

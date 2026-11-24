@@ -434,11 +434,15 @@ def connect(home, cli):
             from bridge.clients.codex.desktop_host import MetadataClient
             client = MetadataClient(home)
             client.connect()
+            if client.desktop_generation != record['generation']:
+                client.close()
+                raise ValueError('Shared runtime generation changed during handshake')
             return client
         if sys.platform == 'win32':
             from bridge.clients.codex.desktop_runtime_windows import MetadataClient
             client = MetadataClient(directory(home), record)
             client.connect()
+            client.desktop_generation = record['generation']
             return client
         expected = socket_path(home, record['generation'])
         if record['socket'] != str(expected):
@@ -454,6 +458,7 @@ def connect(home, cli):
                     raise ValueError('Shared runtime generation changed during handshake')
             if verified_socket(expected) != endpoint_identity:
                 raise ValueError('Shared runtime socket changed during handshake')
+            client.desktop_generation = record['generation']
             return client
         except Exception:
             client.close()

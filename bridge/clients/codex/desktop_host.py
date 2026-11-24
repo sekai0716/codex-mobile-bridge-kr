@@ -498,12 +498,15 @@ class _Follower:
 class MetadataClient:
     def __init__(self, home):
         self.client = DesktopIPC('', codex_home=home)
+        self.desktop_generation = None
 
     def connect(self):
         try:
             self.client.connect()
         except IPCError as exc:
             raise AppServerUnavailable(str(exc)) from exc
+        # Readiness and subagent operations must use the generation of this handshake.
+        self.desktop_generation = self.client.hosted_generation
 
     def request(self, method, params, timeout=90):
         try:

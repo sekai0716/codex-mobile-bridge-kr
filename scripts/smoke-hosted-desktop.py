@@ -6,6 +6,7 @@ credentials; it does not launch, stop or access the user's Desktop or daemon.
 The fixture's parent process represents the App; GUI integration is separate.
 """
 import argparse
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -160,6 +161,12 @@ def main():
                 request('turn/start', {'threadId': thread_id, 'input': [{'type': 'text', 'text': 'Synthetic seed'}]})
                 assert completed()['status'] == 'completed'
                 before = runtime._read(private / 'active.json')['runtime']
+                if sys.platform == 'linux':
+                    with closing(runtime.connect(home, cli)) as metadata:
+                        record = runtime._read(private / 'active.json')
+                        assert metadata.desktop_generation == record['generation']
+                        thread = metadata.request('thread/read', {'threadId': thread_id, 'includeTurns': False})
+                        assert thread['thread']['id'] == thread_id
                 bridge = Bridge(home, root / 'gateway', codex_bin=str(cli))
                 try:
                     session = bridge.session(thread_id)

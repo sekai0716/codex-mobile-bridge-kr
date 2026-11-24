@@ -48,3 +48,13 @@ test('desktop messages share Korean presentation and stable operation text',()=>
  for(const [source,expected] of [['작곡가 숨기기','입력창 접기'],['승인해 주세요','나 대신 승인'],['저지르다','커밋']])assert.equal(desktop.translate(source,'ko'),expected);
  assert.equal(desktop.translate('승인해 주세요','en'),'Approve for me');
 });
+
+test('chat organization and shared connection status have Chinese translations',()=>{
+  const ui=i18n();
+  assert.equal(ui.t('Uncategorized'),'분류되지 않음');
+  ui.setLanguage('zh');
+  assert.equal(ui.t('Add'),'添加');
+  assert.equal(ui.t('Uncategorized'),'未归类');
+  assert.equal(ui.t('等待当前操作结束后自动准备原生侧聊'),'等待当前操作结束后准备 Codex 共享连接。');
+  assert.equal(ui.t('等待 Codex 启动后自动恢复原生连接'),'等待 Codex 启动后恢复共享连接。');
+});

@@ -2,6 +2,10 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Add": "추가",
+  "Uncategorized": "분류되지 않음",
+  "等待当前操作结束后自动准备原生侧聊": "진행 중인 작업이 끝나면 Codex 공유 연결을 준비합니다.",
+  "等待 Codex 启动后自动恢复原生连接": "Codex가 시작되면 공유 연결을 복구합니다.",
   "Could not reconnect this chat to Codex. Try reconnecting this chat again.": "이 채팅을 Codex에 연결하지 못했습니다. 다시 연결을 눌러 주세요.",
   "The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.": "Codex 데스크톱 공유 연결을 준비해야 합니다. 데스크톱 작업이 모두 끝나면 앱을 정상 종료하고 Bridge의 계정 관리에서 연결 준비 상태를 확인하세요.",
   "The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.": "Codex 데스크톱과 Bridge에서 선택한 계정 또는 작업 공간이 다릅니다. 두 앱에서 같은 계정과 작업 공간을 선택하세요.",

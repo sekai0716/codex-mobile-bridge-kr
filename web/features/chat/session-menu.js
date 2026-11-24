@@ -420,7 +420,7 @@ class SessionMenu {
         if(choice.id===selected)button.append(this.node('span','sm-selected','✓'));
       }
       if(local){
-        const form=this.node('form','sm-form'),input=this.node('input'),add=this.node('button','primary',this.t('다음에 추가'));
+        const form=this.node('form','sm-form'),input=this.node('input'),add=this.node('button','primary',this.t('Add'));
         const label=this.t(view==='project'?'새 프로젝트 이름':'새 섹션 이름');input.maxLength=120;input.required=true;input.placeholder=label;input.setAttribute('aria-label',label);add.type='submit';form.append(input,add);box.append(form);
         let request=null;
         form.onsubmit=event=>{event.preventDefault();const title=input.value.trim();if(!title)return;

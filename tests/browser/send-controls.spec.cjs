@@ -534,6 +534,57 @@ test('desktop composer choices fit above compact controls and keep keyboard sele
   await expect(menu.getByRole('menuitemradio').last()).toBeInViewport();
 });
 
+test('the primary send button keeps its label and icon on one row', async ({page}) => {
+  await prepare(page);
+  const send = page.locator('#composer #send');
+  await page.locator('#message').fill('发送按钮回归检查');
+  await page.evaluate(() => BridgeI18n.setLanguage('zh'));
+  for (const [status, label] of [['idle', '发送新消息'], ['active', '完成后发送']]) {
+    await page.evaluate(status => sendControlsFixture.update(status), status);
+    await expect(send).toHaveAttribute('aria-label', label);
+    await expect(send).toHaveCSS('display', 'flex');
+    const bounds = await send.evaluate(button => {
+      const parent = button.getBoundingClientRect();
+      const icon = button.querySelector('svg').getBoundingClientRect();
+      const text = button.querySelector('span').getBoundingClientRect();
+      return {
+        inside: [icon, text].every(part =>
+          part.left >= parent.left && part.right <= parent.right
+          && part.top >= parent.top && part.bottom <= parent.bottom),
+        aligned: Math.abs((icon.top + icon.height / 2) - (text.top + text.height / 2)) < 1,
+      };
+    });
+    expect(bounds).toEqual({inside: true, aligned: true});
+  }
+});
+
+test('uncategorized labels follow the UI language and project names stay literal', async ({page}) => {
+  await prepare(page);
+  const labels = await page.evaluate(() => {
+    const chat = {
+      host: 'local', hostLabel: 'Fixture', recency: Date.now(), title: '테스트 채팅',
+      projectName: '未归类',
+    };
+    listRows = [
+      {...chat, id: '91aa1111-2222-4333-8444-555555555555', projectKey: 'local|unassigned'},
+      {...chat, id: '92aa1111-2222-4333-8444-555555555555', projectKey: 'local|named-project'},
+    ];
+    const text = () => [...document.querySelectorAll('#sessions .session small span')]
+      .map(span => span.textContent.split(' · ')[0]);
+    document.getElementById('list-mode').value = 'project';
+    BridgeI18n.setLanguage('ko');
+    renderList();
+    const korean = text();
+    BridgeI18n.setLanguage('zh');
+    renderList();
+    return {korean, chinese: text()};
+  });
+  expect(labels).toEqual({
+    korean: ['未归类', '분류되지 않음'],
+    chinese: ['未归类', '未归类'],
+  });
+});
+
 test('Codex composer sends idle, queues busy or steers with no repeat after an unknown write',async({page},testInfo)=>{
   await prepare(page);
   const input=page.locator('#message'),send=page.locator('#send'),caret=page.locator('#composer .composer-submit-caret');

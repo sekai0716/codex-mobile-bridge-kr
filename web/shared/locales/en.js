@@ -2,6 +2,10 @@
 // Registered UI messages only. Chat text, commands and file names are not language-pack inputs.
 (()=>{
 const messages={
+  "Add": "Add",
+  "Uncategorized": "Uncategorized",
+  "等待当前操作结束后自动准备原生侧聊": "Waiting for the current operation to finish before preparing the shared Codex connection.",
+  "等待 Codex 启动后自动恢复原生连接": "Waiting for Codex to start before restoring the shared connection.",
   "Could not reconnect this chat to Codex. Try reconnecting this chat again.": "Could not reconnect this chat to Codex. Try reconnecting this chat again.",
   "The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.": "The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.",
   "The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.": "The Codex desktop is connected to a different account or workspace. Select the same account in Bridge and the desktop app.",
