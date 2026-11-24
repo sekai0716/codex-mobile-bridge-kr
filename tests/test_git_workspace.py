@@ -26,6 +26,7 @@ class GitWorkspaceTests(unittest.TestCase):
         self.git('init', '-q', '-b', 'main')
         self.git('config', 'user.name', 'Fixture'); self.git('config', 'user.email', 'fixture@example.invalid')
         self.git('config', 'commit.gpgsign', 'false'); self.git('config', 'core.hooksPath', '.git/hooks')
+        self.git('config', 'maintenance.auto', 'false')  # Tests copy the repository immediately after commit.
         self.work = Workspace(self.root)
 
     def tearDown(self): self.temp.cleanup()
