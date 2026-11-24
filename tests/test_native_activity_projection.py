@@ -36,6 +36,17 @@ class NativeActivityProjection(unittest.TestCase):
         self.assertTrue(text.endswith('Exit code\nraw'))
         self.assertEqual([text.split('\n')[i] for i in cmd['commandLabelLines']],
                          ['Read file', 'Searched files', 'Working directory', 'Duration', 'Exit code'])
+        self.assertEqual(cmd['commandActions'], ['read', 'search'])
+
+    def test_command_categories_use_only_the_native_actions(self):
+        source = {'type': 'commandExecution', 'id': 'cmd', 'command': 'cat unverified.txt',
+                  'commandActions': [{'type': 'read', 'path': 'C:/skills/demo/SKILL.md'},
+                                     {'type': 'listFiles'}, {'type': 'search', 'path': '/repo'},
+                                     {'type': 'read', 'path': '/repo/README.md'}, {'type': 'read', 'name': 'b.txt'},
+                                     {'type': 'unknown'}]}
+        row = timeline([source]).rows[0]
+        self.assertEqual(row['commandActions'], ['readSkill', 'listFiles', 'search', 'read', 'command'])
+        self.assertNotIn('commandActions', timeline([{**source, 'commandActions': []}]).rows[0])
 
     def test_review_internal_records_retry_progress_and_unknown_fallback(self):
         rows = [{'id': 'try1', 'type': 'error', 'willRetry': True, 'message': 'Reconnecting... 1/5'},
@@ -122,6 +133,7 @@ class NativeActivityProjection(unittest.TestCase):
             rows = normalize_state(native)['turns'][0]['messages']
             self.assertEqual([r['kind'] for r in rows], ['commandExecution', 'webSearch'])
             self.assertEqual(rows[0]['commandInfo'], [('Listed files', '/tmp'), ('Duration', '1000 ms'), ('Exit code', '0')])
+            self.assertEqual(rows[0]['commandActions'], ['listFiles'])
             self.assertEqual(rows[0]['status'], 'completed')
             self.assertEqual(rows[1]['text'], 'abc\n\nexample\nhttps://example.test')
             index = home / 'thread_history_1.sqlite'

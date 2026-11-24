@@ -12,7 +12,8 @@ import ntpath
 from bridge.features.sessions.activity import (automation_result, command_info, function_message, generated_image_path, lines, memory_sources,
                                                native_activity, readable, records, visible_items)
 from bridge.features.sessions.tool_images import inspect_tool_images, label_computer_use
-from bridge.features.sessions.store import items_array, native_file_changes, native_turn_file_changes, native_patch_counts
+from bridge.features.sessions.store import (items_array, native_diff_file_changes, native_file_changes,
+                                           native_patch_counts, native_turn_file_changes)
 
 
 
@@ -355,8 +356,11 @@ def normalize_item(item, *, image_cache=None, parent_id=None, saved_images=()):
         row.update(role="activity", title="추론 요약", text="\n".join(summary or content))
     elif kind == "commandExecution":
         row.update(role="activity", title="명령을 실행하다", text=item.get("command", ""), output=item.get("aggregatedOutput", ""), exitCode=item.get("exitCode"))
-        if metadata := command_info(item):
+        metadata, operations = command_info(item)
+        if metadata:
             row['commandInfo'] = metadata
+        if operations and operations != ['command']:
+            row['commandActions'] = operations
     elif kind == 'collabAgentToolCall':
         row.update(collab_activity(item, parent_id))
     elif (kind == 'subAgentActivity' and item.get('kind') == 'started'
@@ -625,13 +629,16 @@ def normalize_state(state, connected=True, *, image_cache=None, item_limit=None,
         settings = (params.get('collaborationMode') or {}).get('settings') or {}
         model = params.get('model') or settings.get('model') or turn.get('model')
         effort = params.get('effort') or params.get('reasoningEffort') or settings.get('reasoning_effort') or turn.get('reasoningEffort')
+        if '_nativeFileChanges' in turn or not omitted and items_complete:
+            file_changes = native_turn_file_changes(turn)
+        else:
+            # An authoritative turn diff does not need the omitted message bodies.
+            file_changes = native_diff_file_changes(turn.get('diff')) if turn.get('status') == 'completed' and authoritative_diff else []
         result.append({"model": model, "effort": effort, "id": turn.get("turnId") or str(ordinal), "status": turn.get("status"),
                        "startedAt": started_at, "messages": messages,
                        "actionable": bool(turn.get("turnId")) and turn.get("turnId") != "history",
                        "error": None if turn.get("willRetry") is True else turn.get("error"), "diff": turn.get("diff"),
-                       # A partial turn cannot establish complete totals. Defer its footer
-                       # until backfill includes the whole turn; never scan omitted patches.
-                       "fileChanges": native_turn_file_changes(turn) if '_nativeFileChanges' in turn or (not omitted and (items_complete or authoritative_diff)) else [],
+                       "fileChanges": file_changes,
                        "fileChangesBasis": turn.get('_nativeFileChangesBasis') or ('net' if isinstance(turn.get('diff'), str) and turn['diff'].startswith('diff --git ') else 'recorded')})
     history = state.get("turnHistory", {}).get("history", {})
     settings = state.get('latestThreadSettings') or {}

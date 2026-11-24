@@ -30,6 +30,8 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(footer['fileSummary']['count'], 2)
         self.assertEqual(footer['fileSummary']['added'], 3)
         self.assertEqual(footer['fileSummary']['removed'], 1)
+        self.assertNotIn('created', footer['fileSummary']['files'][0])
+        self.assertTrue(footer['fileSummary']['files'][1]['created'])
         self.assertEqual(footer['text'], '')
         self.assertEqual(timeline.detail(timeline.cursor(footer['key']))['text'], '')
         self.assertFalse(footer['truncated'])
@@ -148,6 +150,24 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(normalize_state({'turns':[turn]})['turns'][0]['fileChanges'][0]['path'],'net.py')
         turn.pop('diff');turn['_nativeFileChanges']=[{'path':'full.py','added':2,'removed':1,'diff':'full recorded patch'}]
         self.assertEqual(normalize_state({'turns':[turn]})['turns'][0]['fileChanges'][0]['path'],'full.py')
+
+    def test_partial_turn_keeps_an_authoritative_new_file_diff(self):
+        diff = ('diff --git a/new.py b/new.py\nnew file mode 100644\n--- /dev/null\n+++ b/new.py\n'
+                '@@ -0,0 +1,2 @@\n+first\n+second\n')
+        turn = {'turnId': 'partial', 'status': 'completed', 'diff': diff,
+                'itemsPagination': {'hasLoadedOldest': False},
+                'items': [{'type': 'fileChange', 'id': 'earlier', 'changes': [{'path': 'other.py', 'diff': '+earlier'}]},
+                          {'type': 'agentMessage', 'id': 'last', 'text': 'Done'}]}
+        view = normalize_state({'turns': [turn]}, item_limit=1)
+        self.assertTrue(view['historyWindowMore'])
+        timeline = Timeline()
+        timeline.update({**view, 'sequence': 1})
+        footer = timeline.rows[-1]
+        self.assertEqual(footer['fileSummary']['basis'], 'net')
+        self.assertEqual(footer['fileSummary']['files'],
+                         [{'path': 'new.py', 'added': 2, 'removed': 0, 'created': True, 'hasDiff': True}])
+        detail = timeline.detail(timeline.cursor(footer['key']), version=footer['version'], file_index=0)
+        self.assertEqual(detail['text'], diff)
 
     def test_recent_window_skips_old_bodies_and_expands_without_cursor_reset(self):
         from unittest.mock import patch

@@ -111,6 +111,14 @@ function groupChatActivityRows(rows){
 function chatCommandFirstLine(row){
   return row.kind==='commandExecution'&&typeof row.text==='string'?row.text.split(/[\r\n\u2028\u2029]/,1)[0].trim():'';
 }
+const chatCommandLabels={
+  command:'Ran commands',read:'Read files',listFiles:'Listed directory contents',
+  readSkill:'Read skills',search:'Searched workspace files'
+};
+function chatCommandActivityTypes(row){
+  const actions=Array.isArray(row.commandActions)?row.commandActions.filter(action=>Object.hasOwn(chatCommandLabels,action)):[];
+  return actions.length?actions:['command'];
+}
 // 묶음은 표시만 담당한다. 각 행의 노드·상세 조회·읽기 상태는 기존
 // 타임라인에 남기고, 과거 페이지가 앞에 붙어도 같은 묶음을 재사용한다.
 class ChatActivityGroups {
@@ -143,8 +151,11 @@ class ChatActivityGroups {
       }
       group.rows=unit.rows;groups.set(group.node.dataset.key,group);
       for(const {row} of items)members.set(row.key,group);
-      const visible=items.filter(({node})=>!node.hidden),labels={commands:'Ran commands',files:'Edited files',web:'Searched the web',tools:'Tool activity',images:'Viewed images',review:'Automatic approval review'};
-      const types=[...new Set(visible.map(({row})=>chatActivityGroupKind(row)))];
+      const visible=items.filter(({node})=>!node.hidden),labels={...chatCommandLabels,files:'Edited files',web:'Searched the web',tools:'Tool activity',images:'Viewed images',review:'Automatic approval review'};
+      const types=[...new Set(visible.flatMap(({row})=>{
+        const kind=chatActivityGroupKind(row);
+        return kind==='commands'?chatCommandActivityTypes(row):[kind];
+      }))];
       const active=visible.some(({row})=>row.status==='inProgress');
       const reviewing=visible.some(({row})=>row.approvalReview?.status==='inProgress');
       const text=types.map(kind=>BridgeI18n.t(labels[kind])).join(' · ')+(reviewing?'ㆍ'+BridgeI18n.t('Auto-review in progress'):active?BridgeI18n.t('· 진행중'):'');
@@ -216,6 +227,8 @@ function decorateChatActivity(node,row,heading,command=''){
 }
 function chatActivityCaption(row){
   if(row.activityCard)return BridgeI18n.t(row.title);
+  if(row.kind==='commandExecution'&&row.commandActions?.length)
+    return chatCommandActivityTypes(row).map(action=>BridgeI18n.t(chatCommandLabels[action])).join(' · ');
   if(row.kind==='automaticApprovalReview')return typeof row.reviewActionLabel==='string'&&row.reviewActionLabel.trim()?row.reviewActionLabel.split(/[\r\n]/,1)[0]:BridgeI18n.t('Tool request');
   if(['mcpToolCall','dynamicToolCall','storedToolEvent'].includes(row.kind)&&typeof row.title==='string')return row.title;
   return BridgeI18n.t(row.title||row.kind||row.type);

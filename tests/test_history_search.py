@@ -65,30 +65,72 @@ class HistoryLookupTests(unittest.TestCase):
         second = self.bridge.thread_history_search(support.THREAD,{**params,'cursor':first['cursor']})
         self.assertEqual([row['itemId'] for row in second['data']],['20','21'])
 
-    def test_native_queue_ids_and_ambiguous_ack_do_not_duplicate(self):
-        rows, writes = [], []
+    def test_bridge_queue_stays_local_and_existing_native_receipt_stays_native(self):
+        previous, queued = str(uuid.uuid4()), str(uuid.uuid4())
+        native_row = {'id': 'native-1', 'clientUserMessageId': previous,
+                      'input': [{'type': 'text', 'text': '이미 Codex에서 대기 중'}]}
+        prior = {'text': '이미 Codex에서 대기 중', 'mode': 'queue', 'status': 'unknown',
+                 'at': 1, 'queueOwner': 'native', 'nativeGeneration': 'fixture-generation',
+                 'nativeAccount': 'fixture-account'}
+        self.bridge.submissions[support.THREAD + ':' + previous] = prior
+        reads = []
         def request(method, params):
-            if method == 'thread/queue/list':
-                if params.get('limit') == 1: return {'data':rows[:1]}
-                if len(rows)>1 and not params.get('cursor'): return {'data':rows[:1], 'nextCursor':'second'}
-                return {'data':rows[1:] if params.get('cursor') else rows}
-            self.assertEqual(method, 'thread/queue/add')
-            writes.append(params)
-            rows.append({'id':'native-'+str(len(rows)), 'clientUserMessageId':params['clientUserMessageId'], 'input':params['input']})
-            if len(writes)==2: raise AppServerUnavailable('lost response')
-            return {'queuedSubmission':rows[-1]}
+            self.assertEqual(method, 'thread/queue/list')
+            reads.append(params)
+            if params.get('cursor'):
+                return {'data': [native_row]}
+            return {'data': [{'id': 'native-direct', 'input': [{'type': 'text', 'text': '앱 입력'}]}],
+                    'nextCursor': 'next'}
         self.source(request)
-        first, second = str(uuid.uuid4()), str(uuid.uuid4())
-        for id_, expected in ((first,'queued'),(second,'unknown')):
-            self.assertEqual(self.bridge.send(support.THREAD,'같은 본문',id_,'queue')['status'], expected)
-            self.bridge.send(support.THREAD,'같은 본문',id_,'queue')
+        self.assertEqual(self.bridge.send(support.THREAD, 'Bridge 입력', queued, 'queue')['status'], 'queued')
+        self.assertTrue(self.bridge.send(support.THREAD, 'Bridge 입력', queued, 'queue')['duplicate'])
+        self.assertEqual(reads, [])
+        key = support.THREAD + ':' + queued
+        with open(self.bridge.ledger_path, encoding='utf-8') as ledger:
+            self.assertEqual(json.load(ledger)[key]['queueAccount'], 'fixture-account')
+        before = self.bridge.message_management(support.THREAD)
+        self.assertEqual([row['id'] for row in before['queue']], [queued])
+        updated = self.bridge.manage_messages(support.THREAD, {
+            'action': 'edit', 'version': before['version'], 'id': queued, 'editId': str(uuid.uuid4()),
+            'text': 'Bridge에서 다시 편집한 입력', 'expectedAccount': 'fixture-account'})
+        self.assertEqual(updated['queue'][0]['text'], 'Bridge에서 다시 편집한 입력')
         result = self.bridge.original_queue(support.THREAD,'fixture-account')
-        self.assertEqual([r['clientId'] for r in result['rows']], [first, second])
-        self.assertEqual(len(writes),2)
-        receipts = [self.bridge.submissions[support.THREAD+':'+id_] for id_ in (first, second)]
-        self.assertEqual([row['status'] for row in receipts], ['accepted','accepted'])
-        self.assertTrue(all(row['queueOwner']=='native' for row in receipts))
-        self.assertEqual(self.bridge.message_management(support.THREAD)['queue'], [])
+        self.assertEqual([row['id'] for row in result['rows']], ['native-direct', 'native-1'])
+        self.assertEqual(len(reads), 2)
+        self.assertEqual(self.bridge.submissions[support.THREAD + ':' + previous]['status'], 'accepted')
+        self.assertEqual(self.bridge.submissions[key]['status'], 'queued')
+
+    def test_queued_message_waits_for_the_original_account_and_dispatches_once(self):
+        identifier = str(uuid.uuid4())
+        key = support.THREAD + ':' + identifier
+        self.bridge.send(support.THREAD, '원래 계정에 보낼 메시지', identifier, 'queue')
+        session = self.bridge.live[support.THREAD]
+        with session.condition:
+            session.state['threadRuntimeStatus'] = {'type': 'idle'}
+        self.bridge._management_identity.return_value = 'different-account'
+        foreign = self.bridge.message_management(support.THREAD, [identifier])
+        self.assertEqual(foreign['queue'], [])
+        self.assertEqual(foreign['receipts'][0]['status'], 'notFound')
+        self.bridge._send_queued(session, key, self.bridge.submissions[key])
+        self.assertEqual(self.bridge.submissions[key]['status'], 'queued')
+        self.assertFalse(any(row['method'] == 'thread-follower-start-turn' for row in self.fixture.requests))
+        self.bridge._management_identity.return_value = 'fixture-account'
+        original = self.bridge._call
+        def app_starts_first(selected, method, params, **options):
+            with selected.condition:
+                selected.state['threadRuntimeStatus'] = {'type': 'active'}
+            return original(selected, method, params, **options)
+        with patch.object(self.bridge, '_call', side_effect=app_starts_first):
+            self.bridge._send_queued(session, key, self.bridge.submissions[key])
+        self.assertEqual(self.bridge.submissions[key]['status'], 'queued')
+        self.assertFalse(any(row['method'] == 'thread-follower-start-turn' for row in self.fixture.requests))
+        with session.condition:
+            session.state['threadRuntimeStatus'] = {'type': 'idle'}
+        for _ in range(2):
+            self.bridge._send_queued(session, key, self.bridge.submissions[key])
+        calls = [row for row in self.fixture.requests if row['method'] == 'thread-follower-start-turn']
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]['params']['turnStart']['request']['clientUserMessageId'], identifier)
 
 
 class IndexLookupTests(unittest.TestCase):

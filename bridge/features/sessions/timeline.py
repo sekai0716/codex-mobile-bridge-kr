@@ -77,6 +77,7 @@ class Timeline:
                 summary = {'id': 'native-file-changes', 'kind': 'fileChanges', 'role': 'fileChanges',
                            'fileSummary': {'count': len(changes), 'added': added, 'removed': removed, 'basis': turn.get('fileChangesBasis', 'recorded'),
                                            'files': [{**{k: c[k] for k in ('path', 'added', 'removed')},
+                                                      **({'created': True} if c.get('created') else {}),
                                                       'hasDiff': bool(c.get('diff'))} for c in changes]},
                            'text': ''}
                 entries.append(((turn['id'], summary['id'], summary['kind'], 0), turn, summary, False))
@@ -136,11 +137,12 @@ class Timeline:
                     file_patches[key] = (revision, patches)
                 version = hashlib.sha256(encoded([text, turn.get('model'), turn.get('effort'), attachments, message.get('fileSummary'),
                                                  revision, message.get('title'), message.get('activityCard'), message.get('appView'), message.get('agent'), message.get('collab'), message.get('computerUse'),
-                                                 message.get('approvalReview'), message.get('reviewLinked'),
+                                                 message.get('approvalReview'), message.get('reviewLinked'), message.get('commandActions'),
                                                  message.get('status'), message.get('exitCode'), message.get('success'),
                                                  message.get('source'), message.get('completed')])).hexdigest()[:24]
                 row = {k: message[k] for k in ('role', 'kind', 'status', 'title', 'phase', 'requestId', 'exitCode', 'success',
-                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'collab', 'computerUse', 'activityCard', 'appView') if k in message}
+                                             'approvalReview', 'reviewLinked', 'source', 'completed', 'agent', 'collab', 'computerUse', 'activityCard', 'appView',
+                                             'commandActions') if k in message}
                 if label_lines:
                     row['commandLabelLines'] = label_lines
                 if isinstance(message.get('reviewActionLabel'), str):

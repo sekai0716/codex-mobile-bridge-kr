@@ -46,6 +46,10 @@ function renderTurnDiffFile(timeline,row,file,index,card){
   item.className='turn-diff-file';heading.className='turn-diff-heading';path.className='edited-files-path';path.textContent=file.path;
   heading.append(path);
   if(!single){
+    if(file.created){
+      const created=document.createElement('small');created.className='muted';created.dataset.i18n='File created';
+      created.textContent=timelineText(created.dataset.i18n);heading.append(created);
+    }
     counts.className='edited-files-stats';
     for(const [kind,text] of [['added','+'+file.added],['removed','−'+file.removed]]){
       const count=document.createElement('span');count.className='edited-files-'+kind;count.textContent=text;counts.append(count);

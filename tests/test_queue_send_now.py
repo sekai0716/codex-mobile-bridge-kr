@@ -16,7 +16,7 @@ THREAD = support.THREAD
 class QueueSendNowTests(unittest.TestCase):
     def setUp(self):
         support.IntegrationTests.setUp(self)
-        self.identity = patch.object(self.bridge, '_management_identity', return_value='account-a')
+        self.identity = patch.object(self.bridge, '_draft_account_identity', return_value='account-a')
         self.identity.start()
         self.addCleanup(self.identity.stop)
         self.fixture.state['threadRuntimeStatus'] = {'type': 'active'}

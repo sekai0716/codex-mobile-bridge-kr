@@ -375,11 +375,13 @@ test('completed edit card wraps the selected file diff and keeps its original li
       f.patchReads.push({file,offset});return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
     };
     const files=['src/one.js','src/two.js','a','b'].map(path=>({path,added:2,removed:1,hasDiff:true}));
-    f.extraRows=[{key:'footer',order:4,turnId:'t',role:'fileChanges',kind:'fileChanges',version:'patch',fileSummary:{count:4,added:8,removed:4,basis:'recorded',files}}];
+    Object.assign(files[0],{created:true,removed:0});
+    f.extraRows=[{key:'footer',order:4,turnId:'t',role:'fileChanges',kind:'fileChanges',version:'patch',fileSummary:{count:4,added:8,removed:3,basis:'recorded',files}}];
     chatTimeline.apply(f.page(),true);
   },removedLine);
   const card=page.locator('.edited-files-card');await card.locator(':scope > summary').click();
   expect(await page.evaluate(()=>sendControlsFixture.patchReads.length)).toBe(0);
+  await expect(card.locator('.turn-diff-file').first().getByText('생성됨',{exact:true})).toBeVisible();
   await expect(card.getByText('파일 1개 더 보기')).toBeVisible();await card.getByText('파일 1개 더 보기').click();
   const file=card.locator('.turn-diff-file').nth(1);await file.locator('summary').click();
   expect(await file.locator('.removed code').textContent()).toBe(removedLine);
@@ -666,7 +668,11 @@ test('native activity headings and permissions use requested Korean and switch b
     f.extraRows=[
       {key:'steer-event',order:3,role:'activity',kind:'steered',title:'steered',text:'unchanged tool output',version:1},
       {key:'approval-event',order:4,role:'activity',kind:'automaticApprovalReview',title:'Automatic approval review',
-        reviewActionLabel:'git status',approvalReview:{id:'review-fixture',status:'inProgress'},text:'review rationale',version:1}
+        reviewActionLabel:'git status',approvalReview:{id:'review-fixture',status:'inProgress'},text:'review rationale',version:1},
+      {key:'read-event',order:5,role:'activity',kind:'commandExecution',turnId:'operations',
+        commandActions:['read','listFiles'],text:'first command',version:1},
+      {key:'search-event',order:6,role:'activity',kind:'commandExecution',turnId:'operations',
+        commandActions:['readSkill','search'],text:'second command\nother output',version:1}
     ];
     chatTimeline.apply({...f.page(),sequence:2});f.update('active');
   });
@@ -674,10 +680,15 @@ test('native activity headings and permissions use requested Korean and switch b
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('스티어링함');
   const review=page.locator('#messages [data-key=approval-event] summary');
   await expect(review).toHaveText('git statusㆍ자동 검토 중');
+  const group=page.locator('#messages .activity-group');
+  await expect(group.locator('.activity-group-label')).toHaveText('파일 읽음 · 파일 목록 확인함 · 스킬 읽음 · 파일 검색함');
+  await group.locator(':scope > summary').click();
+  await expect(group.locator('[data-key=search-event] summary')).toHaveText('second command');
   await page.evaluate(()=>{BridgeI18n.setLanguage('en');BridgeI18n.apply();chatTimeline.relabel();});
   await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('Ran a command');
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('Steered');
   await expect(review).toHaveText('git statusㆍAuto-review in progress');
+  await expect(group.locator('.activity-group-label')).toHaveText('Read files · Listed directory contents · Read skills · Searched workspace files');
   await expect(page.locator('#localized-folder-fixture')).toHaveText('Folder');
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
   await page.evaluate(()=>{BridgeI18n.setLanguage('ko');BridgeI18n.apply();chatTimeline.relabel();});

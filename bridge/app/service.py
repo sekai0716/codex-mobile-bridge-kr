@@ -78,6 +78,10 @@ class SubmissionRejected(ValueError):
     """The request was rejected before any submission was recorded or sent."""
 
 
+class QueueDispatchDeferred(ValueError):
+    """The local preflight stopped a queued message before transport."""
+
+
 CHAT_RECONNECT_ERROR = 'Could not reconnect this chat to Codex. Try reconnecting this chat again.'
 SHARED_DESKTOP_SETUP = 'The Codex desktop shared connection is not ready. After all desktop tasks finish, close the desktop app normally and check connection setup in Accounts.'
 
@@ -4679,15 +4683,18 @@ class Bridge:
             for session in sessions:
                 with self.submit_lock:
                     queued = [(k, dict(v)) for k, v in self.submissions.items() if k.startswith(session.id + ":") and v["status"] == "queued"]
-                if queued and session.connected and session.view().get("status") == "idle":
+                with session.condition:
+                    idle = session.connected and (session.state or {}).get('threadRuntimeStatus', {}).get('type') == 'idle'
+                if queued and idle:
                     for paused_key, paused in queued:
                         if paused.get('cliRelease'):
                             self._settle_scope_queued(session, paused_key)
+                    account = self._management_identity(session.id, refresh=True) if any(row.get('queueAccount') for _, row in queued) else ''
                     with self.submit_lock:
-                        queued = [(key, dict(row)) for key, row in self.submissions.items() if key.startswith(session.id + ':')
-                                  and row['status'] == 'queued' and not row.get('cliRelease')]
-                    if queued:
-                        key, entry = queued[0]
+                        next_batch = [(key, dict(row)) for key, row in self._account_submissions(session.id, account)
+                                      if row['status'] == 'queued' and not row.get('cliRelease')]
+                    if next_batch:
+                        key, entry = next_batch[0]
                         try:
                             self._send_queued(session, key, entry)
                         except Exception:
@@ -4765,6 +4772,18 @@ class Bridge:
         target.write_text(json.dumps(self.submissions, ensure_ascii=False), encoding='utf-8')
         target.chmod(0o600)
         target.replace(self.ledger_path)
+
+    def _restore_queued(self, key):
+        with self.submit_lock:
+            entry = self.submissions.get(key)
+            if not entry or entry.get('status') != 'unknown':
+                return
+            entry['status'] = 'queued'
+            try:
+                self._save_ledger()
+            except Exception:
+                entry['status'] = 'unknown'
+                raise
 
     def _draft_account_identity(self, view):
         provider = view.get('provider')
@@ -4911,8 +4930,8 @@ class Bridge:
         self._reconcile_submissions(session)
         self._refresh_saved_async(session, receipts=True)
         with self.submit_lock:
-            entries = [(k.split(":")[1], copy.deepcopy(v)) for k, v in self.submissions.items()
-                       if k.startswith(session.id + ":")]
+            entries = [(k.split(":")[1], copy.deepcopy(v))
+                       for k, v in self._account_submissions(session.id, view.get('draftAccountIdentity', ''))]
             # Native goal creates live in the goal-command ledger, while older
             # prompt-based goals remain in submissions. Merge both by request id
             # so a newly created native goal cannot be shadowed by a stale entry.
@@ -5922,6 +5941,11 @@ class Bridge:
             self._draft_account_identity({'provider': provider})
         return identity
 
+    def _account_submissions(self, thread_id, account):
+        prefix = thread_id + ':'
+        return [(key, entry) for key, entry in self.submissions.items()
+                if key.startswith(prefix) and entry.get('queueAccount', account) == account]
+
     @contextmanager
     def _thread_source(self, session, *, write=False):
         with session.condition:
@@ -5968,7 +5992,7 @@ class Bridge:
         uuid.UUID(thread_id)
         identity = self._management_identity(thread_id, refresh=True)
         with self.goal_lock, self.submit_lock:
-            rows = [(k.split(':', 1)[1], copy.deepcopy(v)) for k, v in self.submissions.items() if k.startswith(thread_id + ':')]
+            rows = [(k.split(':', 1)[1], copy.deepcopy(v)) for k, v in self._account_submissions(thread_id, identity)]
             result = management_snapshot(rows, receipt_ids, self._goal_activation_ids(thread_id), scope=[self.host, thread_id, identity])
             for receipt in result['receipts']:
                 command = self.goal_commands.get(thread_id + ':' + receipt['id'])
@@ -5993,9 +6017,10 @@ class Bridge:
             if not identity or body.get('expectedAccount') != identity:
                 raise ValueError("계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.")
             body = {k: v for k, v in body.items() if k != 'expectedAccount'}
-            rows = [(k.split(':', 1)[1], copy.deepcopy(v)) for k, v in self.submissions.items() if k.startswith(thread_id + ':')]
+            matching = self._account_submissions(thread_id, identity)
+            rows = [(k.split(':', 1)[1], copy.deepcopy(v)) for k, v in matching]
             updated, result = management_mutate(rows, body, self._goal_activation_ids(thread_id), scope=[self.host, thread_id, identity])
-            keys = [k for k in self.submissions if k.startswith(thread_id + ':')]
+            keys = {k for k, _ in matching}
             values = iter((thread_id + ':' + k, v) for k, v in updated)
             previous = self.submissions
             self.submissions = dict(next(values) if k in keys else (k, v) for k, v in previous.items())
@@ -6025,7 +6050,7 @@ class Bridge:
                 raise ValueError('계정 연결이 변경되었습니다. 채팅을 새로 고치고 다시 시도하세요.')
             with self.goal_lock, self.submit_lock:
                 prior = self.submissions.get(key)
-                if prior is None:
+                if prior is None or prior.get('queueAccount', expected_account) != expected_account:
                     raise ValueError('이 메시지는 더 이상 대기열에 없습니다.')
                 if prior['status'] != 'queued':
                     return {'id': submission_id, 'status': prior['status'], 'duplicate': True}
@@ -6063,6 +6088,9 @@ class Bridge:
                     raise
             try:
                 return self._dispatch(session, key, dispatch)
+            except QueueDispatchDeferred:
+                self._restore_queued(key)
+                raise
             finally:
                 with session.condition:
                     session.changed()
@@ -6207,21 +6235,7 @@ class Bridge:
                             raise ValueError("계획이 변경되었습니다. 다시 시도하기 전에 새로고침하세요.")
             if session.runtime == 'cli' and _async_response is None:
                 self._verify_cli_submission_account(session)
-            # Native queued input inherits the existing mode and has no field for Bridge file
-            # references, plan replies or goal activation. Keep those on their original path.
-            native_generation, native_account = None, None
-            if (active and mode == 'queue' and not files and not plan_response and not activation and _async_response is None
-                    and (work_mode is None or work_mode == 'default' and
-                         (session.state.get('latestCollaborationMode') or {}).get('mode', 'default') == 'default')):
-                try:
-                    native_account = self._management_identity(thread_id, refresh=True)
-                    if native_account:
-                        with self._thread_source(session, write=True) as (request, generation):
-                            page = request('thread/queue/list', {'threadId':thread_id, 'limit':1})
-                            if isinstance(page.get('data'), list):
-                                native_generation = generation
-                except (AppServerError, IPCError, OSError, ValueError):
-                    pass  # All probes are reads. No native submission has been attempted.
+            queue_account = self._management_identity(thread_id, refresh=True) if mode == 'queue' else ''
             admission = None
             if self.cli_scope.target is not None and session.runtime == 'cli' and _async_response is None:
                 with self.cli_sessions.lock:
@@ -6242,9 +6256,8 @@ class Bridge:
                             record.get('phase') == 'released' and token in record.get('connections', ()))):
                         raise IPCError('목표 CLI 해제 의도가 있거나 연결이 변경되었습니다. 전송하기 전에 명시적으로 다시 연결하십시오. 메시지가 대기열에 포함되지 않습니다.。')
                 entry = {"text": text, "mode": mode, "skills": selected, "status": "queued" if mode == "queue" else "unknown", "at": time.time()}
-                if native_generation:
-                    # An unknown native receipt is never eligible for the Bridge dispatcher.
-                    entry.update(status='unknown', queueOwner='native', nativeGeneration=native_generation, nativeAccount=native_account)
+                if queue_account:
+                    entry['queueAccount'] = queue_account
                 if self.cli_scope.target is not None:
                     entry.update(origin=session.origin, runtime=session.runtime)
                     if session.runtime == 'cli' and self.cli_sessions.remote_home:
@@ -6268,25 +6281,6 @@ class Bridge:
             with session.condition:
                 session.changed()
             if mode == "queue":
-                if native_generation:
-                    inputs = [{'type':'text','text':text,'text_elements':[]}]
-                    inputs.extend({'type':'skill','name':s['name'],'path':s['path']} for s in selected)
-                    try:
-                        with self._thread_source(session, write=True) as (request, generation):
-                            if generation != native_generation or self._management_identity(thread_id) != native_account:
-                                raise ValueError('Original session changed. Check the queue.')
-                            answer = request('thread/queue/add', {'threadId':thread_id,'clientUserMessageId':submission_id,'input':inputs})
-                            row = answer['queuedSubmission']
-                            if row.get('clientUserMessageId') != submission_id or not row.get('id'):
-                                raise ValueError('Unknown queue receipt.')
-                    except (AppServerError, IPCError, OSError, ValueError, KeyError):
-                        return {'id':submission_id,'status':'unknown'}
-                    with self.submit_lock:
-                        self.submissions[key].update(status='accepted', nativeQueueId=row['id'])
-                        self._save_ledger()
-                    with session.condition:
-                        session.changed()
-                    return {'status':'queued','id':submission_id,'queueOwner':'native'}
                 return {"status": "queued", "id": submission_id}
             return self._dispatch(session, key, entry)
 
@@ -6303,10 +6297,11 @@ class Bridge:
                     # Keep a queued first message from an older gateway intact
                     # until an explicit reconnect or model choice releases it.
                     return
+            account = self._management_identity(session.id, refresh=True) if entry.get('queueAccount') else ''
             with self.goal_lock:
                 with self.submit_lock:
-                    queued = [(k, v) for k, v in self.submissions.items() if k.startswith(session.id + ':')
-                              and v.get('status') == 'queued' and not v.get('cliRelease')]
+                    queued = [(k, v) for k, v in self._account_submissions(session.id, account)
+                              if v.get('status') == 'queued' and not v.get('cliRelease')]
                     if not queued or queued[0][0] != key:
                         return
                     entry = copy.deepcopy(queued[0][1])
@@ -6327,6 +6322,8 @@ class Bridge:
                     if cancelled:
                         return
                     self._dispatch(session, key, entry)
+                except QueueDispatchDeferred:
+                    self._restore_queued(key)
                 finally:
                     with session.condition:
                         session.changed()
@@ -6369,14 +6366,23 @@ class Bridge:
             request["collaborationMode"] = {"mode": "plan" if entry["workMode"] == "plan" else "default",
                                             "settings": {"model": model, "reasoning_effort": effort, "developer_instructions": None}}
         request["input"].extend({"type": "skill", "name": s["name"], "path": s["path"]} for s in entry.get("skills", []))
+        def verify_queue_target():
+            if entry.get('queueAccount') and self._management_identity(session.id) != entry['queueAccount']:
+                raise QueueDispatchDeferred('계정 연결이 변경되었습니다. 원래 계정의 대기열에서 다시 확인하세요.')
+            if entry['mode'] == 'queue':
+                with session.condition:
+                    if not session.connected or session.state.get('threadRuntimeStatus', {}).get('type') != 'idle':
+                        raise QueueDispatchDeferred('채팅이 다시 실행 중입니다. 작업이 끝나면 대기 메시지를 보냅니다.')
+
+        write_options = {'before_write': verify_queue_target} if entry['mode'] == 'queue' or entry.get('queueAccount') else {}
         if entry["mode"] != "steer":
             response = self._call(session, "thread-follower-start-turn", {
-                "turnStart": {"request": request, "context": {"inheritThreadSettings": True, **context}}}, timeout=90)
+                "turnStart": {"request": request, "context": {"inheritThreadSettings": True, **context}}}, timeout=90, **write_options)
         else:
             response = self._call(session, "thread-follower-steer-turn", {
                 "input": request["input"], "clientUserMessageId": submission_id,
                 "restoreMessage": {"request": request, "context": context},
-                "attachments": context['attachments']}, timeout=30)
+                "attachments": context['attachments']}, timeout=30, **write_options)
         with self.submit_lock:
             self.submissions[key]["status"] = "accepted"
             self._save_ledger()

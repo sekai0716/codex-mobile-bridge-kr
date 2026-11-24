@@ -53,20 +53,29 @@ def search_activity(item):
 
 def command_info(item):
     info = []
+    operations = []
     for action in records(item.get('commandActions')):
         kind = action.get('type')
         if kind == 'read':
-            info.append(('Read file', action.get('path') or action.get('name')))
+            path = action.get('path') or action.get('name')
+            skill = isinstance(path, str) and ntpath.basename(path) == 'SKILL.md'
+            operations.append('readSkill' if skill else 'read')
+            info.append(('Read file', path))
         elif kind == 'listFiles':
+            operations.append('listFiles')
             info.append(('Listed files', action.get('path')))
         elif kind == 'search':
+            operations.append('search')
             info.append(('Searched files', lines(action.get('query'), action.get('path'))))
+        else:
+            operations.append('command')
     if isinstance(item.get('cwd'), str) and item['cwd']:
         info.append(('Working directory', item['cwd']))
     for key, label, unit in [('durationMs', 'Duration', ' ms'), ('exitCode', 'Exit code', '')]:
         if type(item.get(key)) is int:
             info.append((label, f'{item[key]}{unit}'))
-    return [(label, value) for label, value in info if isinstance(value, str) and value]
+    return ([(label, value) for label, value in info if isinstance(value, str) and value],
+            list(dict.fromkeys(operations)))
 
 
 def generated_image_path(item):

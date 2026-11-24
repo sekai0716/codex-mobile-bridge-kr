@@ -142,7 +142,7 @@ class AgentChat {
         }else{
           const details=this.node('details');
           let heading;
-          if(message.kind==='collabAgentToolCall'){
+          if(message.kind==='collabAgentToolCall'||message.kind==='commandExecution'&&message.commandActions?.length){
             heading=this.node('summary');heading.textContent=chatActivityLabel(message);
           }else heading=this.node('summary','',message.name||message.kind||BridgeI18n.t('도구 기록'));
           details.append(heading,this.node('pre','',message.output||message.text||''));body.append(details);

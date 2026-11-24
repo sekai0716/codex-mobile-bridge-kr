@@ -210,18 +210,24 @@ def native_file_changes(items):
         for change in changes:
             if not isinstance(change, dict) or not isinstance(change.get('path'), str):
                 continue
+            kind = change.get('kind')
+            operation = kind.get('type') if isinstance(kind, dict) else change.get('type')
             diff = change.get('diff', change.get('unified_diff', ''))
-            content_diff = not diff and change.get('type') in ('add', 'delete') and isinstance(change.get('content'), str)
+            content_diff = not diff and operation in ('add', 'delete') and isinstance(change.get('content'), str)
             if content_diff:
-                prefix = '+' if change['type'] == 'add' else '-'
+                prefix = '+' if operation == 'add' else '-'
                 diff = '\n'.join(prefix + line for line in change['content'].splitlines())
             if not isinstance(diff, str):
                 continue
             path = change['path']
             entry = files.setdefault(path, {'path': path, 'added': 0, 'removed': 0, 'diff': ''})
+            if operation == 'add':
+                entry['created'] = True
+            elif operation == 'delete':
+                entry.pop('created', None)
             if content_diff:
                 lines = len(change['content'].splitlines())
-                added, removed = (lines, 0) if change['type'] == 'add' else (0, lines)
+                added, removed = (lines, 0) if operation == 'add' else (0, lines)
             else:
                 added, removed = native_patch_counts(diff)
             entry['added'] += added
@@ -230,31 +236,36 @@ def native_file_changes(items):
     return list(files.values())
 
 
+def native_diff_file_changes(diff):
+    if not isinstance(diff, str) or not diff.startswith('diff --git '):
+        return []
+    changes = []
+    for section in re.split(r'(?=^diff --git )', diff, flags=re.MULTILINE):
+        if not section:
+            continue
+        target = re.search(r'^\+\+\+ (.+)$', section, re.MULTILINE)
+        original = re.search(r'^--- (.+)$', section, re.MULTILINE)
+        path = target.group(1) if target and target.group(1) != '/dev/null' else original.group(1) if original else None
+        if not path:
+            renamed = re.search(r'^rename to (.+)$', section, re.MULTILINE)
+            path = renamed.group(1) if renamed else None
+        if path and path.startswith('"'):
+            try:
+                path = json.loads(path)
+            except ValueError:
+                continue
+        if path:
+            change = {'path': path[2:] if path.startswith(('a/', 'b/')) else path, 'diff': section}
+            if (original and original.group(1) == '/dev/null') or re.search(r'^new file mode \d+$', section, re.MULTILINE):
+                change['type'] = 'add'
+            changes.append(change)
+    return native_file_changes([{'type': 'fileChange', 'changes': changes}])
+
+
 def native_turn_file_changes(turn):
     if '_nativeFileChanges' in turn:
         return turn['_nativeFileChanges']
-    diff = turn.get('diff')
-    if isinstance(diff, str) and diff.startswith('diff --git '):
-        changes = []
-        for section in re.split(r'(?=^diff --git )', diff, flags=re.MULTILINE):
-            if not section:
-                continue
-            target = re.search(r'^\+\+\+ (.+)$', section, re.MULTILINE)
-            original = re.search(r'^--- (.+)$', section, re.MULTILINE)
-            path = target.group(1) if target and target.group(1) != '/dev/null' else original.group(1) if original else None
-            if not path:
-                renamed = re.search(r'^rename to (.+)$', section, re.MULTILINE)
-                path = renamed.group(1) if renamed else None
-            if path and path.startswith('"'):
-                try:
-                    path = json.loads(path)
-                except ValueError:
-                    continue
-            if path:
-                changes.append({'path': path[2:] if path.startswith(('a/', 'b/')) else path, 'diff': section})
-        if changes:
-            return native_file_changes([{'type': 'fileChange', 'changes': changes}])
-    return native_file_changes(items_array(turn.get('items', [])))
+    return native_diff_file_changes(turn.get('diff')) or native_file_changes(items_array(turn.get('items', [])))
 
 
 class StoreUnavailable(RuntimeError):

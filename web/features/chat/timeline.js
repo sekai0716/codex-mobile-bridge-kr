@@ -29,7 +29,7 @@ function labelComputerUse(node,row){
   summary.title=caption+chatActivityStateSuffix(row);
 }
 const fileChangeLabel=row=>row.fileSummary?.files.length===1
-  ?timelineText('Edited {filename}').replace('{filename}',()=>row.fileSummary.files[0].path.split(/[\\/]/).pop())
+  ?timelineText(row.fileSummary.files[0].created?'Created {filename}':'Edited {filename}').replace('{filename}',()=>row.fileSummary.files[0].path.split(/[\\/]/).pop())
   :timelineText('{count} 파일을 편집했습니다.').replace('{count}',row.fileSummary?.count||0);
 const recentTimelinePages=new Map();
 function timelineFilePath(path,cwd){
