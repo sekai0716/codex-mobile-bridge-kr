@@ -22,19 +22,39 @@ class SideChatPanel {
   }
   url() { return this.workbench.endpoint(this.session, 'side-chat') + '&view=native'; }
   relabel() { this.paint(); }
-  async load() {
-    if (this.disposed || this.loading) return;
+  async load({refresh = false} = {}) {
+    if (this.disposed || (this.loading && !refresh)) return;
+    // 생성·종료 전 목록이 늦게 도착하더라도 변경 뒤의 목록을 덮지 않는다.
+    this.controller?.abort();
     const controller = this.controller = new AbortController(); this.loading = true;
     this.refreshButton.disabled = true; this.status.textContent = BridgeI18n.t('채팅 로드 중…');
     try {
       const result = await this.workbench.request(this.url(), undefined, controller.signal);
-      if (this.disposed) return;
-      this.chats = result.chats || []; this.paint();
+      if (controller.signal.aborted) return;
+      this.chats = result.chats || [];
+      this.syncTabTitles();
+      this.paint();
     } catch (error) {
       if (!this.disposed && !controller.signal.aborted) this.status.textContent = BridgeI18n.t(error.message);
     } finally {
-      this.loading = false; this.refreshButton.disabled = false;
+      if (this.controller === controller) {
+        this.loading = false;
+        this.refreshButton.disabled = false;
+      }
     }
+  }
+  syncTabTitles() {
+    // 생성 응답에 제목이 없어도 같은 채팅 ID의 실제 목록 제목을 반영한다.
+    const titles = new Map(this.chats.map(chat => [chat.id, chat.title]));
+    let changed = false;
+    for (const tab of this.session.files) {
+      if (!tab.chatId) continue;
+      const title = titles.get(tab.chatId);
+      if (typeof title !== 'string' || !title || tab.name === title) continue;
+      tab.name = title;
+      changed = true;
+    }
+    if (changed && this.workbench.current === this.session) this.workbench.paintTabs(this.session);
   }
   paint() {
     if (this.disposed || !this.chats) return;
@@ -56,7 +76,6 @@ class SideChatPanel {
     if(this.disposed||this.workbench.current!==this.session||chat.host&&chat.host!==this.session.host)return;
     if(!chat.id||chat.id===this.session.id||chat.parentId&&chat.parentId!==this.session.id||chat.attachedParentId&&chat.attachedParentId!==this.session.id)return;
     const tab=this.workbench.sideChatTab(this.session,chat);
-    this.workbench.paintTabs(this.session);
     return this.workbench.select(tab.id);
   }
   async create(temporary = false) {
@@ -73,7 +92,7 @@ class SideChatPanel {
       if (this.disposed) return;
       const listed=this.chats?.find(chat=>chat.id===result.id);
       const opening=this.workbench.isVisible(this.session,this.tab)?this.open({...listed,...result}):null;
-      await Promise.all([this.load(),opening]);
+      await Promise.all([this.load({refresh:true}),opening]);
     } catch (error) {
       if (!this.disposed) {
         this.status.textContent='';
@@ -100,7 +119,7 @@ class SideChatPanel {
       try {
         if (this.workbench.current === this.session) await this.workbench.close('child:' + chat.id);
       } finally { cleanup?.(); }
-      await this.load();
+      await this.load({refresh:true});
     } catch (error) { if (!this.disposed) this.status.textContent = BridgeI18n.t(error.message); }
     finally { this.ending = false; }
   }

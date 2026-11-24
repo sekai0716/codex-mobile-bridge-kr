@@ -25,7 +25,7 @@ async function prepare(page,initialRows=[]){
       });
       if(path.pathname.endsWith('/subagents'))return response({agents:[]});
       if(path.pathname.endsWith('/detail')){fixture.details.push(path.search);return response({version:Number(path.searchParams.get('version')),offset:0,text:'추론 요약 전체 내용',next:null,files:[]});}
-      if(path.pathname.endsWith('/send')){const body=JSON.parse(options.body);fixture.writes.push(body);return response({status:fixture.reply});}
+      if(path.pathname.endsWith('/send')){const body=JSON.parse(options.body);fixture.writes.push(body);return response({status:fixture.reply,queueOwner:fixture.queueOwner});}
       if(path.pathname.endsWith('/uploads')){
         const file=options.body,row={id:path.searchParams.get('id'),name:path.searchParams.get('name'),size:file.size,image:null};
         fixture.uploadWrites.push(row);return response(row);
@@ -294,18 +294,28 @@ test('side chats use individual tabs and still discover agents from the parent c
     const parent=f.meta.id,host='local',reply=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
     const one={id:'10000000-0000-4000-8000-000000000001',title:'자료 확인',attachedParentId:parent,host};
     const two={id:'10000000-0000-4000-8000-000000000002',title:'일정 확인',attachedParentId:parent,host};
-    f.sides=[one];f.rootAgents=[];
+    f.sides=[one];f.rootAgents=[];f.sideWrites=[];
     window.fetch=async(url,options={})=>{
       const path=new URL(url,location.origin),id=path.pathname.split('/')[3];
       if(path.pathname.endsWith('/side-chat')){
         if(options.body){f.sides.push(two);return reply({id:two.id,host,parentId:parent});}
-        return reply({parentId:parent,chats:f.sides});
+        const listing={parentId:parent,chats:[...f.sides]};
+        if(f.holdSideList){
+          f.holdSideList=false;
+          return new Promise(resolve=>{f.finishSideList=()=>resolve(reply(listing));});
+        }
+        return reply(listing);
       }
       if(path.pathname.endsWith('/subagents'))return reply({agents:id===parent?f.rootAgents:[]});
       const child=f.sides.find(chat=>chat.id===id);
       if(child&&path.pathname.endsWith('/timeline')){
         const attachedParent={id:parent,host,available:true};
-        return reply({...f.page(),rows:[],meta:{...f.meta,...child,attachedParent}});
+        return reply({...f.page(),rows:[],meta:{...f.meta,...child,attachedParent,access:{canSend:true}}});
+      }
+      if(child&&path.pathname.endsWith('/send')){
+        const body=JSON.parse(options.body);
+        f.sideWrites.push({id,text:body.text});
+        return reply({status:'accepted',id:body.id});
       }
       return original(url,options);
     };
@@ -318,15 +328,38 @@ test('side chats use individual tabs and still discover agents from the parent c
   await page.evaluate(()=>sendControlsFixture.rootAgents.push({id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',parentId:sendControlsFixture.meta.id,nickname:'Eve'}));
   await page.getByRole('button',{name:'자료 확인',exact:true}).click();
   const first=page.getByRole('tab',{name:'자료 확인',exact:true});
-  await expect(first).toHaveAttribute('aria-selected','true');await expect(page.locator('#chat-title')).toHaveText('자료 확인');await input.fill('사이드 초안');
-  await expect(page.getByRole('tab',{name:'Eve',exact:true})).toBeVisible();
+  const childInput=page.locator('.wb-child-view textarea');
   await expect(first).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#chat-title')).toHaveText('전송·추론 표시 검증');
+  await expect(childInput).toBeEnabled();await childInput.fill('사이드 초안');
+  // 대기 중인 부모의 하위 에이전트 목록은 10초 간격으로 갱신한다.
+  await expect(page.getByRole('tab',{name:'Eve',exact:true})).toBeVisible({timeout:15000});
+  await expect(first).toHaveAttribute('aria-selected','true');
+  // 생성 전 목록이 진행 중인 상태에서 ID만 들어 있는 생성 응답을 받는다.
+  await page.evaluate(()=>{sendControlsFixture.holdSideList=true;});
   await page.locator('.wb-tab[data-tab=sidechat] [role=tab]').click();
+  await page.waitForFunction(()=>typeof sendControlsFixture.finishSideList==='function');
   await page.locator('.wb-side-content .wb-toolbar button').first().click();
   await expect(page.getByRole('tab',{name:'일정 확인',exact:true})).toHaveAttribute('aria-selected','true');
-  await expect(page.locator('#chat-title')).toHaveText('일정 확인');
-  await expect(input).toHaveValue('');await first.click();await expect(input).toHaveValue('사이드 초안');
-  await main.click();await expect(input).toHaveValue('부모 초안');await expect(page.locator('.wb-float')).toHaveCount(0);
+  await expect(page.locator('#chat-title')).toHaveText('전송·추론 표시 검증');
+  await expect(childInput).toBeEnabled();
+  await expect(childInput).toHaveValue('');
+  await page.evaluate(async()=>{
+    sendControlsFixture.finishSideList();
+    await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
+  });
+  expect(await page.evaluate(()=>workbench.current.files.find(tab=>tab.sideChat).sideChat.chats.map(chat=>chat.title))).toEqual(['자료 확인','일정 확인']);
+  await first.click();await expect(childInput).toHaveValue('사이드 초안');
+  await page.locator('.wb-child-view button[type=submit]').click();
+  await expect(childInput).toHaveValue('');
+  expect(await page.evaluate(()=>sendControlsFixture.sideWrites)).toEqual([{id:'10000000-0000-4000-8000-000000000001',text:'사이드 초안'}]);
+  expect(await page.evaluate(()=>sendControlsFixture.writes)).toEqual([]);
+  if(await page.locator('#chat.wb-split').count()){
+    await expect(page.getByRole('button',{name:'메인 채팅',exact:true})).toBeVisible();
+  }else await main.click();
+  await expect(input).toBeVisible();
+  await expect(input).toHaveValue('부모 초안');
+  await expect(page.locator('.wb-float')).toHaveCount(0);
 });
 
 test('completed edit card wraps the selected file diff and keeps its original line numbers',async({page})=>{
@@ -628,17 +661,27 @@ test('native activity headings and permissions use requested Korean and switch b
     const name=workbench.raw(workbench.node('span','','접는 사람'));name.id='raw-filename-fixture';workbench.panel.append(label,name);
   });
   await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('명령을 실행함');
-  await page.evaluate(()=>{const f=sendControlsFixture;f.extraRows=[{key:'steer-event',order:3,role:'activity',kind:'steered',title:'steered',text:'unchanged tool output',version:1},{key:'approval-event',order:4,role:'activity',kind:'automaticApprovalReview',title:'automaticApprovalReview',text:'unchanged tool output',version:1}];chatTimeline.apply({...f.page(),sequence:2});f.update('active');});
+  await page.evaluate(()=>{
+    const f=sendControlsFixture;
+    f.extraRows=[
+      {key:'steer-event',order:3,role:'activity',kind:'steered',title:'steered',text:'unchanged tool output',version:1},
+      {key:'approval-event',order:4,role:'activity',kind:'automaticApprovalReview',title:'Automatic approval review',
+        reviewActionLabel:'git status',approvalReview:{id:'review-fixture',status:'inProgress'},text:'review rationale',version:1}
+    ];
+    chatTimeline.apply({...f.page(),sequence:2});f.update('active');
+  });
   await expect(page.locator('#working')).toHaveText('Codex 생각 중');
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('스티어링함');
-  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동 검토 중');
+  const review=page.locator('#messages [data-key=approval-event] summary');
+  await expect(review).toHaveText('git statusㆍ자동 검토 중');
   await page.evaluate(()=>{BridgeI18n.setLanguage('en');BridgeI18n.apply();chatTimeline.relabel();});
   await expect(page.locator('#messages [data-key=tool] summary')).toHaveText('Ran a command');
   await expect(page.locator('#messages [data-key=steer-event] summary')).toHaveText('Steered');
+  await expect(review).toHaveText('git statusㆍAuto-review in progress');
   await expect(page.locator('#localized-folder-fixture')).toHaveText('Folder');
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
   await page.evaluate(()=>{BridgeI18n.setLanguage('ko');BridgeI18n.apply();chatTimeline.relabel();});
-  await expect(page.locator('#messages [data-key=approval-event] summary')).toHaveText('자동 검토 중');
+  await expect(review).toHaveText('git statusㆍ자동 검토 중');
   await expect(page.locator('#localized-folder-fixture')).toHaveText('폴더');
   await expect(page.locator('#raw-filename-fixture')).toHaveText('접는 사람');
 });
@@ -831,4 +874,94 @@ test('original chat search paginates and ignores a result after the chat changes
   await page.evaluate(()=>threadLookup.open('queue'));
   await expect(dialog.locator('[data-id]')).toHaveCount(2);
   await expect(dialog.locator('[data-id="second"]')).toContainText('doc.md');
+});
+
+test('Codex queue count follows the original session across visibility, focus and send acknowledgements', async ({page}) => {
+  await page.clock.install();
+  await prepare(page);
+  await page.evaluate(() => {
+    const fixture = window.originalQueueFixture = {rows:[], reads:0, hidden:false, hold:false};
+    fixture.setRows = (...texts) => { fixture.rows = texts.map(text => ({id:text, text, attachments:[]})); };
+    fixture.setHidden = hidden => {
+      fixture.hidden = hidden;
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    Object.defineProperty(document, 'hidden', {get:() => fixture.hidden, configurable:true});
+    const request = threadLookup.request;
+    threadLookup.request = async (target, action, body, signal) => {
+      if (action !== 'original-queue') return request(target, action, body, signal);
+      fixture.reads++;
+      const result = {available:true, rows:fixture.rows};
+      if (fixture.hold) {
+        fixture.hold = false;
+        return new Promise(resolve => {
+          fixture.signal = signal;
+          fixture.release = () => resolve(result);
+        });
+      }
+      return result;
+    };
+    fixture.setRows('Codex 앱에서 대기 중인 메시지');
+    sendControlsFixture.update('active', {queueRevision:0});
+  });
+  const badge = page.locator('#queued .native-queue-count');
+  await page.clock.runFor(250);
+  await expect(badge).toHaveText('Codex 대기열 · 1');
+  const reads = await page.evaluate(() => originalQueueFixture.reads);
+  await page.evaluate(() => {
+    originalQueueFixture.setHidden(true);
+    originalQueueFixture.setRows();
+  });
+  await page.clock.runFor(11000);
+  expect(await page.evaluate(() => originalQueueFixture.reads)).toBe(reads);
+  await page.evaluate(() => originalQueueFixture.setHidden(false));
+  await page.clock.runFor(250);
+  await expect(badge).toHaveCount(0);
+
+  await page.evaluate(() => {
+    originalQueueFixture.setRows('Codex에서 추가한 첫 메시지', 'Codex에서 추가한 두 번째 메시지');
+    window.dispatchEvent(new Event('focus'));
+  });
+  await page.clock.runFor(250);
+  await expect(badge).toHaveText('Codex 대기열 · 2');
+  await badge.click();
+  const dialog = page.locator('dialog:has(#thread-lookup-title)');
+  await expect(dialog.locator('[data-id]')).toHaveCount(2);
+  await page.evaluate(() => originalQueueFixture.setRows('Codex에서 추가한 두 번째 메시지'));
+  await page.clock.runFor(3100);
+  await expect(dialog.locator('[data-id]')).toHaveCount(1);
+  await expect(badge).toHaveText('Codex 대기열 · 1');
+  await dialog.getByRole('button', {name:'닫기', exact:true}).click();
+
+  await page.evaluate(() => {
+    originalQueueFixture.setRows('Codex에서 추가한 두 번째 메시지', 'Bridge에서 보낸 대기 메시지');
+    sendControlsFixture.reply = 'queued';
+    sendControlsFixture.queueOwner = 'native';
+  });
+  await page.locator('#message').fill('Bridge에서 보낸 대기 메시지');
+  await page.locator('#send').click();
+  await expect.poll(() => page.evaluate(() => sendControlsFixture.writes.length)).toBe(1);
+  await page.clock.runFor(400);
+  await expect(badge).toHaveText('Codex 대기열 · 2');
+
+  await page.evaluate(() => {
+    originalQueueFixture.hold = true;
+    sendControlsFixture.update('active', {queueRevision:1});
+  });
+  await page.clock.runFor(250);
+  await page.waitForFunction(() => typeof originalQueueFixture.release === 'function');
+  await page.evaluate(() => {
+    originalQueueFixture.setRows('다른 계정의 대기 메시지');
+    const scope = threadLookup.scope;
+    threadLookup.scope = () => ({...scope(), key:'different-account'});
+    renderState(sendControlsFixture.meta);
+  });
+  await page.clock.runFor(250);
+  await expect(badge).toHaveText('Codex 대기열 · 1');
+  expect(await page.evaluate(() => originalQueueFixture.signal.aborted)).toBe(true);
+  await page.evaluate(() => originalQueueFixture.release());
+  await page.clock.runFor(250);
+  await expect(badge).toHaveText('Codex 대기열 · 1');
+  await badge.click();
+  await expect(dialog.locator('[data-id]')).toHaveText('다른 계정의 대기 메시지');
 });

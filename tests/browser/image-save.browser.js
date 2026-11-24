@@ -20,7 +20,7 @@ async function runImageSaveChecks(){
       check(save.querySelector('svg')&&save.getAttribute('aria-label')===BridgeI18n.t('로컬에 저장')&&!save.textContent,'save uses accessible icon only');
       const reuse=document.getElementById('image-preview-reuse'),reuseRect=reuse.getBoundingClientRect();
       const close=document.getElementById('image-preview-close').getBoundingClientRect(),title=document.getElementById('image-preview-title').getBoundingClientRect();
-      check(!reuse.hidden&&reuse.textContent===BridgeI18n.t('인용하다'),'short reference label');
+      check(!reuse.hidden&&reuse.textContent===BridgeI18n.t('인용'),'short reference label');
       check(close.right<=title.left&&title.right<=reuseRect.left&&reuseRect.right<=innerWidth,'header order fits without overlap');
       check(Math.abs(close.top+close.height/2-reuseRect.top-reuseRect.height/2)<1&&toolbar.children.length===3,'header stays one row');
       check(getComputedStyle(reuse).whiteSpace==='nowrap','reuse label stays horizontal');

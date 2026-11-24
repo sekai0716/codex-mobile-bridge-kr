@@ -8,6 +8,9 @@ class ThreadLookup {
     this.dialog.setAttribute('aria-labelledby', 'thread-lookup-title');
     document.body.append(this.dialog);
     this.dialog.addEventListener('close', () => { this.controller?.abort(); clearInterval(this.timer); });
+    const refreshQueue = () => this.refreshQueue();
+    document.addEventListener('visibilitychange', refreshQueue);
+    window.addEventListener('focus', refreshQueue);
   }
   node(tag, value, cls) {
     const node = document.createElement(tag);
@@ -91,60 +94,90 @@ class ThreadLookup {
   }
   async queue() {
     if (this.mode !== 'queue' || this.busy || !this.current()) return;
+    if (this.queueWatch?.key === this.target.key) return this.queueWatch.read();
     await this.read('original-queue', undefined, data => {
-      this.status.textContent = this.t(data.available ? 'Manage these queued messages in Codex.' : 'The original queue is unavailable on this connection.');
-      const signature = JSON.stringify([data.available,data.rows]);
-      if (this.signature === signature && this.list.children.length) return;
-      this.signature = signature; this.list.replaceChildren();
-      for (const row of data.rows) {
-        const entry = this.node('article', undefined, 'message-management-row'); entry.dataset.id = row.id;
-        const copy = this.node('div', undefined, 'message-management-copy');
-        copy.append(this.node('div', row.text, 'message-management-text'));
-        if (row.attachments.length) copy.append(this.node('small', row.attachments.join(' · ')));
-        entry.append(copy); this.list.append(entry);
-      }
-      if(data.available && !data.rows.length) this.list.append(this.node('p', this.t('대기 중인 메시지 없음')));
+      if (this.queueWatch?.key !== this.target.key) this.paintQueue(data);
     });
   }
+  paintQueue(data) {
+    const rows = data.rows || [];
+    this.status.textContent = this.t(data.available ? 'Manage these queued messages in Codex.' : 'The original queue is unavailable on this connection.');
+    const signature = JSON.stringify([data.available,rows]);
+    if (this.signature === signature && this.list.children.length) return;
+    this.signature = signature; this.list.replaceChildren();
+    for (const row of rows) {
+      const entry = this.node('article', undefined, 'message-management-row'); entry.dataset.id = row.id;
+      const copy = this.node('div', undefined, 'message-management-copy');
+      copy.append(this.node('div', row.text, 'message-management-text'));
+      if (row.attachments.length) copy.append(this.node('small', row.attachments.join(' · ')));
+      entry.append(copy); this.list.append(entry);
+    }
+    if (data.available && !rows.length) this.list.append(this.node('p', this.t('대기 중인 메시지 없음')));
+  }
+  paintQueueCount(container, rows) {
+    container.querySelector('.native-queue-count')?.remove();
+    if (!rows.length) return;
+    const button = this.button('Codex queue', () => this.open('queue'));
+    button.classList.add('native-queue-count');
+    button.textContent += ' · ' + rows.length;
+    container.prepend(button);
+  }
+  refreshQueue() {
+    this.queueWatch?.refresh();
+  }
   watch(view, container) {
-    const target = this.scope();
+    const target = this.scope(), previous = this.queueWatch;
     if (!view?.connected || !target) {
-      clearTimeout(this.nextRead); this.watchKey = null; this.queueRows = [];
+      previous?.stop();
+      this.queueWatch = null;
+      this.paintQueueCount(container, []);
       return;
     }
     const revision = view.queueRevision || 0;
-    if (this.watchKey !== target.key) {
-      clearTimeout(this.nextRead); this.watchKey = target.key;
-      this.queueRows = []; this.readStamp = null;
+    const sameScope = previous?.key === target.key;
+    const rows = sameScope ? previous.rows : [];
+    this.paintQueueCount(container, rows);
+    if (sameScope && revision === previous.revision && view.status === previous.status) {
+      previous.container = container;
+      return;
     }
-    const render = () => {
-      container.querySelector('.native-queue-count')?.remove();
-      if (!this.queueRows.length || this.scope()?.key !== target.key) return;
-      const button = this.button('Codex queue', () => this.open('queue'));
-      button.classList.add('native-queue-count'); button.textContent += ' · ' + this.queueRows.length;
-      container.prepend(button);
+    previous?.stop();
+    let timer, pending;
+    const current = () => this.queueWatch === watch && this.scope()?.key === watch.key;
+    const stop = () => {
+      clearTimeout(timer);
+      pending?.abort();
+      pending = null;
     };
-    render();
-    const stamp = target.key + '/' + revision + '/' + view.status;
-    if (this.readStamp === stamp) return;
-    this.readStamp = stamp;
-    const poll = async () => {
-      if (this.readStamp !== stamp || this.watchKey !== target.key) return;
-      if (this.scope()?.key !== target.key || document.hidden) { this.readStamp = null; return; }
+    const read = async () => {
+      if (!current() || document.hidden || pending) return;
+      clearTimeout(timer);
+      const controller = pending = new AbortController();
+      const valid = () => current() && !controller.signal.aborted;
+      const dialogOpen = () => this.mode === 'queue' && this.current();
       try {
-        const data = await this.request(target, 'original-queue', undefined, undefined);
-        if (this.scope()?.key !== target.key || this.readStamp !== stamp || this.watchKey !== target.key) return;
-        this.queueRows = data.rows || []; render();
-        if (this.current() && this.mode === 'queue') this.queue();
-      } catch { /* The source may have gone away while a chat is still displayed. */ }
-      finally {
-        if (this.watchKey === target.key && this.readStamp === stamp) {
-          clearTimeout(this.nextRead);
+        const data = await this.request(target, 'original-queue', undefined, controller.signal);
+        if (!valid()) return;
+        watch.rows = data.rows || [];
+        this.paintQueueCount(watch.container, watch.rows);
+        if (dialogOpen()) this.paintQueue(data);
+      } catch (error) {
+        if (valid() && dialogOpen()) this.status.textContent = this.t(error.message);
+      } finally {
+        if (pending === controller) {
+          pending = null;
           // Desktop follower connections may not receive app-server-specific notifications.
-          if (view.status === 'active' || this.queueRows.length) this.nextRead = setTimeout(poll, 10000);
+          if (valid() && !document.hidden && (watch.status === 'active' || watch.rows.length)) {
+            timer = setTimeout(read, 10000);
+          }
         }
       }
     };
-    clearTimeout(this.nextRead); this.nextRead = setTimeout(poll, 125);
+    const refresh = () => {
+      stop();
+      if (current() && !document.hidden) timer = setTimeout(read, 125);
+    };
+    const watch = this.queueWatch = {key:target.key, revision, status:view.status, container, rows, read, stop, refresh};
+    refresh();
   }
 }

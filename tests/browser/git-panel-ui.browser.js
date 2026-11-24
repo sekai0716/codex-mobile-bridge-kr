@@ -11,7 +11,10 @@ async function runGitRepositorySelectionChecks(){
   const diff=repo=>({kind:'diff',path:entry.path,text:'--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+Changed in '+repo+'\n'});
   const wb={node:base.node.bind(base),button:base.button.bind(base),raw:base.raw.bind(base),notify(){},url:(s,operation,path='')=>'/synthetic/'+operation+'?path='+encodeURIComponent(path),request:async(url,params,signal)=>{
     const parsed=new URL(url,location.origin),action=parsed.pathname.split('/').at(-1),repository=params?.repository??parsed.searchParams.get('repository');calls.push({action,repository,params,signal});
-    if(action==='git-repositories')return {repositories:empty?[]:repositories,project:'/workspace'};
+    if(action==='git-repositories')return {
+      repositories:empty?[]:session.cwd==='/workspace'?repositories:[{path:'repo-c',name:'repo-c',root:'/moved/repo-c'}],
+      project:session.cwd
+    };
     if(action==='git-status')return {available:true,project:repository,branch:'main',commit:'1'.repeat(40),scope:'.',entries:[entry],version:'version-'+repository};
     if(action==='git-diff'){if(hold){hold=false;return new Promise(resolve=>finishDiff=resolve);}return {...diff(repository),section:parsed.searchParams.get('section'),hunks:['1'.repeat(64)],canDiscardHunk:true,version:'version-'+repository};}
     if(action==='git-history')return {commits:[{id:(repository==='repo-a'?'a':'b').repeat(40),subject:'Changes in '+repository,author:'Fixture',date:'2026-11-17T00:00:00Z',parents:[]}],hasMore:false};
@@ -34,6 +37,9 @@ async function runGitRepositorySelectionChecks(){
     check(body.querySelector('.wb-git-path strong').textContent===entry.path&&!body.querySelector('.wb-git-path file'),'file names remain literal text');
     const row=body.querySelector('.wb-git-file[data-section=unstaged]');hold=true;const old=panel.show(entry,'unstaged',row);await until(()=>finishDiff);
     picker().value='repo-b';picker().onchange();await until(()=>panel.state.project==='repo-b'&&body.querySelector('.wb-git-file'));
+    check(calls.filter(call=>call.action==='git-repositories').length===1
+      &&calls.filter(call=>call.action==='git-status').map(call=>call.repository).join(',')==='repo-a,repo-b',
+    'switching repositories reuses discovery and reads fresh status for the selected checkout');
     await panel.show(entry,'unstaged',body.querySelector('.wb-git-file[data-section=unstaged]'));finishDiff(diff('stale-repo-a'));await old;
     check(body.textContent.includes('Changed in repo-b')&&!body.textContent.includes('stale-repo-a'),'late diffs from the previous checkout cannot replace the current selection');
     body.querySelector('.wb-hunk-actions button:last-child').click();
@@ -43,7 +49,11 @@ async function runGitRepositorySelectionChecks(){
     await until(()=>!panel.busy&&body.querySelector('.wb-hunk-actions'));
     const staged=calls.find(call=>call.params?.action==='stage-hunk');
     check(staged.params.path===entry.path&&staged.params.hunk==='1'.repeat(64)&&staged.params.version==='version-repo-b'&&staged.params.repository==='repo-b','stage submits only the selected path, token, repository and reviewed version');
+    const beforeHistory=calls.length;
     body.querySelector('[data-git-mode=history]').click();await until(()=>body.querySelector('.wb-history-row'));
+    const historyReads=calls.slice(beforeHistory);
+    check(historyReads.map(call=>call.action).join(',')==='git-status,git-history'
+      &&historyReads.every(call=>call.repository==='repo-b'),'history reads fresh data without rediscovering repositories');
     body.querySelector('.wb-history-row').click();await until(()=>body.querySelector('.wb-history-diff-area .wb-diff-summary'));
     check(body.textContent.includes('Commit in repo-b')&&body.textContent.includes('Changed in repo-b'),'commit history, details and historical diff all use the selected checkout');
     check(!body.querySelector('.wb-hunk-actions'),'commit history exposes no worktree mutation controls');
@@ -72,10 +82,18 @@ async function runGitRepositorySelectionChecks(){
     for(const [lang,label]of [['ko','Git 저장소'],['en','Git repository'],['zh','Git 仓库']]){
       BridgeI18n.setLanguage(lang);await panel.load();check(picker().getAttribute('aria-label')===label&&picker().value==='repo-a','repository picker follows '+lang+' without changing the selection');
     }
-    empty=true;await panel.load();check(!picker()&&body.querySelector('.wb-status').textContent===BridgeI18n.t('No Git repository was found in this project.'),'missing repositories have a visible empty state without stale action controls');
+    empty=true;
+    const discoveries=calls.filter(call=>call.action==='git-repositories').length;
+    body.querySelector('.wb-git-head button').click();await until(()=>!picker()&&body.querySelector('.wb-status').textContent===BridgeI18n.t('No Git repository was found in this project.'));
+    check(calls.filter(call=>call.action==='git-repositories').length===discoveries+1,'manual refresh rediscovers removed repositories and clears stale actions');
     empty=false;BridgeI18n.setLanguage('ko');await panel.load();
     body.querySelector('[data-git-mode=history]').click();await until(()=>body.querySelector('.wb-history-row'));body.querySelector('.wb-history-row').click();await until(()=>body.querySelector('.wb-diff-summary'));
     check(root.scrollWidth<=root.clientWidth+1&&picker().getBoundingClientRect().width<=root.clientWidth,'repository selection and history fit the viewport');
+    session.cwd='/moved';
+    const beforeMove=calls.length;
+    body.querySelector('[data-git-mode=changes]').click();
+    await until(()=>panel.state.project==='repo-c'&&body.querySelector('.wb-git-file'));
+    check(picker().value==='repo-c'&&calls[beforeMove].action==='git-repositories','changing the chat directory invalidates repository discovery');
     return {width:innerWidth,passed:checks.length,checks};
   }finally{BridgeI18n.setLanguage(language);panel.dispose();}
 }

@@ -5,7 +5,7 @@ window.runChatTimeChecks=async function(){
   const actionsFollow=(node,label,action)=>{
     const bar=node.querySelector('.message-actions'),time=bar?.querySelector('time');
     check(bar?.firstElementChild?.textContent==='복사',label+' copy precedes timestamp');
-    check(bar?.children[1]?.textContent==='인용하다',label+' quote follows copy');
+    check(bar?.children[1]?.textContent==='인용',label+' quote follows copy');
     check(time&&bar.lastElementChild===time,label+' native timestamp is last');
     if(action)check(time.previousElementSibling?.textContent===action,label+' native action precedes timestamp');
     const before=time.previousElementSibling.getBoundingClientRect(),rect=time.getBoundingClientRect();
@@ -62,18 +62,27 @@ window.runChatTimeChecks=async function(){
     timeline.url=()=>'/synthetic/side-chat';timeline.apply({rows:[{...rows[1],text:'Side reply'}],meta:{},sequence:3,epoch:'side',before:null,hasMore:false},true);
     actionsFollow(container.querySelector('[data-key="reply"]'),'Native side chat','여기에서 분기');
   }finally{timeline.dispose();viewport.remove();}
-  const detail=document.createElement('div');detail.style.cssText='position:fixed;inset:0;overflow:auto;background:var(--page);z-index:10';document.body.append(detail);
-  const panel=Object.create(AgentsPanel.prototype);Object.assign(panel,{selected:{id:'child'},detail,session:{id:'parent',host:'local'},node:(tag,cls='',text='')=>{const node=document.createElement(tag);node.className=cls;node.textContent=text;return node;},button:(label,click)=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=click;return button;},workbench:{request:async()=>({turns:[{status:'completed',messages}],historyComplete:true})}});
+  const body=document.createElement('div');body.style.cssText='position:fixed;inset:0;overflow:auto;background:var(--page);z-index:10';document.body.append(body);
+  const session={id:'parent',host:'local',provider:'codex'},quoted=[];
+  const node=(tag,cls='',text='')=>{const element=document.createElement(tag);element.className=cls;element.textContent=text;return element;};
+  const workbench={node,current:session,quoteMessage:(...args)=>quoted.push(args),
+    button:(label,click)=>{const button=node('button','',label);button.type='button';button.onclick=click;return button;},
+    endpoint:(target,action)=>'/synthetic/'+target.id+'/'+action+'?host='+target.host,
+    request:async url=>{
+      check(url==='/synthetic/parent/subagents?host=local&id=child&live=1','Agent tab reads its parent and child identities');
+      return {id:'child',turns:[{id:'agent-turn',status:'completed',messages}],historyComplete:true};
+    }};
+  const panel=new AgentChat(workbench,session,{parentId:'parent',agent:{id:'child'},body}),detail=panel.detail;
   try{
-    await panel.readDetail();
+    panel.setVisible(true);
+    await new Promise(requestAnimationFrame);
     check(detail.querySelectorAll('time.message-time').length===2,'Subagent retains native timestamps without inventing old clocks');
     actionsFollow(detail.querySelector('.wb-agent-message'),'Subagent user');
     actionsFollow(detail.querySelectorAll('.wb-agent-message')[1],'Subagent assistant');
-    const quoted=[];panel.workbench.current=panel.session;panel.workbench.quoteMessage=(...args)=>quoted.push(args);
-    const quote=detail.querySelector('.message-quote');quote.disabled=false;quote.click();
+    const quote=detail.querySelector('.message-quote');quote.click();
     check(quoted.length===1&&quoted[0][0]==='Question'&&quoted[0][2].id==='parent'&&quoted[0][2].host==='local'&&quoted[0][2].provider==='codex','Subagent quote preserves full destination identity');
-    panel.workbench.current={};quote.click();
+    workbench.current={};quote.click();
     check(quoted.length===1,'Subagent stale session cannot quote into another chat');
-  }finally{panel.detailController?.abort();detail.remove();}
+  }finally{panel.dispose();body.remove();}
   return {providers:4};
 };

@@ -143,12 +143,17 @@ class IntegrationTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_live_read_send_same_thread_and_idempotence(self):
-        view = self.bridge.view(THREAD)
-        self.assertTrue(view['connected'])
-        self.assertEqual(view['provider'], 'custom-api')
+        # Desktop의 직접 입력과 Bridge의 입력이 하나의 소유자와 원래 대화에 쌓인다.
+        self.fixture.state['turns'] = [{'turnId': 'from-desktop', 'status': 'completed', 'items': [
+            {'id': 'user-desktop', 'type': 'userMessage', 'content': [{'type': 'text', 'text': 'from the app'}]}]}]
+        session = self.bridge.session(THREAD)
+        first = self.bridge.timeline_read(THREAD)
+        self.assertTrue(first['meta']['connected'])
+        self.assertEqual(first['meta']['provider'], 'custom-api')
+        self.assertEqual([row['text'] for row in first['rows']], ['from the app'])
         message_id = str(uuid.uuid4())
-        self.bridge.send(THREAD, 'hello', message_id)
-        self.bridge.send(THREAD, 'hello', message_id)
+        for _ in range(2):
+            self.assertEqual(self.bridge.send(THREAD, 'hello', message_id)['status'], 'accepted')
         calls = [r for r in self.fixture.requests if r['method'] == 'thread-follower-start-turn']
         self.assertEqual(len(calls), 1)
         call = calls[0]
@@ -159,6 +164,21 @@ class IntegrationTests(unittest.TestCase):
         self.assertNotIn('model', request)
         self.assertNotIn('modelProvider', request)
         self.assertTrue(call['params']['turnStart']['context']['inheritThreadSettings'])
+        self.fixture.state['turns'].extend([
+            {'turnId': 'from-bridge', 'status': 'completed', 'items': [
+                {'id': 'user-bridge', 'type': 'userMessage', 'content': request['input']}]},
+            {'turnId': 'desktop-again', 'status': 'completed', 'items': [
+                {'id': 'user-again', 'type': 'userMessage', 'content': [{'type': 'text', 'text': 'app still live'}]}]},
+        ])
+        self.fixture.revision += 1
+        self.fixture.snapshot()
+        with session.condition:
+            self.assertTrue(session.condition.wait_for(lambda: session.revision == self.fixture.revision, timeout=3))
+        latest = self.bridge.timeline_read(THREAD, 'changes', after=first['sequence'], epoch=first['epoch'], start=first['before'])
+        self.assertTrue(latest['meta']['connected'])
+        self.assertEqual([row['text'] for row in latest['rows']], ['hello', 'app still live'])
+        self.assertEqual(session.owner, 'owner')
+        self.assertEqual([r['method'] for r in self.fixture.requests], ['initialize', 'thread-follower-start-turn'])
 
     def test_desktop_router_restart_rediscovers_owner_without_restarting_gateway(self):
         session = self.bridge.session(THREAD)

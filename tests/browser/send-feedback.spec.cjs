@@ -1,6 +1,8 @@
 'use strict';
 const {test,expect}=require('@playwright/test');
 
+test.use({locale:'ko-KR'});
+
 test.beforeEach(async({context,request,baseURL})=>{
  await context.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
  expect(await(await request.get('/__fixture_health')).json()).toEqual({fixture:'cmb-browser-regression'});
@@ -12,17 +14,20 @@ for(const [provider,backend] of [['claude','code'],['claude','cowork'],['deepsee
   const root=document.createElement('div');root.className='app';root.id='send-feedback-root';root.style.cssText='position:fixed;inset:0;background:var(--page);z-index:10';document.body.append(root);
   const select=document.createElement('select');['codex','claude','deepseek'].forEach(id=>select.add(new Option(id,id)));
   const fixture=window.sendFeedbackFixture={writes:[],notices:[],finish:null};
-  const detail={session:{id:'feedback-test',title:'대화형 인증 보내기',backend,status:'idle',capabilities:{send:true,attachments:true,projectReferences:true}},messages:[{id:'reply',role:'assistant',text:'테스트 메시지를 보낼 수 있습니다。'}],connected:true};
+  fixture.detail={session:{id:'feedback-test',title:'대화형 인증 보내기',backend,status:'idle',capabilities:{send:true,attachments:true,projectReferences:true}},messages:[{id:'reply',role:'assistant',text:'테스트 메시지를 보낼 수 있습니다。'}],connected:true};
   const view=fixture.view=new DesktopSessionsView({root,select,notify:text=>fixture.notices.push(text),onSelect(){},csrf:()=>'',onUnauthorized(){},request:async(url,body)=>{
    if(body){fixture.writes.push(body);return new Promise(resolve=>fixture.finish=resolve);}
-   if(url.includes('/detail'))return detail;if(url.includes('/workspace'))return {entries:[],total:0,project:'/fixture'};
-   return {sessions:[detail.session]};
+   if(url.includes('/detail'))return fixture.detail;if(url.includes('/workspace'))return {entries:[],total:0,project:'/fixture'};
+   return {sessions:[fixture.detail.session]};
   }});
+  // 백그라운드 조회도 같은 최신 네이티브 상태를 읽도록 응답 원본을 함께 바꾼다.
+  fixture.publish=detail=>{fixture.detail=detail;view.applyDetail(detail);};
   await view.choose(provider);await view.open('feedback-test');clearTimeout(view.timer);
  },{provider,backend});
  const composer=page.locator('#send-feedback-root .ds-composer'),input=composer.locator('textarea'),send=composer.locator('button[type=submit]'),feedback=composer.locator('.ds-send-feedback');
- await input.fill('이 메시지의 전송 상태를 확인하고 아직 어떤 작업도 수행하지 마세요.。');await send.click();
- await expect(feedback).toBeVisible();await expect(feedback).toContainText('배상…');await expect(feedback).toContainText('이 메시지를 확인해주세요');await expect(send).toBeDisabled();
+ const message='이 메시지의 전송 상태를 확인하고 아직 어떤 작업도 수행하지 마세요.';
+ await input.fill(message);await send.click();
+ await expect(feedback).toBeVisible();await expect(feedback.getByRole('status')).toHaveText('전송 중…');await expect(feedback.locator('p')).toHaveText(message);await expect(send).toBeDisabled();
  expect(await page.evaluate(()=>sendFeedbackFixture.notices)).toEqual([]);
  for(const theme of ['light','dark']){
   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
@@ -41,24 +46,24 @@ for(const [provider,backend] of [['claude','code'],['claude','cowork'],['deepsee
  expect(await page.evaluate(()=>sendFeedbackFixture.notices.filter(value=>value==='채팅으로 보냈습니다').length)).toBe(1);
  // A successful submission is distinct from ongoing native work. The indicator
  // remains in the real chat timeline and never reuses the send acknowledgement.
- await page.evaluate(()=>{const v=sendFeedbackFixture.view;v.applyDetail({connected:true,session:{...v.state,status:'active',requests:[]},messages:v.historyMessages});});
+ await page.evaluate(()=>{const f=sendFeedbackFixture,v=f.view;f.publish({connected:true,session:{...v.state,status:'active',requests:[]},messages:v.historyMessages});});
  const progress=page.locator('#send-feedback-root .ds-messages .working');
- await expect(progress).toBeVisible();await expect(progress).toContainText('일하고 있는…');
+ await expect(progress).toBeVisible();await expect(progress).toContainText('생각 중');
  expect(await progress.evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
  await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-native-working.png`)});
  await page.evaluate(()=>sendFeedbackFixture.view.staleDetail());
  await expect(progress).toContainText('실행 상태를 일시적으로 사용할 수 없습니다.');
- await page.evaluate(()=>{const v=sendFeedbackFixture.view;v.applyDetail({connected:true,session:{...v.state,status:'idle',requests:[]},messages:v.historyMessages});});
+ await page.evaluate(()=>{const f=sendFeedbackFixture,v=f.view;f.publish({connected:true,session:{...v.state,status:'idle',requests:[]},messages:v.historyMessages});});
  await expect(progress).toBeHidden();
  const imageId='a'.repeat(64),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8XcAAAAASUVORK5CYII=','base64');
  await page.route('**/api/desktop-sessions/*/images/*',route=>route.fulfill({status:200,contentType:'image/png',body:png}));
- await page.evaluate(imageId=>{const v=sendFeedbackFixture.view;v.applyDetail({connected:true,session:v.state,messages:[{id:'history-image',role:'user',text:'',attachments:[{type:'image',name:'photo.png',desktopId:imageId}]}]});},imageId);
+ await page.evaluate(imageId=>{const f=sendFeedbackFixture;f.publish({connected:true,session:f.view.state,messages:[{id:'history-image',role:'user',text:'',attachments:[{type:'image',name:'photo.png',desktopId:imageId}]}]});},imageId);
  const image=page.locator('#send-feedback-root .attachment-image');await expect(image).toBeVisible();
  await expect.poll(()=>image.evaluate(node=>node.naturalWidth)).toBe(1);
  await image.click();await expect(page.locator('#image-preview-dialog')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath(`${provider}-${backend}-history-image.png`)});
  await page.keyboard.press('Escape');await expect(page.locator('#image-preview-dialog')).toBeHidden();
- await page.evaluate(()=>{const v=sendFeedbackFixture.view;document.documentElement.dataset.showProcess='true';v.applyDetail({connected:true,session:v.state,messages:[{id:'context',role:'activity',kind:'context',title:'문맥',text:'프로젝트 설명 및 자동 주입 내용'}]});});
+ await page.evaluate(()=>{const f=sendFeedbackFixture;document.documentElement.dataset.showProcess='true';f.publish({connected:true,session:f.view.state,messages:[{id:'context',role:'activity',kind:'context',title:'문맥',text:'프로젝트 설명 및 자동 주입 내용'}]});});
  const context=page.locator('#send-feedback-root .activity');await expect(context.locator('pre')).toBeHidden();await context.locator('summary').click();await expect(context.locator('pre')).toBeVisible();
  await page.evaluate(()=>{const v=sendFeedbackFixture.view;v.collapseComposer(true);v.workbench.request=async()=>({name:'photo.png',path:'images/photo.png',absolutePath:'/fixture/images/photo.png',size:4,kind:'file'});BridgeFileActions.menu(v.workbench,v.workbench.current,{name:'photo.png',path:'images/photo.png',kind:'file'});});
  await page.getByRole('button',{name:'메시지 내 참조',exact:true}).click();await expect(input).toBeVisible();await expect(input).toHaveValue('다음 초안');await expect(page.locator('#send-feedback-root .attachment-chip')).toContainText('photo.png');

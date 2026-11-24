@@ -111,6 +111,7 @@ class LiveSession:
         self.timeline_limit = 40
         self.timeline_source = None
         self.timeline_source_limit = None
+        self.timeline_source_anchor = None
         self.revision = None
         self.sequence = 0
         self.connected = False
@@ -160,10 +161,15 @@ class LiveSession:
     def timeline_view(self):
         # Presentation only. Actions still call view() against current state.
         with self.condition:
+            anchor = self.timeline.source_anchor
+            # 상태 변경은 changed()에서 캐시를 지운다. 같은 읽기 위치와 범위의
+            # 폴링은 원본 기록을 다시 훑지 않고 기존 표시 결과를 사용한다.
+            if (self.timeline_source is not None and self.timeline_source_limit == self.timeline_limit
+                    and self.timeline_source_anchor == anchor):
+                return dict(self.timeline_source)
             source = self.state if self.connected else self.history_state or self.state
             # Preserve the actual loaded anchor across appends, rather than
             # treating older Desktop hydration as newly appended messages.
-            anchor = self.timeline.source_anchor
             if anchor is not None:
                 after, found = 0, False
                 for turn in ordered_turns(source or {}):
@@ -189,6 +195,7 @@ class LiveSession:
             if self.timeline_source is None or self.timeline_source_limit != self.timeline_limit:
                 self.timeline_source = self.view(item_limit=self.timeline_limit, include_file_diffs=True)
                 self.timeline_source_limit = self.timeline_limit
+            self.timeline_source_anchor = anchor
             return dict(self.timeline_source)
 
     def set_history(self, state):

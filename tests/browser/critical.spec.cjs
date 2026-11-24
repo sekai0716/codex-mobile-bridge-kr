@@ -437,7 +437,7 @@ for(const provider of ['Codex','Claude','DSH']){
    await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
    await expect(box.getByRole('button',{name:'채팅 알림 설정',exact:true})).toBeVisible();
    await expect(box.getByRole('button',{name:'프로젝트 목록',exact:true})).toHaveCount(1);
-   await expect(box.getByRole('button',{name:'부분',exact:true})).toHaveCount(1);
+   await expect(box.getByRole('button',{name:'섹션',exact:true})).toHaveCount(1);
    await box.evaluate(node=>Promise.all(node.getAnimations().map(a=>a.finished)));
    await page.screenshot({path:testInfo.outputPath(provider+'-'+theme+'-list.png')});
    await box.getByRole('button',{name:'채팅 세부정보',exact:true}).click();
@@ -451,17 +451,19 @@ for(const provider of ['Codex','Claude','DSH']){
    await box.getByRole('textbox',{name:'채팅 이름',exact:true}).fill('이 이름을 저장하지 않고 돌아가기');
    await box.dispatchEvent('cancel',{cancelable:true});
    await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
-   for(const label of ['프로젝트 목록','부분']){
+   for(const [label,remove,input] of [['프로젝트 목록','프로젝트에서 제거','새 프로젝트 이름'],['섹션','섹션에서 삭제','새 섹션 이름']]){
     await box.getByRole('button',{name:label,exact:true}).click();
-    await expect(box.getByRole('button',{name:'예'+label,exact:true})).toBeVisible();
-    const local=provider==='Claude'||provider==='DSH'&&label==='부분';
+    const selected=box.getByRole('button',{name:remove+' ✓',exact:true});
+    await expect(selected).toBeVisible();
+    await expect(selected).toHaveAttribute('aria-pressed','true');
+    const local=provider==='Claude'||provider==='DSH'&&label==='섹션';
     await expect(box.getByText('Bridge에만 적용됩니다.',{exact:true})).toHaveCount(local?1:0);
-    await expect(box.getByRole('textbox',{name:label==='프로젝트 목록'?'새 프로젝트 이름':'새 섹션 이름',exact:true})).toHaveCount(local?1:0);
+    await expect(box.getByRole('textbox',{name:input,exact:true})).toHaveCount(local?1:0);
     await box.getByRole('button',{name:'채팅 메뉴로 돌아가기',exact:true}).click();
     await expect(box.locator('.sm-name strong')).toHaveText(provider+' · 페이지 대화형 검증');
    }
    await box.getByRole('button',{name:'중지하고 보관처리하세요…',exact:true}).click();
-   const confirm=box.getByRole('button',{name:'아카이브 확인',exact:true}),cancel=box.getByRole('button',{name:'취소',exact:true});
+   const confirm=box.getByRole('button',{name:'보관 확인',exact:true}),cancel=box.getByRole('button',{name:'취소',exact:true});
    await expect(cancel).toBeFocused();
    const left=await confirm.boundingBox(),right=await cancel.boundingBox();
    expect(left.x).toBeLessThan(right.x);expect(Math.abs(left.width-right.width)).toBeLessThan(1);expect(left.height).toBe(right.height);
@@ -528,7 +530,7 @@ test('reset outlook is opt-in and fits both themes',async({page},testInfo)=>{
     accountsPanel.accept(value);
     document.getElementById('accounts-dialog').showModal();
   });
-  await expect(page.locator('label:has(#appearance-reset-dynamic)')).toHaveText('Codex 공식 재설정 업데이트');
+  await expect(page.locator('label:has(#appearance-reset-dynamic)')).toHaveText('Codex 한도 초기화 소식 표시');
   const card=page.locator('.accounts-global-reset');
   for(const theme of ['light','dark']){
     await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
@@ -536,12 +538,12 @@ test('reset outlook is opt-in and fits both themes',async({page},testInfo)=>{
     await expect(card).toContainText('제3자 통계 및 예측');
     await expect(card).toContainText('24%');
     await expect(card).toContainText('48%');
-    await expect(card.getByRole('button',{name:'업데이트 알림 재설정 활성화'})).toHaveAttribute('aria-pressed','false');
+    await expect(card.getByRole('button',{name:'한도 초기화 소식 알림 켜기'})).toHaveAttribute('aria-pressed','false');
     await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 꺼짐');
-    await card.getByRole('button',{name:'업데이트 알림 재설정 활성화'}).click();
+    await card.getByRole('button',{name:'한도 초기화 소식 알림 켜기'}).click();
     await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 켜짐');
-    await expect(card.getByRole('button',{name:'업데이트 알림 재설정 비활성화'})).toHaveAttribute('aria-pressed','true');
-    await card.getByRole('button',{name:'업데이트 알림 재설정 비활성화'}).click();
+    await expect(card.getByRole('button',{name:'한도 초기화 소식 알림 끄기'})).toHaveAttribute('aria-pressed','true');
+    await card.getByRole('button',{name:'한도 초기화 소식 알림 끄기'}).click();
     await expect(card.locator('.accounts-global-reminder')).toHaveText('알림 꺼짐');
     const bounds=await card.boundingBox();
     expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -851,10 +853,10 @@ test('inline account connection methods confirm switches and keep normal lists q
  const layout=await options.evaluate(node=>{const box=node.getBoundingClientRect(),buttons=[...node.children].map(button=>button.getBoundingClientRect());return {sameRow:Math.abs(buttons[0].top-buttons[1].top)<1,fits:buttons.every(b=>b.left>=box.left&&b.right<=box.right+1),labels:[...node.children].map(b=>b.textContent)};});
  expect(layout.sameRow).toBe(true);expect(layout.fits).toBe(true);expect(layout.labels).toEqual(['로컬 연결','공식 원격 연결']);
  await testInfo.attach('inline-account-methods',{body:await page.locator('dialog[open]').screenshot(),contentType:'image/png'});
- await official.click();const confirm=page.locator('.client-disable-dialog');await expect(confirm).toBeVisible();await expect(confirm).toContainText('애플리케이션 접근 방법 전환');await expect(confirm).toContainText('컴퓨터를 종료하거나 다시 시작하지 않습니다. App');expect(writes).toHaveLength(0);
+ await official.click();const confirm=page.locator('.client-disable-dialog');await expect(confirm).toBeVisible();await expect(confirm).toContainText('앱 연결 방법을 전환하시겠습니까?');await expect(confirm).toContainText('데스크톱 앱을 종료하거나 다시 시작하지 않고도');expect(writes).toHaveLength(0);
  await confirm.getByRole('button',{name:'취소',exact:true}).click();expect(writes).toHaveLength(0);await expect(local).toHaveAttribute('aria-pressed','true');
  await official.click();await expect(confirm).toBeVisible();await testInfo.attach('mode-switch-confirmation',{body:await confirm.screenshot(),contentType:'image/png'});
- await confirm.getByRole('button',{name:'스위치 확인',exact:true}).click();await expect(official).toHaveAttribute('aria-pressed','true');expect(writes).toEqual([{provider:'zcode',enabled:true,connectionMode:'official-remote'}]);await expect(page.locator('dialog[open]')).toHaveCount(1);
+ await confirm.getByRole('button',{name:'전환 확인',exact:true}).click();await expect(official).toHaveAttribute('aria-pressed','true');expect(writes).toEqual([{provider:'zcode',enabled:true,connectionMode:'official-remote'}]);await expect(page.locator('dialog[open]')).toHaveCount(1);
  await page.evaluate(()=>document.querySelector('dialog[open]').close());
  await page.evaluate(()=>clientNavigation.applyClients({clients:clientNavigation.clients.map(row=>row.id==='zcode'?{...row,connected:false,retryable:true,setupStatus:'needs-retry',reason:'테스트 연결 해제 프롬프트'}:row)}));
  await expect(page.locator('.ds-list-status')).toContainText('테스트 연결 해제 프롬프트');await expect(page.locator('.ds-list-status')).toBeVisible();
@@ -1067,7 +1069,7 @@ test('Antigravity desktop management configures existing models and approvals pe
  const panel=page.locator('[data-antigravity-management]');await expect(panel.locator(':scope > [role=status]')).toContainText('원주민 역사 사용 가능 · 기본 서비스가 연결되지 않았습니다');
  await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeDisabled();await panel.getByLabel('세션 소스',{exact:true}).selectOption('cli');await expect(panel.getByLabel('채팅',{exact:true})).toHaveValue('cli-session');
  await panel.getByLabel('모델',{exact:true}).selectOption('cli-model');await panel.getByRole('button',{name:'애플리케이션 모델',exact:true}).click();
- await page.evaluate(()=>window.__agyModelsFail=true);await panel.getByRole('button',{name:'모델 새로 고침',exact:true}).click();await expect(panel.locator('.project-picker-models [role=status]')).toContainText('모델을 수동으로 채울 수 있습니다.');await panel.getByLabel('모델',{exact:true}).selectOption('__manual__');await panel.getByLabel('수동으로 모델 입력',{exact:true}).fill('MODEL_PLACEHOLDER_M525');await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'애플리케이션 모델',exact:true}).click();await expect(panel.getByLabel('수동으로 모델 입력',{exact:true})).toHaveValue('MODEL_PLACEHOLDER_M525');
+ await page.evaluate(()=>window.__agyModelsFail=true);await panel.getByRole('button',{name:'모델 새로 고침',exact:true}).click();await expect(panel.locator('.project-picker-models [role=status]')).toContainText('모델 ID를 직접 입력할 수 있습니다.');await panel.getByLabel('모델',{exact:true}).selectOption('__manual__');await panel.getByLabel('모델 직접 입력',{exact:true}).fill('MODEL_PLACEHOLDER_M525');await expect(panel.getByRole('button',{name:'애플리케이션 모델',exact:true})).toBeEnabled();await panel.getByRole('button',{name:'애플리케이션 모델',exact:true}).click();await expect(panel.getByLabel('모델 직접 입력',{exact:true})).toHaveValue('MODEL_PLACEHOLDER_M525');
  await panel.getByLabel('승인방법',{exact:true}).selectOption('mobile-ask');await panel.getByRole('button',{name:'신청 승인 방법',exact:true}).click();await expect(panel.getByLabel('승인방법',{exact:true})).toHaveValue('mobile-ask');
  await page.screenshot({path:path.join(root,'.tmp/feedback-20261110/agy-'+info.project.name+'-management-'+page.viewportSize().width+'.png'),fullPage:true});
  const writes=await page.evaluate(()=>testCalls.filter(row=>['settings','access'].includes(row.operation)));expect(writes.map(row=>row.surface)).toEqual(['cli','cli','cli']);expect(writes.map(row=>row.sessionId)).toEqual(['cli-session','cli-session','cli-session']);expect(writes[0].modelCatalogIdentity).toBe('cli-account');expect(writes[1]).toMatchObject({model:'MODEL_PLACEHOLDER_M525',manualModel:true,modelCatalogIdentity:'cli-account'});expect(await page.evaluate(()=>testCalls.some(row=>row.action==='accounts'))).toBe(false);

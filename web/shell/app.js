@@ -1592,6 +1592,8 @@ $('composer').onsubmit=async event=>{
     const result=await api(sessionUrl(target,'send',targetHost),{...body,id:pending.id});
     if(result.status==='ignored')throw Error(t('이 확인되지 않은 기록은 무시되었습니다. 다시 보내기 전에 메시지를 새로 고치고 편집하세요.'));
     if(result.status==='unknown')throw Error(t('메시지가 전달되었을 수 있습니다. 채팅 기록을 확인하세요. 다시 클릭하면 두 번 제출되지 않습니다.'));
+    if(result.queueOwner==='native'&&currentId===target&&currentHost===targetHost&&
+        scope?.account===codexDraftScope?.account&&scope?.gateway===draftGateway)threadLookup?.refreshQueue();
     bumpRecency(target,targetHost);
     const sameRevision=usedDurable?composerDrafts.load(scope)?.revision===revision:$('message').value===rawText&&JSON.stringify(codexQuotes?.quotes||[])===submittedQuotes;
     let confirmed=usedDurable?await composerDrafts.settleSend(scope,pending.id,attempt,'confirm',revision):false;
