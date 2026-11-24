@@ -7,6 +7,7 @@ import os
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -35,7 +36,10 @@ class AdapterLifecycleTests(unittest.TestCase):
         self.config = {'home': str(self.home), 'cli': '/fixture/launcher'}
         self.app = {'pid': 11, 'parent': 1, 'image': '/fixture/app'}
         self.adapter = {'pid': os.getpid(), 'parent': 11, 'image': '/fixture/adapter'}
-        self.child = {'pid': 22, 'parent': os.getpid(), 'image': '/fixture/launcher'}
+        birth = ({'bootId': str(uuid.uuid4()), 'startTicks': 1234} if sys.platform == 'linux'
+                 else {'birth': [1, 2], 'started': [3, 4]})
+        self.child = {'pid': 22, 'parent': os.getpid(), 'image': '/fixture/launcher',
+                      'uid': 501, 'ruid': 501, **birth}
         self.native = Mock(pid=22, returncode=0)
         self.native.poll.return_value = None
         self.native.wait.side_effect = subprocess.TimeoutExpired('native', 25)
@@ -77,8 +81,7 @@ class AdapterLifecycleTests(unittest.TestCase):
         self.native.kill.assert_not_called()
         # Exec before readiness does not make the still-running child replaceable.
         current = {**record['runtime'], 'image': '/fixture/CodexCLI.app/codex',
-                   'parent': 1, 'birth': [1, 2], 'started': [3, 4], 'uid': 501, 'ruid': 501}
-        record['runtime'].update({key: current[key] for key in ('birth', 'started', 'uid', 'ruid')})
+                   'parent': 1}
         with patch.object(runtime, 'process_identity', return_value=current):
             with self.assertRaisesRegex(ValueError, '尚未退出'):
                 runtime.require_inactive(record)

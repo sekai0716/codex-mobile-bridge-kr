@@ -13,6 +13,19 @@ test('language normalization and error translation preserve unknown details',()=
   assert.equal(i18n.translate('C:\\private\\알려지지 않은.log','en'),'C:\\private\\알려지지 않은.log');
 });
 
+test('desktop HTML loads the language packs before the translation engine',()=>{
+  const fs=require('node:fs'),vm=require('node:vm');
+  const desktop=path.join(__dirname,'../desktop');
+  const html=fs.readFileSync(path.join(desktop,'index.html'),'utf8');
+  const context=vm.createContext({});
+  for(const [,source] of html.matchAll(/<script\s+src="([^"]+)"/g)){
+    if(!source.startsWith('../web/shared/locales/')&&source!=='../web/shared/i18n.js')continue;
+    vm.runInContext(fs.readFileSync(path.join(desktop,source),'utf8'),context,{filename:source});
+  }
+  assert.equal(vm.runInContext("BridgeI18n.translateTo('보조 채팅','ko')",context),'사이드 채팅');
+  assert.equal(vm.runInContext("BridgeI18n.translateTo('보조 채팅','zh')",context),'侧边聊天');
+});
+
 test('tray prefers public HTTPS and rejects non-web addresses',()=>{
   assert.equal(primaryUrl(['file:///private','http://127.0.0.1:8787','http://192.168.1.2:8787']),'http://192.168.1.2:8787');
   assert.equal(primaryUrl(['http://192.168.1.2:8787','https://example.com']),'https://example.com');

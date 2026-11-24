@@ -146,7 +146,7 @@ class NativeSidebarRegistration(unittest.TestCase):
         with patch('bridge.app.service.open_project_in_desktop') as launch, \
              patch('bridge.app.service.time', clock), \
              patch('bridge.app.service.create_empty') as create:
-            with self.assertRaisesRegex(CreationError, '尚未创建聊天'):
+            with self.assertRaisesRegex(CreationError, r'채팅이 생성되지 않았습니다\.'):
                 self.bridge.create_chat(self.project['key'], 'Chat', self.rid)
             launch.assert_called_once()
             create.assert_not_called()
