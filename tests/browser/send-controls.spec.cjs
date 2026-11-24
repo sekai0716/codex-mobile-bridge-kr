@@ -659,6 +659,7 @@ test('a real file over 20 MiB reaches upload and the original attachment ID reac
 });
 
 test('queue card opens its own editor and saving preserves order, attachment and composer draft',async({page})=>{
+  await page.setViewportSize({...page.viewportSize(),height:510});
   await prepare(page);const id='33333333-3333-4333-8333-333333333333';
   await page.evaluate(id=>{
     const f=sendControlsFixture;f.managedQueue=[{id,text:'수정 전 대기 메시지',status:'queued',attachments:['original.txt']},{id:'44444444-4444-4444-8444-444444444444',text:'다음 메시지',status:'queued'}];
@@ -669,7 +670,13 @@ test('queue card opens its own editor and saving preserves order, attachment and
   await expect(card.getByRole('button',{name:/철회/})).toHaveCount(0);await card.getByRole('button',{name:'다시 편집',exact:true}).click();
   const dialog=page.locator('.message-management');const editor=dialog.getByRole('textbox',{name:'대기 중인 메시지 편집'});
   await expect(editor).toHaveValue('수정 전 대기 메시지');await expect(page.locator('#message')).toHaveValue('지금 작성 중인 초안');
-  await editor.fill('수정한 대기 메시지');await dialog.getByRole('button',{name:'저장',exact:true}).click();
+  await expect(editor).toBeInViewport({ratio:.75});
+  await editor.fill('수정한 대기 메시지');
+  await dialog.getByRole('button',{name:'닫기',exact:true}).click();
+  await card.getByRole('button',{name:'다시 편집',exact:true}).click();
+  await expect(editor).toHaveValue('수정한 대기 메시지');
+  await expect(editor).toBeInViewport({ratio:.75});
+  await dialog.getByRole('button',{name:'저장',exact:true}).click();
   await expect(editor).toHaveCount(0);
   expect(await page.evaluate(()=>sendControlsFixture.managedQueue.map(row=>({id:row.id,text:row.text,attachments:row.attachments})))).toEqual([{id,text:'수정한 대기 메시지',attachments:['original.txt']},{id:'44444444-4444-4444-8444-444444444444',text:'다음 메시지',attachments:undefined}]);
   const writes=await page.evaluate(()=>sendControlsFixture.edits);expect(writes).toHaveLength(1);expect(writes[0].id).toBe(id);expect(writes[0].action).toBe('edit');

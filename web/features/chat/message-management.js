@@ -33,7 +33,7 @@ class MessageManagement {
     if(typeof editId!=='string'||!loaded||!this.current(visible))return;
     if(this.editor){
       if(this.editor.sourceId!==editId)this.status.textContent=this.t('현재 편집 내용을 먼저 완료하거나 삭제합니다.');
-      this.editInput?.focus({preventScroll:true});return;
+      this.focusEditor();return;
     }
     const row=this.data.queue?.find(item=>item.id===editId);
     if(!row){this.status.textContent=this.t('이 메시지는 전송 중이거나 더 이상 대기 중이 아닙니다.');return;}
@@ -45,7 +45,9 @@ class MessageManagement {
   async refresh(quiet=false){
     if(this.busy||this.drag)return;
     if(quiet&&(this.refreshing||this.locked()||this.doc.hidden||!this.dialog.open))return;
-    const token=this.generation,request=this.refreshGeneration=(this.refreshGeneration||0)+1,editor=this.editor,scroll=this.scrollEpoch||0;const valid=()=>this.current(token)&&request===this.refreshGeneration&&!this.busy&&!this.drag&&this.editor===editor&&(this.scrollEpoch||0)===scroll;
+    const token=this.generation,request=this.refreshGeneration=(this.refreshGeneration||0)+1,editor=this.editor,scroll=this.scrollEpoch||0;
+    // Reopening can reset the scroll position while the first queue read is in flight.
+    const valid=()=>this.current(token)&&request===this.refreshGeneration&&!this.busy&&!this.drag&&this.editor===editor&&(!quiet||(this.scrollEpoch||0)===scroll);
     this.refreshing=request;if(!quiet)this.status.textContent=this.t('正在读取消息…');
     try{
       const records=await this.localRecords(this.target),ids=records.map(r=>r.id);if(this.editor?.id)ids.push(this.editor.id);
@@ -68,7 +70,7 @@ class MessageManagement {
     finally{if(this.refreshing===request)this.refreshing=null;}
   }
   // Background state must not replace an actively edited list or its scroll position.
-  update(){if(this.dialog.open&&!this.locked())return this.refresh();}
+  update(){if(this.dialog.open&&!this.locked())return this.refresh(true);}
   persistEditor(value){const target=this.cloneValue(this.target),snapshot=this.cloneValue(value);this.editorSave=Promise.resolve(this.editorSave).catch(()=>{}).then(async()=>{await this.saveEditor(target,snapshot,this.persistedEditor??null);this.persistedEditor=this.cloneValue(snapshot);});return this.editorSave;}
   async action(callback){
     if(this.busy||this.drag)return;this.busy=true;this.closeButton.disabled=true;this.refreshButton.disabled=true;this.content.inert=true;this.status.textContent='';
@@ -134,7 +136,12 @@ class MessageManagement {
     const ok=await this.action(async()=>{
       const editor={id:row.id,sourceId:row.id,baseVersion:this.data.version,originalText:row.text||'',body:this.cloneValue(row),status:'editing',operation:'edit'};
       await this.persistEditor(editor);this.editor=editor;
-    });if(ok){this.render();this.editInput?.focus({preventScroll:true});}
+    });if(ok){this.render();this.focusEditor();}
+  }
+  focusEditor(){
+    if(!this.editInput?.isConnected)return;
+    this.editInput.focus({preventScroll:true});
+    this.editInput.closest('section').scrollIntoView({block:'nearest',inline:'nearest'});
   }
   editApplied(data,editor){
     if(editor?.operation!=='edit'||!editor.attempt)return false;

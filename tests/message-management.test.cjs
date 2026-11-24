@@ -47,8 +47,18 @@ test('a read already in flight cannot replace queue DOM after a drag starts',asy
 test('an older read cannot overwrite a newer queue snapshot',async()=>{
  const {m}=fixture(),finish=[];m.localRecords=async()=>[];m.load=()=>new Promise(resolve=>finish.push(resolve));const first=MessageManagement.prototype.refresh.call(m);await settle();const second=MessageManagement.prototype.refresh.call(m);await settle();finish[1]({version:'new',queue:[],receipts:[]});await second;finish[0]({version:'old',queue:[],receipts:[]});await first;assert.equal(m.data.version,'new');assert.equal(m.renders,1);
 });
-test('scroll interaction suppresses background refresh and discards an in-flight DOM replacement',async()=>{
- const {m}=fixture();let finish;m.scrollingUntil=Date.now()+500;let reads=0;m.refresh=()=>reads++;m.update();assert.equal(reads,0);m.scrollingUntil=0;m.localRecords=async()=>[];m.load=()=>new Promise(resolve=>finish=resolve);const request=MessageManagement.prototype.refresh.call(m);await settle();m.scrollEpoch=1;finish({version:'v2',queue:[],receipts:[]});await request;assert.equal(m.renders,undefined);
+test('scroll invalidates a background read but lets an explicit queue refresh finish',async()=>{
+ const {m}=fixture();m.doc={hidden:false};m.scrollingUntil=Date.now()+500;
+ const updates=[];m.refresh=quiet=>updates.push(quiet);
+ m.update();assert.deepEqual(updates,[]);
+ m.scrollingUntil=0;m.update();assert.deepEqual(updates,[true]);
+ let finish;m.localRecords=async()=>[];m.load=()=>new Promise(resolve=>finish=resolve);
+ const background=MessageManagement.prototype.refresh.call(m,true);await settle();
+ m.scrollEpoch=1;finish({version:'v2',queue:[],receipts:[]});await background;
+ assert.equal(m.renders,undefined);
+ const foreground=MessageManagement.prototype.refresh.call(m);await settle();
+ m.scrollEpoch=2;finish({version:'v3',queue:[],receipts:[]});await foreground;
+ assert.equal(m.data.version,'v3');assert.equal(m.renders,1);
 });
 
 test('entering edit is local-only and saving updates the original ID with text only',async()=>{
