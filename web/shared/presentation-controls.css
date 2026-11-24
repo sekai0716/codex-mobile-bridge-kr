@@ -115,7 +115,7 @@ body:has(#app:not([hidden]))>.phone-header{display:none}
 .composer-context-group>:is(.fast-mode-toggle,.account-usage){border:0}
 .composer-context-group>.fast-mode-toggle{flex:none;width:28px;min-width:28px;padding:5px}
 .composer-context-group>.context-usage{min-width:26px;padding:4px}
-.composer-context-group>.account-usage{display:block;flex:none;min-width:28px;max-width:none;padding:5px 4px;white-space:nowrap;font-size:10px;font-variant-numeric:tabular-nums}
+.composer-context-group>.account-usage{display:block;flex:none;min-width:28px;max-width:none;padding:5px 4px;white-space:nowrap;font-size:11px;font-variant-numeric:tabular-nums}
 .chat-progress>i{flex:none}
 @media(max-width:350px){.composer-tools:has(>.composer-context-group)>.tool-button{font-size:10px;padding-inline:3px}}
 .context-usage-ring{display:block;width:17px;height:17px;border-radius:50%;background:conic-gradient(var(--green) var(--context-percent,0%),var(--line) 0);mask:radial-gradient(circle,transparent 46%,#000 50%);-webkit-mask:radial-gradient(circle,transparent 46%,#000 50%)}

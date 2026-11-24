@@ -844,6 +844,46 @@ test('account quota keeps all toolbar buttons on one row and exposes refresh and
   await page.evaluate(()=>{currentHost='wsl:fixture';sendControlsFixture.update('active');});await expect(quota).toBeHidden();
 });
 
+test.describe('touch composer',()=>{
+  test.use({hasTouch:true,isMobile:true});
+
+  test('weekly usage fits before the collapse button at touch viewport widths',async({page})=>{
+    await prepare(page);
+    await page.evaluate(async()=>{
+      document.documentElement.classList.add('bridge-mobile');
+      sendControlsFixture.quotaWindows=[{windowDurationMins:10080,remainingPercent:100,resetsAt:1800500000}];
+      await accountUsageControl.refresh(true);
+      sendControlsFixture.update('active');
+    });
+    await page.locator('#message').fill('터치 화면 검증');
+    const quota=page.locator('#composer .account-usage');
+    await expect(quota).toHaveText('주간 100%');
+    for(const width of [844,390,320]){
+      await page.setViewportSize({width,height:480});
+      const layout=await quota.evaluate(button=>{
+        const group=button.closest('.composer-context-group');
+        const toolbar=group.closest('.toolbar-right');
+        const collapse=toolbar.querySelector('[data-composer-tool=collapse]');
+        const badge=button.getBoundingClientRect();
+        const row=toolbar.getBoundingClientRect();
+        return {
+          touch:matchMedia('(pointer: coarse)').matches,
+          fitsGroup:badge.right<=group.getBoundingClientRect().right+1,
+          fitsToolbar:badge.left>=row.left-1&&badge.right<=row.right+1,
+          beforeCollapse:badge.right<=collapse.getBoundingClientRect().left+1,
+          scrolls:toolbar.scrollWidth>toolbar.clientWidth+1
+        };
+      });
+      expect(layout,`weekly limit at ${width}px`).toEqual({
+        touch:true,fitsGroup:true,fitsToolbar:true,beforeCollapse:true,scrolls:false
+      });
+      await expect(quota).toHaveCSS('font-size','11px');
+    }
+    await quota.tap();
+    await expect(page.locator('.account-usage-dialog')).toContainText('재설정 시간:');
+  });
+});
+
 test('settings keep translation keys and edits when returning from Chinese to Korean or English',async({page})=>{
   await prepare(page);await page.locator('#message').fill('언어를 바꿔도 남길 초안');
   await page.evaluate(()=>document.getElementById('appearance-dialog').showModal());
